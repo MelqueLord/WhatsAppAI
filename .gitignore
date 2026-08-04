@@ -1,0 +1,17 @@
+bin/
+obj/
+packages/
+TestResults/
+coverage/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example

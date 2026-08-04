@@ -10,7 +10,7 @@
 
 ## Fase 0 — Bootstrap e qualidade
 
-- [ ] **T001** Criar solution .NET 10, `global.json` e projetos do plano. **Refs:** NFR-007, R-001, ADR-0001. **Paths:** `WhatsAppAI.sln`, `global.json`, `src/*/*.csproj`, `tests/*/*.csproj`. **Depends:** nenhuma. **Aceite:** SDK fixado; restore e build da solution vazia passam sem warnings do projeto.
+- [X] **T001** Criar solution .NET 10, `global.json` e projetos do plano. **Refs:** NFR-007, R-001, ADR-0001. **Paths:** `WhatsAppAI.sln`, `global.json`, `src/*/*.csproj`, `tests/*/*.csproj`. **Depends:** nenhuma. **Aceite:** SDK fixado; restore e build da solution vazia passam sem warnings do projeto.
 - [ ] **T002** Criar React 19.2 + TypeScript + Vite. **Refs:** US-002, US-003, US-005, US-006, R-002. **Paths:** `apps/web/package.json`, `apps/web/src/`, lockfile. **Depends:** nenhuma. **Aceite:** dependências fixadas; lint, teste e build da SPA vazia passam.
 - [ ] **T003** Configurar PostgreSQL 18 no Docker Compose e EF Core/Npgsql, sem criar migration. **Refs:** NFR-007, NFR-009, R-003, ADR-0005. **Paths:** `compose.yaml`, `src/WhatsAppAI.Infrastructure/`, configuração local da WebApi. **Depends:** T001. **Aceite:** PostgreSQL sobe, readiness passa e DbContext conecta sem schema de negócio/migration antecipada.
 - [ ] **T004** [P] Configurar formatadores, analyzers, nullable, warnings e testes de arquitetura. **Refs:** NFR-006, NFR-008, FR-004. **Paths:** `.editorconfig`, `Directory.Build.props`, `tests/WhatsAppAI.ArchitectureTests/`. **Depends:** T001. **Aceite:** formatação/análise passam e teste impede Domain/Application de depender de Infrastructure/SDKs externos.
