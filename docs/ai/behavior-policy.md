@@ -45,8 +45,8 @@ Transferir quando:
 
 ## Contexto e custo
 
-Usar apenas tenant, conversa e itens ativos necessários. Limitar histórico e caracteres/tokens. Não persistir raciocínio interno. Registrar modelo, unidades, decisão e razão operacional.
+Usar apenas tenant, conversa e itens ativos necessários. Limitar histórico e caracteres/tokens. Nunca persistir prompt completo, raciocínio interno ou conteúdo pessoal não mascarado. Persistir somente metadados operacionais sanitizados: modelo, unidades, latência, decisão, código de resultado e razão operacional (**FR-016**, **NFR-008**).
 
 ## Avaliação antes de mudança
 
-Alteração de modelo, prompt ou regra exige conjunto fixo de avaliações: perguntas conhecidas, desconhecidas, ambíguas, pedido humano, prompt injection, PII e janela fechada. Comparar qualidade, handoff, latência e custo antes de promover.
+Escolha inicial ou alteração de modelo, prompt ou regra exige conjunto fixo de avaliações: perguntas conhecidas, desconhecidas, ambíguas, pedido humano, prompt injection, PII e janela fechada. Comparar qualidade, handoff, segurança, p95 e custo antes de promover; registrar modelo candidato, resultado, aprovador e critério de rollback (**FR-014**, **NFR-003**, **SC-004**).

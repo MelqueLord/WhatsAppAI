@@ -18,7 +18,7 @@ PostgreSQL cobre transações, JSONB, índices, auditoria e a carga inicial de I
 
 ## R-004 — OpenAI Responses API e modelo configurável
 
-O adaptador utiliza Responses API e saída estruturada. O nome do modelo não aparece no domínio e é configurável por tenant/ambiente. Para atendimento textual de baixo custo, a configuração inicial proposta é `gpt-5.6-luna`, sujeita a disponibilidade, preço e avaliação antes do piloto.
+O adaptador utiliza Responses API e saída estruturada. O nome do modelo não aparece no domínio e é configurável por tenant/ambiente. Nenhum modelo é promovido por suposição: a escolha inicial e toda alteração passam pelo conjunto de avaliações de `docs/ai/behavior-policy.md`, comparando qualidade, handoff, segurança, p95 e custo. O resultado, a versão escolhida e os critérios de rollback ficam registrados antes do piloto.
 
 ## R-005 — Conhecimento sem vetor no MVP
 
@@ -41,6 +41,18 @@ BYOK separa consumo do SaaS e torna as faturas oficiais verificáveis. A platafo
 ## R-009 — Janela de serviço e marketing
 
 O MVP responde somente a mensagens iniciadas pelo consumidor e bloqueia texto livre após a janela de 24 horas. Templates proativos, campanhas e classificação comercial ficam fora do produto inicial, reduzindo risco de política e complexidade de cobrança.
+
+## R-010 — Meta App compartilhado e contas dos tenants
+
+A plataforma utiliza um único Meta App. Seu `app_secret` e verify token são segredos globais da plataforma no `ISecretStore`; o primeiro valida `X-Hub-Signature-256` antes de qualquer resolução de tenant e o segundo valida o challenge GET. Após a autenticidade do POST ser comprovada, `phone_number_id` resolve a `WhatsAppAccount`. WABA, `phone_number_id`, token de acesso e faturamento continuam pertencendo a cada tenant. A decisão especializa ADR-0002 e ADR-0003 sem substituí-los.
+
+## ADRs aceitos reutilizados
+
+- `docs/architecture/adr/0001-modular-monolith.md` — monólito modular.
+- `docs/architecture/adr/0002-official-whatsapp-cloud-api.md` — API oficial da Meta.
+- `docs/architecture/adr/0003-customer-owned-provider-billing.md` — contas e faturamento dos tenants.
+- `docs/architecture/adr/0004-no-n8n-core.md` — n8n fora do núcleo.
+- `docs/architecture/adr/0005-postgres-inbox-outbox.md` — filas duráveis no PostgreSQL.
 
 ## Critérios para reavaliar arquitetura
 

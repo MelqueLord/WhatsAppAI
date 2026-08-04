@@ -22,6 +22,16 @@
 - **FR-014/015:** JSON inválido, texto longo, decisão desconhecida e mudança de versão.
 - **FR-004/NFR-008:** segredos ausentes de banco em claro, logs e respostas.
 - **NFR-009:** timeout após envio, retry e webhook tardio sem duplicar.
+- **FR-001:** login público exige antiforgery; mutação sem `X-CSRF-TOKEN`, com token inválido ou de outra sessão falha.
+- **FR-003/US-001:** PlatformAdmin cria, suspende e reativa tenant; suspensão preserva histórico e bloqueia operações.
+- **FR-005/FR-022/BR-011:** assinatura usa app secret global antes de resolver `phone_number_id`; desconhecido fica cifrado/quarentenado e pode ser consultado/reprocessado com auditoria.
+- **FR-017:** update/desativação exige `If-Match`; versão obsoleta falha e não há delete físico.
+- **FR-018/NFR-006:** tenants distintos aceitam o mesmo `(provider, metric, source_id)` sem colisão; duplicata no mesmo tenant falha.
+- **FR-019:** identidade da aplicação não consegue atualizar ou apagar `AuditLog`.
+- **FR-023/NFR-006:** download de mídia exige sessão/tenant correto e nunca retorna token ou URL privada da Meta.
+- **NFR-003:** no mínimo 100 decisões elegíveis, com p95 abaixo de 10 s e tempos de fila/aplicação/provedor separados.
+- **NFR-004:** relatório mensal calcula respostas elegíveis concluídas sem 5xx/timeout da plataforma sobre requisições válidas recebidas, sem excluir manutenção ou remover falhas Meta/OpenAI do total.
+- **NFR-005:** restore usa ponto de no máximo 24 h e conclui smoke test aprovado em até 4 h da declaração.
 
 ## Ambientes
 
