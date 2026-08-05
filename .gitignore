@@ -3,6 +3,10 @@ obj/
 packages/
 TestResults/
 coverage/
+node_modules/
+dist/
+build/
+*.log
 .vs/
 .idea/
 .vscode/
