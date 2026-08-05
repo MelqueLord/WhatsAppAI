@@ -12,12 +12,17 @@ Este documento define a sequência esperada; os comandos executáveis serão con
 
 ## Preparação planejada
 
+Copie `.env.example` para um `.env` local ignorado, substitua a senha de exemplo e execute:
+
 ```bash
 docker compose up -d postgres
+docker compose ps postgres
+dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=whatsapp_ai;Username=whatsapp_ai;Password=<senha-local>"
 dotnet restore
-dotnet ef database update --project src/WhatsAppAI.Infrastructure --startup-project src/WhatsAppAI.WebApi
 dotnet run --project src/WhatsAppAI.WebApi
 ```
+
+Nenhuma migration existe no bootstrap. O primeiro `dotnet ef database update` somente será executado depois da migration de Tenant/User prevista na Fase 1.
 
 Em outro terminal:
 
