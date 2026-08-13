@@ -1,0 +1,52 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
+using Serilog.Events;
+
+namespace WhatsAppAI.Infrastructure.Observability;
+
+public static class ObservabilityExtensions
+{
+    public static IServiceCollection AddObservability(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHttpContextAccessor();
+
+        Log.Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithMachineName()
+            .Enrich.WithThreadId()
+            .Enrich.WithEnvironmentName()
+            .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
+
+        services.AddHealthChecks();
+
+        return services;
+    }
+
+    public static IApplicationBuilder UseObservability(this IApplicationBuilder app)
+    {
+        app.UseCorrelationId();
+
+        return app;
+    }
+
+    public static WebApplication MapHealthCheckEndpoints(this WebApplication app)
+    {
+        app.MapHealthChecks("/health/live", new()
+        {
+            Predicate = _ => false
+        });
+
+        app.MapHealthChecks("/health/ready", new()
+        {
+            Predicate = check => check.Tags.Contains("ready")
+        });
+
+        return app;
+    }
+}

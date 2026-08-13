@@ -1,0 +1,22 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>all</AnalysisMode>
+    <NoWarn>$(NoWarn);NU1603;NU1903;CA1002;CA1508;CA1515;CA1707;CA1802;CA1822;CA1823;CA2000;CA2025;CA2227;CA1720;CA1056;CA1054;CA1308;CA1310;CS0414;MA0011;S108;S1144;S1172;S1186;S1854;S2094;S2486;S2699;S3458;S1075;S6966;MA0048;MA0074;MA0016;MA0009;MA0006;CA1812;CA2007;CA1716;CA2234;MA0004;MA0051;MA0150;MA0002;AsyncFixer01;CA1848;CA1873;CA1031;CA1305;CA1307;CA1861;CA1862;CA5401;S3267;S1066</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.1" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.12.11" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.32.0.97167" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
