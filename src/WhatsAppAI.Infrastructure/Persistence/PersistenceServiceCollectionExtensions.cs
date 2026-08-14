@@ -47,6 +47,9 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<IAiProviderCredentialRepository, AiProviderCredentialRepository>();
         services.AddScoped<IKnowledgeItemRepository, KnowledgeItemRepository>();
+        services.AddScoped<IClientTagRepository, ClientTagRepository>();
+        services.AddScoped<IContactTagRepository, ContactTagRepository>();
+        services.AddScoped<IBotConfigurationRepository, BotConfigurationRepository>();
         services.AddScoped<IAiInteractionRepository, AiInteractionRepository>();
         services.AddScoped<IUsageLedgerRepository, UsageLedgerRepository>();
         services.AddScoped<IModelEvaluationRepository, ModelEvaluationRepository>();

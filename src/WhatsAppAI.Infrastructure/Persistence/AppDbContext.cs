@@ -29,6 +29,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UsageLedger> UsageLedger => Set<UsageLedger>();
     public DbSet<ModelEvaluation> ModelEvaluations => Set<ModelEvaluation>();
     public DbSet<KnowledgeItem> KnowledgeItems => Set<KnowledgeItem>();
+    public DbSet<ClientTag> ClientTags => Set<ClientTag>();
+    public DbSet<ContactTag> ContactTags => Set<ContactTag>();
+    public DbSet<BotConfiguration> BotConfigurations => Set<BotConfiguration>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

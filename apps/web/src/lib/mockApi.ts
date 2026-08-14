@@ -111,6 +111,84 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
 
   // Webhook Events
   'GET /api/webhook-events': async () => mocks.mockWebhookEvents,
+
+  // Client Tags
+  'GET /api/client-tags': async () => mocks.mockClientTags,
+  'POST /api/client-tags': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    const tag = { id: `tag-${Date.now()}`, name: body.name, color: body.color, description: body.description, isActive: true }
+    mocks.mockClientTags.push(tag)
+    return { id: tag.id }
+  },
+  'PUT /api/client-tags/:id': async (req, params) => {
+    const body = await req.json().catch(() => ({}))
+    const tag = mocks.mockClientTags.find((t) => t.id === params!.id)
+    if (tag) {
+      tag.name = body.name ?? tag.name
+      tag.color = body.color ?? tag.color
+      tag.description = body.description ?? tag.description
+    }
+    return { id: tag?.id }
+  },
+  'POST /api/client-tags/:id/deactivate': async (_req, params) => {
+    const tag = mocks.mockClientTags.find((t) => t.id === params!.id)
+    if (tag) tag.isActive = false
+    return { id: tag?.id, isActive: false }
+  },
+  'POST /api/client-tags/:id/reactivate': async (_req, params) => {
+    const tag = mocks.mockClientTags.find((t) => t.id === params!.id)
+    if (tag) tag.isActive = true
+    return { id: tag?.id, isActive: true }
+  },
+
+  // Contact Tags
+  'GET /api/client-tags/contacts/:contactId/tags': async (_req, params) => {
+    const tagIds = mocks.mockContactTags[params!.contactId] || []
+    return mocks.mockClientTags.filter((t) => tagIds.includes(t.id))
+  },
+  'POST /api/client-tags/contacts/:contactId/tags/:tagId': async (_req, params) => {
+    if (!mocks.mockContactTags[params!.contactId]) mocks.mockContactTags[params!.contactId] = []
+    if (!mocks.mockContactTags[params!.contactId].includes(params!.tagId)) {
+      mocks.mockContactTags[params!.contactId].push(params!.tagId)
+    }
+    return { assigned: true }
+  },
+  'DELETE /api/client-tags/contacts/:contactId/tags/:tagId': async (_req, params) => {
+    if (mocks.mockContactTags[params!.contactId]) {
+      mocks.mockContactTags[params!.contactId] = mocks.mockContactTags[params!.contactId].filter((t) => t !== params!.tagId)
+    }
+    return { removed: true }
+  },
+
+  // Bot Configuration
+  'GET /api/bot-config': async () => mocks.mockBotConfig,
+  'POST /api/bot-config': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    mocks.mockBotConfig = { ...mocks.mockBotConfig, ...body, configured: true, version: mocks.mockBotConfig.version + 1 }
+    return { saved: true }
+  },
+  'PUT /api/bot-config/mode': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    mocks.mockBotConfig.mode = body.mode || mocks.mockBotConfig.mode
+    return { mode: mocks.mockBotConfig.mode }
+  },
+  'PUT /api/bot-config/messages': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    mocks.mockBotConfig.welcomeMessage = body.welcomeMessage ?? mocks.mockBotConfig.welcomeMessage
+    mocks.mockBotConfig.offlineMessage = body.offlineMessage ?? mocks.mockBotConfig.offlineMessage
+    mocks.mockBotConfig.fallbackMessage = body.fallbackMessage ?? mocks.mockBotConfig.fallbackMessage
+    return { saved: true }
+  },
+  'PUT /api/bot-config/tokens': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    mocks.mockBotConfig.maxTokensPerResponse = body.maxTokens || mocks.mockBotConfig.maxTokensPerResponse
+    return { maxTokensPerResponse: mocks.mockBotConfig.maxTokensPerResponse }
+  },
+  'POST /api/bot-config/toggle': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    mocks.mockBotConfig.enabled = body.enabled ?? mocks.mockBotConfig.enabled
+    return { enabled: mocks.mockBotConfig.enabled }
+  },
 }
 
 function matchRoute(method: string, url: string): { handler: Function; params: Record<string, string> } | null {

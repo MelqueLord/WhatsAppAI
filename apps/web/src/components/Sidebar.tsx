@@ -14,6 +14,8 @@ import {
   BarChart3,
   LayoutDashboard,
   LogOut,
+  Tags,
+  Settings,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -33,6 +35,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
           { to: '/integrations/ai', icon: Bot, label: 'IA' },
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
+          { to: '/tags', icon: Tags, label: 'Tags' },
+          { to: '/bot-config', icon: Settings, label: 'Bot' },
         ]
       : []),
     { to: '/usage', icon: BarChart3, label: 'Uso' },

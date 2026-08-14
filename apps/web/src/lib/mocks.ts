@@ -166,3 +166,30 @@ export const mockAiConfig = {
   isActive: true,
   version: 1,
 }
+
+export const mockClientTags = [
+  { id: 'tag-vip', name: 'VIP', color: '#10B981', description: 'Clientes VIP com prioridade', isActive: true },
+  { id: 'tag-new', name: 'Novo', color: '#3B82F6', description: 'Clientes novos', isActive: true },
+  { id: 'tag-returning', name: 'Recorrente', color: '#8B5CF6', description: 'Clientes que retornam', isActive: true },
+  { id: 'tag-support', name: 'Suporte', color: '#F59E0B', description: 'Precisa de suporte técnico', isActive: true },
+  { id: 'tag-b2b', name: 'B2B', color: '#EC4899', description: 'Cliente empresarial', isActive: true },
+  { id: 'tag-inactive', name: 'Inativo', color: '#6B7280', description: 'Cliente inativo', isActive: false },
+]
+
+export const mockContactTags: Record<string, string[]> = {
+  'c-1': ['tag-vip', 'tag-returning'],
+  'c-2': ['tag-support'],
+  'c-3': ['tag-new'],
+  'c-5': ['tag-b2b'],
+}
+
+export const mockBotConfig = {
+  configured: true,
+  mode: 'SimpleAutoReply',
+  welcomeMessage: 'Olá! Bem-vindo à nossa empresa. Como posso ajudar?',
+  offlineMessage: 'No momento estamos fora do horário de atendimento. Deixe sua mensagem que retornaremos em breve.',
+  fallbackMessage: 'Desculpe, não entendi. Pode reformular sua pergunta?',
+  maxTokensPerResponse: 500,
+  enabled: true,
+  version: 1,
+}
