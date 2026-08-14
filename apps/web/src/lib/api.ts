@@ -28,6 +28,8 @@ export interface Conversation {
   lastMessage?: string
   lastMessageAt?: string
   isWindowOpen: boolean
+  assignedToUserId?: string
+  assignedToUserName?: string
 }
 
 export interface Message {

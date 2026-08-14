@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Conversation } from '../../lib/api'
 import { cn, formatTime, truncate } from '../../lib/utils'
-import { MessageCircle, Search, Bot, User, Pause, Loader2 } from 'lucide-react'
+import { MessageCircle, Search, Bot, User, Pause, Loader2, Filter } from 'lucide-react'
 
 interface ConversationListProps {
   selectedId?: string
@@ -11,6 +11,7 @@ interface ConversationListProps {
 
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
   const [search, setSearch] = useState('')
+  const [operatorFilter, setOperatorFilter] = useState<string>('all')
 
   const { data, isLoading } = useQuery({
     queryKey: ['conversations'],
@@ -18,15 +19,38 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     refetchInterval: 15000,
   })
 
-  const conversations = (data?.items ?? []).filter((c) =>
-    c.contactName.toLowerCase().includes(search.toLowerCase()) ||
-    c.contactPhone.includes(search)
-  )
+  const allConversations = data?.items ?? []
+
+  // Extract unique operators from conversations
+  const operators = useMemo(() => {
+    const map = new Map<string, string>()
+    allConversations.forEach((c) => {
+      if (c.assignedToUserId && c.assignedToUserName) {
+        map.set(c.assignedToUserId, c.assignedToUserName)
+      }
+    })
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [allConversations])
+
+  const conversations = allConversations.filter((c) => {
+    const matchesSearch =
+      c.contactName.toLowerCase().includes(search.toLowerCase()) ||
+      c.contactPhone.includes(search)
+
+    const matchesOperator =
+      operatorFilter === 'all' ||
+      (operatorFilter === 'unassigned' && !c.assignedToUserId) ||
+      c.assignedToUserId === operatorFilter
+
+    return matchesSearch && matchesOperator
+  })
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="p-4 border-b border-slate-200">
-        <h2 className="text-lg font-semibold text-slate-800 mb-3">Conversas</h2>
+      <div className="p-4 border-b border-slate-200 space-y-3">
+        <h2 className="text-lg font-semibold text-slate-800">Conversas</h2>
+
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -37,6 +61,24 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
           />
         </div>
+
+        {/* Operator Filter */}
+        {operators.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <select
+              value={operatorFilter}
+              onChange={(e) => setOperatorFilter(e.target.value)}
+              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+            >
+              <option value="all">Todos os operadores</option>
+              <option value="unassigned">Não atribuídas</option>
+              {operators.map((op) => (
+                <option key={op.id} value={op.id}>{op.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -76,9 +118,17 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
                   <p className="text-sm text-slate-500 truncate">
-                    {truncate(conv.lastMessage || 'Sem mensagens', 38)}
+                    {truncate(conv.lastMessage || 'Sem mensagens', 32)}
                   </p>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    {conv.assignedToUserName && (
+                      <span
+                        className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full max-w-[60px] truncate"
+                        title={conv.assignedToUserName}
+                      >
+                        {conv.assignedToUserName.split(' ')[0]}
+                      </span>
+                    )}
                     {conv.mode === 'Human' && (
                       <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center" title="Humano">
                         <User className="w-3 h-3 text-blue-600" />

@@ -34,6 +34,8 @@ export const mockConversations = [
     lastMessage: 'Obrigado pelo atendimento!',
     lastMessageAt: m(30),
     isWindowOpen: true,
+    assignedToUserId: 'op-1',
+    assignedToUserName: 'Carlos Souza',
     version: 5,
   },
   {
@@ -41,11 +43,13 @@ export const mockConversations = [
     contactId: 'ct-3',
     contactName: 'Ana Oliveira',
     contactPhone: '+55 21 97777-9012',
-    mode: 'Automatic',
+    mode: 'Human',
     status: 'Open',
     lastMessage: 'Preciso de ajuda com meu pedido #12345',
     lastMessageAt: h(2),
     isWindowOpen: true,
+    assignedToUserId: 'op-2',
+    assignedToUserName: 'Fernanda Lima',
     version: 2,
   },
   {
@@ -82,6 +86,8 @@ export const mockConversations = [
     lastMessage: 'Preciso falar com o gerente.',
     lastMessageAt: h(48),
     isWindowOpen: false,
+    assignedToUserId: 'op-1',
+    assignedToUserName: 'Carlos Souza',
     version: 2,
   },
 ]
