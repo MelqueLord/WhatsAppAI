@@ -20,8 +20,8 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
   useEffect(() => {
     const newConnection = new HubConnectionBuilder()
       .withUrl(hubUrl, { withCredentials: true })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Information)
+      .withAutomaticReconnect({ nextRetryDelayInMilliseconds: () => 10000 })
+      .configureLogging(LogLevel.Warning)
       .build()
 
     newConnection.on('NewMessage', (message) => {
@@ -43,7 +43,7 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
     setConnection(newConnection)
 
     return () => {
-      newConnection.stop()
+      newConnection.stop().catch(() => {})
     }
   }, [hubUrl])
 
@@ -52,21 +52,22 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
       try {
         await connection.start()
         setIsConnected(true)
-      } catch (err) {
-        console.error('SignalR connection error:', err)
+      } catch {
+        // Hub not available (mock mode or server down)
+        setIsConnected(false)
       }
     }
   }, [connection])
 
   const joinConversation = useCallback(async (conversationId: string) => {
     if (connection && isConnected) {
-      await connection.invoke('JoinConversation', conversationId)
+      try { await connection.invoke('JoinConversation', conversationId) } catch {}
     }
   }, [connection, isConnected])
 
   const leaveConversation = useCallback(async (conversationId: string) => {
     if (connection && isConnected) {
-      await connection.invoke('LeaveConversation', conversationId)
+      try { await connection.invoke('LeaveConversation', conversationId) } catch {}
     }
   }, [connection, isConnected])
 
