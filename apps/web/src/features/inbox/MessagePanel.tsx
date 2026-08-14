@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Conversation, type Message } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatTime } from '../../lib/utils'
+import { TagAssigner } from '../../components/TagAssigner'
 import {
   MoreVertical,
   Send,
@@ -143,7 +144,12 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-slate-800 truncate">{conversation.contactName}</h3>
-          <p className="text-xs text-slate-500">{conversation.contactPhone}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-slate-500">{conversation.contactPhone}</p>
+            {conversation.contactId && (
+              <TagAssigner contactId={conversation.contactId} compact />
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isConnected ? (

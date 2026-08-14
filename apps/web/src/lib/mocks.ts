@@ -14,6 +14,7 @@ export const mockUser = {
 export const mockConversations = [
   {
     id: 'c-1',
+    contactId: 'ct-1',
     contactName: 'Maria Silva',
     contactPhone: '+55 11 99999-1234',
     mode: 'Automatic',
@@ -25,6 +26,7 @@ export const mockConversations = [
   },
   {
     id: 'c-2',
+    contactId: 'ct-2',
     contactName: 'João Santos',
     contactPhone: '+55 11 98888-5678',
     mode: 'Human',
@@ -36,6 +38,7 @@ export const mockConversations = [
   },
   {
     id: 'c-3',
+    contactId: 'ct-3',
     contactName: 'Ana Oliveira',
     contactPhone: '+55 21 97777-9012',
     mode: 'Automatic',
@@ -47,6 +50,7 @@ export const mockConversations = [
   },
   {
     id: 'c-4',
+    contactId: 'ct-4',
     contactName: 'Pedro Costa',
     contactPhone: '+55 31 96666-3456',
     mode: 'Paused',
@@ -58,6 +62,7 @@ export const mockConversations = [
   },
   {
     id: 'c-5',
+    contactId: 'ct-5',
     contactName: 'Carla Mendes',
     contactPhone: '+55 41 95555-7890',
     mode: 'Automatic',
@@ -69,6 +74,7 @@ export const mockConversations = [
   },
   {
     id: 'c-6',
+    contactId: 'ct-6',
     contactName: 'Lucas Ferreira',
     contactPhone: '+55 51 94444-1234',
     mode: 'Human',
@@ -177,10 +183,10 @@ export const mockClientTags = [
 ]
 
 export const mockContactTags: Record<string, string[]> = {
-  'c-1': ['tag-vip', 'tag-returning'],
-  'c-2': ['tag-support'],
-  'c-3': ['tag-new'],
-  'c-5': ['tag-b2b'],
+  'ct-1': ['tag-vip', 'tag-returning'],
+  'ct-2': ['tag-support'],
+  'ct-3': ['tag-new'],
+  'ct-5': ['tag-b2b'],
 }
 
 export const mockBotConfig = {

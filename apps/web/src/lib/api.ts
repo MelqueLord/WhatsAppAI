@@ -20,6 +20,7 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
 
 export interface Conversation {
   id: string
+  contactId: string
   contactName: string
   contactPhone: string
   mode: string
@@ -88,5 +89,13 @@ export const api = {
         body: JSON.stringify({ mode }),
         headers: version ? { 'If-Match': version.toString() } : {},
       }),
+  },
+  tags: {
+    list: () => fetchApi<any[]>('/api/client-tags'),
+    getContactTags: (contactId: string) => fetchApi<any[]>(`/api/client-tags/contacts/${contactId}/tags`),
+    assignToContact: (contactId: string, tagId: string) =>
+      fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'POST' }),
+    removeFromContact: (contactId: string, tagId: string) =>
+      fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
   },
 }
