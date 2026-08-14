@@ -9,9 +9,10 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
   },
   server: {
-    proxy: {
-      '/api': 'http://localhost:5179',
-      '/hubs': 'http://localhost:5179',
-    },
+    // Proxy disabled for mock mode. Enable when running backend:
+    // proxy: {
+    //   '/api': 'http://localhost:5179',
+    //   '/hubs': 'http://localhost:5179',
+    // },
   },
 })
