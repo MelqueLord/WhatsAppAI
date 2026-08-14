@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Serilog;
+using WhatsAppAI.Infrastructure;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Meta;
 using WhatsAppAI.Infrastructure.Observability;
@@ -11,8 +14,10 @@ using WhatsAppAI.WebApi.Auth.Activate;
 using WhatsAppAI.WebApi.Conversations;
 using WhatsAppAI.WebApi.Hubs;
 using WhatsAppAI.WebApi.Integrations;
+using WhatsAppAI.WebApi.Knowledge;
 using WhatsAppAI.WebApi.Media;
 using WhatsAppAI.WebApi.Operators;
+using WhatsAppAI.WebApi.Usage;
 using WhatsAppAI.WebApi.WebhookEvents;
 using WhatsAppAI.WebApi.Webhooks;
 
@@ -30,14 +35,46 @@ builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddIdentityServices();
 builder.Services.AddSecretServices();
 builder.Services.AddMetaServices();
+builder.Services.AddOpenAiServices();
 builder.Services.AddWorkers();
 
 builder.Services.AddSignalR();
+
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("fixed", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 100;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 10;
+    });
+
+    options.AddFixedWindowLimiter("webhook", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 500;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+    });
+
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 20;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+    });
+});
+
+// CORS
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5173", "http://localhost:3000"];
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -57,7 +94,20 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors();
+app.UseRateLimiter();
 app.UseObservability();
+
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    await next();
+});
+
 app.UseIdentityServices();
 
 app.MapGet("/", () => "WhatsApp AI Manager - API Running!");
@@ -68,6 +118,10 @@ app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
 app.MapOperatorEndpoints();
 app.MapWhatsAppEndpoints();
+app.MapAiProviderEndpoints();
+app.MapModelEvaluationEndpoints();
+app.MapKnowledgeEndpoints();
+app.MapUsageEndpoints();
 app.MapConversationEndpoints();
 app.MapConversationModeEndpoints();
 app.MapMediaEndpoints();

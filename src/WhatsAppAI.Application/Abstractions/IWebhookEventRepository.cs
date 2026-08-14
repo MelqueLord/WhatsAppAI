@@ -10,4 +10,5 @@ public interface IWebhookEventRepository
     Task<IReadOnlyList<WebhookEvent>> GetRetryableEventsAsync(int batchSize = 10, CancellationToken cancellationToken = default);
     Task AddAsync(WebhookEvent webhookEvent, CancellationToken cancellationToken = default);
     Task UpdateAsync(WebhookEvent webhookEvent, CancellationToken cancellationToken = default);
+    Task<int> DeleteProcessedBeforeAsync(DateTime cutoff, int batchSize, CancellationToken cancellationToken = default);
 }

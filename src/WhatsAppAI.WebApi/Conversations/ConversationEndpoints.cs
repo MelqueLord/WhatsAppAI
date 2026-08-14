@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.WebApi.Hubs;
@@ -85,6 +86,8 @@ public static class ConversationEndpoints
         ICurrentTenant currentTenant,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
+        IOutboxMessageRepository outboxMessageRepository,
+        IClock clock,
         IHubContext<InboxHub> hubContext)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
@@ -94,10 +97,15 @@ public static class ConversationEndpoints
         if (conversation is null || conversation.TenantId != currentTenant.TenantId)
             return Results.NotFound();
 
-        if (!conversation.IsWindowOpen)
+        if (!conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
 
         var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString();
+
+        var existing = await messageRepository.GetByIdempotencyKeyAsync(idempotencyKey);
+        if (existing is not null)
+            return Results.Ok(new { id = existing.Id, status = existing.Status.ToString() });
+
         var message = Message.CreateOutbound(
             currentTenant.TenantId.Value,
             conversationId,
@@ -108,10 +116,12 @@ public static class ConversationEndpoints
 
         await messageRepository.AddAsync(message);
 
+        var outboxMessage = OutboxMessage.Create(currentTenant.TenantId.Value, message.Id);
+        await outboxMessageRepository.AddAsync(outboxMessage);
+
         conversation.RecordMessage();
         await conversationRepository.UpdateAsync(conversation);
 
-        // Notify clients via SignalR
         await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}")
             .SendAsync(InboxHubMethods.NewMessage, new
             {

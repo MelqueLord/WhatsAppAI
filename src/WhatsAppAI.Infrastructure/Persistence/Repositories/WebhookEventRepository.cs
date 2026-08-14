@@ -57,4 +57,18 @@ public sealed class WebhookEventRepository(
         context.Set<WebhookEvent>().Update(webhookEvent);
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<int> DeleteProcessedBeforeAsync(DateTime cutoff, int batchSize, CancellationToken cancellationToken = default)
+    {
+        var toDelete = await context.Set<WebhookEvent>()
+            .Where(e => e.CreatedAt < cutoff && e.Status == WebhookEventStatus.Processed)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+        if (toDelete.Count == 0) return 0;
+
+        context.Set<WebhookEvent>().RemoveRange(toDelete);
+        await context.SaveChangesAsync(cancellationToken);
+        return toDelete.Count;
+    }
 }

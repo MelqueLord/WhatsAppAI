@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Context;
+using WhatsAppAI.Application.Audit;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Infrastructure.Conversations;
@@ -41,8 +43,18 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IContactRepository, ContactRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<IHandoffEventRepository, HandoffEventRepository>();
+        services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
+        services.AddScoped<IAiProviderCredentialRepository, AiProviderCredentialRepository>();
+        services.AddScoped<IKnowledgeItemRepository, KnowledgeItemRepository>();
+        services.AddScoped<IAiInteractionRepository, AiInteractionRepository>();
+        services.AddScoped<IUsageLedgerRepository, UsageLedgerRepository>();
+        services.AddScoped<IModelEvaluationRepository, ModelEvaluationRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<AuditService>();
         services.AddScoped<IConversationQueries, ConversationQueries>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<ContextAssembler>();
 
         return services;
     }

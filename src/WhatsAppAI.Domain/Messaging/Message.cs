@@ -22,6 +22,7 @@ public sealed class Message
     public DateTime? ReadAt { get; private set; }
     public DateTime? FailedAt { get; private set; }
     public string? FailureReason { get; private set; }
+    public bool ProcessedByAi { get; private set; }
 
     public Conversation Conversation { get; private set; } = null!;
     public Contact Contact { get; private set; } = null!;
@@ -106,6 +107,11 @@ public sealed class Message
         Status = MessageStatus.Failed;
         FailureReason = reason;
         FailedAt = DateTime.UtcNow;
+    }
+
+    public void MarkProcessedByAi()
+    {
+        ProcessedByAi = true;
     }
 }
 

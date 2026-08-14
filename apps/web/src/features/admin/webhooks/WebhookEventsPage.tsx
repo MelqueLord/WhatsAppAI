@@ -1,199 +1,121 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react'
+import {
+  Webhook,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
+  HelpCircle,
+  Loader2,
+} from 'lucide-react'
 
-interface WebhookEvent {
-  id: string;
-  phoneNumberId: string;
-  tenantId?: string;
-  status: string;
-  createdAt: string;
-  processedAt?: string;
-  retryCount: number;
-  errorMessage?: string;
-}
-
-const API_BASE = '/api/webhook-events';
-
-async function fetchEvents(status?: string): Promise<WebhookEvent[]> {
-  const params = new URLSearchParams();
-  if (status) params.append('status', status);
-  params.append('limit', '50');
-
-  const response = await fetch(`${API_BASE}?${params}`, {
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to fetch events');
-  return response.json();
-}
-
-async function reprocessEvent(eventId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/${eventId}/reprocess`, {
-    method: 'POST',
-    headers: {
-      'X-CSRF-TOKEN': getCsrfToken(),
-    },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to reprocess event');
-}
-
-function getCsrfToken(): string {
-  const meta = document.querySelector('meta[name="csrf-token"]');
-  return meta?.getAttribute('content') ?? '';
-}
+const MOCK_EVENTS = [
+  { id: 'evt-a1b2c3d4e5f6', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:30:00Z', retryCount: 0 },
+  { id: 'evt-b2c3d4e5f6a1', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:25:00Z', retryCount: 0 },
+  { id: 'evt-c3d4e5f6a1b2', phoneNumberId: '123456789012345', status: 'Pending', createdAt: '2026-08-14T08:20:00Z', retryCount: 0 },
+  { id: 'evt-d4e5f6a1b2c3', phoneNumberId: '123456789012345', status: 'Failed', createdAt: '2026-08-14T08:15:00Z', retryCount: 2, errorMessage: 'Timeout ao processar mensagem' },
+  { id: 'evt-e5f6a1b2c3d4', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:10:00Z', retryCount: 0 },
+  { id: 'evt-f6a1b2c3d4e5', phoneNumberId: '987654321098765', status: 'Dead', createdAt: '2026-08-14T07:50:00Z', retryCount: 5, errorMessage: 'Assinatura inválida após 5 tentativas' },
+  { id: 'evt-a1b2c3d4e5f7', phoneNumberId: '123456789012345', status: 'Unknown', createdAt: '2026-08-14T07:45:00Z', retryCount: 0, errorMessage: 'Tipo de evento não reconhecido: referral' },
+  { id: 'evt-b2c3d4e5f6a2', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T07:40:00Z', retryCount: 1 },
+  { id: 'evt-c3d4e5f6a1b3', phoneNumberId: '987654321098765', status: 'Processing', createdAt: '2026-08-14T07:35:00Z', retryCount: 0 },
+  { id: 'evt-d4e5f6a1b2c4', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T07:30:00Z', retryCount: 0 },
+]
 
 export function WebhookEventsPage() {
-  const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  const { data: events, isLoading } = useQuery({
-    queryKey: ['webhook-events', statusFilter],
-    queryFn: () => fetchEvents(statusFilter === 'all' ? undefined : statusFilter),
-  });
+  const filteredEvents = statusFilter === 'all' ? MOCK_EVENTS : MOCK_EVENTS.filter(e => e.status.toLowerCase() === statusFilter)
 
-  const reprocessMutation = useMutation({
-    mutationFn: reprocessEvent,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['webhook-events'] });
-      setError(null);
-    },
-    onError: () => setError('Failed to reprocess event'),
-  });
-
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'processed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'failed':
-        return 'bg-orange-100 text-orange-800';
-      case 'dead':
-        return 'bg-red-100 text-red-800';
-      case 'unknown':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'processed': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"><CheckCircle2 className="w-3 h-3" /> Processado</span>
+      case 'pending': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><Clock className="w-3 h-3" /> Pendente</span>
+      case 'processing': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><Loader2 className="w-3 h-3 animate-spin" /> Processando</span>
+      case 'failed': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700"><AlertTriangle className="w-3 h-3" /> Falhou</span>
+      case 'dead': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700"><XCircle className="w-3 h-3" /> Morto</span>
+      case 'unknown': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700"><HelpCircle className="w-3 h-3" /> Desconhecido</span>
+      default: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">{status}</span>
     }
-  };
+  }
 
-  if (isLoading) return <div>Loading...</div>;
+  const filters = [
+    { value: 'all', label: 'Todos' },
+    { value: 'pending', label: 'Pendentes' },
+    { value: 'failed', label: 'Falhos' },
+    { value: 'dead', label: 'Mortos' },
+    { value: 'unknown', label: 'Desconhecidos' },
+  ]
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Webhook Events</h1>
-        <div className="flex gap-2">
-          {['all', 'pending', 'failed', 'dead', 'unknown'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1 rounded text-sm ${
-                statusFilter === status
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+    <div className="h-full flex flex-col bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <h1 className="text-xl font-semibold text-slate-800">Eventos Webhook</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Monitoramento dos eventos recebidos da Meta</p>
+      </div>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          {filters.map((filter) => (
+            <button key={filter.value} onClick={() => setStatusFilter(filter.value)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === filter.value ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+              {filter.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-          <button onClick={() => setError(null)} className="float-right font-bold">×</button>
-        </div>
-      )}
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Phone Number ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Created
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Retries
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Error
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {events?.map((event) => (
-              <tr key={event.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                  {event.id.slice(0, 8)}...
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {event.phoneNumberId}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(event.status)}`}>
-                    {event.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(event.createdAt).toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {event.retryCount}
-                </td>
-                <td className="px-6 py-4 text-sm text-red-600 max-w-xs truncate">
-                  {event.errorMessage || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  {(event.status === 'Failed' || event.status === 'Dead') && (
-                    <button
-                      onClick={() => reprocessMutation.mutate(event.id)}
-                      disabled={reprocessMutation.isPending}
-                      className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
-                    >
-                      Reprocess
-                    </button>
-                  )}
-                </td>
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <table className="min-w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone Number</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Criado em</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Tentativas</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Erro</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredEvents.map((event) => (
+                <tr key={event.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4"><code className="text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded">{event.id.slice(0, 12)}...</code></td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{event.phoneNumberId}</td>
+                  <td className="px-6 py-4">{getStatusBadge(event.status)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{new Date(event.createdAt).toLocaleString('pt-BR')}</td>
+                  <td className="px-6 py-4"><span className={`text-sm font-medium ${event.retryCount > 0 ? 'text-amber-600' : 'text-slate-500'}`}>{event.retryCount}</span></td>
+                  <td className="px-6 py-4 text-sm text-red-600 max-w-[200px] truncate">{event.errorMessage || '-'}</td>
+                  <td className="px-6 py-4 text-right">
+                    {(event.status === 'Failed' || event.status === 'Dead') && (
+                      <button className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium ml-auto"><RefreshCw className="w-3.5 h-3.5" /> Reprocessar</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <h3 className="font-medium text-slate-800 mb-3">Legenda de Status</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { status: 'pending', desc: 'Aguardando processamento' },
+              { status: 'processing', desc: 'Em processamento' },
+              { status: 'processed', desc: 'Processado com sucesso' },
+              { status: 'failed', desc: 'Falhou, será reintentado' },
+              { status: 'dead', desc: 'Falhou após máx. tentativas' },
+              { status: 'unknown', desc: 'Tipo de evento não reconhecido' },
+            ].map((item) => (
+              <div key={item.status} className="flex items-start gap-2">
+                {getStatusBadge(item.status)}
+                <p className="text-[10px] text-slate-400 mt-1">{item.desc}</p>
+              </div>
             ))}
-          </tbody>
-        </table>
-
-        {events?.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No webhook events found.
           </div>
-        )}
-      </div>
-
-      <div className="mt-6 p-4 bg-gray-50 rounded">
-        <h3 className="font-medium mb-2">Status Legend:</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-          <div><span className="font-medium">Pending:</span> Awaiting processing</div>
-          <div><span className="font-medium">Processing:</span> Currently being processed</div>
-          <div><span className="font-medium">Processed:</span> Successfully processed</div>
-          <div><span className="font-medium">Failed:</span> Failed, will retry</div>
-          <div><span className="font-medium">Dead:</span> Failed after max retries</div>
-          <div><span className="font-medium">Unknown:</span> Unrecognized event type</div>
         </div>
       </div>
     </div>
-  );
+  )
 }

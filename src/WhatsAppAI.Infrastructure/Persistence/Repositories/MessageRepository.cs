@@ -18,6 +18,21 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
             .FirstOrDefaultAsync(m => m.ExternalId == externalId, cancellationToken);
     }
 
+    public async Task<Message?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        return await context.Set<Message>()
+            .FirstOrDefaultAsync(m => m.IdempotencyKey == idempotencyKey, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Message>> GetUnprocessedInboundAsync(int limit = 20, CancellationToken cancellationToken = default)
+    {
+        return await context.Set<Message>()
+            .Where(m => m.Direction == MessageDirection.Inbound && !m.ProcessedByAi)
+            .OrderBy(m => m.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Message>> GetByConversationAsync(
         Guid conversationId,
         int limit = 50,

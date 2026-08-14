@@ -41,12 +41,17 @@ public sealed class Conversation
         };
     }
 
-    public void SwitchMode(ConversationMode newMode, string? assignedToUserId = null)
+    public ConversationMode SwitchMode(ConversationMode newMode, uint expectedVersion, string? assignedToUserId = null)
     {
+        if (Version != expectedVersion)
+            throw new ConcurrencyException($"Version conflict: expected {expectedVersion}, actual {Version}.");
+
+        var previous = Mode;
         Mode = newMode;
         AssignedToUserId = newMode == ConversationMode.Human ? assignedToUserId : null;
         Version++;
         UpdatedAt = DateTime.UtcNow;
+        return previous;
     }
 
     public void RenewWindow()
@@ -55,7 +60,7 @@ public sealed class Conversation
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public bool IsWindowOpen => WindowExpiresAt.HasValue && WindowExpiresAt.Value > DateTime.UtcNow;
+    public bool IsWindowOpen(DateTime utcNow) => WindowExpiresAt.HasValue && WindowExpiresAt.Value > utcNow;
 
     public void RecordMessage()
     {

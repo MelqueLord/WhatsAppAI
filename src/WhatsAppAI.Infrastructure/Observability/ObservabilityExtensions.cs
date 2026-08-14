@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 
@@ -24,6 +27,31 @@ public static class ObservabilityExtensions
             .CreateLogger();
 
         services.AddHealthChecks();
+        services.AddProblemDetails();
+
+        // OpenTelemetry
+        var otelEndpoint = configuration["OpenTelemetry:Endpoint"];
+        services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource
+                .AddService("WhatsAppAI"))
+            .WithTracing(tracing =>
+            {
+                tracing
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation();
+
+                if (!string.IsNullOrEmpty(otelEndpoint))
+                    tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint));
+            })
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation();
+
+                if (!string.IsNullOrEmpty(otelEndpoint))
+                    metrics.AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint));
+            });
 
         return services;
     }
@@ -31,6 +59,7 @@ public static class ObservabilityExtensions
     public static IApplicationBuilder UseObservability(this IApplicationBuilder app)
     {
         app.UseCorrelationId();
+        app.UseExceptionHandler();
 
         return app;
     }

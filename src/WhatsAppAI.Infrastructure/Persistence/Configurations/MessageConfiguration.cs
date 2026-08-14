@@ -99,6 +99,10 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("failure_reason")
             .HasMaxLength(2000);
 
+        builder.Property(m => m.ProcessedByAi)
+            .HasColumnName("processed_by_ai")
+            .IsRequired();
+
         builder.HasOne(m => m.Conversation)
             .WithMany(c => c.Messages)
             .HasForeignKey(m => m.ConversationId)

@@ -1,0 +1,224 @@
+import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../../lib/auth'
+import { api } from '../../lib/api'
+import {
+  MessageSquare,
+  Users,
+  Zap,
+  Bot,
+  TrendingUp,
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+export function DashboardPage() {
+  const { user, isPlatformAdmin, isTenantOwner } = useAuth()
+
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => api.conversations.list(undefined, 5),
+  })
+
+  const stats = [
+    {
+      label: 'Conversas Ativas',
+      value: conversations?.items?.length ?? 0,
+      icon: MessageSquare,
+      color: 'emerald',
+    },
+    {
+      label: 'Operadores',
+      value: '—',
+      icon: Users,
+      color: 'blue',
+    },
+    {
+      label: 'Mensagens Hoje',
+      value: '—',
+      icon: Zap,
+      color: 'amber',
+    },
+    {
+      label: 'IA Respondendo',
+      value: 'Ativo',
+      icon: Bot,
+      color: 'violet',
+    },
+  ]
+
+  const colorMap: Record<string, string> = {
+    emerald: 'bg-emerald-50 text-emerald-600',
+    blue: 'bg-blue-50 text-blue-600',
+    amber: 'bg-amber-50 text-amber-600',
+    violet: 'bg-violet-50 text-violet-600',
+  }
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Olá, {user?.displayName || user?.email?.split('@')[0]}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {new Date().toLocaleDateString('pt-BR', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-lg ${colorMap[stat.color]} flex items-center justify-center`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+                <TrendingUp className="w-4 h-4 text-slate-300" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+              <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Conversations */}
+          <div className="bg-white rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-900">Conversas Recentes</h2>
+              <Link
+                to="/inbox"
+                className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+              >
+                Ver todas <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {conversations?.items?.slice(0, 5).map((conv: any) => (
+                <Link
+                  key={conv.id}
+                  to="/inbox"
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                    <MessageSquare className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">
+                      {conv.contactName || conv.contactPhone}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {conv.lastMessage || 'Sem mensagens'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400">
+                      {conv.mode}
+                    </span>
+                    {conv.isWindowOpen && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] text-emerald-600">Aberta</span>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+              {(!conversations?.items || conversations.items.length === 0) && (
+                <div className="px-5 py-8 text-center">
+                  <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">Nenhuma conversa ainda</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="bg-white rounded-xl border border-slate-200">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-900">Ações Rápidas</h2>
+            </div>
+            <div className="p-4 space-y-2">
+              {isTenantOwner && (
+                <>
+                  <QuickLink
+                    to="/integrations/whatsapp"
+                    icon={Zap}
+                    title="Configurar WhatsApp"
+                    description="Conecte seu número WhatsApp Business"
+                  />
+                  <QuickLink
+                    to="/integrations/ai"
+                    icon={Bot}
+                    title="Configurar IA"
+                    description="Configure o provedor de IA e modelo"
+                  />
+                  <QuickLink
+                    to="/knowledge"
+                    icon={CheckCircle2}
+                    title="Base de Conhecimento"
+                    description="Gerencie respostas e informações"
+                  />
+                  <QuickLink
+                    to="/operators"
+                    icon={Users}
+                    title="Gerenciar Operadores"
+                    description="Convide e gerencie sua equipe"
+                  />
+                </>
+              )}
+              {isPlatformAdmin && (
+                <QuickLink
+                  to="/admin/tenants"
+                  icon={Users}
+                  title="Gerenciar Tenants"
+                  description="Administre as empresas da plataforma"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function QuickLink({
+  to,
+  icon: Icon,
+  title,
+  description,
+}: {
+  to: string
+  icon: any
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 transition-colors group"
+    >
+      <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium text-slate-900">{title}</p>
+        <p className="text-xs text-slate-500">{description}</p>
+      </div>
+      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+    </Link>
+  )
+}
