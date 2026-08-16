@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 using Serilog;
 using WhatsAppAI.Infrastructure;
@@ -30,7 +31,7 @@ builder.Host.UseSerilog();
 // Use SQLite for development, MySQL for production
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SQLite";
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=localhost;Port=3306;Database=whatsappai_dev;User=root;Password=root;CharSet=utf8mb4";
+    ?? (dbProvider == "SQLite" ? "Data Source=whatsappai.db" : "Server=localhost;Port=3306;Database=whatsappai_dev;User=root;Password=root;CharSet=utf8mb4");
 
 builder.Services.AddPersistence(connectionString, dbProvider);
 builder.Services.AddObservability(builder.Configuration);
@@ -83,12 +84,9 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("PlatformAdmin", policy => policy.RequireClaim("platform_admin", "true"));
-
 var app = builder.Build();
 
-// Apply database schema
+// Apply database schema and seed
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -99,6 +97,20 @@ using (var scope = app.Services.CreateScope())
     catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
     {
         // Table already exists — schema is present
+    }
+
+    // Optional bootstrap account. Credentials must come from configuration/user-secrets.
+    var bootstrapAdminEmail = builder.Configuration["BootstrapAdmin:Email"];
+    var bootstrapAdminPassword = builder.Configuration["BootstrapAdmin:Password"];
+    if (!string.IsNullOrWhiteSpace(bootstrapAdminEmail) &&
+        !string.IsNullOrWhiteSpace(bootstrapAdminPassword) &&
+        !context.Users.IgnoreQueryFilters().Any(u => u.IsPlatformAdmin))
+    {
+        var adminUser = WhatsAppAI.Domain.Identity.User.Create(bootstrapAdminEmail, "Platform Admin");
+        adminUser.Activate(BCrypt.Net.BCrypt.HashPassword(bootstrapAdminPassword));
+        adminUser.GrantPlatformAdmin();
+        context.Users.Add(adminUser);
+        context.SaveChanges();
     }
 }
 
@@ -125,6 +137,7 @@ app.MapAntiforgeryBootstrap();
 app.MapAuthEndpoints();
 app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
+app.MapSupportSessionEndpoints();
 app.MapOperatorEndpoints();
 app.MapWhatsAppEndpoints();
 app.MapAiProviderEndpoints();

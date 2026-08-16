@@ -47,11 +47,32 @@ public static class AuthEndpoints
             return Results.Unauthorized();
 
         var memberships = await membershipRepository.GetByUserAsync(user.Id);
-        var activeMembership = memberships.FirstOrDefault(m => m.Status == MembershipStatus.Active);
+        if (user.IsPlatformAdmin)
+        {
+            if (memberships.Count != 0)
+                return Results.Unauthorized();
 
-        if (activeMembership is null)
+            await authenticationService.SignInAsync(httpContext, user, null, true);
+
+            return Results.Ok(new UserResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                TenantId = null,
+                Role = "PlatformAdmin",
+                IsPlatformAdmin = true
+            });
+        }
+
+        var activeMemberships = memberships
+            .Where(m => m.Status == MembershipStatus.Active)
+            .ToArray();
+
+        if (memberships.Count > 1 || activeMemberships.Length != 1)
             return Results.Unauthorized();
 
+        var activeMembership = activeMemberships[0];
         await authenticationService.SignInAsync(httpContext, user, activeMembership);
 
         return Results.Ok(new UserResponse
@@ -60,7 +81,8 @@ public static class AuthEndpoints
             Email = user.Email,
             DisplayName = user.DisplayName,
             TenantId = activeMembership.TenantId,
-            Role = activeMembership.Role.ToString()
+            Role = activeMembership.Role.ToString(),
+            IsPlatformAdmin = user.IsPlatformAdmin
         });
     }
 
@@ -84,13 +106,6 @@ public static class AuthEndpoints
         var user = await userRepository.GetByIdAsync(currentTenant.UserId.Value);
         if (user is null)
             return Results.Unauthorized();
-
-        TenantMembership? membership = null;
-        if (currentTenant.TenantId is not null)
-        {
-            membership = await membershipRepository.GetByUserAndTenantAsync(
-                user.Id, currentTenant.TenantId.Value);
-        }
 
         return Results.Ok(new UserResponse
         {

@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 
@@ -10,7 +9,9 @@ namespace WhatsAppAI.Infrastructure.Identity;
 
 public interface IAuthenticationService
 {
-    Task SignInAsync(HttpContext httpContext, User user, TenantMembership membership, bool isPlatformAdmin = false);
+    Task SignInAsync(HttpContext httpContext, User user, TenantMembership? membership,
+        bool isPlatformAdmin = false,
+        Guid? supportTenantId = null, string? supportReason = null);
     Task SignOutAsync(HttpContext httpContext);
     Task<ClaimsPrincipal?> ValidateAsync(HttpContext httpContext);
 }
@@ -19,21 +20,39 @@ internal sealed class AuthenticationService(
     IUserRepository userRepository,
     ITenantMembershipRepository membershipRepository) : IAuthenticationService
 {
-    public async Task SignInAsync(HttpContext httpContext, User user, TenantMembership membership, bool isPlatformAdmin = false)
+    public async Task SignInAsync(HttpContext httpContext, User user, TenantMembership? membership,
+        bool isPlatformAdmin = false,
+        Guid? supportTenantId = null, string? supportReason = null)
     {
+        if (isPlatformAdmin && membership is not null)
+            throw new InvalidOperationException("Platform administrators cannot sign in with a tenant membership.");
+
+        if (!isPlatformAdmin && membership is null)
+            throw new InvalidOperationException("Tenant users must sign in with a membership.");
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new("security_stamp", user.SecurityStamp),
-            new("tenant_id", membership.TenantId.ToString()),
-            new("membership_id", membership.Id.ToString()),
-            new(ClaimTypes.Role, membership.Role.ToString())
+            new("security_stamp", user.SecurityStamp)
         };
 
         if (isPlatformAdmin)
         {
             claims.Add(new Claim("platform_admin", "true"));
+            claims.Add(new Claim(ClaimTypes.Role, "PlatformAdmin"));
+
+            if (supportTenantId.HasValue && supportReason is not null)
+            {
+                claims.Add(new Claim("support_tenant_id", supportTenantId.Value.ToString()));
+                claims.Add(new Claim("support_reason", supportReason));
+            }
+        }
+        else
+        {
+            claims.Add(new Claim("tenant_id", membership!.TenantId.ToString()));
+            claims.Add(new Claim("membership_id", membership.Id.ToString()));
+            claims.Add(new Claim(ClaimTypes.Role, membership.Role.ToString()));
         }
 
         if (user.DisplayName is not null)
@@ -82,13 +101,20 @@ internal sealed class AuthenticationService(
         if (user.SecurityStamp != securityStamp)
             return null;
 
+        var isPlatformAdmin = authenticateResult.Principal.HasClaim("platform_admin", "true");
+        if (isPlatformAdmin != user.IsPlatformAdmin)
+            return null;
+
+        if (isPlatformAdmin)
+            return authenticateResult.Principal;
+
         var membershipId = authenticateResult.Principal.FindFirstValue("membership_id");
-        if (membershipId is not null)
-        {
-            var membership = await membershipRepository.GetByIdAsync(Guid.Parse(membershipId));
-            if (membership is null || membership.Status != MembershipStatus.Active)
-                return null;
-        }
+        if (membershipId is null)
+            return null;
+
+        var membership = await membershipRepository.GetByIdAsync(Guid.Parse(membershipId));
+        if (membership is null || membership.Status != MembershipStatus.Active)
+            return null;
 
         return authenticateResult.Principal;
     }

@@ -1,8 +1,10 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Admin;
 
@@ -34,65 +36,99 @@ public static class AdminTenantEndpoints
 
     private static async Task<IResult> CreateTenantAsync(
         [FromBody] CreateTenantRequest request,
-        ITenantRepository tenantRepository,
-        IUserRepository userRepository,
-        ITenantMembershipRepository membershipRepository,
-        IInvitationRepository invitationRepository,
-        ICurrentTenant currentTenant)
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext)
     {
-        var existingTenant = await tenantRepository.GetByNameAsync(request.Name);
-        if (existingTenant is not null)
-            return Results.Conflict(new { error = "Tenant with this name already exists." });
-
-        var ownerEmail = request.OwnerEmail.Trim().ToLowerInvariant();
-        var existingUser = await userRepository.GetByEmailAsync(ownerEmail);
-
-        var slug = TenantSlugHelper.GenerateSlug(request.Name);
-        var existingBySlug = await tenantRepository.GetBySlugAsync(slug);
-        if (existingBySlug is not null)
-            return Results.Conflict(new { error = "Tenant with this slug already exists." });
-
-        var tenant = Tenant.Create(request.Name, slug);
-        await tenantRepository.AddAsync(tenant);
-
-        User owner;
-        if (existingUser is not null)
+        try
         {
-            owner = existingUser;
+            var existingTenant = await dbContext.Tenants
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.Name == request.Name);
+            if (existingTenant is not null)
+                return Results.Conflict(new { error = "Tenant with this name already exists." });
+
+            var ownerEmail = request.OwnerEmail.Trim().ToLowerInvariant();
+            var existingUser = await dbContext.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == ownerEmail);
+
+            if (existingUser is not null)
+            {
+                var alreadyBelongsToTenant = await dbContext.TenantMemberships
+                    .IgnoreQueryFilters()
+                    .AnyAsync(m => m.UserId == existingUser.Id);
+
+                if (existingUser.IsPlatformAdmin || alreadyBelongsToTenant)
+                    return Results.Conflict(new { error = "User cannot be assigned to another tenant." });
+            }
+
+            var hasPendingInvitation = await dbContext.Invitations
+                .IgnoreQueryFilters()
+                .AnyAsync(invitation => invitation.Email == ownerEmail
+                    && invitation.Status == InvitationStatus.Pending
+                    && invitation.ExpiresAt > DateTime.UtcNow);
+            if (hasPendingInvitation)
+                return Results.Conflict(new { error = "User already has a pending tenant invitation." });
+
+            var slug = TenantSlugHelper.GenerateSlug(request.Name);
+            var existingBySlug = await dbContext.Tenants
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.Slug == slug);
+            if (existingBySlug is not null)
+                return Results.Conflict(new { error = "Tenant with this slug already exists." });
+
+            var tenant = Tenant.Create(request.Name, slug);
+            tenant.Activate();
+            dbContext.Tenants.Add(tenant);
+
+            User owner;
+            if (existingUser is not null)
+            {
+                owner = existingUser;
+            }
+            else
+            {
+                owner = User.Create(ownerEmail, request.OwnerDisplayName);
+                dbContext.Users.Add(owner);
+            }
+
+            var membership = TenantMembership.Create(tenant.Id, owner, MembershipRole.TenantOwner);
+            dbContext.TenantMemberships.Add(membership);
+
+            var tokenBytes = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
+            var token = Convert.ToBase64String(tokenBytes);
+            var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
+
+            var invitation = Invitation.Create(
+                tenant.Id,
+                ownerEmail,
+                tokenHash,
+                InvitationPurpose.TenantOwner,
+                currentTenant.UserId ?? Guid.Empty,
+                owner.Id);
+
+            dbContext.Invitations.Add(invitation);
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Created($"/api/admin/tenants/{tenant.Id}", new CreateTenantResponse
+            {
+                TenantId = tenant.Id,
+                TenantName = tenant.Name,
+                Slug = tenant.Slug,
+                OwnerEmail = ownerEmail,
+                ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
+                Message = "Save this activation link. It will not be shown again."
+            });
         }
-        else
+        catch (Exception ex)
         {
-            owner = User.Create(ownerEmail, request.OwnerDisplayName);
-            await userRepository.AddAsync(owner);
+            return Results.Problem(
+                title: "Failed to create tenant",
+                detail: ex.InnerException?.Message ?? ex.Message,
+                statusCode: 500);
         }
-
-        var membership = TenantMembership.Create(tenant.Id, owner.Id, MembershipRole.Owner);
-        await membershipRepository.AddAsync(membership);
-
-        var tokenBytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
-        var token = Convert.ToBase64String(tokenBytes);
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
-
-        var invitation = Invitation.Create(
-            tenant.Id,
-            ownerEmail,
-            tokenHash,
-            InvitationPurpose.TenantOwner,
-            currentTenant.UserId ?? Guid.Empty,
-            owner.Id);
-
-        await invitationRepository.AddAsync(invitation);
-
-        return Results.Created($"/api/admin/tenants/{tenant.Id}", new CreateTenantResponse
-        {
-            TenantId = tenant.Id,
-            TenantName = tenant.Name,
-            Slug = tenant.Slug,
-            OwnerEmail = ownerEmail,
-            ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
-            Message = "Save this activation link. It will not be shown again."
-        });
     }
 
     private static async Task<IResult> GetAllTenantsAsync(
@@ -105,6 +141,7 @@ public static class AdminTenantEndpoints
             Name = t.Name,
             Slug = t.Slug,
             Status = t.Status.ToString(),
+            Version = t.Version,
             CreatedAt = t.CreatedAt,
             SuspendedAt = t.SuspendedAt
         }));
@@ -124,6 +161,7 @@ public static class AdminTenantEndpoints
             Name = tenant.Name,
             Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
+            Version = tenant.Version,
             CreatedAt = tenant.CreatedAt,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
@@ -133,13 +171,28 @@ public static class AdminTenantEndpoints
     private static async Task<IResult> SuspendTenantAsync(
         Guid tenantId,
         [FromBody] SuspendTenantRequest request,
-        ITenantRepository tenantRepository)
+        ITenantRepository tenantRepository,
+        HttpContext httpContext)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
             return Results.NotFound();
 
-        tenant.Suspend(request.Reason);
+        if (!TryGetIfMatchVersion(httpContext, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header with current version is required." });
+
+        if (tenant.Version != expectedVersion)
+            return Results.Conflict(new { error = "Tenant was modified by another request. Please refresh and try again." });
+
+        try
+        {
+            tenant.Suspend(request.Reason);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
@@ -148,6 +201,7 @@ public static class AdminTenantEndpoints
             Name = tenant.Name,
             Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
+            Version = tenant.Version,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -155,13 +209,28 @@ public static class AdminTenantEndpoints
 
     private static async Task<IResult> ReactivateTenantAsync(
         Guid tenantId,
-        ITenantRepository tenantRepository)
+        ITenantRepository tenantRepository,
+        HttpContext httpContext)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
             return Results.NotFound();
 
-        tenant.Reactivate();
+        if (!TryGetIfMatchVersion(httpContext, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header with current version is required." });
+
+        if (tenant.Version != expectedVersion)
+            return Results.Conflict(new { error = "Tenant was modified by another request. Please refresh and try again." });
+
+        try
+        {
+            tenant.Reactivate();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
@@ -170,8 +239,19 @@ public static class AdminTenantEndpoints
             Name = tenant.Name,
             Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
+            Version = tenant.Version,
             ReactivatedAt = tenant.ReactivatedAt
         });
+    }
+
+    private static bool TryGetIfMatchVersion(HttpContext httpContext, out uint version)
+    {
+        version = 0;
+        var ifMatch = httpContext.Request.Headers.IfMatch.ToString();
+        if (string.IsNullOrWhiteSpace(ifMatch))
+            return false;
+
+        return uint.TryParse(ifMatch.Trim('"'), out version);
     }
 }
 
@@ -203,6 +283,7 @@ public sealed class TenantResponse
     public string Name { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
+    public uint Version { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? SuspendedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
@@ -214,8 +295,8 @@ internal static class TenantSlugHelper
     internal static string GenerateSlug(string name)
     {
         var slug = name.Trim().ToLowerInvariant();
-        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\s-]", "");
-        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[\s-]+", "-");
+        slug = Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+        slug = Regex.Replace(slug, @"[\s-]+", "-");
         return slug.Trim('-');
     }
 }

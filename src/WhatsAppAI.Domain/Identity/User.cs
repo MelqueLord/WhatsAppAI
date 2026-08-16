@@ -7,6 +7,7 @@ public sealed class User
     public string? PasswordHash { get; private set; }
     public string? DisplayName { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsPlatformAdmin { get; private set; }
     public string SecurityStamp { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime? ActivatedAt { get; private set; }
@@ -59,5 +60,15 @@ public sealed class User
     {
         PasswordHash = passwordHash;
         SecurityStamp = Guid.NewGuid().ToString("N");
+    }
+
+    public void GrantPlatformAdmin()
+    {
+        IsPlatformAdmin = true;
+    }
+
+    public void RevokePlatformAdmin()
+    {
+        IsPlatformAdmin = false;
     }
 }

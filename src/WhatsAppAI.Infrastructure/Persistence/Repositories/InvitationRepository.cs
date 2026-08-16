@@ -9,6 +9,7 @@ public sealed class InvitationRepository(AppDbContext context) : IInvitationRepo
     public async Task<Invitation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await context.Invitations
+            .IgnoreQueryFilters()
             .Include(i => i.Tenant)
             .Include(i => i.User)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);

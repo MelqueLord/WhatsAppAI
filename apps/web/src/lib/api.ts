@@ -55,8 +55,29 @@ export interface User {
   email: string
   displayName?: string
   tenantId?: string
-  role?: string
+  role?: 'PlatformAdmin' | 'TenantOwner' | 'Operator'
   isPlatformAdmin: boolean
+}
+
+export interface Tenant {
+  id: string
+  name: string
+  slug: string
+  status: string
+  version: number
+  createdAt: string
+  suspendedAt?: string
+  reactivatedAt?: string
+  suspensionReason?: string
+}
+
+export interface CreateTenantResponse {
+  tenantId: string
+  tenantName: string
+  slug: string
+  ownerEmail: string
+  activationLink: string
+  message: string
 }
 
 export const api = {
@@ -99,5 +120,27 @@ export const api = {
       fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'POST' }),
     removeFromContact: (contactId: string, tagId: string) =>
       fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
+  },
+  admin: {
+    tenants: {
+      list: () => fetchApi<Tenant[]>('/api/admin/tenants'),
+      get: (id: string) => fetchApi<Tenant>(`/api/admin/tenants/${id}`),
+      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string }) =>
+        fetchApi<CreateTenantResponse>('/api/admin/tenants', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      suspend: (id: string, reason: string, version: number) =>
+        fetchApi<Tenant>(`/api/admin/tenants/${id}/suspend`, {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+          headers: { 'If-Match': `"${version}"` },
+        }),
+      reactivate: (id: string, version: number) =>
+        fetchApi<Tenant>(`/api/admin/tenants/${id}/reactivate`, {
+          method: 'POST',
+          headers: { 'If-Match': `"${version}"` },
+        }),
+    },
   },
 }

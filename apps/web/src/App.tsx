@@ -51,8 +51,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function OwnerRoute({ children }: { children: React.ReactNode }) {
-  const { isPlatformAdmin, isTenantOwner } = useAuth()
-  if (!isPlatformAdmin && !isTenantOwner) return <Navigate to="/dashboard" replace />
+  const { isTenantOwner } = useAuth()
+  if (!isTenantOwner) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 

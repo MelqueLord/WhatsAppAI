@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Messaging;
@@ -12,7 +12,7 @@ public static class ConversationModeEndpoints
     {
         var group = app.MapGroup("/api/conversations/{conversationId:guid}/mode")
             .WithTags("Conversation Mode")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapPut("/", SwitchModeAsync)
             .WithName("SwitchConversationMode");

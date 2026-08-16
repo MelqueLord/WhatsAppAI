@@ -67,7 +67,8 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
         builder.HasIndex(m => new { m.TenantId, m.UserId })
             .IsUnique();
 
-        builder.HasIndex(m => m.UserId);
+        builder.HasIndex(m => m.UserId)
+            .IsUnique();
 
         builder.HasIndex(m => m.Status);
     }

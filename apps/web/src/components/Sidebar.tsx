@@ -29,7 +29,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inbox', icon: MessageSquare, label: 'Inbox' },
-    ...(isTenantOwner || isPlatformAdmin
+    ...(isTenantOwner
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },

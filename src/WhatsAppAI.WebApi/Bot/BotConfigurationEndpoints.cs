@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
@@ -11,7 +11,7 @@ public static class BotConfigurationEndpoints
     {
         var group = app.MapGroup("/api/bot-config")
             .WithTags("Bot Configuration")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", GetAsync);
         group.MapPost("/", SaveAsync);

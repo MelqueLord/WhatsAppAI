@@ -53,20 +53,24 @@ public static class ActivateEndpoints
         if (user.IsActive)
             return Results.BadRequest(new { error = "Account is already active." });
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-        user.Activate(passwordHash);
-        await userRepository.UpdateAsync(user);
-
         var membership = await membershipRepository.GetByUserAndTenantAsync(user.Id, invitation.TenantId);
         if (membership is null)
         {
+            var existingMemberships = await membershipRepository.GetByUserAsync(user.Id);
+            if (existingMemberships.Count != 0)
+                return Results.Conflict(new { error = "User already belongs to another tenant." });
+
             var role = invitation.Purpose == InvitationPurpose.TenantOwner
-                ? MembershipRole.Owner
+                ? MembershipRole.TenantOwner
                 : MembershipRole.Operator;
 
-            membership = TenantMembership.Create(invitation.TenantId, user.Id, role);
+            membership = TenantMembership.Create(invitation.TenantId, user, role);
             await membershipRepository.AddAsync(membership);
         }
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        user.Activate(passwordHash);
+        await userRepository.UpdateAsync(user);
 
         membership.Activate();
         await membershipRepository.UpdateAsync(membership);
@@ -74,8 +78,7 @@ public static class ActivateEndpoints
         invitation.Consume();
         await invitationRepository.UpdateAsync(invitation);
 
-        await authenticationService.SignInAsync(httpContext, user, membership,
-            invitation.Purpose == InvitationPurpose.TenantOwner);
+        await authenticationService.SignInAsync(httpContext, user, membership);
 
         return Results.Ok(new ActivateResponse
         {

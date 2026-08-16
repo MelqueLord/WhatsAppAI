@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ public static class IdentityServiceCollectionExtensions
     {
         services.AddScoped<ICurrentTenant, CurrentTenant>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddSingleton<IAuthorizationHandler, TenantContextHandler>();
 
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
@@ -22,19 +24,26 @@ public static class IdentityServiceCollectionExtensions
                 options.LogoutPath = "/api/auth/logout";
                 options.AccessDeniedPath = "/api/auth/access-denied";
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.None;
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.Cookie.Name = "whatsappai.session";
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
             });
 
+        services.AddAuthorizationBuilder()
+            .AddPolicy("RequireTenantContext", policy =>
+                policy.RequireAuthenticatedUser()
+                    .AddRequirements(new TenantContextRequirement()))
+            .AddPolicy("PlatformAdmin", policy =>
+                policy.RequireClaim("platform_admin", "true"));
+
         services.AddAntiforgery(options =>
         {
             options.HeaderName = "X-CSRF-TOKEN";
             options.Cookie.Name = "whatsappai.antiforgery";
             options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.None;
             options.Cookie.SameSite = SameSiteMode.Lax;
         });
 

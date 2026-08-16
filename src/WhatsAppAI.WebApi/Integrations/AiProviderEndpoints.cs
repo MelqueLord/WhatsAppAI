@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Domain.Integrations;
@@ -12,7 +12,7 @@ public static class AiProviderEndpoints
     {
         var group = app.MapGroup("/api/integrations/ai")
             .WithTags("AI Provider")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", GetConfigAsync)
             .WithName("GetAiConfig");

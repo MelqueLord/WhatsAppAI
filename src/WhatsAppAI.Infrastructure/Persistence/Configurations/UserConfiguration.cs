@@ -33,6 +33,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(u => u.IsPlatformAdmin)
+            .HasColumnName("is_platform_admin")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(u => u.SecurityStamp)
             .HasColumnName("security_stamp")
             .HasMaxLength(64)

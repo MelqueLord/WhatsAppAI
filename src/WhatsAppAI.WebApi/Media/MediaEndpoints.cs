@@ -1,4 +1,4 @@
-using WhatsAppAI.Application.Abstractions;
+﻿using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
@@ -11,7 +11,7 @@ public static class MediaEndpoints
     {
         var group = app.MapGroup("/api/media")
             .WithTags("Media")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/{messageId:guid}/download", DownloadMediaAsync)
             .WithName("DownloadMedia");

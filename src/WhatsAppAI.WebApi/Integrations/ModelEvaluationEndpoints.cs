@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Infrastructure.Identity;
@@ -11,7 +11,7 @@ public static class ModelEvaluationEndpoints
     {
         var group = app.MapGroup("/api/integrations/ai/evaluations")
             .WithTags("Model Evaluations")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListEvaluationsAsync)
             .WithName("ListModelEvaluations");

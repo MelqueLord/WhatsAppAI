@@ -45,6 +45,9 @@ internal sealed class TestCurrentTenant : WhatsAppAI.Application.Abstractions.IC
     public string? UserRole => null;
     public bool IsPlatformAdmin => false;
     public bool IsAuthenticated => false;
-    public void SetContext(Guid tenantId, Guid userId, string role, bool isPlatformAdmin) { }
+    public WhatsAppAI.Application.Abstractions.SupportSessionInfo? SupportSession => null;
+    public void SetContext(Guid? tenantId, Guid userId, string role, bool isPlatformAdmin) { }
+    public void EnterSupportSession(Guid tenantId, string reason) { }
+    public void ExitSupportSession() { }
     public void Clear() { }
 }

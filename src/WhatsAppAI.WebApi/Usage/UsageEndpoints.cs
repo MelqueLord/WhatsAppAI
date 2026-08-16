@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure.Identity;
 
@@ -10,7 +10,7 @@ public static class UsageEndpoints
     {
         var group = app.MapGroup("/api/usage")
             .WithTags("Usage")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", GetUsageAsync)
             .WithName("GetUsage");

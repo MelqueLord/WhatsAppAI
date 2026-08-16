@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
@@ -15,7 +15,7 @@ public static class ConversationEndpoints
     {
         var group = app.MapGroup("/api/conversations")
             .WithTags("Conversations")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListConversationsAsync)
             .WithName("ListConversations");

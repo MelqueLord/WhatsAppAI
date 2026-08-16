@@ -1,7 +1,9 @@
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Operators;
 
@@ -11,7 +13,7 @@ public static class OperatorEndpoints
     {
         var group = app.MapGroup("/api/operators")
             .WithTags("Operators")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListOperatorsAsync)
             .WithName("ListOperators");
@@ -42,6 +44,9 @@ public static class OperatorEndpoints
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
         var memberships = await membershipRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var operators = memberships
             .Where(m => m.Role == MembershipRole.Operator)
@@ -64,48 +69,57 @@ public static class OperatorEndpoints
     private static async Task<IResult> InviteOperatorAsync(
         [FromBody] InviteOperatorRequest request,
         ICurrentTenant currentTenant,
-        IUserRepository userRepository,
-        ITenantMembershipRepository membershipRepository,
-        IInvitationRepository invitationRepository)
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
 
-        if (currentTenant.UserRole != "Owner" && !currentTenant.IsPlatformAdmin)
+        if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var existingUser = await userRepository.GetByEmailAsync(email);
+        var existingUser = await dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(user => user.Email == email);
+
         if (existingUser is not null)
         {
-            var existingMembership = await membershipRepository.GetByUserAndTenantAsync(
-                existingUser.Id, currentTenant.TenantId.Value);
+            if (existingUser.IsPlatformAdmin)
+                return Results.Conflict(new { error = "User cannot be assigned to a tenant." });
 
-            if (existingMembership is not null)
-                return Results.Conflict(new { error = "User already belongs to this tenant." });
+            var alreadyBelongsToTenant = await dbContext.TenantMemberships
+                .IgnoreQueryFilters()
+                .AnyAsync(membership => membership.UserId == existingUser.Id);
+            if (alreadyBelongsToTenant)
+                return Results.Conflict(new { error = "User already belongs to a tenant." });
         }
 
-        var pendingInvites = await invitationRepository.GetPendingByTenantAndEmailAsync(
-            currentTenant.TenantId.Value, email);
-
-        foreach (var invite in pendingInvites)
-        {
-            invite.Revoke(currentTenant.UserId.Value);
-            await invitationRepository.UpdateAsync(invite);
-        }
+        var hasPendingInvitation = await dbContext.Invitations
+            .IgnoreQueryFilters()
+            .AnyAsync(invitation => invitation.Email == email
+                && invitation.Status == InvitationStatus.Pending
+                && invitation.ExpiresAt > DateTime.UtcNow);
+        if (hasPendingInvitation)
+            return Results.Conflict(new { error = "User already has a pending tenant invitation." });
 
         var tokenBytes = new byte[32];
         System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
         var token = Convert.ToBase64String(tokenBytes);
         var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
 
-        User? user = existingUser;
+        var user = existingUser;
         if (user is null)
         {
             user = User.Create(email, request.DisplayName);
-            await userRepository.AddAsync(user);
+            dbContext.Users.Add(user);
         }
+
+        var membership = TenantMembership.Create(
+            currentTenant.TenantId.Value,
+            user,
+            MembershipRole.Operator);
+        dbContext.TenantMemberships.Add(membership);
 
         var invitation = Invitation.Create(
             currentTenant.TenantId.Value,
@@ -115,14 +129,23 @@ public static class OperatorEndpoints
             currentTenant.UserId.Value,
             user.Id);
 
-        await invitationRepository.AddAsync(invitation);
+        dbContext.Invitations.Add(invitation);
 
-        return Results.Created($"/api/operators/{invitation.Id}", new InviteOperatorResponse
+        try
         {
-            InvitationId = invitation.Id,
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new { error = "User cannot be assigned to another tenant." });
+        }
+
+        return Results.Created($"/api/operators/{membership.Id}", new InviteOperatorResponse
+        {
+            MembershipId = membership.Id,
             Email = email,
-            ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
-            Message = "Save this activation link. It will not be shown again."
+            ActivationUrl = $"/activate?token={token}&invitation={invitation.Id}",
+            ExpiresAt = invitation.ExpiresAt
         });
     }
 
@@ -135,7 +158,7 @@ public static class OperatorEndpoints
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
 
-        if (currentTenant.UserRole != "Owner" && !currentTenant.IsPlatformAdmin)
+        if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
         var membership = await membershipRepository.GetByIdAsync(operatorId);
@@ -175,7 +198,7 @@ public static class OperatorEndpoints
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
 
-        if (currentTenant.UserRole != "Owner" && !currentTenant.IsPlatformAdmin)
+        if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
         var membership = await membershipRepository.GetByIdAsync(operatorId);
@@ -216,7 +239,7 @@ public static class OperatorEndpoints
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
 
-        if (currentTenant.UserRole != "Owner" && !currentTenant.IsPlatformAdmin)
+        if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
         var membership = await membershipRepository.GetByIdAsync(operatorId);
@@ -252,10 +275,10 @@ public static class OperatorEndpoints
 
         return Results.Ok(new InviteOperatorResponse
         {
-            InvitationId = invitation.Id,
+            MembershipId = membership.Id,
             Email = membership.User.Email,
-            ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
-            Message = "Save this activation link. It will not be shown again."
+            ActivationUrl = $"/activate?token={token}&invitation={invitation.Id}",
+            ExpiresAt = invitation.ExpiresAt
         });
     }
 }
@@ -268,10 +291,10 @@ public sealed class InviteOperatorRequest
 
 public sealed class InviteOperatorResponse
 {
-    public Guid InvitationId { get; init; }
+    public Guid MembershipId { get; init; }
     public string Email { get; init; } = string.Empty;
-    public string ActivationLink { get; init; } = string.Empty;
-    public string Message { get; init; } = string.Empty;
+    public string ActivationUrl { get; init; } = string.Empty;
+    public DateTime ExpiresAt { get; init; }
 }
 
 public sealed class OperatorResponse

@@ -17,13 +17,19 @@ public sealed class TenantMembership
 
     private TenantMembership() { }
 
-    public static TenantMembership Create(Guid tenantId, Guid userId, MembershipRole role)
+    public static TenantMembership Create(Guid tenantId, User user, MembershipRole role)
     {
+        ArgumentNullException.ThrowIfNull(user);
+
+        if (user.IsPlatformAdmin)
+            throw new InvalidOperationException("Platform administrators cannot belong to a tenant.");
+
         return new TenantMembership
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            UserId = userId,
+            UserId = user.Id,
+            User = user,
             Role = role,
             Status = MembershipStatus.Pending,
             CreatedAt = DateTime.UtcNow
@@ -62,7 +68,7 @@ public sealed class TenantMembership
 
 public enum MembershipRole
 {
-    Owner = 0,
+    TenantOwner = 0,
     Operator = 1
 }
 

@@ -19,13 +19,22 @@ internal sealed class CurrentTenantMiddleware(RequestDelegate next)
             var role = context.User.FindFirstValue(ClaimTypes.Role);
             var isPlatformAdmin = context.User.HasClaim("platform_admin", "true");
 
-            if (userId is not null && tenantId is not null && role is not null)
+            if (userId is not null && role is not null &&
+                (isPlatformAdmin || tenantId is not null))
             {
                 currentTenant.SetContext(
-                    Guid.Parse(tenantId),
+                    tenantId is not null ? Guid.Parse(tenantId) : null,
                     Guid.Parse(userId),
                     role,
                     isPlatformAdmin);
+            }
+
+            // Restore support session from claims if present
+            var supportTenantId = context.User.FindFirstValue("support_tenant_id");
+            var supportReason = context.User.FindFirstValue("support_reason");
+            if (isPlatformAdmin && supportTenantId is not null && supportReason is not null)
+            {
+                currentTenant.EnterSupportSession(Guid.Parse(supportTenantId), supportReason);
             }
         }
         else

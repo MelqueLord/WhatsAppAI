@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
@@ -12,7 +12,7 @@ public static class ClientTagEndpoints
     {
         var group = app.MapGroup("/api/client-tags")
             .WithTags("Client Tags")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);

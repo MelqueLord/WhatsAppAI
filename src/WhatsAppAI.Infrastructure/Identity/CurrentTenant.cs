@@ -8,14 +8,36 @@ internal sealed class CurrentTenant : ICurrentTenant
     public Guid? UserId { get; private set; }
     public string? UserRole { get; private set; }
     public bool IsPlatformAdmin { get; private set; }
-    public bool IsAuthenticated => TenantId.HasValue && UserId.HasValue;
+    public bool IsAuthenticated => UserId.HasValue;
+    public SupportSessionInfo? SupportSession { get; private set; }
 
-    public void SetContext(Guid tenantId, Guid userId, string role, bool isPlatformAdmin)
+    public void SetContext(Guid? tenantId, Guid userId, string role, bool isPlatformAdmin)
     {
-        TenantId = tenantId;
+        TenantId = isPlatformAdmin ? null : tenantId;
         UserId = userId;
-        UserRole = role;
+        UserRole = isPlatformAdmin ? "PlatformAdmin" : role;
         IsPlatformAdmin = isPlatformAdmin;
+        SupportSession = null;
+    }
+
+    public void EnterSupportSession(Guid tenantId, string reason)
+    {
+        if (!IsPlatformAdmin)
+            throw new InvalidOperationException("Only platform administrators can enter support sessions.");
+
+        TenantId = tenantId;
+        UserRole = "PlatformAdmin";
+        SupportSession = new SupportSessionInfo(tenantId, reason, DateTime.UtcNow);
+    }
+
+    public void ExitSupportSession()
+    {
+        if (SupportSession is null)
+            return;
+
+        TenantId = null;
+        UserRole = "PlatformAdmin";
+        SupportSession = null;
     }
 
     public void Clear()
@@ -24,5 +46,6 @@ internal sealed class CurrentTenant : ICurrentTenant
         UserId = null;
         UserRole = null;
         IsPlatformAdmin = false;
+        SupportSession = null;
     }
 }

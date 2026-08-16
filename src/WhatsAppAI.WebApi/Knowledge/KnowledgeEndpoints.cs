@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Knowledge;
@@ -12,7 +12,7 @@ public static class KnowledgeEndpoints
     {
         var group = app.MapGroup("/api/knowledge")
             .WithTags("Knowledge")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListAsync)
             .WithName("ListKnowledge");

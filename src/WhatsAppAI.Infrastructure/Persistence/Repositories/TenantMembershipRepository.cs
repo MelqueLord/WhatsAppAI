@@ -17,6 +17,7 @@ public sealed class TenantMembershipRepository(AppDbContext context) : ITenantMe
     public async Task<TenantMembership?> GetByUserAndTenantAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await context.TenantMemberships
+            .IgnoreQueryFilters()
             .Include(m => m.Tenant)
             .Include(m => m.User)
             .FirstOrDefaultAsync(m => m.UserId == userId && m.TenantId == tenantId, cancellationToken);
@@ -34,6 +35,7 @@ public sealed class TenantMembershipRepository(AppDbContext context) : ITenantMe
     public async Task<IReadOnlyList<TenantMembership>> GetByUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await context.TenantMemberships
+            .IgnoreQueryFilters()
             .Include(m => m.Tenant)
             .Where(m => m.UserId == userId)
             .OrderBy(m => m.CreatedAt)
