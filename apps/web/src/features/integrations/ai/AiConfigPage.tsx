@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
-import { Bot, Save, Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react'
+import { useAuth } from '../../../lib/auth'
+import { Bot, Save, Loader2, CheckCircle2, XCircle, Zap, Lock } from 'lucide-react'
 
 export function AiConfigPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const aiEnabled = user?.aiEnabled === true
   const [modelId, setModelId] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [success, setSuccess] = useState(false)
@@ -47,6 +50,19 @@ export function AiConfigPage() {
     },
     onSuccess: (data) => setTestResult(data),
   })
+
+  if (!aiEnabled) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Lock className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-slate-700">IA não disponível</h2>
+          <p className="text-sm text-slate-500 mt-1">Seu plano (BOT) não inclui funcionalidades de IA.</p>
+          <p className="text-sm text-slate-500">Faça upgrade para IA+BOT para usar este recurso.</p>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

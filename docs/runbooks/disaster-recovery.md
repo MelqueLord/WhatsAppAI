@@ -5,19 +5,22 @@
 
 ## Backup Schedule
 
-- **Database:** Automated daily backups with WAL archiving
-- **Retention:** 30 days point-in-time recovery
-- **Secrets:** Managed by vault service (automatic replication)
+- **Database:** Automated daily MySQL backups via `deploy/backup.sh`
+- **Retention:** 7 days (configurable via RETENTION_DAYS)
+- **Secrets:** AES-256 encrypted in database; encryption key in environment variable
+- **Backup location:** `/var/backups/whatsappai/`
 
 ## Recovery Procedures
 
 ### Database Restore
 
 1. Identify restore point (≤24h before incident)
-2. Restore database from backup
-3. Verify data integrity: check latest conversation/message timestamps
-4. Run smoke tests: create test tenant, verify auth, send test message
-5. Target: ≤4 hours from declaration to smoke test pass
+2. Stop application: `docker compose stop api worker`
+3. Run restore: `./deploy/restore.sh /var/backups/whatsappai/backup_YYYYMMDD_HHMMSS.sql.gz`
+4. Restart application: `docker compose up -d api worker`
+5. Verify data integrity: check latest conversation/message timestamps
+6. Run smoke tests: create test tenant, verify auth, send test message
+7. Target: ≤4 hours from declaration to smoke test pass
 
 ### Application Recovery
 

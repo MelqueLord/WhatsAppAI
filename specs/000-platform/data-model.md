@@ -104,10 +104,47 @@ Unidades são canônicas; custo pode ser nulo e, quando presente, é inteiro na 
 
 Somente append; metadata sanitizada. A identidade de banco usada pela aplicação não recebe permissão de `UPDATE` ou `DELETE`; correções são novos eventos relacionados (**FR-019**).
 
+### SubscriptionPlan
+
+`id`, `name`, `code`, `description`, `ai_enabled`, `openai_required`, `ai_metrics`, `max_operators`, `max_knowledge_items`, `is_active`, `created_at`, `updated_at`.
+
+Planos disponíveis: `BOT` (sem IA) e `IA_BOT` (com IA). `ai_enabled` controla acesso a funcionalidades de IA. Único `code`. Seed automático na inicialização (**FR-P001**, **FR-P002**, **BR-P001**).
+
+### BotConfiguration
+
+`id`, `tenant_id`, `mode`, `welcome_message`, `fallback_message`, `max_tokens_per_response`, `is_active`, `version`, timestamps.
+
+Modos: `Manual|SimpleAutoReply|AiPowered`. Configuração por tenant; `Manual` desabilita automação, `SimpleAutoReply` usa mensagem fixa, `AiPowered` usa IA com conhecimento. Versão controla concorrência otimista.
+
+### ClientTag
+
+`id`, `tenant_id`, `name`, `color`, `is_active`, `version`, timestamps.
+
+Tags definidas pelo TenantOwner para categorizar contatos. Único `(tenant_id, name)`. Desativação lógica preserva histórico (**US-009**).
+
+### ContactTag
+
+`id`, `contact_id`, `tag_id`, `created_at`, `created_by`.
+
+Junção entre Contact e ClientTag. Único `(contact_id, tag_id)`. Permite filtrar contatos por tag na inbox.
+
+### ModelEvaluation
+
+`id`, `tenant_id`, `model`, `candidate_model`, `quality_score`, `handoff_rate`, `safety_score`, `cost_per_1k_tokens`, `p95_latency_ms`, `status`, `evaluated_by`, `evaluated_at`, `approved_at`, `rejected_at`, `rollback_model`, timestamps.
+
+Gate de promoção de modelo IA. Status: `Pending|Approved|Rejected`. Aprovação registra métricas e aprovador; rejeição registra motivo. Nenhum modelo muda sem passar pelo gate (**T057**).
+
+### Secret
+
+`id`, `tenant_id` anulável para segredos globais, `kind`, `encrypted_value`, `key_ref`, `status`, `rotated_at`, timestamps.
+
+Segredos criptografados com AES-256 via `IEncryptionService`. `kind` identifica o tipo (MetaAppSecret, MetaVerifyToken, WhatsAppAccessToken, OpenAIKey). Global quando `tenant_id` é nulo; tenant-owned caso contrário. Nunca armazena valor em claro (**FR-004**, **BR-008**).
+
 ## Relacionamentos principais
 
 ```mermaid
 erDiagram
+  SUBSCRIPTION_PLAN ||--o{ TENANT : defines
   TENANT ||--o{ TENANT_MEMBERSHIP : has
     USER ||--o| TENANT_MEMBERSHIP : joins
   TENANT ||--o{ INVITATION : issues
@@ -119,6 +156,12 @@ erDiagram
   CONVERSATION ||--o{ MESSAGE : contains
   CONVERSATION ||--o{ AI_INTERACTION : evaluates
   TENANT ||--o{ KNOWLEDGE_ITEM : defines
+  TENANT ||--|| BOT_CONFIGURATION : configures
+  TENANT ||--o{ CLIENT_TAG : defines
+  CONTACT ||--o{ CONTACT_TAG : has
+  CLIENT_TAG ||--o{ CONTACT_TAG : assigns
+  TENANT ||--o{ MODEL_EVALUATION : evaluates
+  TENANT ||--o{ SECRET : stores
 ```
 
 ## Matriz de rastreabilidade de persistência
@@ -150,3 +193,4 @@ erDiagram
 | **NFR-001, NFR-002, NFR-004, NFR-005, NFR-007** | Metas operacionais não criam entidades de domínio; evidências ficam em telemetria e runbooks sanitizados. |
 | **NFR-006, SC-005** | Toda entidade tenant-owned usa `tenant_id NOT NULL`; FKs, índices e unicidades incluem/validam tenant. |
 | **SC-001, SC-002, SC-003, SC-006** | Evidências são produzidas por testes/piloto; entidades acima fornecem status, timestamps e correlação. |
+| **FR-P001, FR-P002, BR-P001** | `SubscriptionPlan` define planos (BOT/IA_BOT); `Tenant.plan_id` controla acesso a funcionalidades de IA. |

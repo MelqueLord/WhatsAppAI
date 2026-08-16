@@ -5,6 +5,7 @@ public sealed class Tenant
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string Slug { get; private set; } = string.Empty;
+    public Guid PlanId { get; private set; }
     public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
     public DateTime? ActivatedAt { get; private set; }
@@ -19,13 +20,14 @@ public sealed class Tenant
 
     private Tenant() { }
 
-    public static Tenant Create(string name, string slug)
+    public static Tenant Create(string name, string slug, Guid planId)
     {
         return new Tenant
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
             Slug = slug.Trim().ToLowerInvariant(),
+            PlanId = planId,
             Status = TenantStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
@@ -73,6 +75,12 @@ public sealed class Tenant
 
         Status = TenantStatus.Closed;
         ClosedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public void ChangePlan(Guid planId)
+    {
+        PlanId = planId;
         Version++;
     }
 }

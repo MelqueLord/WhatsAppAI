@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Integrations;
 
@@ -30,10 +31,14 @@ public static class ModelEvaluationEndpoints
 
     private static async Task<IResult> ListEvaluationsAsync(
         ICurrentTenant currentTenant,
-        IModelEvaluationRepository evaluationRepository)
+        IModelEvaluationRepository evaluationRepository,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "Model evaluations require IA+BOT plan." });
 
         var evaluations = await evaluationRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         return Results.Ok(evaluations.Select(e => new
@@ -56,10 +61,14 @@ public static class ModelEvaluationEndpoints
     private static async Task<IResult> CreateEvaluationAsync(
         [FromBody] CreateEvaluationRequest request,
         ICurrentTenant currentTenant,
-        IModelEvaluationRepository evaluationRepository)
+        IModelEvaluationRepository evaluationRepository,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
+
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "Model evaluations require IA+BOT plan." });
 
         var evaluation = ModelEvaluation.Create(
             currentTenant.TenantId.Value,

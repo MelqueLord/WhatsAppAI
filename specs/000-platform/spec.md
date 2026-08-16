@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.3.0
-**Data:** 2026-08-03
+**Versão:** 0.4.0
+**Data:** 2026-08-16
 
 ## 1. Problema
 
@@ -224,4 +224,17 @@ Estas decisões não bloqueiam o desenho, mas precisam ser fechadas antes das fa
 - Conta Meta Business aprovada, WABA, número e permissões do cliente.
 - Um Meta App compartilhado da plataforma, com `app_secret` e verify token em cofre global, configurado para WhatsApp Cloud API e webhook HTTPS público.
 - Projeto OpenAI com faturamento, chave e limites do cliente.
-- Domínio, TLS, banco PostgreSQL, armazenamento de segredos e backup.
+- Domínio, TLS, banco MySQL 8.4 LTS, armazenamento de segredos e backup.
+
+## 11. Extensões registradas
+
+### Sistema de Planos e Gestão de Empresas
+
+**Spec:** `spec-planos.md`  
+**Status:** Implementado (Fase 9 - T090-T112)
+
+Permite ao PlatformAdmin cadastrar empresas com dois tipos de plano:
+- **BOT:** Todos os recursos da plataforma, exceto IA para atendimento (inbox, operadores, resposta humana, todos os modos)
+- **IA+BOT:** Completo com IA para atendimento automatizado
+
+Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa IA mas mantém todos os outros recursos.

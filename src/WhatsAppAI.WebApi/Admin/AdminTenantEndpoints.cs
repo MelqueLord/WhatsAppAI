@@ -31,6 +31,9 @@ public static class AdminTenantEndpoints
         group.MapPost("/{tenantId:guid}/reactivate", ReactivateTenantAsync)
             .WithName("ReactivateTenant");
 
+        group.MapPut("/{tenantId:guid}/plan", UpdateTenantPlanAsync)
+            .WithName("UpdateTenantPlan");
+
         return app;
     }
 
@@ -77,7 +80,13 @@ public static class AdminTenantEndpoints
             if (existingBySlug is not null)
                 return Results.Conflict(new { error = "Tenant with this slug already exists." });
 
-            var tenant = Tenant.Create(request.Name, slug);
+            var planCode = request.PlanCode.Trim().ToUpperInvariant();
+            var plan = await dbContext.SubscriptionPlans
+                .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
+            if (plan is null)
+                return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+
+            var tenant = Tenant.Create(request.Name, slug, plan.Id);
             tenant.Activate();
             dbContext.Tenants.Add(tenant);
 
@@ -244,6 +253,38 @@ public static class AdminTenantEndpoints
         });
     }
 
+    private static async Task<IResult> UpdateTenantPlanAsync(
+        Guid tenantId,
+        [FromBody] UpdatePlanRequest request,
+        ITenantRepository tenantRepository,
+        AppDbContext dbContext)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(tenantId);
+        if (tenant is null)
+            return Results.NotFound();
+
+        var planCode = request.PlanCode.Trim().ToUpperInvariant();
+        var plan = await dbContext.SubscriptionPlans
+            .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
+        if (plan is null)
+            return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+
+        if (tenant.PlanId == plan.Id)
+            return Results.Ok(new { message = "Tenant already on this plan." });
+
+        tenant.ChangePlan(plan.Id);
+        await tenantRepository.UpdateAsync(tenant);
+
+        return Results.Ok(new TenantResponse
+        {
+            Id = tenant.Id,
+            Name = tenant.Name,
+            Slug = tenant.Slug,
+            Status = tenant.Status.ToString(),
+            Version = tenant.Version
+        });
+    }
+
     private static bool TryGetIfMatchVersion(HttpContext httpContext, out uint version)
     {
         version = 0;
@@ -260,6 +301,7 @@ public sealed class CreateTenantRequest
     public string Name { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
     public string? OwnerDisplayName { get; init; }
+    public string PlanCode { get; init; } = "BOT";
 }
 
 public sealed class CreateTenantResponse
@@ -275,6 +317,11 @@ public sealed class CreateTenantResponse
 public sealed class SuspendTenantRequest
 {
     public string Reason { get; init; } = string.Empty;
+}
+
+public sealed class UpdatePlanRequest
+{
+    public string PlanCode { get; init; } = string.Empty;
 }
 
 public sealed class TenantResponse

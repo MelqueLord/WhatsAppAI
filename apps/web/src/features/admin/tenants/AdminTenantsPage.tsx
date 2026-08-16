@@ -11,7 +11,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
+import { api, type Tenant, type Plan, type CreateTenantResponse } from '../../../lib/api'
 
 export function AdminTenantsPage() {
   const queryClient = useQueryClient()
@@ -25,6 +25,11 @@ export function AdminTenantsPage() {
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
     queryFn: () => api.admin.tenants.list(),
+  })
+
+  const { data: plans } = useQuery({
+    queryKey: ['plans'],
+    queryFn: () => api.plans.list(),
   })
 
   const createMutation = useMutation({
@@ -55,6 +60,14 @@ export function AdminTenantsPage() {
     },
   })
 
+  const updatePlanMutation = useMutation({
+    mutationFn: ({ tenantId, planCode }: { tenantId: string; planCode: string }) =>
+      api.admin.tenants.updatePlan(tenantId, planCode),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+    },
+  })
+
   const copyLink = () => {
     if (activationLink) {
       const fullLink = `${window.location.origin}${activationLink.activationLink}`
@@ -71,6 +84,7 @@ export function AdminTenantsPage() {
       name: formData.get('name') as string,
       ownerEmail: formData.get('ownerEmail') as string,
       ownerDisplayName: (formData.get('ownerDisplayName') as string) || undefined,
+      planCode: formData.get('planCode') as string,
     })
   }
 
@@ -208,6 +222,9 @@ export function AdminTenantsPage() {
                     Slug
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Plano
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -221,7 +238,7 @@ export function AdminTenantsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTenants.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                       {search ? 'Nenhum tenant encontrado com esse filtro.' : 'Nenhum tenant cadastrado.'}
                     </td>
                   </tr>
@@ -237,30 +254,44 @@ export function AdminTenantsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500">{tenant.slug}</td>
+                      <td className="px-6 py-4">
+                        {plans?.find(p => p.id === tenant.planId)?.name || '-'}
+                      </td>
                       <td className="px-6 py-4">{getStatusBadge(tenant.status)}</td>
                       <td className="px-6 py-4 text-sm text-slate-500">
                         {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {tenant.status === 'Active' ? (
-                          <button
-                            onClick={() => {
-                              setSuspendTarget(tenant)
-                              setSuspendReason('')
-                            }}
-                            className="text-sm text-red-600 hover:text-red-700 font-medium"
+                        <div className="flex items-center justify-end gap-2">
+                          <select
+                            value={plans?.find(p => p.id === tenant.planId)?.code || ''}
+                            onChange={(e) => updatePlanMutation.mutate({ tenantId: tenant.id, planCode: e.target.value })}
+                            className="text-xs px-2 py-1 border border-slate-200 rounded-lg"
                           >
-                            Suspender
-                          </button>
-                        ) : tenant.status === 'Suspended' ? (
-                          <button
-                            onClick={() => reactivateMutation.mutate(tenant)}
-                            disabled={reactivateMutation.isPending}
-                            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
-                          >
-                            {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
-                          </button>
-                        ) : null}
+                            {plans?.map(p => (
+                              <option key={p.id} value={p.code}>{p.name}</option>
+                            ))}
+                          </select>
+                          {tenant.status === 'Active' ? (
+                            <button
+                              onClick={() => {
+                                setSuspendTarget(tenant)
+                                setSuspendReason('')
+                              }}
+                              className="text-sm text-red-600 hover:text-red-700 font-medium"
+                            >
+                              Suspender
+                            </button>
+                          ) : tenant.status === 'Suspended' ? (
+                            <button
+                              onClick={() => reactivateMutation.mutate(tenant)}
+                              disabled={reactivateMutation.isPending}
+                              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                            >
+                              {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -327,6 +358,25 @@ export function AdminTenantsPage() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   placeholder="Nome do responsável (opcional)"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Plano *
+                </label>
+                <select
+                  name="planCode"
+                  required
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                >
+                  {plans?.map((plan) => (
+                    <option key={plan.id} value={plan.code}>
+                      {plan.name} — {plan.description}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  BOT: todos os recursos exceto IA | IA+BOT: completo com IA
+                </p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button

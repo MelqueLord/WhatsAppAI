@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Loader2, Info } from 'lucide-react'
+import { useAuth } from '../../lib/auth'
 
 interface UsageSummary {
   provider: string
@@ -21,6 +22,8 @@ interface UsageResponse {
 
 export function UsagePage() {
   const [days, setDays] = useState(30)
+  const { user } = useAuth()
+  const aiEnabled = user?.aiEnabled === true
 
   const { data, isLoading } = useQuery({
     queryKey: ['usage', days],
@@ -90,7 +93,7 @@ export function UsagePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data?.entries?.map((entry, i) => (
+              {data?.entries?.filter(e => aiEnabled || e.provider !== 'OpenAI').map((entry, i) => (
                 <tr key={i} className="hover:bg-slate-50">
                   <td className="px-5 py-3 text-sm font-medium text-slate-900">{entry.provider}</td>
                   <td className="px-5 py-3 text-sm text-slate-600">{entry.metric}</td>

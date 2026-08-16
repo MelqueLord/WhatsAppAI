@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Integrations;
 
@@ -28,10 +29,14 @@ public static class AiProviderEndpoints
 
     private static async Task<IResult> GetConfigAsync(
         ICurrentTenant currentTenant,
-        IAiProviderCredentialRepository credentialRepository)
+        IAiProviderCredentialRepository credentialRepository,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null)
@@ -51,10 +56,14 @@ public static class AiProviderEndpoints
         [FromBody] SaveAiConfigRequest request,
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
-        ISecretStore secretStore)
+        ISecretStore secretStore,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
 
         if (string.IsNullOrWhiteSpace(request.ApiKey))
             return Results.BadRequest(new { error = "API key is required." });
@@ -100,10 +109,14 @@ public static class AiProviderEndpoints
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
         ISecretStore secretStore,
-        IAiProvider aiProvider)
+        IAiProvider aiProvider,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null || !credential.IsActive)

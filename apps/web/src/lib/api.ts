@@ -57,18 +57,30 @@ export interface User {
   tenantId?: string
   role?: 'PlatformAdmin' | 'TenantOwner' | 'Operator'
   isPlatformAdmin: boolean
+  planCode?: string
+  aiEnabled?: boolean
 }
 
 export interface Tenant {
   id: string
   name: string
   slug: string
+  planId: string
   status: string
   version: number
   createdAt: string
   suspendedAt?: string
   reactivatedAt?: string
   suspensionReason?: string
+}
+
+export interface Plan {
+  id: string
+  name: string
+  code: string
+  description?: string
+  aiEnabled: boolean
+  maxOperators?: number
 }
 
 export interface CreateTenantResponse {
@@ -121,11 +133,14 @@ export const api = {
     removeFromContact: (contactId: string, tagId: string) =>
       fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
   },
+  plans: {
+    list: () => fetchApi<Plan[]>('/api/plans'),
+  },
   admin: {
     tenants: {
       list: () => fetchApi<Tenant[]>('/api/admin/tenants'),
       get: (id: string) => fetchApi<Tenant>(`/api/admin/tenants/${id}`),
-      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string }) =>
+      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string }) =>
         fetchApi<CreateTenantResponse>('/api/admin/tenants', {
           method: 'POST',
           body: JSON.stringify(data),
@@ -140,6 +155,11 @@ export const api = {
         fetchApi<Tenant>(`/api/admin/tenants/${id}/reactivate`, {
           method: 'POST',
           headers: { 'If-Match': `"${version}"` },
+        }),
+      updatePlan: (id: string, planCode: string) =>
+        fetchApi<Tenant>(`/api/admin/tenants/${id}/plan`, {
+          method: 'PUT',
+          body: JSON.stringify({ planCode }),
         }),
     },
   },

@@ -40,6 +40,7 @@ public static class PersistenceServiceCollectionExtensions
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();

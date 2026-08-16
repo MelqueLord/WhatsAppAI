@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bot, Save, Loader2, CheckCircle2, MessageSquare, Zap, Hand, Settings } from 'lucide-react'
+import { Bot, Save, Loader2, CheckCircle2, MessageSquare, Zap, Hand, Settings, Lock } from 'lucide-react'
+import { useAuth } from '../../lib/auth'
 
 interface BotConfig {
   configured: boolean
@@ -15,6 +16,8 @@ interface BotConfig {
 
 export function BotConfigPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const aiEnabled = user?.aiEnabled === true
   const [mode, setMode] = useState('Manual')
   const [welcomeMessage, setWelcomeMessage] = useState('')
   const [offlineMessage, setOfflineMessage] = useState('')
@@ -89,8 +92,8 @@ export function BotConfigPage() {
   const modes = [
     { value: 'Manual', label: 'Manual', icon: Hand, description: 'Sem automação. Operadores respondem tudo.' },
     { value: 'SimpleAutoReply', label: 'Resposta Automática', icon: MessageSquare, description: 'Respostas pré-definidas sem IA. Mínimo de tokens.' },
-    { value: 'AiPowered', label: 'IA Completa', icon: Zap, description: 'IA responde automaticamente com base no conhecimento.' },
-  ]
+    { value: 'AiPowered', label: 'IA Completa', icon: Zap, description: 'IA responde automaticamente com base no conhecimento.', requiresPlan: true },
+  ].filter(m => !m.requiresPlan || aiEnabled)
 
   return (
     <div className="h-full overflow-y-auto">

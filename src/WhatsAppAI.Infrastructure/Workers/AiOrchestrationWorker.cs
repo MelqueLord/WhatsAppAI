@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -6,8 +7,11 @@ using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Automation;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Domain.Usage;
+using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.Infrastructure.Workers;
 
@@ -53,12 +57,14 @@ public sealed class AiOrchestrationWorker(
         var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
         var usageRepository = scope.ServiceProvider.GetRequiredService<IUsageLedgerRepository>();
 
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var botConfigRepository = scope.ServiceProvider.GetRequiredService<IBotConfigurationRepository>();
         var pendingInbound = await messageRepository.GetUnprocessedInboundAsync(20, cancellationToken);
 
         foreach (var message in pendingInbound)
         {
             await ProcessSingleInboundAsync(
-                message, messageRepository, conversationRepository,
+                message, dbContext, botConfigRepository, messageRepository, conversationRepository,
                 credentialRepository, secretStore, aiProvider,
                 contextAssembler, outboxRepository, interactionRepository,
                 usageRepository, cancellationToken);
@@ -67,6 +73,8 @@ public sealed class AiOrchestrationWorker(
 
     private async Task ProcessSingleInboundAsync(
         Message message,
+        AppDbContext dbContext,
+        IBotConfigurationRepository botConfigRepository,
         IMessageRepository messageRepository,
         IConversationRepository conversationRepository,
         IAiProviderCredentialRepository credentialRepository,
@@ -90,6 +98,48 @@ public sealed class AiOrchestrationWorker(
 
             if (conversation.Mode != ConversationMode.Automatic)
                 return;
+
+            // Check BotConfiguration mode
+            var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
+            if (botConfig is null || !botConfig.Enabled)
+            {
+                logger.LogInformation("Bot not configured or disabled for tenant {TenantId}, skipping", message.TenantId);
+                return;
+            }
+
+            if (botConfig.Mode == BotMode.Manual)
+            {
+                logger.LogInformation("Bot in Manual mode for tenant {TenantId}, skipping", message.TenantId);
+                return;
+            }
+
+            // Handle SimpleAutoReply mode
+            if (botConfig.Mode == BotMode.SimpleAutoReply)
+            {
+                var replyContent = !string.IsNullOrWhiteSpace(botConfig.FallbackMessage)
+                    ? botConfig.FallbackMessage
+                    : botConfig.WelcomeMessage;
+
+                if (!string.IsNullOrWhiteSpace(replyContent))
+                {
+                    var outboundMsg = Message.CreateOutbound(
+                        message.TenantId, message.ConversationId, message.ContactId,
+                        MessageType.Text, replyContent, Guid.NewGuid().ToString());
+                    await messageRepository.AddAsync(outboundMsg, cancellationToken);
+
+                    var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
+                    await outboxRepository.AddAsync(outboxMsg);
+                    logger.LogInformation("SimpleAutoReply sent for tenant {TenantId}", message.TenantId);
+                }
+                return;
+            }
+
+            // Check if tenant plan has AI enabled
+            if (!await dbContext.HasAiEnabledAsync(message.TenantId, cancellationToken))
+            {
+                logger.LogInformation("AI not enabled for tenant {TenantId} plan, skipping", message.TenantId);
+                return;
+            }
 
             var credential = await credentialRepository.GetByTenantAsync(message.TenantId, cancellationToken);
             if (credential is null || !credential.IsActive)

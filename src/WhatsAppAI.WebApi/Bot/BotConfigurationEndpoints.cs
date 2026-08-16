@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Bot;
 
@@ -74,7 +76,8 @@ public static class BotConfigurationEndpoints
 
     private static async Task<IResult> UpdateModeAsync(
         [FromBody] UpdateModeRequest request,
-        ICurrentTenant currentTenant, IBotConfigurationRepository repo)
+        ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
@@ -83,6 +86,9 @@ public static class BotConfigurationEndpoints
 
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply, AiPowered" });
+
+        if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
 
         config.UpdateMode(mode);
         await repo.UpdateAsync(config);

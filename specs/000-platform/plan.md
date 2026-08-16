@@ -5,7 +5,7 @@
 
 ## 1. Arquitetura escolhida
 
-Monólito modular com frontend separado e um único backend implantável. O backend expõe HTTP/SignalR, executa workers internos e acessa PostgreSQL. Limites de módulos permitem extração futura, mas não criam custo distribuído antecipadamente.
+Monólito modular com frontend separado e um único backend implantável. O backend expõe HTTP/SignalR, executa workers internos e acessa MySQL 8.4 LTS. Limites de módulos permitem extração futura, mas não criam custo distribuído antecipadamente.
 
 ### Módulos
 
@@ -29,7 +29,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | IA | OpenAI Responses API | interface atual com saída estruturada e uso auditável |
 | WhatsApp | Meta Graph/Cloud API | canal oficial e suportado |
 | Testes | xUnit, Testcontainers, Vitest, Playwright | pirâmide completa e ambiente realista |
-| Local | Docker Compose | PostgreSQL e dependências reproduzíveis |
+| Local | Docker Compose | MySQL e dependências reproduzíveis |
 
 Versões menores devem ser fixadas no bootstrap e atualizadas de forma deliberada.
 
@@ -139,7 +139,7 @@ Implementar fatias verticais em ordem de `tasks.md`. A primeira demo funcional t
 | Controle humano | estados de conversa, versão e revalidação |
 | Isolamento | tenant em dados, auth, SignalR, jobs e testes |
 | Observável | Inbox/Outbox, correlação, métricas e runbooks |
-| Proporcional | PostgreSQL central; extração condicionada a métricas |
+| Proporcional | MySQL central; extração condicionada a métricas |
 | Especificação executável | IDs rastreados em contrato, tarefas e testes |
 
 ## 11. Decisões arquiteturais vigentes

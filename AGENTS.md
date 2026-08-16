@@ -26,11 +26,11 @@ Se código e especificação divergirem, interrompa a implementação e proponha
 
 - Backend: .NET 10 LTS, ASP.NET Core, EF Core e SignalR.
 - Frontend: React 19.2, TypeScript e Vite.
-- Persistência: PostgreSQL 18.
+- Persistência: MySQL 8.4 LTS.
 - Organização: monólito modular com separação leve entre Domain, Application, Infrastructure e WebApi.
 - Integrações: WhatsApp Cloud API oficial e OpenAI Responses API atrás de interfaces próprias.
-- Assíncrono: padrões Inbox/Outbox e worker durável apoiado no PostgreSQL.
-- Não adicionar ao núcleo do MVP: n8n, microsserviços, RabbitMQ, Redis, pgvector ou Kubernetes.
+- Assíncrono: padrões Inbox/Outbox e worker durável apoiado no MySQL.
+- Não adicionar ao núcleo do MVP: n8n, microsserviços, RabbitMQ, Redis ou Kubernetes.
 
 ## Segurança obrigatória
 

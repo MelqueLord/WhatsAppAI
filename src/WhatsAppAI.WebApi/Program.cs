@@ -114,6 +114,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Seed subscription plans
+await app.Services.SeedDefaultPlansAsync();
+
 app.UseCors();
 app.UseRateLimiter();
 app.UseObservability();
@@ -137,6 +140,7 @@ app.MapAntiforgeryBootstrap();
 app.MapAuthEndpoints();
 app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
+app.MapSubscriptionPlanEndpoints();
 app.MapSupportSessionEndpoints();
 app.MapOperatorEndpoints();
 app.MapWhatsAppEndpoints();

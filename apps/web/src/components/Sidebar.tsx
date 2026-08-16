@@ -26,6 +26,8 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, isPlatformAdmin, isTenantOwner, logout } = useAuth()
 
+  const aiEnabled = user?.aiEnabled === true
+
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inbox', icon: MessageSquare, label: 'Inbox' },
@@ -33,7 +35,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
-          { to: '/integrations/ai', icon: Bot, label: 'IA' },
+          ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/tags', icon: Tags, label: 'Tags' },
           { to: '/bot-config', icon: Settings, label: 'Bot' },

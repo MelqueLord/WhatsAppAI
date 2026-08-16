@@ -33,8 +33,9 @@ public sealed class TenantMembershipConfigurationTests
         await context.Database.OpenConnectionAsync();
         await context.Database.EnsureCreatedAsync();
 
-        var firstTenant = Tenant.Create("First company", "first-company");
-        var secondTenant = Tenant.Create("Second company", "second-company");
+        var planId = Guid.NewGuid();
+        var firstTenant = Tenant.Create("First company", "first-company", planId);
+        var secondTenant = Tenant.Create("Second company", "second-company", planId);
         var user = User.Create("operator@example.com");
         context.AddRange(firstTenant, secondTenant, user);
         context.TenantMemberships.Add(TenantMembership.Create(firstTenant.Id, user, MembershipRole.Operator));

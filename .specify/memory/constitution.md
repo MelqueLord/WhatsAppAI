@@ -25,7 +25,7 @@ Cada incremento precisa ser executável, testável e ligado a requisitos. Webhoo
 
 ## VI. Arquitetura proporcional
 
-O início é um monólito modular implantável como uma unidade, com PostgreSQL como infraestrutura central. Novos componentes operacionais só entram mediante métrica, gargalo observado e ADR aprovado. Interfaces protegem o domínio de SDKs externos sem antecipar abstrações genéricas.
+O início é um monólito modular implantável como uma unidade, com MySQL 8.4 LTS como infraestrutura central. Novos componentes operacionais só entram mediante métrica, gargalo observado e ADR aprovado. Interfaces protegem o domínio de SDKs externos sem antecipar abstrações genéricas.
 
 ## VII. Especificação executável
 

@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Auth;
 
@@ -98,7 +100,8 @@ public static class AuthEndpoints
         HttpContext httpContext,
         IUserRepository userRepository,
         ITenantMembershipRepository membershipRepository,
-        ICurrentTenant currentTenant)
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext)
     {
         if (!currentTenant.IsAuthenticated || currentTenant.UserId is null)
             return Results.Unauthorized();
@@ -106,6 +109,22 @@ public static class AuthEndpoints
         var user = await userRepository.GetByIdAsync(currentTenant.UserId.Value);
         if (user is null)
             return Results.Unauthorized();
+
+        string? planCode = null;
+        bool? aiEnabled = null;
+        if (currentTenant.TenantId is not null)
+        {
+            var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+            if (tenant is not null)
+            {
+                var plan = await dbContext.SubscriptionPlans.FindAsync(tenant.PlanId);
+                if (plan is not null)
+                {
+                    planCode = plan.Code;
+                    aiEnabled = plan.AiEnabled;
+                }
+            }
+        }
 
         return Results.Ok(new UserResponse
         {
@@ -133,4 +152,6 @@ public sealed class UserResponse
     public Guid? TenantId { get; init; }
     public string? Role { get; init; }
     public bool IsPlatformAdmin { get; init; }
+    public string? PlanCode { get; init; }
+    public bool? AiEnabled { get; init; }
 }

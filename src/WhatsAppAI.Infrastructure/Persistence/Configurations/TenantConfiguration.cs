@@ -26,6 +26,11 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(t => t.PlanId)
+            .HasColumnName("plan_id")
+            .HasColumnType("char(36)")
+            .IsRequired();
+
         builder.Property(t => t.Status)
             .HasColumnName("status")
             .HasConversion<string>()

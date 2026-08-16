@@ -15,12 +15,14 @@ Este documento define a sequência esperada; os comandos executáveis serão con
 Copie `.env.example` para um `.env` local ignorado, substitua a senha de exemplo e execute:
 
 ```bash
-docker compose up -d postgres
-docker compose ps postgres
-dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=whatsapp_ai;Username=whatsapp_ai;Password=<senha-local>"
+docker compose up -d mysql
+docker compose ps mysql
+dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Server=localhost;Port=3306;Database=whatsapp_ai;User=whatsapp_ai;Password=<senha-local>"
 dotnet restore
 dotnet run --project src/WhatsAppAI.WebApi
 ```
+
+**Nota:** O modo desenvolvimento usa SQLite por conveniência (configurado em `Program.cs`). O MySQL via Docker Compose é usado para testes de integração e produção.
 
 Nenhuma migration existe no bootstrap. O primeiro `dotnet ef database update` somente será executado depois da migration de Tenant/User prevista na Fase 1.
 
@@ -31,6 +33,17 @@ cd apps/web
 npm ci
 npm run dev
 ```
+
+## Planos de assinatura
+
+A aplicação possui dois planos pré-configurados (seed automático):
+
+| Plano | Código | IA | Descrição |
+|---|---|---|---|
+| BOT | `BOT` | Não | Todos os recursos exceto IA para atendimento |
+| IA + BOT | `IA_BOT` | Sim | Completo com IA para atendimento automatizado |
+
+O plano é selecionado ao criar um tenant via `/api/admin/tenants`. Funcionalidades de IA são filtradas automaticamente baseado no plano.
 
 ## Segredos locais
 

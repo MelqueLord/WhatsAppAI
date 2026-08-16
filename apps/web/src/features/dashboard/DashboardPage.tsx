@@ -10,11 +10,14 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
+  Shield,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export function DashboardPage() {
   const { user, isPlatformAdmin, isTenantOwner } = useAuth()
+  const planName = user?.planCode === 'IA_BOT' ? 'IA + BOT' : user?.planCode === 'BOT' ? 'BOT' : '—'
+  const aiEnabled = user?.aiEnabled === true
 
   const { data: conversations } = useQuery({
     queryKey: ['conversations'],
@@ -42,9 +45,9 @@ export function DashboardPage() {
     },
     {
       label: 'IA Respondendo',
-      value: 'Ativo',
+      value: aiEnabled ? 'Ativo' : 'Indisponível',
       icon: Bot,
-      color: 'violet',
+      color: aiEnabled ? 'violet' : 'slate',
     },
   ]
 
@@ -53,24 +56,31 @@ export function DashboardPage() {
     blue: 'bg-blue-50 text-blue-600',
     amber: 'bg-amber-50 text-amber-600',
     violet: 'bg-violet-50 text-violet-600',
+    slate: 'bg-slate-100 text-slate-500',
   }
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">
-            Olá, {user?.displayName || user?.email?.split('@')[0]}
-          </h1>
-          <p className="text-slate-500 mt-1">
-            {new Date().toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Olá, {user?.displayName || user?.email?.split('@')[0]}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {new Date().toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
+            <Shield className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Plano: {planName}</span>
+          </div>
         </div>
 
         {/* Stats Grid */}
