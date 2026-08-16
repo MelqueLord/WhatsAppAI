@@ -40,16 +40,16 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(u => u.ActivatedAt)
             .HasColumnName("activated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(u => u.LastLoginAt)
             .HasColumnName("last_login_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.HasIndex(u => u.Email)
             .IsUnique();

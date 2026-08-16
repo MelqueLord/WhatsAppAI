@@ -21,10 +21,10 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | Área | Escolha | Motivo |
 |---|---|---|
 | Backend | .NET 10 LTS / ASP.NET Core | LTS atual, bom suporte a API, workers e SignalR |
-| ORM | EF Core 10 + Npgsql | migrations e integração madura com PostgreSQL |
+| ORM | EF Core 10 + MySql.EntityFrameworkCore | migrations e integração com MySQL 8.4 |
 | Frontend | React 19.2 + TypeScript + Vite | SPA simples, tipada e de ciclo rápido |
 | UI data | TanStack Query | cache e estados de servidor sem store global excessiva |
-| Banco | PostgreSQL 18 | dados transacionais, JSONB e filas duráveis iniciais |
+| Banco | MySQL 8.4 LTS | dados transacionais, utf8mb4, compatível com Hostinger VPS |
 | Tempo real | SignalR | integração nativa e grupos por tenant |
 | IA | OpenAI Responses API | interface atual com saída estruturada e uso auditável |
 | WhatsApp | Meta Graph/Cloud API | canal oficial e suportado |
@@ -150,6 +150,7 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 - `docs/architecture/adr/0002-official-whatsapp-cloud-api.md`;
 - `docs/architecture/adr/0003-customer-owned-provider-billing.md`;
 - `docs/architecture/adr/0004-no-n8n-core.md`;
-- `docs/architecture/adr/0005-postgres-inbox-outbox.md`.
+- `docs/architecture/adr/0005-postgres-inbox-outbox.md`;
+- `docs/architecture/adr/0006-hosting-and-secrets.md`.
 
 A topologia de um Meta App compartilhado especializa ADR-0002/0003 e está registrada em **R-010**. A política normativa de IA é `docs/ai/behavior-policy.md`.

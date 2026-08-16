@@ -21,6 +21,11 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(t => t.Slug)
+            .HasColumnName("slug")
+            .HasMaxLength(200)
+            .IsRequired();
+
         builder.Property(t => t.Status)
             .HasColumnName("status")
             .HasConversion<string>()
@@ -29,16 +34,24 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
+
+        builder.Property(t => t.ActivatedAt)
+            .HasColumnName("activated_at")
+            .HasColumnType("datetime(6)");
 
         builder.Property(t => t.SuspendedAt)
             .HasColumnName("suspended_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(t => t.ReactivatedAt)
             .HasColumnName("reactivated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
+
+        builder.Property(t => t.ClosedAt)
+            .HasColumnName("closed_at")
+            .HasColumnType("datetime(6)");
 
         builder.Property(t => t.SuspensionReason)
             .HasColumnName("suspension_reason")
@@ -50,6 +63,9 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasDefaultValue(0);
 
         builder.HasIndex(t => t.Name)
+            .IsUnique();
+
+        builder.HasIndex(t => t.Slug)
             .IsUnique();
 
         builder.HasIndex(t => t.Status);

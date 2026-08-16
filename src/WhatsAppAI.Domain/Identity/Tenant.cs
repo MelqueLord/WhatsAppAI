@@ -4,10 +4,13 @@ public sealed class Tenant
 {
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
-    public TenantStatus Status { get; private set; } = TenantStatus.Active;
+    public string Slug { get; private set; } = string.Empty;
+    public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
+    public DateTime? ActivatedAt { get; private set; }
     public DateTime? SuspendedAt { get; private set; }
     public DateTime? ReactivatedAt { get; private set; }
+    public DateTime? ClosedAt { get; private set; }
     public string? SuspensionReason { get; private set; }
     public uint Version { get; private set; }
 
@@ -16,21 +19,35 @@ public sealed class Tenant
 
     private Tenant() { }
 
-    public static Tenant Create(string name)
+    public static Tenant Create(string name, string slug)
     {
         return new Tenant
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
-            Status = TenantStatus.Active,
+            Slug = slug.Trim().ToLowerInvariant(),
+            Status = TenantStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
     }
 
+    public void Activate()
+    {
+        if (Status == TenantStatus.Active)
+            throw new InvalidOperationException("Tenant is already active.");
+
+        if (Status == TenantStatus.Closed)
+            throw new InvalidOperationException("Closed tenants cannot be reactivated.");
+
+        Status = TenantStatus.Active;
+        ActivatedAt = DateTime.UtcNow;
+        Version++;
+    }
+
     public void Suspend(string reason)
     {
-        if (Status == TenantStatus.Suspended)
-            throw new InvalidOperationException("Tenant is already suspended.");
+        if (Status != TenantStatus.Active)
+            throw new InvalidOperationException("Only active tenants can be suspended.");
 
         Status = TenantStatus.Suspended;
         SuspendedAt = DateTime.UtcNow;
@@ -48,10 +65,22 @@ public sealed class Tenant
         SuspensionReason = null;
         Version++;
     }
+
+    public void Close()
+    {
+        if (Status == TenantStatus.Closed)
+            throw new InvalidOperationException("Tenant is already closed.");
+
+        Status = TenantStatus.Closed;
+        ClosedAt = DateTime.UtcNow;
+        Version++;
+    }
 }
 
 public enum TenantStatus
 {
-    Active = 0,
-    Suspended = 1
+    Pending = 0,
+    Active = 1,
+    Suspended = 2,
+    Closed = 3
 }

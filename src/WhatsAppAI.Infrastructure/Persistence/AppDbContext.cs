@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
@@ -9,9 +10,16 @@ using WhatsAppAI.Domain.Usage;
 
 namespace WhatsAppAI.Infrastructure.Persistence;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options)
+public sealed class AppDbContext : DbContext
 {
+    internal readonly ICurrentTenant _currentTenant;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant currentTenant)
+        : base(options)
+    {
+        _currentTenant = currentTenant;
+    }
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
@@ -37,6 +45,69 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        var tenantId = _currentTenant.TenantId;
+
+        modelBuilder.Entity<Contact>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<Conversation>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<Message>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<OutboxMessage>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<HandoffEvent>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<WhatsAppAccount>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<AiProviderCredential>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<AiInteraction>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<UsageLedger>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ModelEvaluation>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<KnowledgeItem>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ClientTag>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ContactTag>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<BotConfiguration>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<Invitation>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<TenantMembership>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+
         base.OnModelCreating(modelBuilder);
+    }
+}
+
+internal sealed class TenantModelCacheKeyFactory
+    : Microsoft.EntityFrameworkCore.Infrastructure.IModelCacheKeyFactory
+{
+    public object Create(DbContext context, bool designTime)
+    {
+        return new TenantModelCacheKey((AppDbContext)context, designTime);
+    }
+}
+
+internal sealed class TenantModelCacheKey(AppDbContext context, bool designTime)
+    : Microsoft.EntityFrameworkCore.Infrastructure.ModelCacheKey(context, designTime)
+{
+    private readonly Guid? _tenantId = context._currentTenant.TenantId;
+
+    public override bool Equals(object? obj)
+    {
+        return base.Equals(obj)
+            && obj is TenantModelCacheKey other
+            && _tenantId == other._tenantId;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(base.GetHashCode(), _tenantId);
     }
 }

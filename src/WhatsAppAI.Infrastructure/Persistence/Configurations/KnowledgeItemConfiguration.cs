@@ -19,10 +19,10 @@ public sealed class KnowledgeItemConfiguration : IEntityTypeConfiguration<Knowle
         builder.Property(k => k.Priority).HasColumnName("priority").IsRequired();
         builder.Property(k => k.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(k => k.Version).HasColumnName("version").IsConcurrencyToken().IsRequired();
-        builder.Property(k => k.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
-        builder.Property(k => k.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz");
-        builder.Property(k => k.DeactivatedAt).HasColumnName("deactivated_at").HasColumnType("timestamptz");
-        builder.Property(k => k.ReactivatedAt).HasColumnName("reactivated_at").HasColumnType("timestamptz");
+        builder.Property(k => k.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(k => k.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime(6)");
+        builder.Property(k => k.DeactivatedAt).HasColumnName("deactivated_at").HasColumnType("datetime(6)");
+        builder.Property(k => k.ReactivatedAt).HasColumnName("reactivated_at").HasColumnType("datetime(6)");
 
         builder.HasIndex(k => new { k.TenantId, k.IsActive });
         builder.HasIndex(k => k.TenantId);

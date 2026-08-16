@@ -54,24 +54,23 @@ public sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webhook
 
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(e => e.ProcessedAt)
             .HasColumnName("processed_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(e => e.NextRetryAt)
             .HasColumnName("next_retry_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique();
 
         builder.HasIndex(e => e.Status);
 
-        builder.HasIndex(e => e.NextRetryAt)
-            .HasFilter("status = 'Failed'");
+        builder.HasIndex(e => e.NextRetryAt);
 
         builder.HasIndex(e => new { e.Status, e.CreatedAt });
     }

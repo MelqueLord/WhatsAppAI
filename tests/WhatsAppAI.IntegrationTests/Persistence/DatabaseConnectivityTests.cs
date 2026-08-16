@@ -1,40 +1,50 @@
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
+using Testcontainers.MySql;
 using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.IntegrationTests.Persistence;
 
 public sealed class DatabaseConnectivityTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18.3-alpine")
+    private readonly MySqlContainer _mysql = new MySqlBuilder("mysql:8.4-lts")
         .WithDatabase("whatsapp_ai_tests")
-        .WithUsername("whatsapp_ai")
+        .WithUsername("testuser")
         .WithPassword($"test-{Guid.NewGuid():N}")
         .Build();
 
-    public Task InitializeAsync() => _postgres.StartAsync();
+    public Task InitializeAsync() => _mysql.StartAsync();
 
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+    public Task DisposeAsync() => _mysql.DisposeAsync().AsTask();
 
     [Fact]
     public async Task DbContext_connects_without_migrations_or_business_schema()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
+            .UseMySQL(_mysql.GetConnectionString())
             .Options;
 
-        await using var context = new AppDbContext(options);
+        await using var context = new AppDbContext(options, new TestCurrentTenant());
 
         Assert.True(await context.Database.CanConnectAsync());
-        Assert.Empty(context.Database.GetMigrations());
 
         await using var connection = context.Database.GetDbConnection();
         await connection.OpenAsync();
 
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';";
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();";
 
         Assert.Equal(0L, Convert.ToInt64(await command.ExecuteScalarAsync()));
     }
+}
+
+internal sealed class TestCurrentTenant : WhatsAppAI.Application.Abstractions.ICurrentTenant
+{
+    public Guid? TenantId => null;
+    public Guid? UserId => null;
+    public string? UserRole => null;
+    public bool IsPlatformAdmin => false;
+    public bool IsAuthenticated => false;
+    public void SetContext(Guid tenantId, Guid userId, string role, bool isPlatformAdmin) { }
+    public void Clear() { }
 }

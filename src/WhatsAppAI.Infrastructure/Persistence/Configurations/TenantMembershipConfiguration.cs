@@ -38,16 +38,16 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
 
         builder.Property(m => m.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(m => m.DeactivatedAt)
             .HasColumnName("deactivated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.ReactivatedAt)
             .HasColumnName("reactivated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.Version)
             .HasColumnName("version")

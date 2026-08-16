@@ -35,16 +35,16 @@ public sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
 
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(c => c.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.LastMessageAt)
             .HasColumnName("last_message_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.HasIndex(c => new { c.TenantId, c.PhoneNumber })
             .IsUnique();

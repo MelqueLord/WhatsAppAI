@@ -27,10 +27,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-// Use SQLite for development, PostgreSQL for production
+// Use SQLite for development, MySQL for production
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SQLite";
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Data Source=whatsappai.db";
+    ?? "Server=localhost;Port=3306;Database=whatsappai_dev;User=root;Password=root;CharSet=utf8mb4";
 
 builder.Services.AddPersistence(connectionString, dbProvider);
 builder.Services.AddObservability(builder.Configuration);
@@ -88,11 +88,18 @@ builder.Services.AddAuthorizationBuilder()
 
 var app = builder.Build();
 
-// Ensure database is created
+// Apply database schema
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.EnsureCreated();
+    try
+    {
+        context.Database.EnsureCreated();
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
+    {
+        // Table already exists — schema is present
+    }
 }
 
 app.UseCors();

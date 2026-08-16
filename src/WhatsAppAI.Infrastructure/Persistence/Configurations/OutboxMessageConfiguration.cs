@@ -36,23 +36,22 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
 
         builder.Property(o => o.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(o => o.ProcessedAt)
             .HasColumnName("processed_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(o => o.NextRetryAt)
             .HasColumnName("next_retry_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(o => o.LastError)
             .HasColumnName("last_error")
             .HasMaxLength(2000);
 
-        builder.HasIndex(o => new { o.Status, o.NextRetryAt })
-            .HasFilter("status = 'Pending'");
+        builder.HasIndex(o => new { o.Status, o.NextRetryAt });
 
         builder.HasIndex(o => o.TenantId);
     }

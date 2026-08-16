@@ -16,7 +16,7 @@ public sealed class ClientTagConfiguration : IEntityTypeConfiguration<ClientTag>
         builder.Property(t => t.Color).HasColumnName("color").HasMaxLength(20);
         builder.Property(t => t.Description).HasColumnName("description").HasMaxLength(500);
         builder.Property(t => t.IsActive).HasColumnName("is_active").IsRequired();
-        builder.Property(t => t.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
+        builder.Property(t => t.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
         builder.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
     }
 }

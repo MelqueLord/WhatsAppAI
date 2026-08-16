@@ -31,12 +31,12 @@ public sealed class SecretConfiguration : IEntityTypeConfiguration<Secret>
 
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(s => s.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.HasIndex(s => new { s.Key, s.TenantId })
             .IsUnique();

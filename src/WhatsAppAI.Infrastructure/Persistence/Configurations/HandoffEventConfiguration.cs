@@ -46,7 +46,7 @@ public sealed class HandoffEventConfiguration : IEntityTypeConfiguration<Handoff
 
         builder.Property(h => h.OccurredAt)
             .HasColumnName("occurred_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.HasIndex(h => new { h.TenantId, h.ConversationId, h.OccurredAt });

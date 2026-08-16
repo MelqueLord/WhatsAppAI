@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Context;
@@ -15,20 +16,25 @@ public static class PersistenceServiceCollectionExtensions
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
         string connectionString,
-        string provider = "PostgreSQL")
+        string provider = "MySQL")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddSingleton<TenantSaveChangesInterceptor>();
+        services.AddSingleton<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
         {
+            options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
+
             switch (provider.ToUpperInvariant())
             {
                 case "SQLITE":
                     options.UseSqlite(connectionString);
                     break;
-                case "POSTGRESQL":
+                case "MYSQL":
                 default:
-                    options.UseNpgsql(connectionString);
+                    options.UseMySQL(connectionString);
                     break;
             }
         });
@@ -60,13 +66,5 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ContextAssembler>();
 
         return services;
-    }
-
-    // Keep backward compatibility
-    public static IServiceCollection AddPostgreSqlPersistence(
-        this IServiceCollection services,
-        string connectionString)
-    {
-        return services.AddPersistence(connectionString, "PostgreSQL");
     }
 }

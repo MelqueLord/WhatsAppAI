@@ -1,28 +1,36 @@
-# ADR-0006: Hosting and Secret Management
+# ADR-0006: Hosting, Database and Secret Management
 
-**Status:** Proposed
-**Date:** 2026-08-14
+**Status:** Accepted — 2026-08-14
 
 ## Context
 
-The platform needs production hosting and a managed secret store. The constitution requires secrets to pass through `ISecretStore` and never persist in plaintext. Current development uses SQLite + AES-encrypted local secrets.
+The platform needs production hosting, a database provider and a managed secret store. The constitution requires secrets to pass through `ISecretStore` and never persist in plaintext. Current development uses SQLite with AES-encrypted local secrets.
 
 ## Decision
 
-**Hosting:** Linux App Service (Azure) or equivalent PaaS with PostgreSQL managed instance.
+**Hosting:** Hostinger VPS with Docker Compose (API, frontend, worker, MySQL, Nginx).
 
-**Secrets:** Environment variables for development; Azure Key Vault (or equivalent) for production. The `ISecretStore` abstraction allows swapping implementations without changing application code.
+**Database:** MySQL 8.4 LTS with `MySql.EntityFrameworkCore` provider. UTF-8 (`utf8mb4`) for text and emojis. UTC timestamps stored as `datetime(6)`. GUIDs stored as `char(36)`.
 
-**Backup:** Automated daily PostgreSQL backups with point-in-time recovery ≤24h.
+**Secrets:** Environment variables for development; Hostinger-managed secrets or file-based vault for production. The `ISecretStore` abstraction allows swapping implementations without changing application code.
+
+**Backup:** Automated daily MySQL backups with point-in-time recovery ≤24h via external backup script.
+
+**Reverse proxy:** Nginx with HTTPS (Let's Encrypt) as the entry point. MySQL port 3306 not exposed to the internet.
 
 ## Consequences
 
-- Production secrets are managed by the cloud provider's vault service.
-- `ISecretStore` has two implementations: `SecretStore` (local/AES) and `KeyVaultSecretStore` (managed).
+- MySQL replaces PostgreSQL throughout: EF Core provider, migrations, connection strings, Docker Compose, Testcontainers.
+- `utf8mb4` character set supports full Unicode including emojis for WhatsApp messages.
+- All timestamps use `datetime(6)` (microsecond precision) in UTC.
+- Partial indexes (PostgreSQL `WHERE` clauses) are removed; MySQL does not support them.
+- Production secrets are managed by environment variables or file-based vault.
+- `ISecretStore` has two implementations: `SecretStore` (local/AES) and a production implementation for the hosting environment.
 - No secrets in source code, CI/CD logs, or application logs.
 - Restore runbook must be tested quarterly.
 
 ## Alternatives Considered
 
-- **Self-managed HashiCorp Vault:** Higher operational overhead for MVP.
-- **AWS Secrets Manager:** Equivalent; chosen based on team familiarity with Azure.
+- **PostgreSQL 18:** Original choice; replaced by MySQL for Hostinger VPS compatibility and simpler hosting.
+- **Azure PaaS:** Higher cost and complexity for MVP; Hostinger VPS sufficient for 50 tenants.
+- **Managed MySQL (RDS/CloudSQL):** Overkill for MVP; VPS MySQL with external backup is sufficient.

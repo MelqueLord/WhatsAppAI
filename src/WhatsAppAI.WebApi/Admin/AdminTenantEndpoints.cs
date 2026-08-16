@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
@@ -46,7 +47,12 @@ public static class AdminTenantEndpoints
         var ownerEmail = request.OwnerEmail.Trim().ToLowerInvariant();
         var existingUser = await userRepository.GetByEmailAsync(ownerEmail);
 
-        var tenant = Tenant.Create(request.Name);
+        var slug = TenantSlugHelper.GenerateSlug(request.Name);
+        var existingBySlug = await tenantRepository.GetBySlugAsync(slug);
+        if (existingBySlug is not null)
+            return Results.Conflict(new { error = "Tenant with this slug already exists." });
+
+        var tenant = Tenant.Create(request.Name, slug);
         await tenantRepository.AddAsync(tenant);
 
         User owner;
@@ -82,6 +88,7 @@ public static class AdminTenantEndpoints
         {
             TenantId = tenant.Id,
             TenantName = tenant.Name,
+            Slug = tenant.Slug,
             OwnerEmail = ownerEmail,
             ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
             Message = "Save this activation link. It will not be shown again."
@@ -96,6 +103,7 @@ public static class AdminTenantEndpoints
         {
             Id = t.Id,
             Name = t.Name,
+            Slug = t.Slug,
             Status = t.Status.ToString(),
             CreatedAt = t.CreatedAt,
             SuspendedAt = t.SuspendedAt
@@ -114,6 +122,7 @@ public static class AdminTenantEndpoints
         {
             Id = tenant.Id,
             Name = tenant.Name,
+            Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
             CreatedAt = tenant.CreatedAt,
             SuspendedAt = tenant.SuspendedAt,
@@ -137,6 +146,7 @@ public static class AdminTenantEndpoints
         {
             Id = tenant.Id,
             Name = tenant.Name,
+            Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
@@ -158,6 +168,7 @@ public static class AdminTenantEndpoints
         {
             Id = tenant.Id,
             Name = tenant.Name,
+            Slug = tenant.Slug,
             Status = tenant.Status.ToString(),
             ReactivatedAt = tenant.ReactivatedAt
         });
@@ -175,6 +186,7 @@ public sealed class CreateTenantResponse
 {
     public Guid TenantId { get; init; }
     public string TenantName { get; init; } = string.Empty;
+    public string Slug { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
     public string ActivationLink { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
@@ -189,9 +201,21 @@ public sealed class TenantResponse
 {
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string Slug { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? SuspendedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
     public string? SuspensionReason { get; init; }
+}
+
+internal static class TenantSlugHelper
+{
+    internal static string GenerateSlug(string name)
+    {
+        var slug = name.Trim().ToLowerInvariant();
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[\s-]+", "-");
+        return slug.Trim('-');
+    }
 }

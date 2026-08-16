@@ -89,6 +89,7 @@ public class DependencyTests
             .ShouldNot()
             .HaveDependencyOnAny(
                 "Microsoft.EntityFrameworkCore",
+                "MySql.EntityFrameworkCore",
                 "Npgsql",
                 "StackExchange.Redis",
                 "Newtonsoft.Json")

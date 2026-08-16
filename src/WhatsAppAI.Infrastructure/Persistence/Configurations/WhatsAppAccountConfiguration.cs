@@ -41,21 +41,19 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
 
         builder.Property(a => a.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(a => a.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(a => a.Version)
             .HasColumnName("version")
             .IsConcurrencyToken()
             .HasDefaultValue(0);
 
-        builder.HasIndex(a => a.TenantId)
-            .IsUnique()
-            .HasFilter("is_active = true");
+        builder.HasIndex(a => a.TenantId);
 
         builder.HasIndex(a => a.PhoneNumberId)
             .IsUnique();

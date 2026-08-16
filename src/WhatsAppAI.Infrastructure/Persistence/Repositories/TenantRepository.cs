@@ -18,6 +18,12 @@ public sealed class TenantRepository(AppDbContext context) : ITenantRepository
             .FirstOrDefaultAsync(t => t.Name == name, cancellationToken);
     }
 
+    public async Task<Tenant?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        return await context.Tenants
+            .FirstOrDefaultAsync(t => t.Slug == slug, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Tenant>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await context.Tenants

@@ -41,12 +41,12 @@ public sealed class AiProviderCredentialConfiguration : IEntityTypeConfiguration
 
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(c => c.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.Version)
             .HasColumnName("version")

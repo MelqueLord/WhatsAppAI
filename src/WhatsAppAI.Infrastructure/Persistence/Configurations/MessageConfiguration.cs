@@ -76,24 +76,24 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(m => m.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamptz")
+            .HasColumnType("datetime(6)")
             .IsRequired();
 
         builder.Property(m => m.SentAt)
             .HasColumnName("sent_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.DeliveredAt)
             .HasColumnName("delivered_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.ReadAt)
             .HasColumnName("read_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.FailedAt)
             .HasColumnName("failed_at")
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(m => m.FailureReason)
             .HasColumnName("failure_reason")
@@ -113,13 +113,9 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasForeignKey(m => m.ContactId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(m => m.ExternalId)
-            .IsUnique()
-            .HasFilter("external_id IS NOT NULL");
+        builder.HasIndex(m => m.ExternalId);
 
-        builder.HasIndex(m => m.IdempotencyKey)
-            .IsUnique()
-            .HasFilter("idempotency_key IS NOT NULL");
+        builder.HasIndex(m => m.IdempotencyKey);
 
         builder.HasIndex(m => new { m.TenantId, m.ConversationId, m.CreatedAt });
 
