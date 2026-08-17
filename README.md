@@ -4,7 +4,22 @@ Nome provisório de um SaaS multiempresa para centralizar atendimentos do WhatsA
 
 ## Estado do projeto
 
-Este repositório contém o pacote inicial de SDD (Spec-Driven Development). Nenhuma linha de produção deve ser implementada antes de a constituição, a especificação e o plano técnico serem revisados.
+O pacote SDD inicial esta definido e a implementacao esta no bootstrap da Fase 0.
+
+Implementado:
+
+- `T001`: solution .NET 10, `global.json` e projetos backend/testes.
+- `T002`: SPA React 19.2 + TypeScript + Vite, com scripts de lint, teste e build.
+- `T003`: PostgreSQL 18 via Docker Compose, EF Core/Npgsql e teste de conectividade sem schema de negocio.
+
+Ainda falta implementar:
+
+- `T004`: formatadores, analyzers, nullable/warnings como gate e testes reais de arquitetura.
+- `T005`: CI reproduzivel com restore, lint, build, testes e `git diff --check`.
+- `T006`: logging estruturado, correlation ID, Problem Details e health checks.
+- Fase 1 em diante: identidade, tenancy, convites, inbox, Meta, resposta humana, IA segura, conhecimento, uso/auditoria e preparo do piloto.
+
+O codigo de dominio ainda nao possui entidades de negocio; `AppDbContext` esta intencionalmente vazio ate a primeira migration real da Fase 1.
 
 ## Premissas fechadas
 
@@ -36,6 +51,6 @@ Este repositório contém o pacote inicial de SDD (Spec-Driven Development). Nen
 | `docs/runbooks/webhook-failures.md` | Operação de falhas de webhook |
 | `docs/sdd-framework.md` | Framework SDD e skills recomendadas |
 
-## Próximo marco
+## Proximo marco
 
-Revisar as perguntas abertas em `spec.md`, aprovar o pacote SDD e executar a Fase 0 de `tasks.md`.
+Concluir `T004`-`T006` para fechar a Fase 0 com qualidade automatizada, CI e observabilidade basica antes de iniciar identidade e tenancy na Fase 1.
