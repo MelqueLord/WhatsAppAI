@@ -26,6 +26,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
+            options.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
 
             switch (provider.ToUpperInvariant())
             {

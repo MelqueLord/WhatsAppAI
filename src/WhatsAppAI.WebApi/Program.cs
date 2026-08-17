@@ -93,7 +93,7 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        context.Database.EnsureCreated();
+        await context.Database.EnsureCreatedAsync();
     }
     catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
     {
@@ -111,7 +111,7 @@ using (var scope = app.Services.CreateScope())
         adminUser.Activate(BCrypt.Net.BCrypt.HashPassword(bootstrapAdminPassword));
         adminUser.GrantPlatformAdmin();
         context.Users.Add(adminUser);
-        context.SaveChanges();
+        await context.SaveChangesAsync();
     }
 }
 
@@ -159,4 +159,4 @@ app.MapClientTagEndpoints();
 app.MapBotConfigurationEndpoints();
 app.MapHub<InboxHub>("/hubs/inbox");
 
-app.Run();
+await app.RunAsync();

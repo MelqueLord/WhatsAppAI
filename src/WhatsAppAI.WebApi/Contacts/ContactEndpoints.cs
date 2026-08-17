@@ -47,10 +47,10 @@ public static class ContactEndpoints
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            search = search.ToLower();
+            var likePattern = $"%{search}%";
             query = query.Where(c =>
-                c.Name != null && c.Name.ToLower().Contains(search) ||
-                c.PhoneNumber.Contains(search));
+                (c.Name != null && EF.Functions.Like(c.Name, likePattern)) ||
+                EF.Functions.Like(c.PhoneNumber, likePattern));
         }
 
         var contacts = await query
