@@ -5,12 +5,13 @@ using Xunit;
 
 namespace WhatsAppAI.IntegrationTests.Security;
 
-public class SecurityTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("IntegrationTests")]
+public class SecurityTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public SecurityTests(WebApplicationFactory<Program> factory)
+    public SecurityTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions

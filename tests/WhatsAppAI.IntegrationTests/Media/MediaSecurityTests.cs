@@ -4,12 +4,13 @@ using Xunit;
 
 namespace WhatsAppAI.IntegrationTests.Media;
 
-public class MediaSecurityTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("IntegrationTests")]
+public class MediaSecurityTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public MediaSecurityTests(WebApplicationFactory<Program> factory)
+    public MediaSecurityTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions

@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type Conversation, type Message } from '../../lib/api'
+import { api, type Conversation } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatTime } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
 import {
-  MoreVertical,
   Send,
   Paperclip,
   Smile,
@@ -20,6 +19,7 @@ import {
   Loader2,
   Wifi,
   WifiOff,
+  UserPlus,
 } from 'lucide-react'
 
 interface MessagePanelProps {
@@ -30,8 +30,25 @@ interface MessagePanelProps {
 export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
   const [message, setMessage] = useState('')
   const [mode, setMode] = useState(conversation.mode)
+  const [showSaveContact, setShowSaveContact] = useState(false)
+  const [contactName, setContactName] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+
+  const isPhoneNumber = /^\+?\d+$/.test(conversation.contactName.replace(/\s/g, ''))
+
+  const saveContactMutation = useMutation({
+    mutationFn: (name: string) =>
+      api.contacts.create({
+        phoneNumber: conversation.contactPhone,
+        name,
+        startConversation: false,
+      }),
+    onSuccess: () => {
+      setShowSaveContact(false)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
 
   const { data: messagesData, isLoading } = useQuery({
     queryKey: ['messages', conversation.id],
@@ -51,7 +68,7 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
 
   const modeMutation = useMutation({
     mutationFn: (newMode: string) =>
-      api.conversations.switchMode(conversation.id, newMode, conversation.version),
+      api.conversations.switchMode(conversation.id, newMode),
     onSuccess: (data) => {
       setMode(data.mode)
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -66,7 +83,7 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
       }
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
-    onStatusUpdate: (update) => {
+    onStatusUpdate: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
     },
     onConversationUpdate: () => {
@@ -152,10 +169,20 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isPhoneNumber && (
+            <button
+              onClick={() => setShowSaveContact(true)}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded-lg"
+              title="Salvar contato"
+            >
+              <UserPlus className="w-4 h-4" />
+              Salvar
+            </button>
+          )}
           {isConnected ? (
-            <Wifi className="w-4 h-4 text-emerald-500" title="Conectado" />
+            <Wifi className="w-4 h-4 text-emerald-500" />
           ) : (
-            <WifiOff className="w-4 h-4 text-slate-400" title="Desconectado" />
+            <WifiOff className="w-4 h-4 text-slate-400" />
           )}
           {getModeBadge()}
           <select
@@ -270,6 +297,47 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
           </button>
         </div>
       </div>
+
+      {/* Save Contact Modal */}
+      {showSaveContact && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Salvar Contato</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Salvar <strong>{conversation.contactPhone}</strong> na lista de contatos.
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              saveContactMutation.mutate(contactName || conversation.contactPhone)
+            }}>
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Nome do contato"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSaveContact(false)}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saveContactMutation.isPending}
+                  className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50"
+                >
+                  {saveContactMutation.isPending ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

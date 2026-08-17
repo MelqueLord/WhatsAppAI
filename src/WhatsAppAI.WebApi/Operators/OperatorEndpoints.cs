@@ -27,6 +27,9 @@ public static class OperatorEndpoints
         group.MapPost("/{operatorId:guid}/reactivate", ReactivateOperatorAsync)
             .WithName("ReactivateOperator");
 
+        group.MapPost("/{operatorId:guid}/reset-password", ResetPasswordAsync)
+            .WithName("ResetOperatorPassword");
+
         return app;
     }
 
@@ -214,6 +217,46 @@ public static class OperatorEndpoints
             ReactivatedAt = membership.ReactivatedAt
         });
     }
+
+    private static async Task<IResult> ResetPasswordAsync(
+        Guid operatorId,
+        [FromBody] ResetPasswordRequest request,
+        ICurrentTenant currentTenant,
+        ITenantMembershipRepository membershipRepository,
+        IUserRepository userRepository)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            return Results.BadRequest(new { error = "Password must be at least 8 characters." });
+
+        var membership = await membershipRepository.GetByIdAsync(operatorId);
+        if (membership is null || membership.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+
+        if (membership.Role != MembershipRole.Operator)
+            return Results.BadRequest(new { error = "Can only reset password for operators." });
+
+        var user = await userRepository.GetByIdAsync(membership.UserId);
+        if (user is null)
+            return Results.NotFound();
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.UpdatePassword(passwordHash);
+        user.SetMustChangePassword(true);
+        await userRepository.UpdateAsync(user);
+
+        return Results.Ok(new ResetPasswordResponse
+        {
+            Email = user.Email,
+            TemporaryPassword = request.NewPassword,
+            Message = "Password reset. Operator must change password on next login."
+        });
+    }
 }
 
 public sealed class CreateOperatorRequest
@@ -242,4 +285,16 @@ public sealed class OperatorResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? DeactivatedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
+}
+
+public sealed class ResetPasswordRequest
+{
+    public string NewPassword { get; init; } = string.Empty;
+}
+
+public sealed class ResetPasswordResponse
+{
+    public string Email { get; init; } = string.Empty;
+    public string TemporaryPassword { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
 }

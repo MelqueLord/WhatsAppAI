@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bot, Save, Loader2, CheckCircle2, MessageSquare, Zap, Hand, Settings, Lock } from 'lucide-react'
+import { Bot, Save, Loader2, CheckCircle2, MessageSquare, Zap, Hand, Settings } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 
 interface BotConfig {

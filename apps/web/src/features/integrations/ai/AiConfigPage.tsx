@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { Bot, Save, Loader2, CheckCircle2, XCircle, Zap, Lock } from 'lucide-react'
 

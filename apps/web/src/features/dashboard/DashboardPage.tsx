@@ -8,7 +8,6 @@ import {
   Bot,
   TrendingUp,
   ArrowRight,
-  Clock,
   CheckCircle2,
   Shield,
 } from 'lucide-react'

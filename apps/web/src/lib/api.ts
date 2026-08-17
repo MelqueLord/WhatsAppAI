@@ -84,6 +84,17 @@ export interface Plan {
   maxOperators?: number
 }
 
+export interface Contact {
+  id: string
+  phoneNumber: string
+  name?: string
+  profilePictureUrl?: string
+  lastMessageAt?: string
+  createdAt: string
+  conversationId?: string
+  message?: string
+}
+
 export interface CreateTenantResponse {
   tenantId: string
   tenantName: string
@@ -129,6 +140,25 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ mode }),
         headers: version ? { 'If-Match': version.toString() } : {},
+      }),
+  },
+  contacts: {
+    list: (search?: string, limit = 50) =>
+      fetchApi<Contact[]>(`/api/contacts?limit=${limit}${search ? `&search=${search}` : ''}`),
+    get: (id: string) => fetchApi<Contact>(`/api/contacts/${id}`),
+    create: (data: { phoneNumber: string; name?: string; startConversation?: boolean }) =>
+      fetchApi<Contact & { conversationId?: string }>('/api/contacts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; profilePictureUrl?: string }) =>
+      fetchApi<Contact>(`/api/contacts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    startConversation: (id: string) =>
+      fetchApi<{ conversationId: string }>(`/api/contacts/${id}/start-conversation`, {
+        method: 'POST',
       }),
   },
   tags: {

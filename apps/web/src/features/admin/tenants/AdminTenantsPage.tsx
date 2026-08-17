@@ -11,7 +11,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { api, type Tenant, type Plan, type CreateTenantResponse } from '../../../lib/api'
+import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 
 export function AdminTenantsPage() {
   const queryClient = useQueryClient()
@@ -33,7 +33,7 @@ export function AdminTenantsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string }) =>
+    mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string }) =>
       api.admin.tenants.create(data),
     onSuccess: (data) => {
       setActivationLink(data)

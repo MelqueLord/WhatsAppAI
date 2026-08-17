@@ -12,7 +12,6 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { api } from '../../lib/api'
 
 interface Operator {
   id: string
@@ -28,6 +27,8 @@ interface Operator {
 export function OperatorsPage() {
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showResetForm, setShowResetForm] = useState(false)
+  const [resetTarget, setResetTarget] = useState<Operator | null>(null)
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [search, setSearch] = useState('')
@@ -84,6 +85,26 @@ export function OperatorsPage() {
       return res.json()
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
+  })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ operatorId, newPassword }: { operatorId: string; newPassword: string }) => {
+      const res = await fetch(`/api/operators/${operatorId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ newPassword }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao resetar senha')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      setCreatedCredentials({ email: data.email, password: data.temporaryPassword })
+      queryClient.invalidateQueries({ queryKey: ['operators'] })
+    },
   })
 
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -264,23 +285,36 @@ export function OperatorsPage() {
                         {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {operator.status === 'Active' ? (
-                          <button
-                            onClick={() => deactivateMutation.mutate(operator.id)}
-                            disabled={deactivateMutation.isPending}
-                            className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-                          >
-                            Desativar
-                          </button>
-                        ) : operator.status === 'Inactive' ? (
-                          <button
-                            onClick={() => reactivateMutation.mutate(operator.id)}
-                            disabled={reactivateMutation.isPending}
-                            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
-                          >
-                            {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
-                          </button>
-                        ) : null}
+                        <div className="flex items-center justify-end gap-2">
+                          {operator.status === 'Active' && (
+                            <button
+                              onClick={() => {
+                                setResetTarget(operator)
+                                setShowResetForm(true)
+                              }}
+                              className="text-sm text-amber-600 hover:text-amber-700 font-medium"
+                            >
+                              Resetar Senha
+                            </button>
+                          )}
+                          {operator.status === 'Active' ? (
+                            <button
+                              onClick={() => deactivateMutation.mutate(operator.id)}
+                              disabled={deactivateMutation.isPending}
+                              className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                            >
+                              Desativar
+                            </button>
+                          ) : operator.status === 'Inactive' ? (
+                            <button
+                              onClick={() => reactivateMutation.mutate(operator.id)}
+                              disabled={reactivateMutation.isPending}
+                              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                            >
+                              {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -290,6 +324,73 @@ export function OperatorsPage() {
           </div>
         )}
       </div>
+
+      {/* Reset password modal */}
+      {showResetForm && resetTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-slate-800">Resetar Senha</h2>
+              <button
+                onClick={() => { setShowResetForm(false); setResetTarget(null) }}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-4">
+              Resetar senha de <strong>{resetTarget.displayName || resetTarget.email}</strong>.
+              O operador deverá alterar a senha no próximo login.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const formData = new FormData(e.currentTarget)
+              resetPasswordMutation.mutate({
+                operatorId: resetTarget.id,
+                newPassword: formData.get('newPassword') as string,
+              })
+              setShowResetForm(false)
+              setResetTarget(null)
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Nova Senha Temporária *
+                </label>
+                <input
+                  name="newPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  placeholder="Mínimo 8 caracteres"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowResetForm(false); setResetTarget(null) }}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetPasswordMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {resetPasswordMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Resetando...</>
+                  ) : (
+                    'Resetar Senha'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create operator modal */}
       {showCreateForm && (

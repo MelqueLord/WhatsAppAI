@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Tags, Plus, Edit2, XCircle, CheckCircle2, Loader2, Tag } from 'lucide-react'
+import { Tags, Plus, Edit2, XCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface ClientTag {
   id: string

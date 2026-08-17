@@ -2,37 +2,38 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.IntegrationTests.Security;
 
-public class PlanIsolationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("IntegrationTests")]
+public class PlanIsolationTests : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebApplicationFactory _factory;
 
-    public PlanIsolationTests(WebApplicationFactory<Program> factory)
+    public PlanIsolationTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
     }
 
     private async Task<(HttpClient client, Guid tenantId)> CreateTenantWithPlanAsync(string planCode)
     {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = await _factory.GetDbContextAsync();
 
         var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == planCode);
         var tenant = Tenant.Create($"Test {planCode}", $"test-{planCode.ToLower()}", plan.Id);
         tenant.Activate();
         db.Tenants.Add(tenant);
 
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123");
         var user = User.Create($"owner-{planCode.ToLower()}@test.com", $"Owner {planCode}");
-        user.Activate("hashed-password");
+        user.Activate(passwordHash);
         db.Users.Add(user);
 
         var membership = TenantMembership.Create(tenant.Id, user, MembershipRole.TenantOwner);
+        membership.Activate();
         db.TenantMemberships.Add(membership);
 
         await db.SaveChangesAsync();
@@ -42,7 +43,27 @@ public class PlanIsolationTests : IClassFixture<WebApplicationFactory<Program>>
             AllowAutoRedirect = false
         });
 
+        // Login to authenticate the client
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = $"owner-{planCode.ToLower()}@test.com",
+            Password = "Test@123"
+        });
+
         return (client, tenant.Id);
+    }
+
+    [Fact]
+    public async Task PlansEndpoint_ReturnsActivePlans()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/plans");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var plans = await response.Content.ReadFromJsonAsync<List<PlanDto>>();
+        Assert.NotNull(plans);
+        Assert.Contains(plans, p => p.Code == "BOT");
+        Assert.Contains(plans, p => p.Code == "IA_BOT");
     }
 
     [Fact]
@@ -110,28 +131,13 @@ public class PlanIsolationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task PlansEndpoint_ReturnsActivePlans()
-    {
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/plans");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var plans = await response.Content.ReadFromJsonAsync<List<PlanDto>>();
-        Assert.NotNull(plans);
-        Assert.Contains(plans, p => p.Code == "BOT");
-        Assert.Contains(plans, p => p.Code == "IA_BOT");
-    }
-
-    [Fact]
     public async Task BotPlan_UpgradeToAiBot_EnablesAiFeatures()
     {
         var (client, tenantId) = await CreateTenantWithPlanAsync("BOT");
 
-        // Verify AI is disabled
         var aiResponse = await client.GetAsync("/api/integrations/ai");
         Assert.Equal(HttpStatusCode.BadRequest, aiResponse.StatusCode);
 
-        // Upgrade to IA+BOT
         var upgradeResponse = await client.PutAsJsonAsync($"/api/admin/tenants/{tenantId}/plan", new { PlanCode = "IA_BOT" });
         Assert.True(upgradeResponse.StatusCode is HttpStatusCode.OK or HttpStatusCode.Unauthorized);
     }

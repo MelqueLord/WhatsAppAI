@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { Tags, Plus, X, Loader2 } from 'lucide-react'
+import { Plus, X, Loader2 } from 'lucide-react'
 
 interface TagAssignerProps {
   contactId: string

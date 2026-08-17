@@ -195,7 +195,7 @@ export const mockContactTags: Record<string, string[]> = {
   'ct-5': ['tag-b2b'],
 }
 
-export const mockBotConfig = {
+export let mockBotConfig = {
   configured: true,
   mode: 'SimpleAutoReply',
   welcomeMessage: 'Olá! Bem-vindo à nossa empresa. Como posso ajudar?',

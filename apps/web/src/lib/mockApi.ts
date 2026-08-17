@@ -164,13 +164,15 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
   'GET /api/bot-config': async () => mocks.mockBotConfig,
   'POST /api/bot-config': async (req) => {
     const body = await req.json().catch(() => ({}))
-    mocks.mockBotConfig = { ...mocks.mockBotConfig, ...body, configured: true, version: mocks.mockBotConfig.version + 1 }
+    const config = mocks.mockBotConfig as any
+    Object.assign(config, body, { configured: true, version: config.version + 1 })
     return { saved: true }
   },
   'PUT /api/bot-config/mode': async (req) => {
     const body = await req.json().catch(() => ({}))
-    mocks.mockBotConfig.mode = body.mode || mocks.mockBotConfig.mode
-    return { mode: mocks.mockBotConfig.mode }
+    const config = mocks.mockBotConfig as any
+    config.mode = body.mode || config.mode
+    return { mode: config.mode }
   },
   'PUT /api/bot-config/messages': async (req) => {
     const body = await req.json().catch(() => ({}))

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Plus, Edit2, XCircle, CheckCircle2, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
+import { BookOpen, Plus, Edit2, XCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface KnowledgeItem {
   id: string

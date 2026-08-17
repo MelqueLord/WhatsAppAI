@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Zap,
   CheckCircle2,
-  AlertTriangle,
   Eye,
   EyeOff,
-  ExternalLink,
   RefreshCw,
   Loader2,
   QrCode,
@@ -25,7 +23,7 @@ export function WhatsAppConfigPage() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [connectionMode, setConnectionMode] = useState<'qrcode' | 'api'>('qrcode')
 
-  const { data: config, isLoading } = useQuery({
+  const { isLoading } = useQuery({
     queryKey: ['whatsapp-config'],
     queryFn: async () => {
       const res = await fetch('/api/integrations/whatsapp', { credentials: 'include' })
@@ -41,14 +39,10 @@ export function WhatsAppConfigPage() {
       return res.json()
     },
     enabled: connectionMode === 'qrcode',
-    refetchInterval: (data) => {
-      // Refetch every 5 seconds to check for connection
-      if (data?.status === 'qr_pending') return 5000
-      return false
-    },
+    refetchInterval: 5000,
   })
 
-  const { data: sessionStatus, refetch: refetchStatus } = useQuery({
+  const { data: sessionStatus } = useQuery({
     queryKey: ['whatsapp-session'],
     queryFn: async () => {
       const res = await fetch('/api/integrations/whatsapp/session/status', { credentials: 'include' })
