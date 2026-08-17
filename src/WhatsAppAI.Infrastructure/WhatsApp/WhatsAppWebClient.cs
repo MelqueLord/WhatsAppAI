@@ -1,28 +1,22 @@
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
+using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using WhatsAppAI.Application.Integrations;
 
 namespace WhatsAppAI.Infrastructure.WhatsApp;
 
-/// <summary>
-/// Development implementation that simulates WhatsApp Web QR code connection.
-/// In production, this would be replaced with a real WhatsApp Web library (Baileys/wwebjs).
-/// </summary>
-public sealed class WhatsAppWebClient : IWhatsAppClient
+public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration configuration) : IWhatsAppClient
 {
-    // Simulated sessions storage
-    private static readonly ConcurrentDictionary<Guid, WhatsAppSession> _sessions = new();
+    private string BaseUrl => configuration["WhatsAppWeb:BaseUrl"] ?? "http://localhost:3020";
 
     public Task<WhatsAppConnectionResult> TestConnectionAsync(
         string phoneNumberId,
         string accessToken,
         CancellationToken cancellationToken = default)
     {
-        // Simulate successful connection for development
         return Task.FromResult(new WhatsAppConnectionResult
         {
             IsSuccess = true,
-            PhoneNumber = "+55 11 99999-0000",
+            PhoneNumber = "WhatsApp Web",
             QualityRating = "GREEN"
         });
     }
@@ -34,7 +28,6 @@ public sealed class WhatsAppWebClient : IWhatsAppClient
         string text,
         CancellationToken cancellationToken = default)
     {
-        // Simulate successful message send
         return Task.FromResult(new SendMessageResult
         {
             IsSuccess = true,
@@ -46,91 +39,71 @@ public sealed class WhatsAppWebClient : IWhatsAppClient
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var session = _sessions.GetOrAdd(tenantId, id => new WhatsAppSession
+        try
         {
-            TenantId = id,
-            Status = "qr_pending",
-            QrCode = GenerateQrCode(),
-            ConnectedAt = null
-        });
+            var result = await httpClient.GetFromJsonAsync<BridgeQrResponse>(
+                $"{BaseUrl}/sessions/{tenantId:N}/qr",
+                cancellationToken);
 
-        if (session.Status == "connected")
+            return new WhatsAppQrCodeResult
+            {
+                IsSuccess = !string.IsNullOrWhiteSpace(result?.QrCode),
+                QrCodeBase64 = result?.QrCode,
+                QrCodeData = result?.QrCodeData,
+                ErrorMessage = string.IsNullOrWhiteSpace(result?.QrCode) ? "QR ainda não disponível. Aguarde alguns segundos." : null
+            };
+        }
+        catch
         {
-            return Task.FromResult(new WhatsAppQrCodeResult
+            return new WhatsAppQrCodeResult
             {
                 IsSuccess = false,
-                ErrorMessage = "Session already connected"
-            });
+                ErrorMessage = "Serviço WhatsApp Web indisponível. Inicie services/whatsapp-web."
+            };
         }
-
-        // Refresh QR code if expired
-        if (session.QrCodeExpiry < DateTime.UtcNow)
-        {
-            session.QrCode = GenerateQrCode();
-            session.QrCodeExpiry = DateTime.UtcNow.AddSeconds(30);
-        }
-
-        return Task.FromResult(new WhatsAppQrCodeResult
-        {
-            IsSuccess = true,
-            QrCodeBase64 = session.QrCode,
-            QrCodeData = $"whatsapp-web-{tenantId:N}"
-        });
     }
 
     public Task<WhatsAppSessionStatus> GetSessionStatusAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        if (_sessions.TryGetValue(tenantId, out var session))
+        try
         {
-            // Simulate connection after 5 seconds (for demo)
-            if (session.Status == "qr_pending" && session.CreatedAt.AddSeconds(5) < DateTime.UtcNow)
-            {
-                session.Status = "connected";
-                session.PhoneNumber = "+55 11 99999-0000";
-                session.ConnectedAt = DateTime.UtcNow;
-            }
+            var result = await httpClient.GetFromJsonAsync<BridgeStatusResponse>(
+                $"{BaseUrl}/sessions/{tenantId:N}/status",
+                cancellationToken);
 
-            return Task.FromResult(new WhatsAppSessionStatus
+            return new WhatsAppSessionStatus
             {
-                IsConnected = session.Status == "connected",
-                PhoneNumber = session.PhoneNumber,
-                Status = session.Status
-            });
+                IsConnected = result?.IsConnected ?? false,
+                PhoneNumber = result?.PhoneNumber,
+                Status = result?.Status ?? "disconnected"
+            };
         }
-
-        return Task.FromResult(new WhatsAppSessionStatus
+        catch
         {
-            IsConnected = false,
-            Status = "disconnected"
-        });
+            return new WhatsAppSessionStatus { IsConnected = false, Status = "bridge_unavailable" };
+        }
     }
 
     public Task DisconnectSessionAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        _sessions.TryRemove(tenantId, out _);
-        return Task.CompletedTask;
+        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:N}/logout", null, cancellationToken);
     }
 
-    private static string GenerateQrCode()
+    private sealed record BridgeQrResponse
     {
-        // Generate a random QR code-like string for development
-        var bytes = new byte[32];
-        RandomNumberGenerator.Fill(bytes);
-        return Convert.ToBase64String(bytes);
+        public string? Status { get; init; }
+        public string? QrCode { get; init; }
+        public string? QrCodeData { get; init; }
     }
 
-    private sealed class WhatsAppSession
+    private sealed record BridgeStatusResponse
     {
-        public Guid TenantId { get; init; }
-        public string Status { get; set; } = "disconnected";
-        public string? QrCode { get; set; }
-        public DateTime? QrCodeExpiry { get; set; }
-        public string? PhoneNumber { get; set; }
-        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
-        public DateTime? ConnectedAt { get; set; }
+        public bool IsConnected { get; init; }
+        public string? PhoneNumber { get; init; }
+        public string? Status { get; init; }
     }
 }

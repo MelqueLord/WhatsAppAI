@@ -8,7 +8,7 @@ flowchart TB
   Meta --> App[WhatsApp AI Manager]
   Operator[Operador] --> App
   App --> OpenAI[OpenAI Responses API]
-  App --> Postgres[(PostgreSQL)]
+  App --> MySQL[(MySQL 8.4 LTS)]
 ```
 
 Meta e OpenAI são contas do tenant. O navegador nunca recebe suas credenciais.
@@ -20,13 +20,13 @@ flowchart TB
   Web[React SPA] -->|HTTPS + cookie| API[ASP.NET Core API]
   Web <-->|SignalR| API
   Meta[Meta webhook] --> API
-  API --> DB[(PostgreSQL)]
+  API --> DB[(MySQL 8.4 LTS)]
   Worker[Workers internos] --> DB
   Worker --> MetaAPI[Meta Graph API]
   Worker --> AIAPI[OpenAI API]
 ```
 
-API e workers podem começar no mesmo processo/artefato. PostgreSQL guarda estado, Inbox e Outbox. Separar o worker em processo independente é uma opção de deploy, não um novo serviço de domínio.
+API e workers podem começar no mesmo processo/artefato. MySQL guarda estado, Inbox e Outbox conforme ADR-0006. Separar o worker em processo independente é uma opção de deploy, não um novo serviço de domínio.
 
 ## Módulos e dependências
 
@@ -46,7 +46,7 @@ flowchart LR
 sequenceDiagram
   participant M as Meta
   participant A as API
-  participant D as PostgreSQL
+  participant D as MySQL
   participant W as Worker
   participant O as OpenAI
   M->>A: webhook assinado

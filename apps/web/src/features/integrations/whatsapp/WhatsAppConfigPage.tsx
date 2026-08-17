@@ -176,7 +176,7 @@ export function WhatsAppConfigPage() {
                   <WifiOff className="w-5 h-5 text-slate-400" />
                   <div>
                     <p className="font-medium text-slate-700">Desconectado</p>
-                    <p className="text-sm text-slate-500">Escaneie o QR Code para conectar</p>
+                    <p className="text-sm text-slate-500">Abra o WhatsApp Web para parear o aparelho</p>
                   </div>
                 </>
               )}

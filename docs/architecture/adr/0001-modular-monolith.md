@@ -8,7 +8,7 @@ O MVP precisa de consistência entre mensagens, modo da conversa, IA e outbox, c
 
 ## Decisão
 
-Usar um monólito modular .NET, uma base PostgreSQL e um frontend React separado. Módulos têm limites de código, mas compartilham transação quando necessário.
+Usar um monólito modular .NET, uma base relacional única e um frontend React separado. Módulos têm limites de código, mas compartilham transação quando necessário. A escolha inicial de PostgreSQL foi substituída por MySQL 8.4 LTS no ADR-0006.
 
 ## Consequências
 

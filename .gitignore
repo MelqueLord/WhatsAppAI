@@ -6,6 +6,7 @@ coverage/
 node_modules/
 dist/
 build/
+services/whatsapp-web/sessions/
 *.log
 .vs/
 .idea/

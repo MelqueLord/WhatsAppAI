@@ -70,6 +70,7 @@ export interface Tenant {
   status: string
   version: number
   createdAt: string
+  dueDate?: string
   suspendedAt?: string
   reactivatedAt?: string
   suspensionReason?: string

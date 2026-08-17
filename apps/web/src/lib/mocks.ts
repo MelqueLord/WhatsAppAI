@@ -9,6 +9,30 @@ export const mockUser = {
   tenantId: 't-1',
   role: 'TenantOwner',
   isPlatformAdmin: false,
+  mustChangePassword: false,
+  aiEnabled: true,
+}
+
+export const mockPlatformAdmin = {
+  id: 'u-admin',
+  email: 'admin@platform.com',
+  displayName: 'Administrador da Ferramenta',
+  tenantId: '',
+  role: 'PlatformAdmin',
+  isPlatformAdmin: true,
+  mustChangePassword: false,
+  aiEnabled: true,
+}
+
+export const mockOperator = {
+  id: 'u-op',
+  email: 'operador@empresa.com',
+  displayName: 'Operador Demo',
+  tenantId: 't-1',
+  role: 'Operator',
+  isPlatformAdmin: false,
+  mustChangePassword: false,
+  aiEnabled: false,
 }
 
 export const mockConversations = [
@@ -130,6 +154,12 @@ export const mockOperators = [
   { id: 'op-3', email: 'operador3@empresa.com', displayName: 'Ricardo Alves', role: 'Operator', isActive: false, createdAt: h(360) },
 ]
 
+export const mockContacts = [
+  { id: 'ct-1', phoneNumber: '+55 11 99999-1234', name: 'Maria Silva', lastMessageAt: m(5), createdAt: h(720), conversationId: 'c-1' },
+  { id: 'ct-2', phoneNumber: '+55 11 98888-5678', name: 'João Santos', lastMessageAt: m(30), createdAt: h(480), conversationId: 'c-2' },
+  { id: 'ct-3', phoneNumber: '+55 21 97777-9012', name: 'Ana Oliveira', lastMessageAt: h(2), createdAt: h(360), conversationId: 'c-3' },
+]
+
 export const mockKnowledge = [
   { id: 'k-1', title: 'Horário de atendimento', content: 'Segunda a sexta das 8h às 18h. Sábado das 8h às 12h.', priority: 10, isActive: true, version: 1 },
   { id: 'k-2', title: 'Política de devolução', content: 'Devoluções em até 30 dias com nota fiscal. Produto sem uso.', priority: 8, isActive: true, version: 2 },
@@ -158,9 +188,14 @@ export const mockWebhookEvents = [
 ]
 
 export const mockTenants = [
-  { id: 't-1', name: 'Empresa Demo', status: 'Active', createdAt: h(720), version: 1 },
-  { id: 't-2', name: 'Loja Virtual Ltda', status: 'Active', createdAt: h(480), version: 2 },
-  { id: 't-3', name: 'Restaurante Bom Sabor', status: 'Suspended', createdAt: h(360), suspendedAt: h(48), suspensionReason: 'Pagamento pendente', version: 3 },
+  { id: 't-1', name: 'Empresa Demo', slug: 'empresa-demo', planId: 'plan-ia-bot', dueDate: new Date(now + 12 * 86400000).toISOString(), status: 'Active', createdAt: h(720), version: 1 },
+  { id: 't-2', name: 'Loja Virtual Ltda', slug: 'loja-virtual', planId: 'plan-bot', dueDate: new Date(now + 3 * 86400000).toISOString(), status: 'Active', createdAt: h(480), version: 2 },
+  { id: 't-3', name: 'Restaurante Bom Sabor', slug: 'restaurante-bom-sabor', planId: 'plan-bot', dueDate: new Date(now - 2 * 86400000).toISOString(), status: 'Suspended', createdAt: h(360), suspendedAt: h(48), suspensionReason: 'Pagamento pendente', version: 3 },
+]
+
+export const mockPlans = [
+  { id: 'plan-bot', name: 'BOT', code: 'BOT', description: 'Somente bot no atendimento', aiEnabled: false },
+  { id: 'plan-ia-bot', name: 'BOT + IA', code: 'IA_BOT', description: 'Bot com IA no atendimento', aiEnabled: true },
 ]
 
 export const mockWhatsAppConfig = {
@@ -201,6 +236,11 @@ export let mockBotConfig = {
   welcomeMessage: 'Olá! Bem-vindo à nossa empresa. Como posso ajudar?',
   offlineMessage: 'No momento estamos fora do horário de atendimento. Deixe sua mensagem que retornaremos em breve.',
   fallbackMessage: 'Desculpe, não entendi. Pode reformular sua pergunta?',
+  flowSteps: [
+    { id: 'step-price', title: 'Precos', keywords: '1, preco, preço, valor', response: 'Temos planos conforme sua necessidade. Um atendente pode finalizar a proposta.' },
+    { id: 'step-hours', title: 'Horarios', keywords: '2, horario, horário, abre, funciona', response: 'Atendemos de segunda a sexta das 8h as 18h.' },
+    { id: 'step-human', title: 'Atendente', keywords: '3, atendente, humano, gerente', response: 'Certo, vou encaminhar voce para um atendente.' },
+  ],
   maxTokensPerResponse: 500,
   enabled: true,
   version: 1,

@@ -28,7 +28,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const aiEnabled = user?.aiEnabled === true
 
-  // Operator sees only inbox
+  // Operator sees only inbox and contacts
   if (isOperator) {
     return (
       <aside
@@ -101,9 +101,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   }
 
   const navItems = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/inbox', icon: MessageSquare, label: 'Inbox' },
-    { to: '/contacts', icon: Users, label: 'Contatos' },
+    ...(isPlatformAdmin ? [] : [{ to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }]),
+    ...(isPlatformAdmin ? [] : [{ to: '/inbox', icon: MessageSquare, label: 'Inbox' }]),
+    ...(isPlatformAdmin ? [] : [{ to: '/contacts', icon: Users, label: 'Contatos' }]),
     ...(isTenantOwner
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
@@ -117,7 +117,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { to: '/usage', icon: BarChart3, label: 'Uso' },
     ...(isPlatformAdmin
       ? [
-          { to: '/admin/tenants', icon: Building2, label: 'Tenants' },
+          { to: '/admin/tenants', icon: Building2, label: 'Empresas' },
           { to: '/admin/webhooks', icon: Shield, label: 'Webhooks' },
         ]
       : []),

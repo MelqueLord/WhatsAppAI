@@ -12,8 +12,7 @@ public static class MetaServiceCollectionExtensions
     {
         if (environment.IsDevelopment())
         {
-            // Use WhatsApp Web client for development (QR code connection)
-            services.AddSingleton<IWhatsAppClient, WhatsAppWebClient>();
+            services.AddHttpClient<IWhatsAppClient, WhatsAppWebClient>();
         }
         else
         {

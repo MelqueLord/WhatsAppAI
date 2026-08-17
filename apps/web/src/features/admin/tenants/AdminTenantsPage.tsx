@@ -127,12 +127,14 @@ export function AdminTenantsPage() {
     }
   }
 
+  const isOverdue = (dueDate?: string) => dueDate ? new Date(dueDate) < new Date() : false
+
   return (
     <div className="h-full flex flex-col bg-slate-50">
       <div className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-800">Tenants</h1>
+            <h1 className="text-xl font-semibold text-slate-800">Empresas</h1>
             <p className="text-sm text-slate-500 mt-0.5">Gerencie as empresas da plataforma</p>
           </div>
           <button
@@ -142,7 +144,7 @@ export function AdminTenantsPage() {
             }}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
           >
-            <Plus className="w-4 h-4" /> Novo Tenant
+            <Plus className="w-4 h-4" /> Nova Empresa
           </button>
         </div>
       </div>
@@ -219,10 +221,13 @@ export function AdminTenantsPage() {
                     Nome
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Slug
+                    Gerência
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Plano
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Vencimento
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Status
@@ -238,7 +243,7 @@ export function AdminTenantsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTenants.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                       {search ? 'Nenhum tenant encontrado com esse filtro.' : 'Nenhum tenant cadastrado.'}
                     </td>
                   </tr>
@@ -253,9 +258,17 @@ export function AdminTenantsPage() {
                           <span className="font-medium text-slate-800">{tenant.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{tenant.slug}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">TenantOwner</td>
                       <td className="px-6 py-4">
                         {plans?.find(p => p.id === tenant.planId)?.name || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {tenant.dueDate ? (
+                          <span className={isOverdue(tenant.dueDate) ? 'font-medium text-red-600' : 'text-slate-500'}>
+                            {new Date(tenant.dueDate).toLocaleDateString('pt-BR')}
+                            {isOverdue(tenant.dueDate) ? ' (em atraso)' : ''}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(tenant.status)}</td>
                       <td className="px-6 py-4 text-sm text-slate-500">
@@ -307,7 +320,7 @@ export function AdminTenantsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-slate-800">Novo Tenant</h2>
+              <h2 className="text-lg font-semibold text-slate-800">Nova Empresa</h2>
               <button
                 onClick={() => setShowCreateForm(false)}
                 className="p-2 hover:bg-slate-100 rounded-lg"
@@ -326,7 +339,7 @@ export function AdminTenantsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Nome do Tenant *
+                  Nome da Empresa *
                 </label>
                 <input
                   name="name"
@@ -338,7 +351,7 @@ export function AdminTenantsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Email do TenantOwner *
+                  Email do responsável *
                 </label>
                 <input
                   name="ownerEmail"
@@ -350,7 +363,7 @@ export function AdminTenantsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Nome do TenantOwner
+                  Nome do responsável
                 </label>
                 <input
                   name="ownerDisplayName"

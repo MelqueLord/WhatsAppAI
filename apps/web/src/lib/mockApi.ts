@@ -1,26 +1,46 @@
 import * as mocks from './mocks'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+let currentUser: typeof mocks.mockUser | null = null
 
 const routes: Record<string, (req: Request, params?: Record<string, string>) => Promise<any>> = {
   // Auth
-  'GET /api/auth/me': async () => mocks.mockUser,
-  'POST /api/auth/login': async () => mocks.mockUser,
-  'POST /api/auth/logout': async () => ({}),
+  'GET /api/auth/me': async () => currentUser,
+  'POST /api/auth/login': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    currentUser = body.email === 'admin@platform.com'
+      ? mocks.mockPlatformAdmin
+      : body.email === 'operador@empresa.com'
+        ? mocks.mockOperator
+        : mocks.mockUser
+    return currentUser
+  },
+  'POST /api/auth/logout': async () => {
+    currentUser = null
+    return {}
+  },
 
   // Conversations
-  'GET /api/conversations': async () => ({
-    items: mocks.mockConversations,
-    nextCursor: null,
-    hasMore: false,
-  }),
+  'GET /api/conversations': async () => {
+    try {
+      const res = await fetch('http://localhost:3020/sessions/demo/conversations')
+      const data = await res.json()
+      return data.items?.length ? data : { items: mocks.mockConversations, nextCursor: null, hasMore: false }
+    } catch {
+      return { items: mocks.mockConversations, nextCursor: null, hasMore: false }
+    }
+  },
 
   // Messages (dynamic)
-  'GET /api/conversations/:id/messages': async (_req, params) => ({
-    items: mocks.mockMessages[params!.id] || [],
-    nextCursor: null,
-    hasMore: false,
-  }),
+  'GET /api/conversations/:id/messages': async (_req, params) => {
+    try {
+      const res = await fetch(`http://localhost:3020/sessions/demo/conversations/${params!.id}/messages`)
+      const data = await res.json()
+      return data.items?.length ? data : { items: mocks.mockMessages[params!.id] || [], nextCursor: null, hasMore: false }
+    } catch {
+      return { items: mocks.mockMessages[params!.id] || [], nextCursor: null, hasMore: false }
+    }
+  },
 
   'POST /api/conversations/:id/messages': async (req, params) => {
     const body = await req.json().catch(() => ({}))
@@ -54,6 +74,25 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
   'POST /api/operators/:id/deactivate': async () => ({ success: true }),
   'POST /api/operators/:id/reactivate': async () => ({ success: true }),
   'POST /api/operators/:id/resend-invite': async () => ({ invitationLink: 'https://example.com/activate?invitation=inv-456&token=def' }),
+
+  // Contacts
+  'GET /api/contacts': async () => mocks.mockContacts,
+  'POST /api/contacts': async (req) => {
+    const body = await req.json().catch(() => ({}))
+    const contact = {
+      id: `ct-${Date.now()}`,
+      phoneNumber: body.phoneNumber ?? '',
+      name: body.name ?? 'Sem nome',
+      lastMessageAt: '',
+      createdAt: new Date().toISOString(),
+      conversationId: body.startConversation ? `c-${Date.now()}` : '',
+    }
+    mocks.mockContacts.push(contact)
+    return contact
+  },
+  'POST /api/contacts/:id/start-conversation': async (_req, params) => ({
+    conversationId: `c-${params!.id}`,
+  }),
 
   // Knowledge
   'GET /api/knowledge': async () => mocks.mockKnowledge,
@@ -94,17 +133,47 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
   'GET /api/integrations/whatsapp': async () => mocks.mockWhatsAppConfig,
   'POST /api/integrations/whatsapp': async () => ({ saved: true }),
   'POST /api/integrations/whatsapp/test-connection': async () => ({ success: true, phoneNumber: '+55 11 99999-0000', qualityRating: 'GREEN' }),
+  'GET /api/integrations/whatsapp/qrcode': async () => {
+    const res = await fetch('http://localhost:3020/sessions/demo/qr')
+    return res.json()
+  },
+  'GET /api/integrations/whatsapp/session/status': async () => {
+    const res = await fetch('http://localhost:3020/sessions/demo/status')
+    return res.json()
+  },
+  'POST /api/integrations/whatsapp/session/disconnect': async () => {
+    const res = await fetch('http://localhost:3020/sessions/demo/logout', { method: 'POST' })
+    return res.json()
+  },
 
   // Usage
   'GET /api/usage': async () => mocks.mockUsage,
+  'GET /api/plans': async () => mocks.mockPlans,
 
   // Admin
   'GET /api/admin/tenants': async () => mocks.mockTenants,
   'POST /api/admin/tenants': async (req) => {
     const body = await req.json().catch(() => ({}))
-    const tenant = { id: `t-${Date.now()}`, name: body.name, status: 'Active', createdAt: new Date().toISOString(), version: 1 }
+    const plan = mocks.mockPlans.find((p) => p.code === body.planCode) ?? mocks.mockPlans[0]
+    const tenant = {
+      id: `t-${Date.now()}`,
+      name: body.name,
+      slug: String(body.name ?? '').toLowerCase().replace(/\s+/g, '-'),
+      planId: plan.id,
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      status: 'Active',
+      createdAt: new Date().toISOString(),
+      version: 1,
+    }
     mocks.mockTenants.push(tenant)
     return { id: tenant.id, invitationLink: 'https://example.com/activate?invitation=inv-new&token=xyz' }
+  },
+  'PUT /api/admin/tenants/:id/plan': async (req, params) => {
+    const body = await req.json().catch(() => ({}))
+    const tenant = mocks.mockTenants.find((t) => t.id === params!.id)
+    const plan = mocks.mockPlans.find((p) => p.code === body.planCode)
+    if (tenant && plan) tenant.planId = plan.id
+    return tenant
   },
   'POST /api/admin/tenants/:id/suspend': async () => ({ success: true }),
   'POST /api/admin/tenants/:id/reactivate': async () => ({ success: true }),
@@ -161,11 +230,30 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
   },
 
   // Bot Configuration
-  'GET /api/bot-config': async () => mocks.mockBotConfig,
+  'GET /api/bot-config': async () => {
+    try {
+      const res = await fetch('http://localhost:3020/sessions/demo/bot-config')
+      return res.ok ? res.json() : mocks.mockBotConfig
+    } catch {
+      return mocks.mockBotConfig
+    }
+  },
   'POST /api/bot-config': async (req) => {
     const body = await req.json().catch(() => ({}))
     const config = mocks.mockBotConfig as any
     Object.assign(config, body, { configured: true, version: config.version + 1 })
+    if (config.enabled) {
+      mocks.mockConversations.forEach((conversation) => {
+        conversation.mode = 'Automatic'
+      })
+    }
+    try {
+      await fetch('http://localhost:3020/sessions/demo/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+    } catch {}
     return { saved: true }
   },
   'PUT /api/bot-config/mode': async (req) => {
@@ -189,6 +277,13 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
   'POST /api/bot-config/toggle': async (req) => {
     const body = await req.json().catch(() => ({}))
     mocks.mockBotConfig.enabled = body.enabled ?? mocks.mockBotConfig.enabled
+    try {
+      await fetch('http://localhost:3020/sessions/demo/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mocks.mockBotConfig),
+      })
+    } catch {}
     return { enabled: mocks.mockBotConfig.enabled }
   },
 }
@@ -246,6 +341,9 @@ export function setupMockApi() {
     try {
       const req = new Request(url, init)
       const data = await match.handler(req, match.params)
+      if (data === null) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+      }
       return new Response(JSON.stringify(data), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

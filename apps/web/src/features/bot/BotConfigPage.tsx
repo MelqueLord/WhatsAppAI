@@ -1,28 +1,39 @@
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bot, Save, Loader2, CheckCircle2, MessageSquare, Zap, Hand, Settings } from 'lucide-react'
-import { useAuth } from '../../lib/auth'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bot, CheckCircle2, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+
+interface FlowStep {
+  id: string
+  title: string
+  keywords: string
+  response: string
+}
 
 interface BotConfig {
-  configured: boolean
-  mode: string
   welcomeMessage: string | null
-  offlineMessage: string | null
+  returningMessage?: string | null
   fallbackMessage: string | null
-  maxTokensPerResponse: number
+  mediaMessage?: string | null
+  handoffMessage?: string | null
   enabled: boolean
-  version: number
+  flowSteps?: FlowStep[]
 }
+
+const newStep = (): FlowStep => ({
+  id: `step-${Date.now()}`,
+  title: '',
+  keywords: '',
+  response: '',
+})
 
 export function BotConfigPage() {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
-  const aiEnabled = user?.aiEnabled === true
-  const [mode, setMode] = useState('Manual')
   const [welcomeMessage, setWelcomeMessage] = useState('')
-  const [offlineMessage, setOfflineMessage] = useState('')
+  const [returningMessage, setReturningMessage] = useState('')
   const [fallbackMessage, setFallbackMessage] = useState('')
-  const [maxTokens, setMaxTokens] = useState(500)
+  const [mediaMessage, setMediaMessage] = useState('')
+  const [handoffMessage, setHandoffMessage] = useState('')
+  const [flowSteps, setFlowSteps] = useState<FlowStep[]>([])
   const [success, setSuccess] = useState(false)
 
   const { data: config, isLoading } = useQuery({
@@ -34,27 +45,30 @@ export function BotConfigPage() {
   })
 
   useEffect(() => {
-    if (config) {
-      setMode(config.mode)
-      setWelcomeMessage(config.welcomeMessage || '')
-      setOfflineMessage(config.offlineMessage || '')
-      setFallbackMessage(config.fallbackMessage || '')
-      setMaxTokens(config.maxTokensPerResponse)
-    }
+    if (!config) return
+    setWelcomeMessage(config.welcomeMessage || '')
+    setReturningMessage(config.returningMessage || '')
+    setFallbackMessage(config.fallbackMessage || '')
+    setMediaMessage(config.mediaMessage || '')
+    setHandoffMessage(config.handoffMessage || '')
+    setFlowSteps(config.flowSteps?.length ? config.flowSteps : [newStep()])
   }, [config])
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (enabled: boolean) => {
       const res = await fetch('/api/bot-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          mode,
+          enabled,
+          mode: 'SimpleAutoReply',
           welcomeMessage,
-          offlineMessage,
+          returningMessage,
           fallbackMessage,
-          maxTokensPerResponse: maxTokens,
+          mediaMessage,
+          handoffMessage,
+          flowSteps: flowSteps.filter((s) => s.title && s.response),
         }),
       })
       if (!res.ok) throw new Error('Erro ao salvar')
@@ -67,19 +81,9 @@ export function BotConfigPage() {
     },
   })
 
-  const toggleMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await fetch('/api/bot-config/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ enabled }),
-      })
-      if (!res.ok) throw new Error('Erro')
-      return res.json()
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot-config'] }),
-  })
+  const updateStep = (id: string, patch: Partial<FlowStep>) => {
+    setFlowSteps((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item))
+  }
 
   if (isLoading) {
     return (
@@ -89,151 +93,140 @@ export function BotConfigPage() {
     )
   }
 
-  const modes = [
-    { value: 'Manual', label: 'Manual', icon: Hand, description: 'Sem automação. Operadores respondem tudo.' },
-    { value: 'SimpleAutoReply', label: 'Resposta Automática', icon: MessageSquare, description: 'Respostas pré-definidas sem IA. Mínimo de tokens.' },
-    { value: 'AiPowered', label: 'IA Completa', icon: Zap, description: 'IA responde automaticamente com base no conhecimento.', requiresPlan: true },
-  ].filter(m => !m.requiresPlan || aiEnabled)
-
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Configuração do Bot</h1>
-              <p className="text-sm text-slate-500">Configure como o bot responde aos clientes</p>
+              <h1 className="text-xl font-bold text-slate-900">Fluxo do bot</h1>
+              <p className="text-sm text-slate-500">Atendimento automatico usado no WhatsApp</p>
             </div>
           </div>
           <button
-            onClick={() => toggleMutation.mutate(!config?.enabled)}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              config?.enabled
-                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            onClick={() => saveMutation.mutate(!config?.enabled)}
+            disabled={saveMutation.isPending}
+            className={`px-4 py-2 rounded-lg font-medium text-sm ${
+              config?.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
             }`}
           >
             {config?.enabled ? 'Ativo' : 'Inativo'}
           </button>
         </div>
 
-        {/* Mode Selection */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Settings className="w-4 h-4" /> Modo de Operação
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {modes.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setMode(m.value)}
-                className={`p-4 rounded-xl border-2 text-left transition-all ${
-                  mode === m.value
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <m.icon className={`w-5 h-5 ${mode === m.value ? 'text-emerald-600' : 'text-slate-400'}`} />
-                  <span className={`font-medium text-sm ${mode === m.value ? 'text-emerald-700' : 'text-slate-700'}`}>
-                    {m.label}
-                  </span>
+          <h2 className="font-semibold text-slate-900 mb-4">Primeiro contato</h2>
+          <textarea
+            value={welcomeMessage}
+            onChange={(e) => setWelcomeMessage(e.target.value)}
+            rows={3}
+            placeholder="Ola! Sou o atendimento automatico. Digite: 1-precos, 2-horarios, 3-falar com atendente."
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+          />
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+          <h2 className="font-semibold text-slate-900 mb-4">Cliente que ja conversou</h2>
+          <textarea
+            value={returningMessage}
+            onChange={(e) => setReturningMessage(e.target.value)}
+            rows={3}
+            placeholder="Ola de novo! Digite uma opcao do menu para continuar."
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+          />
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-900">Perguntas e respostas</h2>
+            <button
+              type="button"
+              onClick={() => setFlowSteps((items) => [...items, newStep()])}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-lg text-sm text-slate-700"
+            >
+              <Plus className="w-4 h-4" /> Adicionar
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {flowSteps.map((step, index) => (
+              <div key={step.id} className="border border-slate-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-slate-700">Passo {index + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFlowSteps((items) => items.filter((item) => item.id !== step.id))}
+                    className="p-2 text-slate-400 hover:text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <p className="text-xs text-slate-500">{m.description}</p>
-              </button>
+                <input
+                  value={step.title}
+                  onChange={(e) => updateStep(step.id, { title: e.target.value })}
+                  placeholder="Titulo: Precos"
+                  className="w-full mb-3 px-4 py-2.5 border border-slate-300 rounded-lg"
+                />
+                <input
+                  value={step.keywords}
+                  onChange={(e) => updateStep(step.id, { keywords: e.target.value })}
+                  placeholder="Palavras-chave: preco, valor, 1"
+                  className="w-full mb-3 px-4 py-2.5 border border-slate-300 rounded-lg"
+                />
+                <textarea
+                  value={step.response}
+                  onChange={(e) => updateStep(step.id, { response: e.target.value })}
+                  rows={3}
+                  placeholder="Resposta enviada ao cliente"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+                />
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Token Limit (for AI mode) */}
-        {mode === 'AiPowered' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-            <h2 className="font-semibold text-slate-900 mb-4">Limite de Tokens</h2>
-            <p className="text-sm text-slate-500 mb-4">
-              Controle o custo limitando tokens por resposta. Menos tokens = respostas mais curtas e econômicas.
-            </p>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="50"
-                max="2000"
-                step="50"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(Number(e.target.value))}
-                className="flex-1"
-              />
-              <div className="w-24 text-center">
-                <span className="text-2xl font-bold text-slate-900">{maxTokens}</span>
-                <p className="text-xs text-slate-500">tokens</p>
-              </div>
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-slate-400">
-              <span>Econômico (50)</span>
-              <span>Padrão (500)</span>
-              <span>Completo (2000)</span>
-            </div>
-          </div>
-        )}
-
-        {/* Messages */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-          <h2 className="font-semibold text-slate-900 mb-4">Mensagens Automáticas</h2>
+          <h2 className="font-semibold text-slate-900 mb-4">Excecoes</h2>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Mensagem de Boas-vindas</label>
-              <textarea
-                value={welcomeMessage}
-                onChange={(e) => setWelcomeMessage(e.target.value)}
-                rows={2}
-                placeholder="Olá! Bem-vindo à nossa empresa. Como posso ajudar?"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Mensagem Fora do Horário</label>
-              <textarea
-                value={offlineMessage}
-                onChange={(e) => setOfflineMessage(e.target.value)}
-                rows={2}
-                placeholder="No momento estamos fora do horário de atendimento..."
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-              />
-            </div>
-            {mode !== 'Manual' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Mensagem de Fallback</label>
-                <textarea
-                  value={fallbackMessage}
-                  onChange={(e) => setFallbackMessage(e.target.value)}
-                  rows={2}
-                  placeholder="Desculpe, não entendi. Pode reformular?"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-                />
-              </div>
-            )}
+            <textarea
+              value={fallbackMessage}
+              onChange={(e) => setFallbackMessage(e.target.value)}
+              rows={2}
+              placeholder="Nao entendi. Escolha uma opcao do menu ou digite atendente."
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+            />
+            <textarea
+              value={mediaMessage}
+              onChange={(e) => setMediaMessage(e.target.value)}
+              rows={2}
+              placeholder="Recebi sua midia. Digite uma opcao ou aguarde atendimento."
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+            />
+            <textarea
+              value={handoffMessage}
+              onChange={(e) => setHandoffMessage(e.target.value)}
+              rows={2}
+              placeholder="Vou encaminhar voce para um atendente."
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none"
+            />
           </div>
         </div>
 
-        {/* Save Button */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => saveMutation.mutate()}
+            onClick={() => saveMutation.mutate(true)}
             disabled={saveMutation.isPending}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50"
           >
-            {saveMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            Salvar Configuração
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Ativar fluxo
           </button>
           {success && (
             <span className="flex items-center gap-1 text-emerald-600 text-sm">
-              <CheckCircle2 className="w-4 h-4" /> Salvo com sucesso!
+              <CheckCircle2 className="w-4 h-4" /> Fluxo ativo no WhatsApp
             </span>
           )}
         </div>
