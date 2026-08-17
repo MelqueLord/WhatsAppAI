@@ -34,9 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refetch])
 
   const logout = useCallback(async () => {
-    await api.auth.logout()
+    try {
+      await api.auth.logout()
+    } catch {
+      // Ignore errors - still redirect
+    }
     queryClient.clear()
-    window.location.href = '/login'
+    window.location.replace('/login')
   }, [queryClient])
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {

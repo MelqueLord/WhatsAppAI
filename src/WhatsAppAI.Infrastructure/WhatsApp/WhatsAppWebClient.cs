@@ -46,9 +46,9 @@ public sealed class WhatsAppWebClient : IWhatsAppClient
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var session = _sessions.GetOrAdd(tenantId, _ => new WhatsAppSession
+        var session = _sessions.GetOrAdd(tenantId, id => new WhatsAppSession
         {
-            TenantId = tenantId,
+            TenantId = id,
             Status = "qr_pending",
             QrCode = GenerateQrCode(),
             ConnectedAt = null

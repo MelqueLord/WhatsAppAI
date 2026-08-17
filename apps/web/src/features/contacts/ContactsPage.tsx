@@ -1,0 +1,225 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Users, Plus, Search, X, Loader2, MessageSquare } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+
+interface Contact {
+  id: string
+  phoneNumber: string
+  name?: string
+  lastMessageAt?: string
+  createdAt: string
+}
+
+export function ContactsPage() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [showCreateForm, setShowCreateForm] = useState(false)
+
+  const { data: contacts, isLoading } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: async () => {
+      const res = await fetch(`/api/contacts?limit=100`, { credentials: 'include' })
+      if (!res.ok) throw new Error('Erro ao carregar contatos')
+      return res.json() as Promise<Contact[]>
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { phoneNumber: string; name?: string; startConversation?: boolean }) => {
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao criar contato')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      setShowCreateForm(false)
+      if (data.conversationId) {
+        navigate('/inbox')
+      }
+    },
+  })
+
+  const startConversationMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const res = await fetch(`/api/contacts/${contactId}/start-conversation`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      return res.json()
+    },
+    onSuccess: (data) => {
+      if (data.conversationId) {
+        navigate('/inbox')
+      }
+    },
+  })
+
+  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    createMutation.mutate({
+      phoneNumber: formData.get('phoneNumber') as string,
+      name: (formData.get('name') as string) || undefined,
+      startConversation: formData.get('startConversation') === 'on',
+    })
+  }
+
+  const filteredContacts = (contacts ?? []).filter((c) =>
+    (c.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    c.phoneNumber.includes(search)
+  )
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-800">Contatos</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Gerencie seus contatos</p>
+          </div>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Novo Contato
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar contatos..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="min-w-full">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Nome</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Telefone</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Última msg</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredContacts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                      Nenhum contato cadastrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredContacts.map((contact) => (
+                    <tr key={contact.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <Users className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium text-slate-800">{contact.name || 'Sem nome'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{contact.phoneNumber}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        {contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => startConversationMutation.mutate(contact.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Conversar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Create contact modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-slate-800">Novo Contato</h2>
+              <button onClick={() => setShowCreateForm(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {createMutation.isError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                {(createMutation.error as Error).message}
+              </div>
+            )}
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Telefone *</label>
+                <input
+                  name="phoneNumber"
+                  type="text"
+                  required
+                  placeholder="+5511999999999"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome</label>
+                <input
+                  name="name"
+                  type="text"
+                  placeholder="Nome do contato"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="startConversation" id="startConversation" className="rounded" />
+                <label htmlFor="startConversation" className="text-sm text-slate-700">
+                  Iniciar conversa após salvar
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={createMutation.isPending} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50">
+                  {createMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : 'Salvar Contato'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

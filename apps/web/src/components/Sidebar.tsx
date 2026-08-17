@@ -63,6 +63,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <MessageSquare className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Inbox</span>}
           </NavLink>
+          <NavLink
+            to="/contacts"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                isActive
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              )
+            }
+          >
+            <Users className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Contatos</span>}
+          </NavLink>
         </nav>
         <div className="border-t border-white/10 p-3">
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
@@ -89,6 +103,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inbox', icon: MessageSquare, label: 'Inbox' },
+    { to: '/contacts', icon: Users, label: 'Contatos' },
     ...(isTenantOwner
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },

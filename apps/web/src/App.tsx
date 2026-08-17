@@ -15,6 +15,7 @@ import { BotConfigPage } from './features/bot/BotConfigPage'
 import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
+import { ContactsPage } from './features/contacts/ContactsPage'
 import { Loader2 } from 'lucide-react'
 
 const queryClient = new QueryClient({
@@ -85,6 +86,7 @@ function App() {
             >
               <Route path="/dashboard" element={<OperatorRoute><DashboardPage /></OperatorRoute>} />
               <Route path="/inbox" element={<InboxPage />} />
+              <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
