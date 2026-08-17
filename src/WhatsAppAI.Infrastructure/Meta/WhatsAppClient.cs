@@ -118,6 +118,38 @@ internal sealed class WhatsAppClient(
         }
     }
 
+    public Task<WhatsAppQrCodeResult> GetQrCodeAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        // Official API doesn't support QR code connection
+        return Task.FromResult(new WhatsAppQrCodeResult
+        {
+            IsSuccess = false,
+            ErrorMessage = "QR code connection is not available with the official API. Please use the API configuration."
+        });
+    }
+
+    public Task<WhatsAppSessionStatus> GetSessionStatusAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        // Official API doesn't have session concept
+        return Task.FromResult(new WhatsAppSessionStatus
+        {
+            IsConnected = false,
+            Status = "not_applicable"
+        });
+    }
+
+    public Task DisconnectSessionAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        // Official API doesn't have session concept
+        return Task.CompletedTask;
+    }
+
     private static string SanitizeError(string error)
     {
         // Remove any potential tokens or sensitive data from error messages

@@ -149,6 +149,7 @@ public static class AdminTenantEndpoints
             Id = t.Id,
             Name = t.Name,
             Slug = t.Slug,
+            PlanId = t.PlanId,
             Status = t.Status.ToString(),
             Version = t.Version,
             CreatedAt = t.CreatedAt,
@@ -169,6 +170,7 @@ public static class AdminTenantEndpoints
             Id = tenant.Id,
             Name = tenant.Name,
             Slug = tenant.Slug,
+            PlanId = tenant.PlanId,
             Status = tenant.Status.ToString(),
             Version = tenant.Version,
             CreatedAt = tenant.CreatedAt,
@@ -209,6 +211,7 @@ public static class AdminTenantEndpoints
             Id = tenant.Id,
             Name = tenant.Name,
             Slug = tenant.Slug,
+            PlanId = tenant.PlanId,
             Status = tenant.Status.ToString(),
             Version = tenant.Version,
             SuspendedAt = tenant.SuspendedAt,
@@ -247,6 +250,7 @@ public static class AdminTenantEndpoints
             Id = tenant.Id,
             Name = tenant.Name,
             Slug = tenant.Slug,
+            PlanId = tenant.PlanId,
             Status = tenant.Status.ToString(),
             Version = tenant.Version,
             ReactivatedAt = tenant.ReactivatedAt
@@ -280,6 +284,7 @@ public static class AdminTenantEndpoints
             Id = tenant.Id,
             Name = tenant.Name,
             Slug = tenant.Slug,
+            PlanId = tenant.PlanId,
             Status = tenant.Status.ToString(),
             Version = tenant.Version
         });
@@ -329,6 +334,7 @@ public sealed class TenantResponse
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
+    public Guid PlanId { get; init; }
     public string Status { get; init; } = string.Empty;
     public uint Version { get; init; }
     public DateTime CreatedAt { get; init; }

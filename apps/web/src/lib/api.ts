@@ -57,6 +57,7 @@ export interface User {
   tenantId?: string
   role?: 'PlatformAdmin' | 'TenantOwner' | 'Operator'
   isPlatformAdmin: boolean
+  mustChangePassword: boolean
   planCode?: string
   aiEnabled?: boolean
 }
@@ -101,6 +102,11 @@ export const api = {
         body: JSON.stringify({ email, password }),
       }),
     logout: () => fetchApi<void>('/api/auth/logout', { method: 'POST' }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      fetchApi<{ message: string; mustChangePassword: boolean }>('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }),
     getCsrf: () => fetchApi<{ token: string; headerName: string }>('/api/auth/csrf'),
   },
   conversations: {

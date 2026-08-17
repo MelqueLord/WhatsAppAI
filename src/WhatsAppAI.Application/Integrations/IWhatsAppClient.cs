@@ -13,6 +13,19 @@ public interface IWhatsAppClient
         string recipientPhone,
         string text,
         CancellationToken cancellationToken = default);
+
+    // QR Code connection for development/unofficial API
+    Task<WhatsAppQrCodeResult> GetQrCodeAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task<WhatsAppSessionStatus> GetSessionStatusAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task DisconnectSessionAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record WhatsAppConnectionResult
@@ -28,4 +41,19 @@ public sealed record SendMessageResult
     public bool IsSuccess { get; init; }
     public string? MessageId { get; init; }
     public string? ErrorMessage { get; init; }
+}
+
+public sealed record WhatsAppQrCodeResult
+{
+    public bool IsSuccess { get; init; }
+    public string? QrCodeBase64 { get; init; }
+    public string? QrCodeData { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record WhatsAppSessionStatus
+{
+    public bool IsConnected { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? Status { get; init; } // "connected", "disconnected", "qr_pending"
 }

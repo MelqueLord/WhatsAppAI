@@ -27,6 +27,9 @@ public static class AuthEndpoints
         group.MapGet("/me", GetCurrentUserAsync)
             .WithName("GetCurrentUser");
 
+        group.MapPost("/change-password", ChangePasswordAsync)
+            .WithName("ChangePassword");
+
         group.MapGet("/access-denied", () => Results.Unauthorized())
             .WithName("AccessDenied")
             .AllowAnonymous();
@@ -63,7 +66,8 @@ public static class AuthEndpoints
                 DisplayName = user.DisplayName,
                 TenantId = null,
                 Role = "PlatformAdmin",
-                IsPlatformAdmin = true
+                IsPlatformAdmin = true,
+                MustChangePassword = user.MustChangePassword
             });
         }
 
@@ -84,7 +88,8 @@ public static class AuthEndpoints
             DisplayName = user.DisplayName,
             TenantId = activeMembership.TenantId,
             Role = activeMembership.Role.ToString(),
-            IsPlatformAdmin = user.IsPlatformAdmin
+            IsPlatformAdmin = user.IsPlatformAdmin,
+            MustChangePassword = user.MustChangePassword
         });
     }
 
@@ -133,8 +138,38 @@ public static class AuthEndpoints
             DisplayName = user.DisplayName,
             TenantId = currentTenant.TenantId,
             Role = currentTenant.UserRole,
-            IsPlatformAdmin = currentTenant.IsPlatformAdmin
+            IsPlatformAdmin = currentTenant.IsPlatformAdmin,
+            MustChangePassword = user.MustChangePassword,
+            PlanCode = planCode,
+            AiEnabled = aiEnabled
         });
+    }
+
+    private static async Task<IResult> ChangePasswordAsync(
+        [FromBody] ChangePasswordRequest request,
+        ICurrentTenant currentTenant,
+        IUserRepository userRepository,
+        IAuthenticationService authenticationService,
+        HttpContext httpContext)
+    {
+        if (!currentTenant.IsAuthenticated || currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            return Results.BadRequest(new { error = "Password must be at least 8 characters." });
+
+        var user = await userRepository.GetByIdAsync(currentTenant.UserId.Value);
+        if (user is null)
+            return Results.Unauthorized();
+
+        if (!string.IsNullOrEmpty(user.PasswordHash) && !BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            return Results.BadRequest(new { error = "Current password is incorrect." });
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.UpdatePassword(passwordHash);
+        await userRepository.UpdateAsync(user);
+
+        return Results.Ok(new { message = "Password changed successfully.", mustChangePassword = false });
     }
 }
 
@@ -142,6 +177,12 @@ public sealed class LoginRequest
 {
     public string Email { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
+}
+
+public sealed class ChangePasswordRequest
+{
+    public string? CurrentPassword { get; init; }
+    public string NewPassword { get; init; } = string.Empty;
 }
 
 public sealed class UserResponse
@@ -152,6 +193,7 @@ public sealed class UserResponse
     public Guid? TenantId { get; init; }
     public string? Role { get; init; }
     public bool IsPlatformAdmin { get; init; }
+    public bool MustChangePassword { get; init; }
     public string? PlanCode { get; init; }
     public bool? AiEnabled { get; init; }
 }

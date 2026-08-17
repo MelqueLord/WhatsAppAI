@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Integrations;
@@ -18,12 +18,20 @@ public static class WhatsAppEndpoints
             .WithName("GetWhatsAppConfig");
 
         group.MapPost("/", SaveConfigAsync)
-            .WithName("SaveWhatsAppConfig")
-            ;
+            .WithName("SaveWhatsAppConfig");
 
         group.MapPost("/test-connection", TestConnectionAsync)
-            .WithName("TestWhatsAppConnection")
-            ;
+            .WithName("TestWhatsAppConnection");
+
+        // QR Code connection endpoints
+        group.MapGet("/qrcode", GetQrCodeAsync)
+            .WithName("GetWhatsAppQrCode");
+
+        group.MapGet("/session/status", GetSessionStatusAsync)
+            .WithName("GetWhatsAppSessionStatus");
+
+        group.MapPost("/session/disconnect", DisconnectSessionAsync)
+            .WithName("DisconnectWhatsAppSession");
 
         return app;
     }
@@ -135,6 +143,55 @@ public static class WhatsAppEndpoints
             success = false,
             message = result.ErrorMessage
         });
+    }
+
+    private static async Task<IResult> GetQrCodeAsync(
+        ICurrentTenant currentTenant,
+        IWhatsAppClient whatsAppClient)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        var result = await whatsAppClient.GetQrCodeAsync(currentTenant.TenantId.Value);
+
+        if (!result.IsSuccess)
+            return Results.BadRequest(new { error = result.ErrorMessage });
+
+        return Results.Ok(new
+        {
+            qrCode = result.QrCodeBase64,
+            qrCodeData = result.QrCodeData,
+            message = "Scan the QR code with WhatsApp on your phone"
+        });
+    }
+
+    private static async Task<IResult> GetSessionStatusAsync(
+        ICurrentTenant currentTenant,
+        IWhatsAppClient whatsAppClient)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        var result = await whatsAppClient.GetSessionStatusAsync(currentTenant.TenantId.Value);
+
+        return Results.Ok(new
+        {
+            isConnected = result.IsConnected,
+            phoneNumber = result.PhoneNumber,
+            status = result.Status
+        });
+    }
+
+    private static async Task<IResult> DisconnectSessionAsync(
+        ICurrentTenant currentTenant,
+        IWhatsAppClient whatsAppClient)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        await whatsAppClient.DisconnectSessionAsync(currentTenant.TenantId.Value);
+
+        return Results.Ok(new { message = "Session disconnected successfully." });
     }
 }
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
@@ -18,21 +18,14 @@ public static class OperatorEndpoints
         group.MapGet("/", ListOperatorsAsync)
             .WithName("ListOperators");
 
-        group.MapPost("/", InviteOperatorAsync)
-            .WithName("InviteOperator")
-            ;
+        group.MapPost("/", CreateOperatorAsync)
+            .WithName("CreateOperator");
 
         group.MapPost("/{operatorId:guid}/deactivate", DeactivateOperatorAsync)
-            .WithName("DeactivateOperator")
-            ;
+            .WithName("DeactivateOperator");
 
         group.MapPost("/{operatorId:guid}/reactivate", ReactivateOperatorAsync)
-            .WithName("ReactivateOperator")
-            ;
-
-        group.MapPost("/{operatorId:guid}/resend-invite", ResendInviteAsync)
-            .WithName("ResendInvite")
-            ;
+            .WithName("ReactivateOperator");
 
         return app;
     }
@@ -66,8 +59,8 @@ public static class OperatorEndpoints
         return Results.Ok(operators);
     }
 
-    private static async Task<IResult> InviteOperatorAsync(
-        [FromBody] InviteOperatorRequest request,
+    private static async Task<IResult> CreateOperatorAsync(
+        [FromBody] CreateOperatorRequest request,
         ICurrentTenant currentTenant,
         AppDbContext dbContext)
     {
@@ -76,6 +69,12 @@ public static class OperatorEndpoints
 
         if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return Results.BadRequest(new { error = "Email is required." });
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+            return Results.BadRequest(new { error = "Temporary password must be at least 8 characters." });
 
         var email = request.Email.Trim().ToLowerInvariant();
 
@@ -95,41 +94,27 @@ public static class OperatorEndpoints
                 return Results.Conflict(new { error = "User already belongs to a tenant." });
         }
 
-        var hasPendingInvitation = await dbContext.Invitations
-            .IgnoreQueryFilters()
-            .AnyAsync(invitation => invitation.Email == email
-                && invitation.Status == InvitationStatus.Pending
-                && invitation.ExpiresAt > DateTime.UtcNow);
-        if (hasPendingInvitation)
-            return Results.Conflict(new { error = "User already has a pending tenant invitation." });
-
-        var tokenBytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
-        var token = Convert.ToBase64String(tokenBytes);
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
         var user = existingUser;
         if (user is null)
         {
-            user = User.Create(email, request.DisplayName);
+            user = User.CreateWithTemporaryPassword(email, passwordHash, request.DisplayName);
             dbContext.Users.Add(user);
+        }
+        else
+        {
+            user.Activate(passwordHash);
+            user.SetMustChangePassword(true);
+            dbContext.Users.Update(user);
         }
 
         var membership = TenantMembership.Create(
             currentTenant.TenantId.Value,
             user,
             MembershipRole.Operator);
+        membership.Activate();
         dbContext.TenantMemberships.Add(membership);
-
-        var invitation = Invitation.Create(
-            currentTenant.TenantId.Value,
-            email,
-            tokenHash,
-            InvitationPurpose.Operator,
-            currentTenant.UserId.Value,
-            user.Id);
-
-        dbContext.Invitations.Add(invitation);
 
         try
         {
@@ -140,12 +125,13 @@ public static class OperatorEndpoints
             return Results.Conflict(new { error = "User cannot be assigned to another tenant." });
         }
 
-        return Results.Created($"/api/operators/{membership.Id}", new InviteOperatorResponse
+        return Results.Created($"/api/operators/{membership.Id}", new CreateOperatorResponse
         {
             MembershipId = membership.Id,
             Email = email,
-            ActivationUrl = $"/activate?token={token}&invitation={invitation.Id}",
-            ExpiresAt = invitation.ExpiresAt
+            DisplayName = request.DisplayName,
+            TemporaryPassword = request.Password,
+            Message = "Operator created. User must change password on first login."
         });
     }
 
@@ -212,9 +198,9 @@ public static class OperatorEndpoints
         await membershipRepository.UpdateAsync(membership);
 
         var user = await userRepository.GetByIdAsync(membership.UserId);
-        if (user is not null && !user.IsActive)
+        if (user is not null)
         {
-            user.Activate(user.PasswordHash ?? string.Empty);
+            user.Activate(user.PasswordHash!);
             await userRepository.UpdateAsync(user);
         }
 
@@ -228,73 +214,22 @@ public static class OperatorEndpoints
             ReactivatedAt = membership.ReactivatedAt
         });
     }
-
-    private static async Task<IResult> ResendInviteAsync(
-        Guid operatorId,
-        ICurrentTenant currentTenant,
-        ITenantMembershipRepository membershipRepository,
-        IInvitationRepository invitationRepository,
-        IUserRepository userRepository)
-    {
-        if (currentTenant.TenantId is null || currentTenant.UserId is null)
-            return Results.Unauthorized();
-
-        if (currentTenant.UserRole != "TenantOwner")
-            return Results.Forbid();
-
-        var membership = await membershipRepository.GetByIdAsync(operatorId);
-        if (membership is null || membership.TenantId != currentTenant.TenantId)
-            return Results.NotFound();
-
-        if (membership.Role != MembershipRole.Operator)
-            return Results.BadRequest(new { error = "Can only resend invites for operators." });
-
-        var pendingInvites = await invitationRepository.GetPendingByTenantAndEmailAsync(
-            currentTenant.TenantId.Value, membership.User.Email);
-
-        foreach (var invite in pendingInvites)
-        {
-            invite.Revoke(currentTenant.UserId.Value);
-            await invitationRepository.UpdateAsync(invite);
-        }
-
-        var tokenBytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
-        var token = Convert.ToBase64String(tokenBytes);
-        var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
-
-        var invitation = Invitation.Create(
-            currentTenant.TenantId.Value,
-            membership.User.Email,
-            tokenHash,
-            InvitationPurpose.Operator,
-            currentTenant.UserId.Value,
-            membership.UserId);
-
-        await invitationRepository.AddAsync(invitation);
-
-        return Results.Ok(new InviteOperatorResponse
-        {
-            MembershipId = membership.Id,
-            Email = membership.User.Email,
-            ActivationUrl = $"/activate?token={token}&invitation={invitation.Id}",
-            ExpiresAt = invitation.ExpiresAt
-        });
-    }
 }
 
-public sealed class InviteOperatorRequest
+public sealed class CreateOperatorRequest
 {
     public string Email { get; init; } = string.Empty;
     public string? DisplayName { get; init; }
+    public string Password { get; init; } = string.Empty;
 }
 
-public sealed class InviteOperatorResponse
+public sealed class CreateOperatorResponse
 {
     public Guid MembershipId { get; init; }
     public string Email { get; init; } = string.Empty;
-    public string ActivationUrl { get; init; } = string.Empty;
-    public DateTime ExpiresAt { get; init; }
+    public string? DisplayName { get; init; }
+    public string TemporaryPassword { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
 }
 
 public sealed class OperatorResponse

@@ -37,7 +37,7 @@ builder.Services.AddPersistence(connectionString, dbProvider);
 builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddIdentityServices();
 builder.Services.AddSecretServices();
-builder.Services.AddMetaServices();
+builder.Services.AddMetaServices(builder.Environment);
 builder.Services.AddOpenAiServices();
 builder.Services.AddWorkers();
 

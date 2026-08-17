@@ -8,6 +8,7 @@ public sealed class User
     public string? DisplayName { get; private set; }
     public bool IsActive { get; private set; }
     public bool IsPlatformAdmin { get; private set; }
+    public bool MustChangePassword { get; private set; }
     public string SecurityStamp { get; private set; } = string.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime? ActivatedAt { get; private set; }
@@ -28,6 +29,22 @@ public sealed class User
             IsActive = false,
             SecurityStamp = Guid.NewGuid().ToString("N"),
             CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public static User CreateWithTemporaryPassword(string email, string passwordHash, string? displayName = null)
+    {
+        return new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email.Trim().ToLowerInvariant(),
+            DisplayName = displayName?.Trim(),
+            PasswordHash = passwordHash,
+            IsActive = true,
+            MustChangePassword = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            CreatedAt = DateTime.UtcNow,
+            ActivatedAt = DateTime.UtcNow
         };
     }
 
@@ -59,6 +76,7 @@ public sealed class User
     public void UpdatePassword(string passwordHash)
     {
         PasswordHash = passwordHash;
+        MustChangePassword = false;
         SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
@@ -70,5 +88,10 @@ public sealed class User
     public void RevokePlatformAdmin()
     {
         IsPlatformAdmin = false;
+    }
+
+    public void SetMustChangePassword(bool mustChange)
+    {
+        MustChangePassword = mustChange;
     }
 }

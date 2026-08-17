@@ -56,6 +56,18 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function OperatorRoute({ children }: { children: React.ReactNode }) {
+  const { isOperator } = useAuth()
+  // Operators can only access inbox
+  if (isOperator) return <Navigate to="/inbox" replace />
+  return <>{children}</>
+}
+
+function NavigateToHome() {
+  const { isOperator } = useAuth()
+  return <Navigate to={isOperator ? '/inbox' : '/dashboard'} replace />
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -71,7 +83,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<OperatorRoute><DashboardPage /></OperatorRoute>} />
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
@@ -79,12 +91,12 @@ function App() {
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
               <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
-              <Route path="/usage" element={<UsagePage />} />
+              <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
             </Route>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<NavigateToHome />} />
+            <Route path="*" element={<NavigateToHome />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

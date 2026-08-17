@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type User } from './api'
 
@@ -9,8 +9,10 @@ interface AuthContextType {
   isPlatformAdmin: boolean
   isTenantOwner: boolean
   isOperator: boolean
+  mustChangePassword: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   refetch: () => void
 }
 
@@ -37,6 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login'
   }, [queryClient])
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await api.auth.changePassword(currentPassword, newPassword)
+    await refetch()
+  }, [refetch])
+
   const value: AuthContextType = {
     user: user ?? null,
     isLoading,
@@ -44,8 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isPlatformAdmin: user?.isPlatformAdmin ?? false,
     isTenantOwner: user?.role === 'TenantOwner',
     isOperator: user?.role === 'Operator',
+    mustChangePassword: user?.mustChangePassword ?? false,
     login,
     logout,
+    changePassword,
     refetch,
   }
 
