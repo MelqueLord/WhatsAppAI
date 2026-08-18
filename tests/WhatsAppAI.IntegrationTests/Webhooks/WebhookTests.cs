@@ -24,10 +24,9 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
         _client = _factory.CreateClient();
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        var context = await _factory.GetDbContextAsync();
-        // Seed test data if needed
+        return Task.CompletedTask;
     }
 
     public Task DisposeAsync()

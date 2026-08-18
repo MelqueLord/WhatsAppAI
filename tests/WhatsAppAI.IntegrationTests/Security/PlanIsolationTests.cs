@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -23,12 +24,12 @@ public class PlanIsolationTests : IClassFixture<TestWebApplicationFactory>
         var db = await _factory.GetDbContextAsync();
 
         var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == planCode);
-        var tenant = Tenant.Create($"Test {planCode}", $"test-{planCode.ToLower()}", plan.Id);
+        var tenant = Tenant.Create($"Test {planCode}", $"test-{planCode.ToLower(CultureInfo.InvariantCulture)}", plan.Id);
         tenant.Activate();
         db.Tenants.Add(tenant);
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123");
-        var user = User.Create($"owner-{planCode.ToLower()}@test.com", $"Owner {planCode}");
+        var user = User.Create($"owner-{planCode.ToLower(CultureInfo.InvariantCulture)}@test.com", $"Owner {planCode}");
         user.Activate(passwordHash);
         db.Users.Add(user);
 
@@ -44,9 +45,9 @@ public class PlanIsolationTests : IClassFixture<TestWebApplicationFactory>
         });
 
         // Login to authenticate the client
-        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        await client.PostAsJsonAsync("/api/auth/login", new
         {
-            Email = $"owner-{planCode.ToLower()}@test.com",
+            Email = $"owner-{planCode.ToLower(CultureInfo.InvariantCulture)}@test.com",
             Password = "Test@123"
         });
 
