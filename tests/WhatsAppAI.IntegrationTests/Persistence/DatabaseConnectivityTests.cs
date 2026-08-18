@@ -10,7 +10,7 @@ public sealed class DatabaseConnectivityTests : IClassFixture<TestWebApplication
     public DatabaseConnectivityTests(TestWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task DbContext_connects_to_MySQL()
+    public async Task DbContext_connects_to_database()
     {
         var db = await _factory.GetDbContextAsync();
         Assert.True(await db.Database.CanConnectAsync());

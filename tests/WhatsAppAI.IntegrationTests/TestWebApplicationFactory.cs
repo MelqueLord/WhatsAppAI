@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,8 +10,23 @@ namespace WhatsAppAI.IntegrationTests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private static readonly string ConnectionString =
-        "Server=127.0.0.1;Port=3306;Database=whatsappai_test;User=root;Password=root;CharSet=utf8mb4";
+    private readonly string? _dbProvider;
+    private readonly SqliteConnection? _sqliteConnection;
+
+    public TestWebApplicationFactory()
+    {
+        _dbProvider = Environment.GetEnvironmentVariable("DatabaseProvider") ?? "SQLite";
+
+        if (_dbProvider == "SQLite")
+        {
+            _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+            _sqliteConnection.Open();
+        }
+    }
+
+    private static string MySqlConnectionString =>
+        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+        ?? "Server=127.0.0.1;Port=3306;Database=whatsappai_test;User=root;Password=root;CharSet=utf8mb4";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -20,8 +36,6 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DatabaseProvider"] = "MySQL",
-                ["ConnectionStrings:DefaultConnection"] = ConnectionString,
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
@@ -41,7 +55,10 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseMySQL(ConnectionString);
+                if (_dbProvider == "MySQL")
+                    options.UseMySQL(MySqlConnectionString);
+                else
+                    options.UseSqlite(_sqliteConnection!);
             });
         });
     }
@@ -61,5 +78,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         return context;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing) _sqliteConnection?.Dispose();
     }
 }
