@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,22 +9,19 @@ namespace WhatsAppAI.IntegrationTests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly SqliteConnection _connection;
-
-    public TestWebApplicationFactory()
-    {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-    }
+    private static readonly string ConnectionString =
+        "Server=127.0.0.1;Port=3306;Database=whatsappai_test;User=root;Password=root;CharSet=utf8mb4";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
-        builder.ConfigureAppConfiguration((context, config) =>
+        builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["DatabaseProvider"] = "MySQL",
+                ["ConnectionStrings:DefaultConnection"] = ConnectionString,
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
@@ -45,7 +41,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseSqlite(_connection);
+                options.UseMySQL(ConnectionString);
             });
         });
     }
@@ -65,11 +61,5 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         return context;
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        if (disposing) _connection.Dispose();
     }
 }

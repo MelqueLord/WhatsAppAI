@@ -3,14 +3,17 @@ using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.IntegrationTests.Persistence;
 
-public sealed class DatabaseConnectivityTests
+public sealed class DatabaseConnectivityTests : IClassFixture<TestWebApplicationFactory>
 {
-    [Fact(Skip = "Requires Docker for MySQL Testcontainer")]
-    public async Task DbContext_connects_without_migrations_or_business_schema()
+    private readonly TestWebApplicationFactory _factory;
+
+    public DatabaseConnectivityTests(TestWebApplicationFactory factory) => _factory = factory;
+
+    [Fact]
+    public async Task DbContext_connects_to_MySQL()
     {
-        // This test requires Docker to run MySQL Testcontainer
-        // Skipped in environments without Docker
-        await Task.CompletedTask;
+        var db = await _factory.GetDbContextAsync();
+        Assert.True(await db.Database.CanConnectAsync());
     }
 }
 
