@@ -1,6 +1,6 @@
 # Spec: Multi-provedor de IA e tela unificada de configuração
 
-**Status:** Registrado (pendente de implementação)
+**Status:** Implementado (Fase 10 - T150-T165)
 **Depende de:** Plataforma base (T001-T075), Sistema de Planos (T090-T116)
 **Refs:** US-004, FR-013, FR-014, FR-021, BR-008
 

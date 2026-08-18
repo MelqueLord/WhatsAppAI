@@ -45,6 +45,19 @@ A aplicação possui dois planos pré-configurados (seed automático):
 
 O plano é selecionado ao criar um tenant via `/api/admin/tenants`. Funcionalidades de IA são filtradas automaticamente baseado no plano.
 
+## Provedores de IA
+
+A plataforma suporta 4 provedores de IA. Para usar IA, o tenant precisa ter plano `IA+BOT` e configurar pelo menos um provedor na tela "Atendimento com IA":
+
+| Provedor | Identificador | Exemplo de modelo |
+|----------|--------------|-------------------|
+| OpenAI | `openai` | gpt-4o-mini |
+| Google Gemini | `gemini` | gemini-2.5-flash |
+| Anthropic | `anthropic` | claude-sonnet-4-20250514 |
+| Xiaomi MiMo | `xiaomi` | mimo-v2.5 |
+
+A API key é criptografada no banco via `ISecretStore`. O endpoint `GET /api/integrations/ai/providers` lista provedores disponíveis com modelos sugeridos.
+
 ## Segredos locais
 
 Não versionar credenciais. Usar `dotnet user-secrets` no backend e um `.env.local` ignorado para valores públicos do frontend. Tokens Meta/OpenAI nunca devem estar no bundle da SPA.

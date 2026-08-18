@@ -42,9 +42,9 @@ Configuração global, não tenant-owned, acessível somente pela infraestrutura
 
 ### AiProviderCredential
 
-`id`, `tenant_id`, `provider`, `secret_ref`, `project_ref`, `model`, `status`, `last_tested_at`, timestamps.
+`id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `is_active`, `created_at`, `updated_at`, `version`.
 
-Não contém chave em claro. Um provedor ativo por tenant no MVP.
+Não contém chave em claro. Múltiplos provedores podem ser configurados por tenant (openai, gemini, anthropic, xiaomi), mas apenas um fica ativo por vez. Trocar de provedor desativa o anterior sem apagar a credencial (**FR-AI-001**, **BR-AI-001**, **BR-AI-002**).
 
 ### Contact
 

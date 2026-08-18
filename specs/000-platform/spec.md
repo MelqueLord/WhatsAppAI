@@ -242,7 +242,7 @@ Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa I
 ### Multi-provedor de IA e tela unificada de configuração
 
 **Spec:** `spec-ai-multi-provider.md`
-**Status:** Registrado (pendente de implementação)
+**Status:** Implementado (Fase 10 - T150-T165)
 
 A tela de configuração de IA deve suportar múltiplos provedores e consolidar todas as configurações relacionadas ao atendimento automatizado por IA em um único lugar.
 
