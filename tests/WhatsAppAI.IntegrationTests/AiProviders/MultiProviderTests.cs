@@ -19,13 +19,15 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     private async Task<(HttpClient client, Guid tenantId)> CreateTenantWithAiPlanAsync()
     {
         var db = await _factory.GetDbContextAsync();
-        var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == "IA+BOT");
-        var tenant = Tenant.Create("AI Tenant", "ai-tenant", plan.Id);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == "IA_BOT");
+        var tenant = Tenant.Create($"AI Tenant {suffix}", $"ai-tenant-{suffix}", plan.Id);
         tenant.Activate();
         db.Tenants.Add(tenant);
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123");
-        var user = User.Create("owner-ai@test.com", "AI Owner");
+        var email = $"owner-ai-{suffix}@test.com";
+        var user = User.Create(email, "AI Owner");
         user.Activate(passwordHash);
         db.Users.Add(user);
 
@@ -36,7 +38,7 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         await db.SaveChangesAsync();
 
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsJsonAsync("/api/auth/login", new { Email = "owner-ai@test.com", Password = "Test@123" });
+        await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "Test@123" });
         return (client, tenant.Id);
     }
 

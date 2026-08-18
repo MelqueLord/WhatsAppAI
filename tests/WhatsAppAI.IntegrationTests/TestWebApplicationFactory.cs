@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,13 @@ namespace WhatsAppAI.IntegrationTests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string _dbName = Guid.NewGuid().ToString();
+    private readonly SqliteConnection _connection;
+
+    public TestWebApplicationFactory()
+    {
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -29,7 +36,6 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Remove the existing DbContext configuration
             var descriptors = services.Where(
                 d => d.ServiceType == typeof(DbContextOptions<AppDbContext>) ||
                      d.ServiceType == typeof(AppDbContext)).ToList();
@@ -37,10 +43,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             foreach (var descriptor in descriptors)
                 services.Remove(descriptor);
 
-            // Add SQLite in-memory database with unique name per factory instance
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseSqlite($"DataSource=file:{_dbName}?mode=memory&cache=shared");
+                options.UseSqlite(_connection);
             });
         });
     }
@@ -49,8 +54,22 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await context.Database.OpenConnectionAsync();
         await context.Database.EnsureCreatedAsync();
+
+        if (!await context.SubscriptionPlans.AnyAsync())
+        {
+            await context.SubscriptionPlans.AddRangeAsync(
+                WhatsAppAI.Domain.Identity.SubscriptionPlan.CreateBot(),
+                WhatsAppAI.Domain.Identity.SubscriptionPlan.CreateAiBot());
+            await context.SaveChangesAsync();
+        }
+
         return context;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing) _connection.Dispose();
     }
 }

@@ -22,14 +22,15 @@ public class PlanIsolationTests : IClassFixture<TestWebApplicationFactory>
     private async Task<(HttpClient client, Guid tenantId)> CreateTenantWithPlanAsync(string planCode)
     {
         var db = await _factory.GetDbContextAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
 
         var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == planCode);
-        var tenant = Tenant.Create($"Test {planCode}", $"test-{planCode.ToLower(CultureInfo.InvariantCulture)}", plan.Id);
+        var tenant = Tenant.Create($"Test {planCode} {suffix}", $"test-{planCode.ToLower(CultureInfo.InvariantCulture)}-{suffix}", plan.Id);
         tenant.Activate();
         db.Tenants.Add(tenant);
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123");
-        var user = User.Create($"owner-{planCode.ToLower(CultureInfo.InvariantCulture)}@test.com", $"Owner {planCode}");
+        var user = User.Create($"owner-{planCode.ToLower(CultureInfo.InvariantCulture)}-{suffix}@test.com", $"Owner {planCode}");
         user.Activate(passwordHash);
         db.Users.Add(user);
 
