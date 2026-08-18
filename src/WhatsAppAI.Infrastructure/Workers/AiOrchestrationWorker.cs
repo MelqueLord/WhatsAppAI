@@ -51,7 +51,7 @@ public sealed class AiOrchestrationWorker(
         var conversationRepository = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
         var credentialRepository = scope.ServiceProvider.GetRequiredService<IAiProviderCredentialRepository>();
         var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-        var aiProvider = scope.ServiceProvider.GetRequiredService<IAiProvider>();
+        var aiProviderResolver = scope.ServiceProvider.GetRequiredService<IAiProviderResolver>();
         var contextAssembler = scope.ServiceProvider.GetRequiredService<ContextAssembler>();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
         var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
@@ -65,7 +65,7 @@ public sealed class AiOrchestrationWorker(
         {
             await ProcessSingleInboundAsync(
                 message, dbContext, botConfigRepository, messageRepository, conversationRepository,
-                credentialRepository, secretStore, aiProvider,
+                credentialRepository, secretStore, aiProviderResolver,
                 contextAssembler, outboxRepository, interactionRepository,
                 usageRepository, cancellationToken);
         }
@@ -79,7 +79,7 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IAiProviderCredentialRepository credentialRepository,
         ISecretStore secretStore,
-        IAiProvider aiProvider,
+        IAiProviderResolver aiProviderResolver,
         ContextAssembler contextAssembler,
         IOutboxMessageRepository outboxRepository,
         IAiInteractionRepository interactionRepository,
@@ -155,6 +155,18 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
+            // Resolve the correct AI provider based on the credential's provider name
+            IAiProvider aiProvider;
+            try
+            {
+                aiProvider = aiProviderResolver.Resolve(credential.Provider);
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogWarning(ex, "AI provider '{Provider}' not available for tenant {TenantId}", credential.Provider, message.TenantId);
+                return;
+            }
+
             var context = await contextAssembler.BuildAsync(
                 message.TenantId, message.ConversationId, null, cancellationToken);
 
@@ -180,11 +192,11 @@ public sealed class AiOrchestrationWorker(
                 response.InputTokens, response.OutputTokens, 0, response.RawResponseId);
             await interactionRepository.AddAsync(interaction, cancellationToken);
 
-            // Persist usage ledger
+            // Persist usage ledger with actual provider name
             if (response.InputTokens > 0)
             {
                 var usage = UsageLedger.Create(
-                    message.TenantId, "openai", "input_tokens",
+                    message.TenantId, credential.Provider, "input_tokens",
                     response.RawResponseId ?? message.Id.ToString(),
                     response.InputTokens, "tokens");
                 await usageRepository.AddAsync(usage, cancellationToken);
@@ -192,7 +204,7 @@ public sealed class AiOrchestrationWorker(
             if (response.OutputTokens > 0)
             {
                 var usage = UsageLedger.Create(
-                    message.TenantId, "openai", "output_tokens",
+                    message.TenantId, credential.Provider, "output_tokens",
                     response.RawResponseId ?? message.Id.ToString(),
                     response.OutputTokens, "tokens");
                 await usageRepository.AddAsync(usage, cancellationToken);

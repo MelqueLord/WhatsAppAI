@@ -214,3 +214,45 @@ Permitir que PlatformAdmin cadastre empresas com dois tipos de plano:
 - [X] **T089** Atualizar tasks.md. **Refs:** tasks.md.
 
 ### Nota: T090-T095 já implementados (Fase 9 - Sistema de Planos)
+
+## Feature: Multi-provedor de IA e tela unificada
+
+**Spec:** `specs/000-platform/spec-ai-multi-provider.md`
+**Status:** Pendente
+**Dependências:** Plataforma base (T001-T075), Sistema de Planos (T090-T116)
+
+### Fase 10 — Multi-provedor de IA
+
+- [ ] **T150** Criar `IAiProviderResolver` e refatorar registro DI para suportar múltiplos provedores. **Refs:** FR-AI-001, FR-AI-002, BR-AI-001. **Paths:** `src/WhatsAppAI.Application/Automation/IAiProviderResolver.cs`, `src/WhatsAppAI.Infrastructure/OpenAI/OpenAIServiceCollectionExtensions.cs`, `src/WhatsAppAI.Infrastructure/AiProviderServiceCollectionExtensions.cs`. **Depends:** T051. **Aceite:** `IAiProviderResolver.Resolve(providerName)` retorna o adaptador correto; provedor inexistente lança exceção descritiva; registro DI mantém compatibilidade com `IAiProvider` existente via fallback para OpenAI.
+
+- [ ] **T151** [P] Implementar `GeminiProvider : IAiProvider`. **Refs:** FR-AI-002, US-AI-001. **Paths:** `src/WhatsAppAI.Infrastructure/Gemini/GeminiProvider.cs`, `src/WhatsAppAI.Infrastructure/Gemini/GeminiModels.cs`. **Depends:** T150. **Aceite:** `GetResponseAsync` chama `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` com API key como query param; resposta é convertida para `AiResponse` com `AiDecision`; erro sanitizado é lançado sem expor credenciais.
+
+- [ ] **T152** [P] Implementar `AnthropicProvider : IAiProvider`. **Refs:** FR-AI-002, US-AI-001. **Paths:** `src/WhatsAppAI.Infrastructure/Anthropic/AnthropicProvider.cs`, `src/WhatsAppAI.Infrastructure/Anthropic/AnthropicModels.cs`. **Depends:** T150. **Aceite:** `GetResponseAsync` chama `api.anthropic.com/v1/messages` com header `x-api-key` e `anthropic-version: 2023-06-01`; resposta é convertida para `AiResponse`; tokens input/output são extraídos do bloco `usage`.
+
+- [ ] **T153** [P] Implementar `XiaomiProvider : IAiProvider`. **Refs:** FR-AI-002, US-AI-001. **Paths:** `src/WhatsAppAI.Infrastructure/Xiaomi/XiaomiProvider.cs`, `src/WhatsAppAI.Infrastructure/Xiaomi/XiaomiModels.cs`. **Depends:** T150. **Aceite:** `GetResponseAsync` chama endpoint compatível com Chat Completions (Bearer token); resposta é convertida para `AiResponse`; modelos `mimo-v2.5-pro` e `mimo-v2.5` funcionam.
+
+- [ ] **T154** Registrar todos os provedores no DI e criar extensão `AddAiProviderServices`. **Refs:** FR-AI-002. **Paths:** `src/WhatsAppAI.Infrastructure/AiProviderServiceCollectionExtensions.cs`, `src/WhatsAppAI.WebApi/Program.cs`. **Depends:** T151, T152, T153. **Aceite:** `IAiProvider` continua resolvendo OpenAI como padrão (backward compat); `IAiProviderResolver` resolve por nome; todos os 4 provedores são registrados como named HttpClient.
+
+- [ ] **T155** Atualizar `AiOrchestrationWorker` para usar `IAiProviderResolver` e registrar provedor no `UsageLedger`. **Refs:** FR-AI-001, BR-AI-001. **Paths:** `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`. **Depends:** T154. **Aceite:** worker lê `credential.Provider` e resolve o adaptador correto; `UsageLedger` registra o nome real do provedor (não hardcoded "openai"); fallback para OpenAI se provedor não resolvido.
+
+- [ ] **T156** Atualizar endpoints de IA (`AiProviderEndpoints`) para aceitar `provider` e listar modelos por provedor. **Refs:** FR-AI-001, FR-AI-006, FR-AI-007. **Paths:** `src/WhatsAppAI.WebApi/Integrations/AiProviderEndpoints.cs`. **Depends:** T154. **Aceite:** `POST /api/integrations/ai` aceita campo `provider` (openai|gemini|anthropic|xiaomi); `GET /api/integrations/ai/providers` retorna lista de provedores com modelos sugeridos; `POST /api/integrations/ai/test-connection` usa o adaptador do provedor selecionado.
+
+- [ ] **T157** Mesclar endpoints de `BotConfiguration` nos endpoints de IA ou expor rota unificada. **Refs:** FR-AI-003, FR-AI-005, US-AI-002. **Paths:** `src/WhatsAppAI.WebApi/Integrations/AiProviderEndpoints.cs`, `src/WhatsAppAI.WebApi/Bot/BotConfigurationEndpoints.cs`. **Depends:** T156. **Aceite:** `GET /api/integrations/ai` retorna também `botConfig` (modo, mensagens, limites); `POST /api/integrations/ai` aceita campos de bot config; endpoints antigos de `/api/bot-config` continuam funcionando para backward compat.
+
+- [ ] **T158** [P] Testes unitários para `GeminiProvider`. **Refs:** FR-AI-002, G6. **Paths:** `tests/WhatsAppAI.UnitTests/Automation/GeminiProviderTests.cs`. **Depends:** T151. **Aceite:** teste mocka HttpClient; valida mapeamento de resposta para `AiDecision`; valida tratamento de erro e timeout.
+
+- [ ] **T159** [P] Testes unitários para `AnthropicProvider`. **Refs:** FR-AI-002, G6. **Paths:** `tests/WhatsAppAI.UnitTests/Automation/AnthropicProviderTests.cs`. **Depends:** T152. **Aceite:** teste mocka HttpClient; valida headers obrigatórios (`x-api-key`, `anthropic-version`); valida mapeamento de `content` e `usage`.
+
+- [ ] **T160** [P] Testes unitários para `XiaomiProvider`. **Refs:** FR-AI-002, G6. **Paths:** `tests/WhatsAppAI.UnitTests/Automation/XiaomiProviderTests.cs`. **Depends:** T153. **Aceite:** teste mocka HttpClient; valida formato Chat Completions; valida Bearer token.
+
+- [ ] **T161** Testes unitários para `IAiProviderResolver`. **Refs:** FR-AI-002, G6. **Paths:** `tests/WhatsAppAI.UnitTests/Automation/AiProviderResolverTests.cs`. **Depends:** T150. **Aceite:** resolve "openai", "gemini", "anthropic", "xiaomi" corretamente; nome desconhecido lança exceção; case-insensitive.
+
+- [ ] **T162** Testes de integração para multi-provedor (contrato e isolamento). **Refs:** FR-AI-002, BR-AI-001, BR-AI-002. **Paths:** `tests/WhatsAppAI.IntegrationTests/AiProviders/`. **Depends:** T154, T156. **Aceite:** salvar provedor A, depois provedor B, credencial de A permanece; testar conexão de cada provedor com fixture; provedor inativo não é usado pelo worker.
+
+- [ ] **T163** Reescrever `AiConfigPage` com seletor de provedor e seções unificadas (provedor + bot config). **Refs:** FR-AI-003, FR-AI-006, FR-AI-007, US-AI-002. **Paths:** `apps/web/src/features/integrations/ai/AiConfigPage.tsx`. **Depends:** T156, T157. **Aceite:** seletor visual com 4 provedores (OpenAI, Gemini, Anthropic, Xiaomi); dropdown de modelos muda conforme provedor; campos de bot config (modo, mensagens, limites) integrados na mesma tela; provedor atual é destacado; API key não é exibida após salvar.
+
+- [ ] **T164** Remover `BotConfigPage`, atualizar rotas e sidebar. **Refs:** FR-AI-003. **Paths:** `apps/web/src/features/bot/BotConfigPage.tsx`, `apps/web/src/App.tsx`, `apps/web/src/components/Sidebar.tsx`. **Depends:** T163. **Aceite:** rota `/bot-config` removida; menu lateral não exibe mais "Bot" separado; import de `BotConfigPage` removido de `App.tsx`; tela de IA é acessível apenas por `OwnerRoute` + `aiEnabled`.
+
+- [ ] **T165** Atualizar testes frontend para tela unificada. **Refs:** FR-AI-003, G6. **Paths:** `apps/web/src/features/integrations/ai/AiConfigPage.test.tsx` (novo). **Depends:** T163. **Aceite:** teste renderiza seletor de provedor; teste valida mudança de provedor atualiza modelos sugeridos; teste valida salvamento de config de bot integrada.
+
+- [ ] **T166** Atualizar tasks.md e gap G6 após Fase 10. **Refs:** tasks.md. **Depends:** T150-T165. **Aceite:** tasks.md atualizado com Fase 10 completa; gap G6 atualizado com novos testes.

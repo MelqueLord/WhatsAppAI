@@ -1,18 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
-using WhatsAppAI.Application.Automation;
-using WhatsAppAI.Infrastructure.OpenAI;
 
 namespace WhatsAppAI.Infrastructure;
 
+/// <summary>
+/// Deprecated: use <see cref="AiProviderServiceCollectionExtensions.AddAiProviderServices"/> instead.
+/// This method is kept for backward compatibility and delegates to the new unified registration.
+/// </summary>
 public static class OpenAIServiceCollectionExtensions
 {
     public static IServiceCollection AddOpenAiServices(this IServiceCollection services)
     {
-        services.AddHttpClient<IAiProvider, OpenAiProvider>(client =>
-        {
-            client.BaseAddress = new Uri("https://api.openai.com/");
-            client.Timeout = TimeSpan.FromSeconds(60);
-        });
-        return services;
+        return services.AddAiProviderServices();
     }
 }

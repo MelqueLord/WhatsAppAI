@@ -9,6 +9,36 @@ namespace WhatsAppAI.WebApi.Integrations;
 
 public static class AiProviderEndpoints
 {
+    private static readonly HashSet<string> SupportedProviders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "openai", "gemini", "anthropic", "xiaomi"
+    };
+
+    private static readonly Dictionary<string, object[]> ProviderModels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["openai"] =
+        [
+            new { id = "gpt-4o", name = "GPT-4o" },
+            new { id = "gpt-4o-mini", name = "GPT-4o Mini" },
+            new { id = "gpt-4.1-mini", name = "GPT-4.1 Mini" }
+        ],
+        ["gemini"] =
+        [
+            new { id = "gemini-2.5-pro", name = "Gemini 2.5 Pro" },
+            new { id = "gemini-2.5-flash", name = "Gemini 2.5 Flash" }
+        ],
+        ["anthropic"] =
+        [
+            new { id = "claude-sonnet-4-20250514", name = "Claude Sonnet 4" },
+            new { id = "claude-haiku-3-5-20241022", name = "Claude Haiku 3.5" }
+        ],
+        ["xiaomi"] =
+        [
+            new { id = "mimo-v2.5-pro", name = "MiMo v2.5 Pro" },
+            new { id = "mimo-v2.5", name = "MiMo v2.5" }
+        ]
+    };
+
     public static IEndpointRouteBuilder MapAiProviderEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/integrations/ai")
@@ -17,6 +47,9 @@ public static class AiProviderEndpoints
 
         group.MapGet("/", GetConfigAsync)
             .WithName("GetAiConfig");
+
+        group.MapGet("/providers", GetProvidersAsync)
+            .WithName("GetAiProviders");
 
         group.MapPost("/", SaveConfigAsync)
             .WithName("SaveAiConfig");
@@ -27,9 +60,30 @@ public static class AiProviderEndpoints
         return app;
     }
 
+    private static IResult GetProvidersAsync(IAiProviderResolver resolver)
+    {
+        var registered = resolver.GetRegisteredProviders();
+        var providers = registered.Select(p => new
+        {
+            id = p.ToLowerInvariant(),
+            name = p.ToLowerInvariant() switch
+            {
+                "openai" => "OpenAI",
+                "gemini" => "Google Gemini",
+                "anthropic" => "Anthropic",
+                "xiaomi" => "Xiaomi MiMo",
+                _ => p
+            },
+            models = ProviderModels.GetValueOrDefault(p) ?? []
+        });
+
+        return Results.Ok(providers);
+    }
+
     private static async Task<IResult> GetConfigAsync(
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -39,16 +93,26 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "AI not available in your plan." });
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (credential is null)
-            return Results.Ok(new { configured = false });
+        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
 
         return Results.Ok(new
         {
-            configured = true,
-            provider = credential.Provider,
-            modelId = credential.ModelId,
-            isActive = credential.IsActive,
-            version = credential.Version
+            configured = credential is not null,
+            provider = credential?.Provider,
+            modelId = credential?.ModelId,
+            isActive = credential?.IsActive,
+            version = credential?.Version,
+            botConfig = botConfig is not null
+                ? new
+                {
+                    mode = botConfig.Mode.ToString(),
+                    welcomeMessage = botConfig.WelcomeMessage,
+                    offlineMessage = botConfig.OfflineMessage,
+                    fallbackMessage = botConfig.FallbackMessage,
+                    maxTokensPerResponse = botConfig.MaxTokensPerResponse,
+                    enabled = botConfig.Enabled
+                }
+                : new { mode = "Manual", welcomeMessage = (string?)null, offlineMessage = (string?)null, fallbackMessage = (string?)null, maxTokensPerResponse = 500, enabled = true }
         });
     }
 
@@ -56,6 +120,7 @@ public static class AiProviderEndpoints
         [FromBody] SaveAiConfigRequest request,
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
         ISecretStore secretStore,
         AppDbContext dbContext)
     {
@@ -71,20 +136,20 @@ public static class AiProviderEndpoints
         if (string.IsNullOrWhiteSpace(request.ModelId))
             return Results.BadRequest(new { error = "Model ID is required." });
 
-        var provider = request.Provider ?? "OpenAI";
-        var secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
+        var provider = request.Provider ?? "openai";
+        if (!SupportedProviders.Contains(provider))
+            return Results.BadRequest(new { error = $"Unsupported provider. Use: {string.Join(", ", SupportedProviders)}" });
 
+        var secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
         await secretStore.SetAsync(secretKey, request.ApiKey);
 
         var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-
         if (existing is not null)
         {
             if (existing.Provider != provider)
             {
                 existing.Deactivate();
                 await credentialRepository.UpdateAsync(existing);
-
                 var newCredential = AiProviderCredential.Create(
                     currentTenant.TenantId.Value, provider, request.ModelId, secretKey);
                 await credentialRepository.AddAsync(newCredential);
@@ -102,6 +167,28 @@ public static class AiProviderEndpoints
             await credentialRepository.AddAsync(credential);
         }
 
+        // Save bot configuration if provided
+        if (request.BotConfig is not null)
+        {
+            var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+            var mode = Enum.TryParse<BotMode>(request.BotConfig.Mode, true, out var m) ? m : BotMode.Manual;
+
+            if (botConfig is null)
+            {
+                botConfig = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
+                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage);
+                botConfig.UpdateTokenLimit(request.BotConfig.MaxTokensPerResponse ?? 500);
+                await botConfigRepository.AddAsync(botConfig);
+            }
+            else
+            {
+                botConfig.UpdateMode(mode);
+                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage);
+                botConfig.UpdateTokenLimit(request.BotConfig.MaxTokensPerResponse ?? botConfig.MaxTokensPerResponse);
+                await botConfigRepository.UpdateAsync(botConfig);
+            }
+        }
+
         return Results.Ok(new { saved = true });
     }
 
@@ -109,7 +196,7 @@ public static class AiProviderEndpoints
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
         ISecretStore secretStore,
-        IAiProvider aiProvider,
+        IAiProviderResolver aiProviderResolver,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -128,6 +215,8 @@ public static class AiProviderEndpoints
 
         try
         {
+            var aiProvider = aiProviderResolver.Resolve(credential.Provider);
+
             var request = new AiRequest
             {
                 ModelId = credential.ModelId,
@@ -167,4 +256,14 @@ public sealed record SaveAiConfigRequest
     public string? Provider { get; init; }
     public string ModelId { get; init; } = string.Empty;
     public string ApiKey { get; init; } = string.Empty;
+    public SaveBotConfigRequest? BotConfig { get; init; }
+}
+
+public sealed record SaveBotConfigRequest
+{
+    public string? Mode { get; init; }
+    public string? WelcomeMessage { get; init; }
+    public string? OfflineMessage { get; init; }
+    public string? FallbackMessage { get; init; }
+    public int? MaxTokensPerResponse { get; init; }
 }

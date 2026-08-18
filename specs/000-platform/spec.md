@@ -238,3 +238,33 @@ Permite ao PlatformAdmin cadastrar empresas com dois tipos de plano:
 - **IA+BOT:** Completo com IA para atendimento automatizado
 
 Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa IA mas mantém todos os outros recursos.
+
+### Multi-provedor de IA e tela unificada de configuração
+
+**Spec:** `spec-ai-multi-provider.md`
+**Status:** Registrado (pendente de implementação)
+
+A tela de configuração de IA deve suportar múltiplos provedores e consolidar todas as configurações relacionadas ao atendimento automatizado por IA em um único lugar.
+
+**Provedores suportados:**
+- **OpenAI** (GPT-4o, GPT-4o-mini, etc.)
+- **Google Gemini** (Gemini 2.5 Pro, Gemini 2.5 Flash, etc.)
+- **Anthropic** (Claude Sonnet 4, Claude Haiku 3.5, etc.)
+- **Xiaomi MiMo** (mimo-v2.5-pro, mimo-v2.5, etc.)
+
+**Consolidação na tela de IA (substitui a tela separada de "Fluxo do bot"):**
+1. Seleção de provedor (dropdown com OpenAI, Gemini, Anthropic, Xiaomi)
+2. Modelo e credencial (API key) do provedor selecionado
+3. Teste de conexão específico por provedor
+4. Modo de operação (Manual, SimpleAutoReply, AiPowered)
+5. Mensagens automáticas (boas-vindas, fallback, handoff, mídia)
+6. Limites de tokens por resposta
+7. Status e indicadores do provedor ativo
+
+**Requisitos:**
+- FR-AI-001: suportar múltiplos provedores de IA com adapter específico por provider
+- FR-AI-002: credenciais são por provedor; tenant pode ter mais de um provedor configurado mas apenas um ativo por vez
+- FR-AI-003: a tela unificada substitui as duas telas atuais (AiConfigPage + BotConfigPage)
+- FR-AI-004: testes de contrato para cada provedor devem validar a interface comum
+- BR-AI-001: provedor não suportado ou credencial inválida não impede operação em modo Manual
+- BR-AI-002: trocar de provedor preserva histórico de interações do provedor anterior

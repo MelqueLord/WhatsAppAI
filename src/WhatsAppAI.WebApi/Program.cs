@@ -39,7 +39,7 @@ builder.Services.AddObservability(builder.Configuration);
 builder.Services.AddIdentityServices();
 builder.Services.AddSecretServices();
 builder.Services.AddMetaServices(builder.Environment);
-builder.Services.AddOpenAiServices();
+builder.Services.AddAiProviderServices();
 builder.Services.AddWorkers();
 
 builder.Services.AddSignalR();
