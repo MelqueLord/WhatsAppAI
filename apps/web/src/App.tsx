@@ -11,7 +11,7 @@ import { WhatsAppConfigPage } from './features/integrations/whatsapp/WhatsAppCon
 import { AiConfigPage } from './features/integrations/ai/AiConfigPage'
 import { KnowledgePage } from './features/knowledge/KnowledgePage'
 import { ClientTagsPage } from './features/tags/ClientTagsPage'
-import { BotConfigPage } from './features/bot/BotConfigPage'
+
 import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
@@ -92,7 +92,6 @@ function App() {
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
-              <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
