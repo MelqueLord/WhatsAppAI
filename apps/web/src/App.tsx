@@ -58,6 +58,12 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function TenantUserRoute({ children }: { children: React.ReactNode }) {
+  const { isTenantOwner, isOperator } = useAuth()
+  if (!isTenantOwner && !isOperator) return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
 function OperatorRoute({ children }: { children: React.ReactNode }) {
   const { isOperator } = useAuth()
   // Operators can only access inbox
@@ -89,7 +95,7 @@ function App() {
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
-              <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
+              <Route path="/integrations/whatsapp" element={<TenantUserRoute><WhatsAppConfigPage /></TenantUserRoute>} />
               <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />

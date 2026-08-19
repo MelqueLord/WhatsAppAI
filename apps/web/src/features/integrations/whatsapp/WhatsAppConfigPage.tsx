@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../../../lib/auth'
 import {
   Zap,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 
 export function WhatsAppConfigPage() {
+  const { isOperator } = useAuth()
   const queryClient = useQueryClient()
   const [wabaId, setWabaId] = useState('')
   const [phoneNumberId, setPhoneNumberId] = useState('')
@@ -117,7 +119,7 @@ export function WhatsAppConfigPage() {
         </div>
 
         {/* Connection Mode Toggle */}
-        <div className="mb-6 p-1 bg-slate-100 rounded-xl flex">
+        {!isOperator && <div className="mb-6 p-1 bg-slate-100 rounded-xl flex">
           <button
             onClick={() => setConnectionMode('qrcode')}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -140,7 +142,7 @@ export function WhatsAppConfigPage() {
             <Smartphone className="w-4 h-4" />
             API Oficial
           </button>
-        </div>
+        </div>}
 
         {/* QR Code Connection */}
         {connectionMode === 'qrcode' && (
@@ -245,7 +247,7 @@ export function WhatsAppConfigPage() {
         )}
 
         {/* API Configuration */}
-        {connectionMode === 'api' && (
+        {!isOperator && connectionMode === 'api' && (
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="font-semibold text-slate-900 mb-4">Credenciais da API Oficial</h2>
 

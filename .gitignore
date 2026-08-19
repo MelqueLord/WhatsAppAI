@@ -11,6 +11,7 @@ services/whatsapp-web/sessions/
 .vs/
 .idea/
 .vscode/
+.history/
 *.user
 *.suo
 *.tmp

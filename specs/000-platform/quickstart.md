@@ -10,7 +10,18 @@ Este documento define a sequência esperada; os comandos executáveis serão con
 - Docker com Compose
 - HTTPS local confiável para testes de webhook, quando necessário
 
-## Preparação planejada
+## Execucao local sem administrador
+
+Para executar em uma maquina Windows sem permissao de administrador, instale o .NET SDK 10 e o Node.js LTS no escopo do usuario e execute:
+
+```powershell
+.\setup.ps1
+.\run.bat
+```
+
+Esse caminho usa SQLite em `src/WhatsAppAI.WebApi/whatsappai.db`, nao inicia Docker e sobe a API em `http://localhost:5000` e o frontend em `http://localhost:5173`. O servico opcional `services/whatsapp-web` pode ser instalado com `npm install` nessa pasta para habilitar o QR Code local.
+
+## Preparação com Docker/MySQL
 
 Copie `.env.example` para um `.env` local ignorado, substitua a senha de exemplo e execute:
 

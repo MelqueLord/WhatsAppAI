@@ -253,6 +253,11 @@ export function BotConfigPage() {
               <CheckCircle2 className="w-4 h-4" /> Fluxo salvo com sucesso
             </span>
           )}
+          {saveMutation.isError && (
+            <span className="text-red-600 text-sm">
+              {(saveMutation.error as Error).message || 'Erro ao salvar fluxo'}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         try
         {
             var result = await httpClient.GetFromJsonAsync<BridgeQrResponse>(
-                $"{BaseUrl}/sessions/{tenantId:N}/qr",
+                $"{BaseUrl}/sessions/{tenantId:D}/qr",
                 cancellationToken);
 
             return new WhatsAppQrCodeResult
@@ -70,7 +70,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         try
         {
             var result = await httpClient.GetFromJsonAsync<BridgeStatusResponse>(
-                $"{BaseUrl}/sessions/{tenantId:N}/status",
+                $"{BaseUrl}/sessions/{tenantId:D}/status",
                 cancellationToken);
 
             return new WhatsAppSessionStatus
@@ -90,7 +90,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:N}/logout", null, cancellationToken);
+        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:D}/logout", null, cancellationToken);
     }
 
     private sealed record BridgeQrResponse

@@ -34,6 +34,9 @@ public static class AdminTenantEndpoints
         group.MapPut("/{tenantId:guid}/plan", UpdateTenantPlanAsync)
             .WithName("UpdateTenantPlan");
 
+        group.MapPost("/{tenantId:guid}/owner/reset-password", ResetOwnerPasswordAsync)
+            .WithName("ResetTenantOwnerPassword");
+
         return app;
     }
 
@@ -100,6 +103,7 @@ public static class AdminTenantEndpoints
             }
 
             var membership = TenantMembership.Create(tenant.Id, owner, MembershipRole.TenantOwner);
+            membership.Activate();
             dbContext.TenantMemberships.Add(membership);
 
             await dbContext.SaveChangesAsync();
@@ -110,6 +114,8 @@ public static class AdminTenantEndpoints
                 TenantName = tenant.Name,
                 Slug = tenant.Slug,
                 OwnerEmail = ownerEmail,
+                OwnerDisplayName = owner.DisplayName,
+                DueDate = tenant.DueDate,
                 TemporaryPassword = temporaryPassword,
                 Message = "Guarde a senha temporária. Ela será exigida no primeiro login e deverá ser alterada."
             });
@@ -153,9 +159,16 @@ public static class AdminTenantEndpoints
     }
 
     private static async Task<IResult> GetAllTenantsAsync(
-        ITenantRepository tenantRepository)
+        ITenantRepository tenantRepository,
+        AppDbContext dbContext)
     {
         var tenants = await tenantRepository.GetAllAsync();
+        var owners = await dbContext.TenantMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.Role == MembershipRole.TenantOwner)
+            .Select(m => new { m.TenantId, m.User.Email, m.User.DisplayName })
+            .ToDictionaryAsync(x => x.TenantId);
+
         return Results.Ok(tenants.Select(t => new TenantResponse
         {
             Id = t.Id,
@@ -165,6 +178,9 @@ public static class AdminTenantEndpoints
             Status = t.Status.ToString(),
             Version = t.Version,
             CreatedAt = t.CreatedAt,
+            DueDate = t.DueDate,
+            OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
+            OwnerDisplayName = owner?.DisplayName,
             SuspendedAt = t.SuspendedAt
         }));
     }
@@ -186,6 +202,7 @@ public static class AdminTenantEndpoints
             Status = tenant.Status.ToString(),
             Version = tenant.Version,
             CreatedAt = tenant.CreatedAt,
+            DueDate = tenant.DueDate,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -302,6 +319,32 @@ public static class AdminTenantEndpoints
         });
     }
 
+    private static async Task<IResult> ResetOwnerPasswordAsync(
+        Guid tenantId,
+        AppDbContext dbContext)
+    {
+        var owner = await dbContext.TenantMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.TenantId == tenantId && m.Role == MembershipRole.TenantOwner)
+            .Select(m => m.User)
+            .SingleOrDefaultAsync();
+
+        if (owner is null)
+            return Results.NotFound(new { error = "Tenant owner not found." });
+
+        var temporaryPassword = GenerateTemporaryPassword();
+        owner.UpdatePassword(BCrypt.Net.BCrypt.HashPassword(temporaryPassword));
+        owner.SetMustChangePassword(true);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            email = owner.Email,
+            temporaryPassword,
+            message = "Senha redefinida. O responsável deverá alterá-la no próximo login."
+        });
+    }
+
     private static bool TryGetIfMatchVersion(HttpContext httpContext, out uint version)
     {
         version = 0;
@@ -327,6 +370,8 @@ public sealed class CreateTenantResponse
     public string TenantName { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
+    public string? OwnerDisplayName { get; init; }
+    public DateTime DueDate { get; init; }
     public string TemporaryPassword { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
 }
@@ -350,6 +395,9 @@ public sealed class TenantResponse
     public string Status { get; init; } = string.Empty;
     public uint Version { get; init; }
     public DateTime CreatedAt { get; init; }
+    public DateTime DueDate { get; init; }
+    public string? OwnerEmail { get; init; }
+    public string? OwnerDisplayName { get; init; }
     public DateTime? SuspendedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
     public string? SuspensionReason { get; init; }

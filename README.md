@@ -50,6 +50,64 @@ Falta validar antes de considerar pronto para piloto real:
 | `docs/runbooks/webhook-failures.md` | Operação de falhas de webhook |
 | `docs/sdd-framework.md` | Framework SDD e skills recomendadas |
 
-## Próximo marco
+## Como rodar localmente
 
-Validar a implementacao completa com build/testes, revisar riscos operacionais pendentes e executar o checklist de deploy/piloto.
+### Requisitos
+
+- Windows 10/11
+- .NET SDK 10
+- Node.js LTS, que inclui npm
+- Git
+
+Docker e permissao de administrador nao sao necessarios para o desenvolvimento local. O setup usa SQLite e instala dependencias apenas na conta do usuario atual.
+
+### Depois de baixar pelo GitHub
+
+```powershell
+git clone <URL_DO_REPOSITORIO>
+Set-Location WhatsAppAI
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\setup.ps1
+.\run.bat
+```
+
+O `Set-ExecutionPolicy` vale somente para o terminal atual e nao exige administrador. Se o PowerShell ja permitir scripts, essa linha pode ser omitida.
+
+O setup executa restore, instala dependencias, configura SQLite, compila backend/frontend e roda os testes do frontend. Para preparar mais rapidamente sem os testes:
+
+```powershell
+.\setup.ps1 -SkipTests
+```
+
+### Enderecos locais
+
+- Aplicacao web: http://localhost:5173
+- API: http://localhost:5000
+- WhatsApp Web bridge/QR: http://localhost:3020
+
+O bridge do WhatsApp e opcional. O `setup.ps1` instala suas dependencias automaticamente; sem ele, o restante da aplicacao continua funcionando, mas a conexao por QR fica indisponivel.
+
+### Primeiro acesso
+
+Em ambiente de desenvolvimento, o administrador inicial e:
+
+```text
+E-mail: admin@platform.com
+Senha: Admin@123
+```
+
+Entre como `PlatformAdmin`, crie uma empresa e use a senha temporaria exibida no cadastro para acessar o `TenantOwner`. O `TenantOwner` pode convidar ou criar `Operators`.
+
+### Parar a aplicacao
+
+Feche as janelas abertas pelo `run.bat` ou pressione `Ctrl+C` nelas. O banco SQLite fica em `src/WhatsAppAI.WebApi/whatsappai.db`.
+
+### Docker/MySQL
+
+Para um ambiente parecido com producao, use o Compose separadamente:
+
+```powershell
+docker compose up -d mysql
+```
+
+Esse caminho e opcional e pode exigir Docker Desktop configurado. O desenvolvimento diario recomendado continua sendo SQLite sem administrador.

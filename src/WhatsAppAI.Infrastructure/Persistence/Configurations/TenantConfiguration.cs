@@ -42,6 +42,11 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasColumnType("datetime(6)")
             .IsRequired();
 
+        builder.Property(t => t.DueDate)
+            .HasColumnName("due_date")
+            .HasColumnType("datetime(6)")
+            .IsRequired();
+
         builder.Property(t => t.ActivatedAt)
             .HasColumnName("activated_at")
             .HasColumnType("datetime(6)");

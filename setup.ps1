@@ -1,363 +1,76 @@
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Setup completo do WhatsApp AI Manager
+    Prepares WhatsApp AI Manager for local development without administrator rights.
 .DESCRIPTION
-    Instala pré-requisitos, configura banco de dados e inicia a aplicação
-.EXAMPLE
-    .\setup.ps1
-    .\setup.ps1 -SkipInstall
-    .\setup.ps1 -RunOnly
+    Uses SQLite, .NET SDK and Node.js already installed for the current user.
+    Docker/MySQL remain optional for integration or production-like runs.
 #>
 
+[CmdletBinding()]
 param(
-    [switch]$SkipInstall,
-    [switch]$RunOnly,
-    [switch]$TestOnly
+    [switch]$SkipTests,
+    [switch]$Run
 )
 
-$ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
-
-$DOTNET_VERSION = "10.0"
-$NODE_MIN_VERSION = "20"
-$MYSQL_ROOT_PASSWORD = "root"
-$MYSQL_DATABASE = "whatsappai_dev"
-$ENCRYPTION_KEY = [Convert]::ToBase64String([byte[]](1..32))
-
-function Write-Step {
-    param([string]$Message)
-    Write-Host "`n========================================" -ForegroundColor Cyan
-    Write-Host "  $Message" -ForegroundColor Cyan
-    Write-Host "========================================`n" -ForegroundColor Cyan
-}
-
-function Test-Command {
-    param([string]$Command)
-    $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
-}
-
-function Install-DotNet {
-    Write-Step "Verificando .NET SDK"
-
-    if (Test-Command "dotnet") {
-        $version = dotnet --version
-        Write-Host "✅ .NET SDK encontrado: $version" -ForegroundColor Green
-        return
-    }
-
-    Write-Host "❌ .NET SDK não encontrado" -ForegroundColor Red
-
-    if ($SkipInstall) {
-        Write-Host "Instale manualmente: https://dotnet.microsoft.com/download/dotnet/10.0" -ForegroundColor Yellow
-        exit 1
-    }
-
-    Write-Host "📦 Instalando .NET 10 SDK..." -ForegroundColor Yellow
-
-    if (Test-Command "winget") {
-        winget install Microsoft.DotNet.SDK.10 --accept-source-agreements --accept-package-agreements
-    } else {
-        Write-Host "Winget não disponível. Baixe manualmente:" -ForegroundColor Yellow
-        Write-Host "https://dotnet.microsoft.com/download/dotnet/10.0" -ForegroundColor Cyan
-        exit 1
-    }
-
-    # Refresh PATH
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-
-    if (-not (Test-Command "dotnet")) {
-        Write-Host "❌ Instalação falhou. Reinicie o terminal e tente novamente." -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "✅ .NET SDK instalado com sucesso" -ForegroundColor Green
-}
-
-function Install-Docker {
-    Write-Step "Verificando Docker"
-
-    if (Test-Command "docker") {
-        $version = docker --version
-        Write-Host "✅ Docker encontrado: $version" -ForegroundColor Green
-        return
-    }
-
-    Write-Host "❌ Docker não encontrado" -ForegroundColor Red
-
-    if ($SkipInstall) {
-        Write-Host "Instale manualmente: https://www.docker.com/products/docker-desktop/" -ForegroundColor Yellow
-        exit 1
-    }
-
-    Write-Host "📦 Instalando Docker Desktop..." -ForegroundColor Yellow
-
-    if (Test-Command "winget") {
-        winget install Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
-    } else {
-        Write-Host "Winget não disponível. Baixe manualmente:" -ForegroundColor Yellow
-        Write-Host "https://www.docker.com/products/docker-desktop/" -ForegroundColor Cyan
-        exit 1
-    }
-
-    Write-Host "⚠️  Reinicie o computador após instalar o Docker Desktop" -ForegroundColor Yellow
-    Write-Host "   Depois execute este script novamente" -ForegroundColor Yellow
-    exit 0
-}
-
-function Install-Node {
-    Write-Step "Verificando Node.js"
-
-    if (Test-Command "node") {
-        $version = node --version
-        Write-Host "✅ Node.js encontrado: $version" -ForegroundColor Green
-        return
-    }
-
-    Write-Host "❌ Node.js não encontrado" -ForegroundColor Red
-
-    if ($SkipInstall) {
-        Write-Host "Instale manualmente: https://nodejs.org/" -ForegroundColor Yellow
-        exit 1
-    }
-
-    Write-Host "📦 Instalando Node.js..." -ForegroundColor Yellow
-
-    if (Test-Command "winget") {
-        winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-    } else {
-        Write-Host "Winget não disponível. Baixe manualmente:" -ForegroundColor Yellow
-        Write-Host "https://nodejs.org/" -ForegroundColor Cyan
-        exit 1
-    }
-
-    # Refresh PATH
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-
-    Write-Host "✅ Node.js instalado com sucesso" -ForegroundColor Green
-}
-
-function Start-MySQL {
-    Write-Step "Iniciando MySQL via Docker"
-
-    # Check if compose file exists
-    if (-not (Test-Path "compose.yaml")) {
-        Write-Host "❌ compose.yaml não encontrado" -ForegroundColor Red
-        exit 1
-    }
-
-    # Start MySQL
-    Write-Host "🐬 Iniciando MySQL 8.4..." -ForegroundColor Yellow
-    docker compose up -d mysql
-
-    # Wait for MySQL to be ready
-    Write-Host "⏳ Aguardando MySQL ficar pronto..." -ForegroundColor Yellow
-    $maxAttempts = 30
-    $attempt = 0
-
-    while ($attempt -lt $maxAttempts) {
-        $attempt++
-        $result = docker compose exec -T mysql mysqladmin ping -h localhost -uroot -p$MYSQL_ROOT_PASSWORD 2>$null
-
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ MySQL pronto!" -ForegroundColor Green
-            return
-        }
-
-        Write-Host "." -NoNewline
-        Start-Sleep -Seconds 1
-    }
-
-    Write-Host "`n❌ MySQL não ficou pronto a tempo" -ForegroundColor Red
-    exit 1
-}
-
-function Set-UserSecrets {
-    Write-Step "Configurando User Secrets"
-
-    $projectPath = "src/WhatsAppAI.WebApi"
-
-    # Initialize user secrets
-    dotnet user-secrets init --project $projectPath 2>$null
-
-    # Set connection string
-    $connString = "Server=localhost;Port=3306;Database=$MYSQL_DATABASE;User=root;Password=$MYSQL_ROOT_PASSWORD;CharSet=utf8mb4"
-    dotnet user-secrets set "ConnectionStrings:DefaultConnection" $connString --project $projectPath
-
-    # Set encryption key
-    dotnet user-secrets set "Encryption:Key" $ENCRYPTION_KEY --project $projectPath
-
-    # Set Meta secrets (placeholder for development)
-    dotnet user-secrets set "Meta:VerifyToken" "dev-verify-token" --project $projectPath
-    dotnet user-secrets set "Meta:AppSecret" "dev-app-secret" --project $projectPath
-
-    Write-Host "✅ User Secrets configurado" -ForegroundColor Green
-}
-
-function Install-Dependencies {
-    Write-Step "Instalando dependências"
-
-    # .NET restore
-    Write-Host "📦 Restaurando pacotes .NET..." -ForegroundColor Yellow
-    dotnet restore
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Falha ao restaurar pacotes .NET" -ForegroundColor Red
-        exit 1
-    }
-
-    # Frontend dependencies
-    Write-Host "📦 Instalando dependências do frontend..." -ForegroundColor Yellow
-    Push-Location apps/web
-    npm install
-    Pop-Location
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Falha ao instalar dependências do frontend" -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "✅ Dependências instaladas" -ForegroundColor Green
-}
-
-function Initialize-Database {
-    Write-Step "Inicializando banco de dados"
-
-    # MySQL database is created by docker-compose via MYSQL_DATABASE env var
-    Write-Host "🐬 Banco de dados MySQL criado pelo Docker Compose" -ForegroundColor Yellow
-
-    # Run migrations
-    Write-Host "🔄 Executando migrations..." -ForegroundColor Yellow
-    dotnet ef database update --project src/WhatsAppAI.Infrastructure --startup-project src/WhatsAppAI.WebApi
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "⚠️  Migrations não executadas (pode ser normal na primeira vez)" -ForegroundColor Yellow
-        Write-Host "   O banco será criado quando a aplicação iniciar" -ForegroundColor Yellow
-    } else {
-        Write-Host "✅ Banco de dados inicializado" -ForegroundColor Green
-    }
-}
-
-function Build-Solution {
-    Write-Step "Build da solução"
-
-    Write-Host "🔨 Compilando backend..." -ForegroundColor Yellow
-    dotnet build --configuration Release
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Falha no build do backend" -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "🔨 Compilando frontend..." -ForegroundColor Yellow
-    Push-Location apps/web
-    npm run build
-    Pop-Location
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Falha no build do frontend" -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "✅ Build concluído com sucesso" -ForegroundColor Green
-}
-
-function Invoke-Tests {
-    Write-Step "Executando testes"
-
-    # Backend tests
-    Write-Host "🧪 Executando testes .NET..." -ForegroundColor Yellow
-    dotnet test --configuration Release --verbosity normal
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "⚠️  Alguns testes falharam" -ForegroundColor Yellow
-    } else {
-        Write-Host "✅ Todos os testes passaram" -ForegroundColor Green
-    }
-
-    # Frontend tests
-    Write-Host "🧪 Executando testes frontend..." -ForegroundColor Yellow
-    Push-Location apps/web
-    npm test
-    Pop-Location
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "⚠️  Alguns testes frontend falharam" -ForegroundColor Yellow
-    } else {
-        Write-Host "✅ Testes frontend passaram" -ForegroundColor Green
-    }
-}
-
-function Start-Application {
-    Write-Step "Iniciando aplicação"
-
-    Write-Host @"
-
-🚀 WhatsApp AI Manager
-
-   Backend:  http://localhost:5179
-   Frontend: http://localhost:5173
-   Health:   http://localhost:5179/health/live
-
-   Pressione Ctrl+C para parar
-
-"@ -ForegroundColor Green
-
-    # Start backend in background
-    Write-Host "🖥️  Iniciando backend..." -ForegroundColor Yellow
-    $backendJob = Start-Job -ScriptBlock {
-        Set-Location $using:PWD
-        dotnet run --project src/WhatsAppAI.WebApi --configuration Release
-    }
-
-    # Start frontend
-    Write-Host "🖥️  Iniciando frontend..." -ForegroundColor Yellow
-    Push-Location apps/web
-
-    try {
-        npm run dev
-    } finally {
-        Pop-Location
-        Stop-Job -Job $backendJob -ErrorAction SilentlyContinue
-        Remove-Job -Job $backendJob -Force -ErrorAction SilentlyContinue
-    }
-}
-
-# ============================================
-# MAIN
-# ============================================
-
-Write-Host @"
-
-╔═══════════════════════════════════════════════╗
-║     WhatsApp AI Manager - Setup Script        ║
-╚═══════════════════════════════════════════════╝
-
-"@ -ForegroundColor Cyan
-
-# Change to script directory
+$ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-if ($TestOnly) {
-    Install-DotNet
-    Install-Dependencies
-    Invoke-Tests
-    exit 0
+function Require-Command([string]$Name, [string]$InstallUrl) {
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        Write-Host "$Name was not found. Install it for the current user: $InstallUrl" -ForegroundColor Red
+        exit 1
+    }
 }
 
-if (-not $RunOnly) {
-    Install-DotNet
-    Install-Docker
-    Install-Node
-    Start-MySQL
-    Set-UserSecrets
-    Install-Dependencies
-    Initialize-Database
-    Build-Solution
+Write-Host 'WhatsApp AI Manager - local setup (no administrator rights)' -ForegroundColor Cyan
+Require-Command 'dotnet' 'https://dotnet.microsoft.com/download/dotnet/10.0'
+Require-Command 'node' 'https://nodejs.org/'
+Require-Command 'npm' 'https://nodejs.org/'
+
+Write-Host "Using .NET $(& dotnet --version) and Node $(& node --version)" -ForegroundColor Green
+
+& dotnet user-secrets init --project src/WhatsAppAI.WebApi 2>$null
+& dotnet user-secrets set 'DatabaseProvider' 'SQLite' --project src/WhatsAppAI.WebApi
+& dotnet user-secrets set 'ConnectionStrings:DefaultConnection' 'Data Source=whatsappai.db' --project src/WhatsAppAI.WebApi
+& dotnet user-secrets set 'Encryption:Key' 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHiA=' --project src/WhatsAppAI.WebApi
+& dotnet user-secrets set 'Meta:VerifyToken' 'dev-verify-token' --project src/WhatsAppAI.WebApi
+& dotnet user-secrets set 'Meta:AppSecret' 'dev-app-secret' --project src/WhatsAppAI.WebApi
+
+Write-Host 'Restoring backend dependencies...' -ForegroundColor Yellow
+& dotnet restore
+
+Write-Host 'Installing frontend dependencies...' -ForegroundColor Yellow
+Push-Location apps/web
+try {
+    if (Test-Path package-lock.json) { & npm ci } else { & npm install }
+}
+finally { Pop-Location }
+
+if (Test-Path services/whatsapp-web/package.json) {
+    Write-Host 'Installing optional WhatsApp Web bridge dependencies...' -ForegroundColor Yellow
+    Push-Location services/whatsapp-web
+    try { & npm install }
+    finally { Pop-Location }
 }
 
-if (-not $SkipInstall) {
-    Invoke-Tests
+Write-Host 'Building backend...' -ForegroundColor Yellow
+& dotnet build src/WhatsAppAI.WebApi/WhatsAppAI.WebApi.csproj --no-restore
+
+Write-Host 'Building frontend...' -ForegroundColor Yellow
+Push-Location apps/web
+try { & npm run build }
+finally { Pop-Location }
+
+if (-not $SkipTests) {
+    Write-Host 'Running frontend tests...' -ForegroundColor Yellow
+    Push-Location apps/web
+    try { & npm test }
+    finally { Pop-Location }
 }
 
-Start-Application
+Write-Host 'Setup completed. SQLite will be created by the API on first run.' -ForegroundColor Green
+Write-Host 'Run run.bat or use: dotnet run --project src/WhatsAppAI.WebApi --urls http://localhost:5000' -ForegroundColor Green
+
+if ($Run) {
+    & .\run.bat
+}

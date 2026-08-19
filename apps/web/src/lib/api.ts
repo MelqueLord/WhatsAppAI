@@ -70,7 +70,9 @@ export interface Tenant {
   status: string
   version: number
   createdAt: string
-  dueDate?: string
+  dueDate: string
+  ownerEmail?: string
+  ownerDisplayName?: string
   suspendedAt?: string
   reactivatedAt?: string
   suspensionReason?: string
@@ -101,6 +103,8 @@ export interface CreateTenantResponse {
   tenantName: string
   slug: string
   ownerEmail: string
+  ownerDisplayName?: string
+  dueDate: string
   temporaryPassword: string
   message: string
 }
@@ -207,6 +211,11 @@ export const api = {
           method: 'PUT',
           body: JSON.stringify({ planCode }),
         }),
+      resetOwnerPassword: (id: string) =>
+        fetchApi<{ email: string; temporaryPassword: string; message: string }>(
+          `/api/admin/tenants/${id}/owner/reset-password`,
+          { method: 'POST' },
+        ),
     },
   },
 }

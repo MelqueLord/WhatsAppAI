@@ -10,6 +10,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  KeyRound,
 } from 'lucide-react'
 import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 
@@ -19,6 +20,7 @@ export function AdminTenantsPage() {
   const [createResult, setCreateResult] = useState<CreateTenantResponse | null>(null)
   const [copiedPassword, setCopiedPassword] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+  const [resetResult, setResetResult] = useState<{ tenantName: string; email: string; temporaryPassword: string } | null>(null)
   const [search, setSearch] = useState('')
   const [suspendTarget, setSuspendTarget] = useState<Tenant | null>(null)
   const [suspendReason, setSuspendReason] = useState('')
@@ -66,6 +68,18 @@ export function AdminTenantsPage() {
       api.admin.tenants.updatePlan(tenantId, planCode),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+    },
+  })
+
+  const resetOwnerPasswordMutation = useMutation({
+    mutationFn: (tenantId: string) => api.admin.tenants.resetOwnerPassword(tenantId),
+    onSuccess: (data, tenantId) => {
+      const tenant = tenants?.find((item) => item.id === tenantId)
+      setResetResult({
+        tenantName: tenant?.name ?? 'Empresa',
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+      })
     },
   })
 
@@ -213,6 +227,25 @@ export function AdminTenantsPage() {
           </div>
         )}
 
+        {resetResult && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <KeyRound className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-amber-800">Senha redefinida para {resetResult.tenantName}</p>
+                <p className="text-sm text-amber-700 mt-1">Responsável: {resetResult.email}</p>
+                <code className="inline-block mt-2 px-3 py-2 bg-white border border-amber-200 rounded-lg text-sm font-mono font-bold text-amber-800">
+                  {resetResult.temporaryPassword}
+                </code>
+                <p className="text-xs text-amber-700 mt-2">A senha será exibida somente nesta tela e deverá ser alterada no próximo login.</p>
+              </div>
+              <button onClick={() => setResetResult(null)} className="p-1 hover:bg-amber-100 rounded-lg" title="Fechar">
+                <X className="w-4 h-4 text-amber-600" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -287,7 +320,10 @@ export function AdminTenantsPage() {
                           <span className="font-medium text-slate-800">{tenant.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">TenantOwner</td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="text-slate-700">{tenant.ownerDisplayName || 'TenantOwner'}</div>
+                        <div className="text-xs text-slate-500">{tenant.ownerEmail || 'Responsável não encontrado'}</div>
+                      </td>
                       <td className="px-6 py-4">
                         {plans?.find(p => p.id === tenant.planId)?.name || '-'}
                       </td>
@@ -314,6 +350,15 @@ export function AdminTenantsPage() {
                               <option key={p.id} value={p.code}>{p.name}</option>
                             ))}
                           </select>
+                          <button
+                            onClick={() => resetOwnerPasswordMutation.mutate(tenant.id)}
+                            disabled={!tenant.ownerEmail || resetOwnerPasswordMutation.isPending}
+                            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 font-medium disabled:opacity-50"
+                            title="Redefinir senha do responsável"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {resetOwnerPasswordMutation.isPending ? 'Redefinindo...' : 'Redefinir senha'}
+                          </button>
                           {tenant.status === 'Active' ? (
                             <button
                               onClick={() => {

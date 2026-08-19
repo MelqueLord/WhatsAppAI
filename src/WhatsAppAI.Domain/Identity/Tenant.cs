@@ -8,6 +8,7 @@ public sealed class Tenant
     public Guid PlanId { get; private set; }
     public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
+    public DateTime DueDate { get; private set; }
     public DateTime? ActivatedAt { get; private set; }
     public DateTime? SuspendedAt { get; private set; }
     public DateTime? ReactivatedAt { get; private set; }
@@ -22,6 +23,7 @@ public sealed class Tenant
 
     public static Tenant Create(string name, string slug, Guid planId)
     {
+        var createdAt = DateTime.UtcNow;
         return new Tenant
         {
             Id = Guid.NewGuid(),
@@ -29,7 +31,8 @@ public sealed class Tenant
             Slug = slug.Trim().ToLowerInvariant(),
             PlanId = planId,
             Status = TenantStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = createdAt,
+            DueDate = createdAt.AddDays(30)
         };
     }
 

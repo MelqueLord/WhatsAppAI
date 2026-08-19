@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 
 async function bootstrap() {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_API === 'true') {
     const { setupMockApi } = await import('./lib/mockApi')
     setupMockApi()
   }

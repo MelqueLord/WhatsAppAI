@@ -70,6 +70,8 @@ public static class BotConfigurationEndpoints
             config.UpdateMode(mode);
             config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
             config.UpdateTokenLimit(request.MaxTokensPerResponse ?? config.MaxTokensPerResponse);
+            if (!config.Enabled)
+                config.Toggle(true);
             await repo.UpdateAsync(config);
         }
 
