@@ -41,6 +41,8 @@ public static class BotConfigurationEndpoints
             welcomeMessage = config.WelcomeMessage,
             offlineMessage = config.OfflineMessage,
             fallbackMessage = config.FallbackMessage,
+            handoffMessage = config.HandoffMessage,
+            mediaMessage = config.MediaMessage,
             maxTokensPerResponse = config.MaxTokensPerResponse,
             enabled = config.Enabled,
             version = config.Version
@@ -59,14 +61,14 @@ public static class BotConfigurationEndpoints
         if (config is null)
         {
             config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
-            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage);
+            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
             config.UpdateTokenLimit(request.MaxTokensPerResponse ?? 500);
             await repo.AddAsync(config);
         }
         else
         {
             config.UpdateMode(mode);
-            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage);
+            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
             config.UpdateTokenLimit(request.MaxTokensPerResponse ?? config.MaxTokensPerResponse);
             await repo.UpdateAsync(config);
         }
@@ -104,7 +106,7 @@ public static class BotConfigurationEndpoints
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
 
-        config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage);
+        config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
         await repo.UpdateAsync(config);
         return Results.Ok(new { saved = true });
     }
@@ -143,9 +145,11 @@ public sealed record SaveBotConfigRequest(
     string? WelcomeMessage,
     string? OfflineMessage,
     string? FallbackMessage,
+    string? HandoffMessage,
+    string? MediaMessage,
     int? MaxTokensPerResponse);
 
 public sealed record UpdateModeRequest(string Mode);
-public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? OfflineMessage, string? FallbackMessage);
+public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? MediaMessage);
 public sealed record UpdateTokenLimitRequest(int MaxTokens);
 public sealed record ToggleBotRequest(bool Enabled);

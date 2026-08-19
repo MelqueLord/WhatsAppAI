@@ -46,22 +46,26 @@ public class BotConfigurationTests
     public void UpdateMessages_SetsMessages()
     {
         var config = BotConfiguration.Create(Guid.NewGuid());
-        config.UpdateMessages("Welcome", "Offline", "Fallback");
+        config.UpdateMessages("Welcome", "Offline", "Fallback", "Handoff", "Media");
 
         Assert.Equal("Welcome", config.WelcomeMessage);
         Assert.Equal("Offline", config.OfflineMessage);
         Assert.Equal("Fallback", config.FallbackMessage);
+        Assert.Equal("Handoff", config.HandoffMessage);
+        Assert.Equal("Media", config.MediaMessage);
     }
 
     [Fact]
     public void UpdateMessages_TrimsWhitespace()
     {
         var config = BotConfiguration.Create(Guid.NewGuid());
-        config.UpdateMessages("  Welcome  ", null, "  Fallback  ");
+        config.UpdateMessages("  Welcome  ", null, "  Fallback  ", null, null);
 
         Assert.Equal("Welcome", config.WelcomeMessage);
         Assert.Null(config.OfflineMessage);
         Assert.Equal("Fallback", config.FallbackMessage);
+        Assert.Null(config.HandoffMessage);
+        Assert.Null(config.MediaMessage);
     }
 
     [Fact]

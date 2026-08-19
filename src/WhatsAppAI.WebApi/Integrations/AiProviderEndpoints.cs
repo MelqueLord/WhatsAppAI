@@ -176,14 +176,14 @@ public static class AiProviderEndpoints
             if (botConfig is null)
             {
                 botConfig = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
-                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage);
+                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage, request.BotConfig.HandoffMessage, request.BotConfig.MediaMessage);
                 botConfig.UpdateTokenLimit(request.BotConfig.MaxTokensPerResponse ?? 500);
                 await botConfigRepository.AddAsync(botConfig);
             }
             else
             {
                 botConfig.UpdateMode(mode);
-                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage);
+                botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage, request.BotConfig.HandoffMessage, request.BotConfig.MediaMessage);
                 botConfig.UpdateTokenLimit(request.BotConfig.MaxTokensPerResponse ?? botConfig.MaxTokensPerResponse);
                 await botConfigRepository.UpdateAsync(botConfig);
             }
@@ -265,5 +265,7 @@ public sealed record SaveBotConfigRequest
     public string? WelcomeMessage { get; init; }
     public string? OfflineMessage { get; init; }
     public string? FallbackMessage { get; init; }
+    public string? HandoffMessage { get; init; }
+    public string? MediaMessage { get; init; }
     public int? MaxTokensPerResponse { get; init; }
 }

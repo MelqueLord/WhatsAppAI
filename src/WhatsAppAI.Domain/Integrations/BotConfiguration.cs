@@ -8,6 +8,8 @@ public sealed class BotConfiguration
     public string? WelcomeMessage { get; private set; }
     public string? OfflineMessage { get; private set; }
     public string? FallbackMessage { get; private set; }
+    public string? HandoffMessage { get; private set; }
+    public string? MediaMessage { get; private set; }
     public int MaxTokensPerResponse { get; private set; }
     public bool Enabled { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -36,11 +38,13 @@ public sealed class BotConfiguration
         Version++;
     }
 
-    public void UpdateMessages(string? welcome, string? offline, string? fallback)
+    public void UpdateMessages(string? welcome, string? offline, string? fallback, string? handoff, string? media)
     {
         WelcomeMessage = welcome?.Trim();
         OfflineMessage = offline?.Trim();
         FallbackMessage = fallback?.Trim();
+        HandoffMessage = handoff?.Trim();
+        MediaMessage = media?.Trim();
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
