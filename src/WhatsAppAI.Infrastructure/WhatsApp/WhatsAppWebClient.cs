@@ -35,7 +35,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         });
     }
 
-    public Task<WhatsAppQrCodeResult> GetQrCodeAsync(
+    public async Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
@@ -63,7 +63,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         }
     }
 
-    public Task<WhatsAppSessionStatus> GetSessionStatusAsync(
+    public async Task<WhatsAppSessionStatus> GetSessionStatusAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
@@ -86,7 +86,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         }
     }
 
-    public Task DisconnectSessionAsync(
+    public async Task DisconnectSessionAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
