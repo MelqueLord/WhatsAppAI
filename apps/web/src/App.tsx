@@ -9,6 +9,7 @@ import { InboxPage } from './features/inbox/InboxPage'
 import { OperatorsPage } from './features/operators/OperatorsPage'
 import { WhatsAppConfigPage } from './features/integrations/whatsapp/WhatsAppConfigPage'
 import { AiConfigPage } from './features/integrations/ai/AiConfigPage'
+import { BotConfigPage } from './features/bot/BotConfigPage'
 import { KnowledgePage } from './features/knowledge/KnowledgePage'
 import { ClientTagsPage } from './features/tags/ClientTagsPage'
 
@@ -89,6 +90,7 @@ function App() {
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
+              <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />

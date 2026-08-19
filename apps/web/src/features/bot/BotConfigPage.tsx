@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, CheckCircle2, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { Bot, CheckCircle2, Loader2, Plus, Save, Trash2, Power } from 'lucide-react'
 
 interface FlowStep {
   id: string
@@ -10,6 +10,8 @@ interface FlowStep {
 }
 
 interface BotConfig {
+  configured: boolean
+  mode: string
   welcomeMessage: string | null
   returningMessage?: string | null
   fallbackMessage: string | null
@@ -54,14 +56,29 @@ export function BotConfigPage() {
     setFlowSteps(config.flowSteps?.length ? config.flowSteps : [newStep()])
   }, [config])
 
-  const saveMutation = useMutation({
+  const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
+      const res = await fetch('/api/bot-config/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) throw new Error('Erro ao alterar status')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bot-config'] })
+    },
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       const res = await fetch('/api/bot-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          enabled,
           mode: 'SimpleAutoReply',
           welcomeMessage,
           returningMessage,
@@ -107,12 +124,19 @@ export function BotConfigPage() {
             </div>
           </div>
           <button
-            onClick={() => saveMutation.mutate(!config?.enabled)}
-            disabled={saveMutation.isPending}
-            className={`px-4 py-2 rounded-lg font-medium text-sm ${
-              config?.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+            onClick={() => toggleMutation.mutate(!config?.enabled)}
+            disabled={toggleMutation.isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              config?.enabled
+                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
+            {toggleMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Power className="w-4 h-4" />
+            )}
             {config?.enabled ? 'Ativo' : 'Inativo'}
           </button>
         </div>
@@ -217,16 +241,16 @@ export function BotConfigPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => saveMutation.mutate(true)}
+            onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
             className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50"
           >
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Ativar fluxo
+            Salvar fluxo
           </button>
           {success && (
             <span className="flex items-center gap-1 text-emerald-600 text-sm">
-              <CheckCircle2 className="w-4 h-4" /> Fluxo ativo no WhatsApp
+              <CheckCircle2 className="w-4 h-4" /> Fluxo salvo com sucesso
             </span>
           )}
         </div>

@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   Tags,
+  Settings,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -107,6 +108,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
+          { to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' },
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Atendimento IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/tags', icon: Tags, label: 'Tags' },

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../../lib/auth'
-import { Bot, Save, Loader2, CheckCircle2, XCircle, Zap, Lock } from 'lucide-react'
+import { Bot, Save, Loader2, CheckCircle2, XCircle, Zap, Lock, Power } from 'lucide-react'
 
 interface ProviderInfo { id: string; name: string; models: { id: string; name: string }[] }
 interface BotConfig { mode: string; welcomeMessage: string | null; offlineMessage: string | null; fallbackMessage: string | null; maxTokensPerResponse: number; enabled: boolean }
@@ -93,6 +93,23 @@ export function AiConfigPage() {
     onSuccess: (data) => setTestResult(data),
   })
 
+  const toggleAiMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch('/api/bot-config/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) throw new Error('Erro ao alterar status')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bot-config'] })
+      queryClient.invalidateQueries({ queryKey: ['ai-config'] })
+    },
+  })
+
   if (!aiEnabled) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -112,14 +129,32 @@ export function AiConfigPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
-            <Bot className="w-5 h-5" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Atendimento com IA</h1>
+              <p className="text-sm text-slate-500">Provedor, modelo, modo e mensagens automáticas</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Atendimento com IA</h1>
-            <p className="text-sm text-slate-500">Provedor, modelo, modo e mensagens automáticas</p>
-          </div>
+          <button
+            onClick={() => toggleAiMutation.mutate(!config?.botConfig?.enabled)}
+            disabled={toggleAiMutation.isPending || !config?.configured}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all disabled:opacity-50 ${
+              config?.botConfig?.enabled
+                ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            {toggleAiMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Power className="w-4 h-4" />
+            )}
+            {config?.botConfig?.enabled ? 'IA Ativa' : 'IA Inativa'}
+          </button>
         </div>
 
         {/* Provider selector */}
