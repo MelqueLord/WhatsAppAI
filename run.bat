@@ -7,25 +7,23 @@ echo   WhatsApp AI Manager - Quick Start
 echo ========================================
 echo.
 
-echo Starting PostgreSQL...
-docker compose up -d postgres
+echo Starting MySQL...
+docker compose up -d mysql
 
-echo Waiting for PostgreSQL...
+echo Waiting for MySQL...
 timeout /t 5 /nobreak > nul
 
 echo Starting Backend...
 start "WhatsApp AI Backend" dotnet run --project src/WhatsAppAI.WebApi
 
 echo Starting Frontend...
-cd apps/web
-start "WhatsApp AI Frontend" npm run dev
-cd ..
+start "WhatsApp AI Frontend" cmd /c "cd apps\web && npm run dev"
 
 echo.
 echo ========================================
 echo   Application is starting!
 echo.
-echo   Backend:  http://localhost:5000
+echo   Backend:  http://localhost:5179
 echo   Frontend: http://localhost:5173
 echo.
 echo   Press any key to stop all services

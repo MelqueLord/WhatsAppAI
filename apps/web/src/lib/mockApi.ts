@@ -19,8 +19,23 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
     currentUser = null
     return {}
   },
+  'POST /api/auth/change-password': async () => {
+    if (currentUser) currentUser.mustChangePassword = false
+    return { message: 'Senha alterada com sucesso', mustChangePassword: false }
+  },
+  'GET /api/auth/csrf': async () => ({ token: 'mock-csrf-token', headerName: 'X-CSRF-Token' }),
+
+  // Dashboard
+  'GET /api/dashboard/stats': async () => ({
+    operatorCount: mocks.mockOperators.filter((o) => o.isActive).length,
+    messagesToday: 42,
+    activeConversations: mocks.mockConversations.filter((c) => c.status === 'Open').length,
+  }),
 
   // Conversations
+  'GET /api/conversations/:id': async (_req, params) => {
+    return mocks.mockConversations.find((c) => c.id === params!.id) ?? null
+  },
   'GET /api/conversations': async () => {
     try {
       const res = await fetch('http://localhost:3020/sessions/demo/conversations')
@@ -77,6 +92,14 @@ const routes: Record<string, (req: Request, params?: Record<string, string>) => 
 
   // Contacts
   'GET /api/contacts': async () => mocks.mockContacts,
+  'PUT /api/contacts/:id': async (req, params) => {
+    const body = await req.json().catch(() => ({}))
+    const contact = mocks.mockContacts.find((c) => c.id === params!.id)
+    if (contact) {
+      if (body.name !== undefined) contact.name = body.name
+    }
+    return contact ?? { error: 'Not found' }
+  },
   'POST /api/contacts': async (req) => {
     const body = await req.json().catch(() => ({}))
     const contact = {

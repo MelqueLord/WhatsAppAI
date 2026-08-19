@@ -10,8 +10,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:5000',
-      '/hubs': 'http://localhost:5000',
+      '/api': 'http://localhost:5179',
+      '/hubs': 'http://localhost:5179',
     },
   },
 })

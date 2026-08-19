@@ -21,8 +21,8 @@ $ProgressPreference = "SilentlyContinue"
 
 $DOTNET_VERSION = "10.0"
 $NODE_MIN_VERSION = "20"
-$POSTGRES_PASSWORD = "postgres"
-$POSTGRES_DB = "whatsappai_dev"
+$MYSQL_ROOT_PASSWORD = "root"
+$MYSQL_DATABASE = "whatsappai_dev"
 $ENCRYPTION_KEY = [Convert]::ToBase64String([byte[]](1..32))
 
 function Write-Step {
@@ -137,8 +137,8 @@ function Install-Node {
     Write-Host "✅ Node.js instalado com sucesso" -ForegroundColor Green
 }
 
-function Start-Postgres {
-    Write-Step "Iniciando PostgreSQL via Docker"
+function Start-MySQL {
+    Write-Step "Iniciando MySQL via Docker"
 
     # Check if compose file exists
     if (-not (Test-Path "compose.yaml")) {
@@ -146,21 +146,21 @@ function Start-Postgres {
         exit 1
     }
 
-    # Start PostgreSQL
-    Write-Host "🐘 Iniciando PostgreSQL 18..." -ForegroundColor Yellow
-    docker compose up -d postgres
+    # Start MySQL
+    Write-Host "🐬 Iniciando MySQL 8.4..." -ForegroundColor Yellow
+    docker compose up -d mysql
 
-    # Wait for PostgreSQL to be ready
-    Write-Host "⏳ Aguardando PostgreSQL ficar pronto..." -ForegroundColor Yellow
+    # Wait for MySQL to be ready
+    Write-Host "⏳ Aguardando MySQL ficar pronto..." -ForegroundColor Yellow
     $maxAttempts = 30
     $attempt = 0
 
     while ($attempt -lt $maxAttempts) {
         $attempt++
-        $result = docker compose exec -T postgres pg_isready -U postgres 2>$null
+        $result = docker compose exec -T mysql mysqladmin ping -h localhost -uroot -p$MYSQL_ROOT_PASSWORD 2>$null
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ PostgreSQL pronto!" -ForegroundColor Green
+            Write-Host "✅ MySQL pronto!" -ForegroundColor Green
             return
         }
 
@@ -168,7 +168,7 @@ function Start-Postgres {
         Start-Sleep -Seconds 1
     }
 
-    Write-Host "`n❌ PostgreSQL não ficou pronto a tempo" -ForegroundColor Red
+    Write-Host "`n❌ MySQL não ficou pronto a tempo" -ForegroundColor Red
     exit 1
 }
 
@@ -181,7 +181,7 @@ function Set-UserSecrets {
     dotnet user-secrets init --project $projectPath 2>$null
 
     # Set connection string
-    $connString = "Host=localhost;Database=$POSTGRES_DB;Username=postgres;Password=$POSTGRES_PASSWORD"
+    $connString = "Server=localhost;Port=3306;Database=$MYSQL_DATABASE;User=root;Password=$MYSQL_ROOT_PASSWORD;CharSet=utf8mb4"
     dotnet user-secrets set "ConnectionStrings:DefaultConnection" $connString --project $projectPath
 
     # Set encryption key
@@ -223,9 +223,8 @@ function Install-Dependencies {
 function Initialize-Database {
     Write-Step "Inicializando banco de dados"
 
-    # Create database if not exists
-    Write-Host "🐘 Criando banco de dados..." -ForegroundColor Yellow
-    docker compose exec -T postgres psql -U postgres -c "CREATE DATABASE $POSTGRES_DB;" 2>$null
+    # MySQL database is created by docker-compose via MYSQL_DATABASE env var
+    Write-Host "🐬 Banco de dados MySQL criado pelo Docker Compose" -ForegroundColor Yellow
 
     # Run migrations
     Write-Host "🔄 Executando migrations..." -ForegroundColor Yellow
@@ -296,9 +295,9 @@ function Start-Application {
 
 🚀 WhatsApp AI Manager
 
-   Backend:  http://localhost:5000
+   Backend:  http://localhost:5179
    Frontend: http://localhost:5173
-   Health:   http://localhost:5000/health/live
+   Health:   http://localhost:5179/health/live
 
    Pressione Ctrl+C para parar
 
@@ -350,7 +349,7 @@ if (-not $RunOnly) {
     Install-DotNet
     Install-Docker
     Install-Node
-    Start-Postgres
+    Start-MySQL
     Set-UserSecrets
     Install-Dependencies
     Initialize-Database
