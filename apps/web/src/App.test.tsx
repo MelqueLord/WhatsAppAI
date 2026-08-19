@@ -1,14 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import App from './App'
 
 describe('App', () => {
-  it('renders the application bootstrap', () => {
+  it('renders the login page when not authenticated', async () => {
     render(<App />)
 
-    expect(
-      screen.getByRole('heading', { name: 'WhatsApp AI Manager' }),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/login')
+    })
   })
 })
