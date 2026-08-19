@@ -23,22 +23,27 @@ export function DashboardPage() {
     queryFn: () => api.conversations.list(undefined, 5),
   })
 
+  const { data: statsData } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => api.dashboard.getStats(),
+  })
+
   const stats = [
     {
       label: 'Conversas Ativas',
-      value: conversations?.items?.length ?? 0,
+      value: statsData?.activeConversations ?? 0,
       icon: MessageSquare,
       color: 'emerald',
     },
     {
       label: 'Operadores',
-      value: '—',
+      value: statsData?.operatorCount ?? 0,
       icon: Users,
       color: 'blue',
     },
     {
       label: 'Mensagens Hoje',
-      value: '—',
+      value: statsData?.messagesToday ?? 0,
       icon: Zap,
       color: 'amber',
     },

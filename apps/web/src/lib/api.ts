@@ -105,6 +105,12 @@ export interface CreateTenantResponse {
   message: string
 }
 
+export interface DashboardStats {
+  operatorCount: number
+  messagesToday: number
+  activeConversations: number
+}
+
 export const api = {
   auth: {
     getMe: () => fetchApi<User>('/api/auth/me'),
@@ -120,6 +126,9 @@ export const api = {
         body: JSON.stringify({ currentPassword, newPassword }),
       }),
     getCsrf: () => fetchApi<{ token: string; headerName: string }>('/api/auth/csrf'),
+  },
+  dashboard: {
+    getStats: () => fetchApi<DashboardStats>('/api/dashboard/stats'),
   },
   conversations: {
     list: (cursor?: string, limit = 50) =>

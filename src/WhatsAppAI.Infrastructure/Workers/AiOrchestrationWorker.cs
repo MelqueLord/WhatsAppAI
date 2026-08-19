@@ -247,6 +247,19 @@ public sealed class AiOrchestrationWorker(
                     ConversationMode.Human, conversation.Version, null);
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
 
+                // Send handoff message to client
+                var handoffText = !string.IsNullOrWhiteSpace(botConfig.HandoffMessage)
+                    ? botConfig.HandoffMessage
+                    : "Vou encaminhar voce para um atendente.";
+
+                var handoffMsg = Message.CreateOutbound(
+                    message.TenantId, conversation.Id, message.ContactId,
+                    MessageType.Text, handoffText, Guid.NewGuid().ToString());
+                await messageRepository.AddAsync(handoffMsg, cancellationToken);
+
+                var handoffOutbox = OutboxMessage.Create(message.TenantId, handoffMsg.Id);
+                await outboxRepository.AddAsync(handoffOutbox);
+
                 logger.LogInformation("AI handoff for conversation {ConversationId}: {Reason}",
                     conversation.Id, response.Decision.HandoffReason);
             }

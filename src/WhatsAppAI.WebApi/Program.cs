@@ -15,6 +15,7 @@ using WhatsAppAI.WebApi.Auth.Activate;
 using WhatsAppAI.WebApi.Bot;
 using WhatsAppAI.WebApi.Contacts;
 using WhatsAppAI.WebApi.Conversations;
+using WhatsAppAI.WebApi.Dashboard;
 using WhatsAppAI.WebApi.Hubs;
 using WhatsAppAI.WebApi.Integrations;
 using WhatsAppAI.WebApi.Knowledge;
@@ -157,6 +158,7 @@ app.MapWebhookEndpoints();
 app.MapWebhookEventEndpoints();
 app.MapClientTagEndpoints();
 app.MapBotConfigurationEndpoints();
+app.MapDashboardEndpoints();
 app.MapHub<InboxHub>("/hubs/inbox");
 
 await app.RunAsync();
