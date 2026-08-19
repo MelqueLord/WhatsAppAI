@@ -74,7 +74,7 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         // Save Gemini credential
         var r2 = await client.PostAsJsonAsync("/api/integrations/ai", new
         {
-            provider = "gemini", modelId = "gemini-2.5-flash", apiKey = "AIza-test-gemini"
+            provider = "gemini", modelId = "gemini-3.6-flash", apiKey = "AIza-test-gemini"
         });
         Assert.Equal(HttpStatusCode.OK, r2.StatusCode);
 
@@ -90,7 +90,7 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
 
         Assert.False(openaiCred.IsActive);
         Assert.True(geminiCred.IsActive);
-        Assert.Equal("gemini-2.5-flash", geminiCred.ModelId);
+        Assert.Equal("gemini-3.6-flash", geminiCred.ModelId);
     }
 
     [Fact]

@@ -15,7 +15,7 @@ O TenantOwner precisa de uma tela única e completa para configurar todo o atend
 | Provedor | Identificador | Exemplos de modelos |
 |----------|--------------|---------------------|
 | OpenAI | `openai` | gpt-4o, gpt-4o-mini, gpt-4.1-mini |
-| Google Gemini | `gemini` | gemini-2.5-pro, gemini-2.5-flash |
+| Google Gemini | `gemini` | gemini-3.1-pro-preview, gemini-3.6-flash |
 | Anthropic | `anthropic` | claude-sonnet-4, claude-haiku-3.5 |
 | Xiaomi MiMo | `xiaomi` | mimo-v2.5-pro, mimo-v2.5 |
 

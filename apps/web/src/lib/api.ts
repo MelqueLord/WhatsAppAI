@@ -62,6 +62,14 @@ export interface User {
   aiEnabled?: boolean
 }
 
+export interface Operator {
+  id: string
+  userId: string
+  email: string
+  displayName?: string
+  status: string
+}
+
 export interface Tenant {
   id: string
   name: string
@@ -135,9 +143,9 @@ export const api = {
     getStats: () => fetchApi<DashboardStats>('/api/dashboard/stats'),
   },
   conversations: {
-    list: (cursor?: string, limit = 50) =>
+    list: (cursor?: string, limit = 50, operatorUserId?: string) =>
       fetchApi<CursorPaginationResponse<Conversation>>(
-        `/api/conversations?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
+        `/api/conversations?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}${operatorUserId ? `&operatorUserId=${encodeURIComponent(operatorUserId)}` : ''}`
       ),
     get: (id: string) => fetchApi<Conversation>(`/api/conversations/${id}`),
     getMessages: (id: string, cursor?: string, limit = 50) =>
@@ -155,6 +163,9 @@ export const api = {
         body: JSON.stringify({ mode }),
         headers: version ? { 'If-Match': version.toString() } : {},
       }),
+  },
+  operators: {
+    list: () => fetchApi<Operator[]>('/api/operators'),
   },
   contacts: {
     list: (search?: string, limit = 50) =>

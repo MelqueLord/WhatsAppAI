@@ -8,7 +8,8 @@ namespace WhatsAppAI.Infrastructure.Conversations;
 internal sealed class ConversationQueries(AppDbContext context) : IConversationQueries
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
-        Guid tenantId, CursorPaginationRequest request, CancellationToken cancellationToken = default)
+        Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null,
+        CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
 
@@ -16,6 +17,11 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Include(c => c.Contact)
             .Where(c => c.TenantId == tenantId)
             .AsQueryable();
+
+        if (operatorUserId == "unassigned")
+            query = query.Where(c => string.IsNullOrEmpty(c.AssignedToUserId));
+        else if (!string.IsNullOrWhiteSpace(operatorUserId))
+            query = query.Where(c => c.AssignedToUserId == operatorUserId);
 
         if (!string.IsNullOrEmpty(request.Cursor))
         {

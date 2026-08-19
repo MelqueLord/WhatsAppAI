@@ -62,7 +62,7 @@ export function BotConfigPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
       })
       if (!res.ok) throw new Error('Erro ao alterar status')
       return res.json()
@@ -110,6 +110,8 @@ export function BotConfigPage() {
     )
   }
 
+  const isBotActive = config?.enabled === true && config.mode === 'SimpleAutoReply'
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -124,10 +126,10 @@ export function BotConfigPage() {
             </div>
           </div>
           <button
-            onClick={() => toggleMutation.mutate(!config?.enabled)}
+            onClick={() => toggleMutation.mutate(!isBotActive)}
             disabled={toggleMutation.isPending}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              config?.enabled
+              isBotActive
                 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
@@ -137,7 +139,7 @@ export function BotConfigPage() {
             ) : (
               <Power className="w-4 h-4" />
             )}
-            {config?.enabled ? 'Ativo' : 'Inativo'}
+            {isBotActive ? 'Bot ativo' : 'Bot inativo'}
           </button>
         </div>
 

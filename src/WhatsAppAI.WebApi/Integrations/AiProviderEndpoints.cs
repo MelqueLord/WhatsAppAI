@@ -24,8 +24,8 @@ public static class AiProviderEndpoints
         ],
         ["gemini"] =
         [
-            new { id = "gemini-2.5-pro", name = "Gemini 2.5 Pro" },
-            new { id = "gemini-2.5-flash", name = "Gemini 2.5 Flash" }
+            new { id = "gemini-3.1-pro-preview", name = "Gemini 3.1 Pro Preview" },
+            new { id = "gemini-3.6-flash", name = "Gemini 3.6 Flash" }
         ],
         ["anthropic"] =
         [
@@ -130,9 +130,6 @@ public static class AiProviderEndpoints
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
 
-        if (string.IsNullOrWhiteSpace(request.ApiKey))
-            return Results.BadRequest(new { error = "API key is required." });
-
         if (string.IsNullOrWhiteSpace(request.ModelId))
             return Results.BadRequest(new { error = "Model ID is required." });
 
@@ -140,10 +137,32 @@ public static class AiProviderEndpoints
         if (!SupportedProviders.Contains(provider))
             return Results.BadRequest(new { error = $"Unsupported provider. Use: {string.Join(", ", SupportedProviders)}" });
 
-        var secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
-        await secretStore.SetAsync(secretKey, request.ApiKey);
+        if (provider.Equals("gemini", StringComparison.OrdinalIgnoreCase))
+        {
+            var modelId = request.ModelId.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
+                ? request.ModelId["models/".Length..]
+                : request.ModelId;
+            var allowedGeminiModels = ProviderModels["gemini"]
+                .Select(model => ((dynamic)model).id as string)
+                .Where(id => id is not null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!allowedGeminiModels.Contains(modelId))
+                return Results.BadRequest(new { error = "Modelo Gemini inválido. Selecione um modelo disponível no catálogo." });
+        }
 
         var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (string.IsNullOrWhiteSpace(request.ApiKey) &&
+            (existing is null || !existing.Provider.Equals(provider, StringComparison.OrdinalIgnoreCase)))
+            return Results.BadRequest(new { error = "API key is required for a new provider configuration." });
+
+        var secretKey = existing?.ApiKeyRef ?? $"ai:{currentTenant.TenantId}:{provider}:apikey";
+        if (!string.IsNullOrWhiteSpace(request.ApiKey))
+        {
+            secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
+            await secretStore.SetAsync(secretKey, request.ApiKey);
+        }
+
         if (existing is not null)
         {
             if (existing.Provider != provider)
@@ -185,6 +204,8 @@ public static class AiProviderEndpoints
                 botConfig.UpdateMode(mode);
                 botConfig.UpdateMessages(request.BotConfig.WelcomeMessage, request.BotConfig.OfflineMessage, request.BotConfig.FallbackMessage, request.BotConfig.HandoffMessage, request.BotConfig.MediaMessage);
                 botConfig.UpdateTokenLimit(request.BotConfig.MaxTokensPerResponse ?? botConfig.MaxTokensPerResponse);
+                if (!botConfig.Enabled)
+                    botConfig.Toggle(true);
                 await botConfigRepository.UpdateAsync(botConfig);
             }
         }

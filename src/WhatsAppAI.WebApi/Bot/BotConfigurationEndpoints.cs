@@ -129,16 +129,28 @@ public static class BotConfigurationEndpoints
 
     private static async Task<IResult> ToggleAsync(
         [FromBody] ToggleBotRequest request,
-        ICurrentTenant currentTenant, IBotConfigurationRepository repo)
+        ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
 
+        if (request.Enabled && !string.IsNullOrWhiteSpace(request.Mode))
+        {
+            if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
+                return Results.BadRequest(new { error = "Invalid mode. Use: SimpleAutoReply or AiPowered." });
+
+            if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
+
+            config.UpdateMode(mode);
+        }
+
         config.Toggle(request.Enabled);
         await repo.UpdateAsync(config);
-        return Results.Ok(new { enabled = config.Enabled });
+        return Results.Ok(new { enabled = config.Enabled, mode = config.Mode.ToString() });
     }
 }
 
@@ -154,4 +166,4 @@ public sealed record SaveBotConfigRequest(
 public sealed record UpdateModeRequest(string Mode);
 public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? MediaMessage);
 public sealed record UpdateTokenLimitRequest(int MaxTokens);
-public sealed record ToggleBotRequest(bool Enabled);
+public sealed record ToggleBotRequest(bool Enabled, string? Mode = null);

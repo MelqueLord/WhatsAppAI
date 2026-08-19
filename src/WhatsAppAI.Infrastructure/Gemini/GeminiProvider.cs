@@ -46,7 +46,10 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
             }
         };
 
-        var url = $"v1beta/models/{request.ModelId}:generateContent?key={request.ApiKey}";
+        var modelId = request.ModelId.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
+            ? request.ModelId["models/".Length..]
+            : request.ModelId;
+        var url = $"v1beta/models/{Uri.EscapeDataString(modelId)}:generateContent?key={Uri.EscapeDataString(request.ApiKey)}";
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = JsonContent.Create(payload, options: JsonOptions)
@@ -57,8 +60,9 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.LogError("Gemini API error {StatusCode}: {Body}", httpResponse.StatusCode, body);
-            throw new InvalidOperationException($"Gemini API error: {httpResponse.StatusCode}");
+            var providerMessage = ExtractProviderError(body);
+            logger.LogError("Gemini API error {StatusCode}: {ProviderMessage}", httpResponse.StatusCode, providerMessage);
+            throw new InvalidOperationException($"Gemini API error ({(int)httpResponse.StatusCode} {httpResponse.StatusCode}): {providerMessage}");
         }
 
         var result = JsonSerializer.Deserialize<GeminiResponse>(body, JsonOptions);
@@ -76,6 +80,28 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
             OutputTokens = result.UsageMetadata?.CandidatesTokenCount ?? 0,
             RawResponseId = null
         };
+    }
+
+    private static string ExtractProviderError(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.TryGetProperty("error", out var error))
+            {
+                var message = error.TryGetProperty("message", out var messageProperty)
+                    ? messageProperty.GetString()
+                    : null;
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message.Length > 240 ? message[..240] : message;
+            }
+        }
+        catch
+        {
+            // Keep the provider response out of the user-facing error when it is not JSON.
+        }
+
+        return "O Google recusou a solicitação. Verifique a API habilitada, o modelo e a chave.";
     }
 
     private static string ExtractOutputText(GeminiResponse response)

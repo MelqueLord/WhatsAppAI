@@ -74,7 +74,10 @@ export function AiConfigPage() {
           botConfig: { mode, welcomeMessage, offlineMessage, fallbackMessage, maxTokensPerResponse: maxTokens },
         }),
       })
-      if (!res.ok) throw new Error('Erro ao salvar')
+      if (!res.ok) {
+        const error = await res.json().catch(() => null)
+        throw new Error(error?.error || 'Erro ao salvar configuração de IA')
+      }
       return res.json()
     },
     onSuccess: () => {
@@ -99,7 +102,7 @@ export function AiConfigPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, mode: enabled ? 'AiPowered' : undefined }),
       })
       if (!res.ok) throw new Error('Erro ao alterar status')
       return res.json()
@@ -122,6 +125,8 @@ export function AiConfigPage() {
     )
   }
 
+  const isAiActive = config?.botConfig?.enabled === true && config.botConfig.mode === 'AiPowered'
+
   if (isLoading) {
     return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-500 animate-spin" /></div>
   }
@@ -140,10 +145,10 @@ export function AiConfigPage() {
             </div>
           </div>
           <button
-            onClick={() => toggleAiMutation.mutate(!config?.botConfig?.enabled)}
+            onClick={() => toggleAiMutation.mutate(!isAiActive)}
             disabled={toggleAiMutation.isPending || !config?.configured}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all disabled:opacity-50 ${
-              config?.botConfig?.enabled
+              isAiActive
                 ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
@@ -153,7 +158,7 @@ export function AiConfigPage() {
             ) : (
               <Power className="w-4 h-4" />
             )}
-            {config?.botConfig?.enabled ? 'IA Ativa' : 'IA Inativa'}
+            {isAiActive ? 'IA ativa' : 'IA inativa'}
           </button>
         </div>
 
@@ -198,6 +203,7 @@ export function AiConfigPage() {
             </button>
           </div>
           {success && <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm">Configuração salva!</div>}
+          {saveMutation.isError && <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{(saveMutation.error as Error).message}</div>}
           {testResult && (
             <div className={`mt-3 p-3 border rounded-lg text-sm ${testResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
               {testResult.success ? <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Conexão OK</span>

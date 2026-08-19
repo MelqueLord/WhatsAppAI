@@ -111,9 +111,9 @@ public sealed class GeminiProviderTests : IDisposable
         """;
         _handler.Response = CreateResponse(geminiResponse);
 
-        await _provider.GetResponseAsync(CreateRequest(modelId: "gemini-2.5-flash"));
+        await _provider.GetResponseAsync(CreateRequest(modelId: "gemini-3.6-flash"));
 
-        Assert.Contains("v1beta/models/gemini-2.5-flash:generateContent", _handler.LastRequestUri!.ToString());
+        Assert.Contains("v1beta/models/gemini-3.6-flash:generateContent", _handler.LastRequestUri!.ToString());
         Assert.Contains("key=test-key", _handler.LastRequestUri!.ToString());
     }
 
@@ -141,7 +141,7 @@ public sealed class GeminiProviderTests : IDisposable
 
     private static AiRequest CreateRequest(string? modelId = null, AiMessage[]? messages = null) => new()
     {
-        ModelId = modelId ?? "gemini-2.5-pro",
+            ModelId = modelId ?? "gemini-3.1-pro-preview",
         ApiKey = "test-key",
         Messages = messages ?? [new AiMessage { Role = "user", Content = "Hello" }],
         SystemPrompt = "You are helpful.",

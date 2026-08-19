@@ -36,14 +36,16 @@ public static class ConversationEndpoints
         ICurrentTenant currentTenant,
         IConversationQueries conversationQueries,
         string? cursor = null,
-        int limit = 50)
+        int limit = 50,
+        string? operatorUserId = null)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
         var result = await conversationQueries.GetConversationsAsync(
             currentTenant.TenantId.Value,
-            new CursorPaginationRequest { Cursor = cursor, Limit = limit });
+            new CursorPaginationRequest { Cursor = cursor, Limit = limit },
+            operatorUserId);
 
         return Results.Ok(result);
     }

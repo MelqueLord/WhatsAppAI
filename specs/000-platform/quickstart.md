@@ -63,7 +63,7 @@ A plataforma suporta 4 provedores de IA. Para usar IA, o tenant precisa ter plan
 | Provedor | Identificador | Exemplo de modelo |
 |----------|--------------|-------------------|
 | OpenAI | `openai` | gpt-4o-mini |
-| Google Gemini | `gemini` | gemini-2.5-flash |
+| Google Gemini | `gemini` | gemini-3.6-flash |
 | Anthropic | `anthropic` | claude-sonnet-4-20250514 |
 | Xiaomi MiMo | `xiaomi` | mimo-v2.5 |
 

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Conversation } from '../../lib/api'
 import { cn, formatTime, truncate } from '../../lib/utils'
+import { useAuth } from '../../lib/auth'
 import { MessageCircle, Search, Bot, User, Pause, Loader2, Filter } from 'lucide-react'
 
 interface ConversationListProps {
@@ -10,39 +11,30 @@ interface ConversationListProps {
 }
 
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
+  const { isTenantOwner } = useAuth()
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: () => api.conversations.list(),
+    queryKey: ['conversations', operatorFilter],
+    queryFn: () => api.conversations.list(undefined, 50, operatorFilter === 'all' ? undefined : operatorFilter),
     refetchInterval: 15000,
   })
 
   const allConversations = data?.items ?? []
 
-  // Extract unique operators from conversations
-  const operators = useMemo(() => {
-    const map = new Map<string, string>()
-    allConversations.forEach((c) => {
-      if (c.assignedToUserId && c.assignedToUserName) {
-        map.set(c.assignedToUserId, c.assignedToUserName)
-      }
-    })
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
-  }, [allConversations])
+  const { data: operators = [] } = useQuery({
+    queryKey: ['operators'],
+    queryFn: api.operators.list,
+    enabled: isTenantOwner,
+  })
 
   const conversations = allConversations.filter((c) => {
     const matchesSearch =
       c.contactName.toLowerCase().includes(search.toLowerCase()) ||
       c.contactPhone.includes(search)
 
-    const matchesOperator =
-      operatorFilter === 'all' ||
-      (operatorFilter === 'unassigned' && !c.assignedToUserId) ||
-      c.assignedToUserId === operatorFilter
-
-    return matchesSearch && matchesOperator
+    return matchesSearch
   })
 
   return (
@@ -63,7 +55,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         </div>
 
         {/* Operator Filter */}
-        {operators.length > 0 && (
+        {isTenantOwner && (
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
             <select
@@ -74,7 +66,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
               <option value="all">Todos os operadores</option>
               <option value="unassigned">Não atribuídas</option>
               {operators.map((op) => (
-                <option key={op.id} value={op.id}>{op.name}</option>
+                <option key={op.userId} value={op.userId}>{op.displayName || op.email}</option>
               ))}
             </select>
           </div>
