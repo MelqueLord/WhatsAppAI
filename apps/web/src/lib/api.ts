@@ -101,7 +101,7 @@ export interface CreateTenantResponse {
   tenantName: string
   slug: string
   ownerEmail: string
-  activationLink: string
+  temporaryPassword: string
   message: string
 }
 

@@ -16,8 +16,9 @@ import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 export function AdminTenantsPage() {
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [activationLink, setActivationLink] = useState<CreateTenantResponse | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [createResult, setCreateResult] = useState<CreateTenantResponse | null>(null)
+  const [copiedPassword, setCopiedPassword] = useState(false)
+  const [copiedEmail, setCopiedEmail] = useState(false)
   const [search, setSearch] = useState('')
   const [suspendTarget, setSuspendTarget] = useState<Tenant | null>(null)
   const [suspendReason, setSuspendReason] = useState('')
@@ -36,7 +37,7 @@ export function AdminTenantsPage() {
     mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string }) =>
       api.admin.tenants.create(data),
     onSuccess: (data) => {
-      setActivationLink(data)
+      setCreateResult(data)
       setShowCreateForm(false)
       queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
     },
@@ -68,12 +69,19 @@ export function AdminTenantsPage() {
     },
   })
 
-  const copyLink = () => {
-    if (activationLink) {
-      const fullLink = `${window.location.origin}${activationLink.activationLink}`
-      navigator.clipboard.writeText(fullLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  const copyPassword = () => {
+    if (createResult) {
+      navigator.clipboard.writeText(createResult.temporaryPassword)
+      setCopiedPassword(true)
+      setTimeout(() => setCopiedPassword(false), 2000)
+    }
+  }
+
+  const copyEmail = () => {
+    if (createResult) {
+      navigator.clipboard.writeText(createResult.ownerEmail)
+      setCopiedEmail(true)
+      setTimeout(() => setCopiedEmail(false), 2000)
     }
   }
 
@@ -150,32 +158,53 @@ export function AdminTenantsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {activationLink && (
+        {createResult && (
           <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-emerald-800">Tenant criado com sucesso!</p>
+                <p className="font-medium text-emerald-800">Empresa criada com sucesso!</p>
                 <p className="text-sm text-emerald-600 mt-1">
-                  {activationLink.message}
+                  {createResult.message}
                 </p>
-                <p className="text-sm text-slate-600 mt-2">
-                  <strong>TenantOwner:</strong> {activationLink.ownerEmail}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <code className="flex-1 p-2.5 bg-white border border-emerald-200 rounded-lg text-xs text-slate-700 break-all">
-                    {window.location.origin}{activationLink.activationLink}
-                  </code>
-                  <button
-                    onClick={copyLink}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm"
-                  >
-                    <Copy className="w-4 h-4" /> {copied ? 'Copiado!' : 'Copiar'}
-                  </button>
+
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500 w-16">Email:</span>
+                    <code className="flex-1 p-2 bg-white border border-emerald-200 rounded-lg text-xs text-slate-700">
+                      {createResult.ownerEmail}
+                    </code>
+                    <button
+                      onClick={copyEmail}
+                      className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                      title="Copiar email"
+                    >
+                      {copiedEmail ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500 w-16">Senha:</span>
+                    <code className="flex-1 p-2 bg-white border border-emerald-200 rounded-lg text-sm font-mono font-bold text-emerald-700">
+                      {createResult.temporaryPassword}
+                    </code>
+                    <button
+                      onClick={copyPassword}
+                      className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                      title="Copiar senha"
+                    >
+                      {copiedPassword ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
+
+                <p className="text-xs text-amber-600 mt-3 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  O proprietário será obrigado a alterar a senha no primeiro login.
+                </p>
               </div>
               <button
-                onClick={() => setActivationLink(null)}
+                onClick={() => setCreateResult(null)}
                 className="p-1 hover:bg-emerald-100 rounded-lg"
               >
                 <X className="w-4 h-4 text-emerald-500" />

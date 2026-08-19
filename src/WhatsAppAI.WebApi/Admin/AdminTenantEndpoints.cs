@@ -65,14 +65,6 @@ public static class AdminTenantEndpoints
                     return Results.Conflict(new { error = "User cannot be assigned to another tenant." });
             }
 
-            var hasPendingInvitation = await dbContext.Invitations
-                .IgnoreQueryFilters()
-                .AnyAsync(invitation => invitation.Email == ownerEmail
-                    && invitation.Status == InvitationStatus.Pending
-                    && invitation.ExpiresAt > DateTime.UtcNow);
-            if (hasPendingInvitation)
-                return Results.Conflict(new { error = "User already has a pending tenant invitation." });
-
             var slug = TenantSlugHelper.GenerateSlug(request.Name);
             var existingBySlug = await dbContext.Tenants
                 .IgnoreQueryFilters()
@@ -90,34 +82,25 @@ public static class AdminTenantEndpoints
             tenant.Activate();
             dbContext.Tenants.Add(tenant);
 
+            // Generate temporary password
+            var temporaryPassword = GenerateTemporaryPassword();
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(temporaryPassword);
+
             User owner;
             if (existingUser is not null)
             {
                 owner = existingUser;
+                owner.Activate(passwordHash);
+                owner.SetMustChangePassword(true);
             }
             else
             {
-                owner = User.Create(ownerEmail, request.OwnerDisplayName);
+                owner = User.CreateWithTemporaryPassword(ownerEmail, passwordHash, request.OwnerDisplayName);
                 dbContext.Users.Add(owner);
             }
 
             var membership = TenantMembership.Create(tenant.Id, owner, MembershipRole.TenantOwner);
             dbContext.TenantMemberships.Add(membership);
-
-            var tokenBytes = new byte[32];
-            System.Security.Cryptography.RandomNumberGenerator.Fill(tokenBytes);
-            var token = Convert.ToBase64String(tokenBytes);
-            var tokenHash = BCrypt.Net.BCrypt.HashPassword(token);
-
-            var invitation = Invitation.Create(
-                tenant.Id,
-                ownerEmail,
-                tokenHash,
-                InvitationPurpose.TenantOwner,
-                currentTenant.UserId ?? Guid.Empty,
-                owner.Id);
-
-            dbContext.Invitations.Add(invitation);
 
             await dbContext.SaveChangesAsync();
 
@@ -127,8 +110,8 @@ public static class AdminTenantEndpoints
                 TenantName = tenant.Name,
                 Slug = tenant.Slug,
                 OwnerEmail = ownerEmail,
-                ActivationLink = $"/activate?token={token}&invitation={invitation.Id}",
-                Message = "Save this activation link. It will not be shown again."
+                TemporaryPassword = temporaryPassword,
+                Message = "Guarde a senha temporária. Ela será exigida no primeiro login e deverá ser alterada."
             });
         }
         catch (Exception ex)
@@ -138,6 +121,35 @@ public static class AdminTenantEndpoints
                 detail: ex.InnerException?.Message ?? ex.Message,
                 statusCode: 500);
         }
+    }
+
+    private static string GenerateTemporaryPassword()
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower = "abcdefghjkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        const string special = "!@#$%";
+
+        var password = new char[12];
+        password[0] = upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, upper.Length)];
+        password[1] = lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, lower.Length)];
+        password[2] = digits[System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, digits.Length)];
+        password[3] = special[System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, special.Length)];
+
+        const string all = upper + lower + digits + special;
+        for (int i = 4; i < password.Length; i++)
+        {
+            password[i] = all[System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, all.Length)];
+        }
+
+        // Shuffle
+        for (int i = password.Length - 1; i > 0; i--)
+        {
+            int j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, i + 1);
+            (password[i], password[j]) = (password[j], password[i]);
+        }
+
+        return new string(password);
     }
 
     private static async Task<IResult> GetAllTenantsAsync(
@@ -315,7 +327,7 @@ public sealed class CreateTenantResponse
     public string TenantName { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
-    public string ActivationLink { get; init; } = string.Empty;
+    public string TemporaryPassword { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
 }
 
