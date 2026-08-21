@@ -116,24 +116,43 @@ Esse caminho e opcional e pode exigir Docker Desktop configurado. O desenvolvime
 
 Para conectar a um banco PostgreSQL gerenciado (ex. Supabase, Railway, Render):
 
+#### Setup com Admin Automático (Recomendado)
+
 ```powershell
-# Rodar setup interativo
-.\setup-supabase.ps1
+# Rodar setup completo com usuário admin criado
+.\setup-supabase-with-admin.ps1
 
 # Ou com parametros
-.\setup-supabase.ps1 `
+.\setup-supabase-with-admin.ps1 `
   -ProjectUrl "https://xxxx.supabase.co" `
   -ApiKey "your-api-key" `
   -DbPassword "your-db-password"
 ```
 
 Isso:
-1. Testa conexao
-2. Roda EF Core migrations (cria schema)
-3. Gera `appsettings.Supabase.json`
+1. Testa conexao PostgreSQL
+2. Roda EF Core migrations
+3. Seedeia admin@platform.com / Admin@123
+4. Gera `appsettings.Supabase.json`
 
-Para rodar:
+#### Start na Aplicacao
+
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT='Supabase'
 dotnet run --project src/WhatsAppAI.WebApi
+```
+
+Acesse: http://localhost:5000  
+Login: `admin@platform.com` / `Admin@123`
+
+#### Setup Manual (sem Admin)
+
+Se preferir executar passo a passo:
+
+```powershell
+# 1. Base setup
+.\setup-supabase.ps1
+
+# 2. Admin seed manual (opcional)
+psql -h db.xxx.supabase.co -U postgres -d postgres -f setup-supabase-admin.sql
 ```
