@@ -111,3 +111,29 @@ docker compose up -d mysql
 ```
 
 Esse caminho e opcional e pode exigir Docker Desktop configurado. O desenvolvimento diario recomendado continua sendo SQLite sem administrador.
+
+### Supabase (PostgreSQL)
+
+Para conectar a um banco PostgreSQL gerenciado (ex. Supabase, Railway, Render):
+
+```powershell
+# Rodar setup interativo
+.\setup-supabase.ps1
+
+# Ou com parametros
+.\setup-supabase.ps1 `
+  -ProjectUrl "https://xxxx.supabase.co" `
+  -ApiKey "your-api-key" `
+  -DbPassword "your-db-password"
+```
+
+Isso:
+1. Testa conexao
+2. Roda EF Core migrations (cria schema)
+3. Gera `appsettings.Supabase.json`
+
+Para rodar:
+```powershell
+$env:ASPNETCORE_ENVIRONMENT='Supabase'
+dotnet run --project src/WhatsAppAI.WebApi
+```
