@@ -41,24 +41,38 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto;
 
-    // .NET 10
+    // Render usa proxies dinâmicos.
+    // No .NET 10, use KnownIPNetworks em vez de KnownNetworks.
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 
 // PostgreSQL is the default provider; connection comes from ConnectionStrings:DefaultConnection.
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "PostgreSQL";
+var dbProvider =
+    builder.Configuration["DatabaseProvider"]
+    ?? "PostgreSQL";
 
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Port=5432;Database=whatsappai;Username=postgres;Password=postgres";
 
-builder.Services.AddPersistence(connectionString, dbProvider);
-builder.Services.AddObservability(builder.Configuration);
-builder.Services.AddIdentityServices(builder.Environment);
+builder.Services.AddPersistence(
+    connectionString,
+    dbProvider);
+
+builder.Services.AddObservability(
+    builder.Configuration);
+
+builder.Services.AddIdentityServices(
+    builder.Environment);
+
 builder.Services.AddSecretServices();
-builder.Services.AddMetaServices(builder.Environment);
+
+builder.Services.AddMetaServices(
+    builder.Environment);
+
 builder.Services.AddAiProviderServices();
+
 builder.Services.AddWorkers();
 
 builder.Services.AddSignalR();
@@ -74,7 +88,8 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions =>
         {
             limiterOptions.PermitLimit = 100;
-            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.Window =
+                TimeSpan.FromMinutes(1);
 
             limiterOptions.QueueProcessingOrder =
                 QueueProcessingOrder.OldestFirst;
@@ -87,7 +102,8 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions =>
         {
             limiterOptions.PermitLimit = 500;
-            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.Window =
+                TimeSpan.FromMinutes(1);
         });
 
     options.AddFixedWindowLimiter(
@@ -95,7 +111,8 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions =>
         {
             limiterOptions.PermitLimit = 20;
-            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.Window =
+                TimeSpan.FromMinutes(1);
         });
 });
 
@@ -124,7 +141,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // IMPORTANTE:
-// Deve executar antes de qualquer middleware que dependa
+// deve executar antes de qualquer middleware que dependa
 // de Request.IsHttps, cookies Secure ou antiforgery.
 app.UseForwardedHeaders();
 
@@ -174,26 +191,49 @@ using (var scope = app.Services.CreateScope())
             bootstrapAdminEmail)
         &&
         !string.IsNullOrWhiteSpace(
-            bootstrapAdminPassword)
-        &&
-        !context.Users
-            .IgnoreQueryFilters()
-            .Any(u => u.IsPlatformAdmin))
+            bootstrapAdminPassword))
     {
-        var adminUser =
-            WhatsAppAI.Domain.Identity.User.Create(
-                bootstrapAdminEmail,
-                "Platform Admin");
+        try
+        {
+            var platformAdminExists =
+                await context.Users
+                    .IgnoreQueryFilters()
+                    .AnyAsync(
+                        u => u.IsPlatformAdmin);
 
-        adminUser.Activate(
-            BCrypt.Net.BCrypt.HashPassword(
-                bootstrapAdminPassword));
+            if (!platformAdminExists)
+            {
+                var adminUser =
+                    WhatsAppAI.Domain.Identity.User.Create(
+                        bootstrapAdminEmail,
+                        "Platform Admin");
 
-        adminUser.GrantPlatformAdmin();
+                adminUser.Activate(
+                    BCrypt.Net.BCrypt.HashPassword(
+                        bootstrapAdminPassword));
 
-        context.Users.Add(adminUser);
+                adminUser.GrantPlatformAdmin();
 
-        await context.SaveChangesAsync();
+                context.Users.Add(adminUser);
+
+                await context.SaveChangesAsync();
+
+                Log.Information(
+                    "Bootstrap Platform Admin created successfully for {Email}.",
+                    bootstrapAdminEmail);
+            }
+            else
+            {
+                Log.Information(
+                    "A Platform Admin already exists. Bootstrap creation skipped.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(
+                ex,
+                "Failed to create Bootstrap Platform Admin. Application startup will continue.");
+        }
     }
 }
 
@@ -356,8 +396,7 @@ static async Task EnsurePostgresSchemaCreatedAsync(
 
     if (shouldClose)
     {
-        await connection
-            .OpenAsync();
+        await connection.OpenAsync();
     }
 
     try
@@ -385,8 +424,7 @@ static async Task EnsurePostgresSchemaCreatedAsync(
     {
         if (shouldClose)
         {
-            await connection
-                .CloseAsync();
+            await connection.CloseAsync();
         }
     }
 }
