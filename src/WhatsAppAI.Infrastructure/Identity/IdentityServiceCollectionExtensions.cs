@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -95,16 +96,41 @@ public static class IdentityServiceCollectionExtensions
             "/api/auth/csrf",
             (
                 IAntiforgery antiforgery,
-                HttpContext httpContext) =>
+                HttpContext httpContext,
+                ILoggerFactory loggerFactory) =>
             {
-                var tokens =
-                    antiforgery.GetAndStoreTokens(httpContext);
+                var logger = loggerFactory.CreateLogger(
+                    "AntiforgeryBootstrap");
 
-                return Results.Ok(new
+                try
                 {
-                    token = tokens.RequestToken,
-                    headerName = "X-CSRF-TOKEN"
-                });
+                    logger.LogInformation(
+                        "Generating antiforgery token for request from {Origin}",
+                        httpContext.Request.Headers.Origin.ToString());
+
+                    var tokens =
+                        antiforgery.GetAndStoreTokens(httpContext);
+
+                    logger.LogInformation(
+                        "Antiforgery token generated successfully.");
+
+                    return Results.Ok(new
+                    {
+                        token = tokens.RequestToken,
+                        headerName = "X-CSRF-TOKEN"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "Failed to generate antiforgery token.");
+
+                    return Results.Problem(
+                        title: "Failed to generate CSRF token",
+                        detail: ex.Message,
+                        statusCode: StatusCodes.Status500InternalServerError);
+                }
             })
             .AllowAnonymous();
 
