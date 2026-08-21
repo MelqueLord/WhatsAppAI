@@ -1,4 +1,5 @@
-const API_BASE = ''
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+
 let csrfToken: string | undefined
 
 async function ensureCsrfToken(): Promise<string> {
@@ -22,9 +23,14 @@ async function ensureCsrfToken(): Promise<string> {
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   const method = options?.method?.toUpperCase()
-  const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE'
+  const isMutation =
+    method === 'POST' ||
+    method === 'PUT' ||
+    method === 'PATCH' ||
+    method === 'DELETE'
 
   let mutationHeaders: HeadersInit | undefined
+
   if (isMutation) {
     const token = await ensureCsrfToken()
     mutationHeaders = { 'X-CSRF-TOKEN': token }
@@ -190,127 +196,230 @@ export interface ClientTag {
 export const api = {
   auth: {
     getMe: () => fetchApi<User>('/api/auth/me'),
+
     login: async (email: string, password: string) => {
       return fetchApi<User>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       })
     },
+
     logout: async () => {
       return fetchApi<void>('/api/auth/logout', {
         method: 'POST',
       })
     },
-    changePassword: async (currentPassword: string, newPassword: string) => {
-      return fetchApi<{ message: string; mustChangePassword: boolean }>('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      })
+
+    changePassword: async (
+      currentPassword: string,
+      newPassword: string
+    ) => {
+      return fetchApi<{ message: string; mustChangePassword: boolean }>(
+        '/api/auth/change-password',
+        {
+          method: 'POST',
+          body: JSON.stringify({ currentPassword, newPassword }),
+        }
+      )
     },
-    getCsrf: () => fetchApi<{ token: string; headerName: string }>('/api/auth/csrf'),
+
+    getCsrf: () =>
+      fetchApi<{ token: string; headerName: string }>('/api/auth/csrf'),
   },
+
   dashboard: {
     getStats: () => fetchApi<DashboardStats>('/api/dashboard/stats'),
   },
+
   conversations: {
     list: (cursor?: string, limit = 50, operatorUserId?: string) =>
       fetchApi<CursorPaginationResponse<Conversation>>(
         `/api/conversations?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}${operatorUserId ? `&operatorUserId=${encodeURIComponent(operatorUserId)}` : ''}`
       ),
-    get: (id: string) => fetchApi<Conversation>(`/api/conversations/${id}`),
+
+    get: (id: string) =>
+      fetchApi<Conversation>(`/api/conversations/${id}`),
+
     getMessages: (id: string, cursor?: string, limit = 50) =>
       fetchApi<CursorPaginationResponse<Message>>(
         `/api/conversations/${id}/messages?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
       ),
+
     sendMessage: (id: string, content: string) =>
-      fetchApi<{ id: string; status: string }>(`/api/conversations/${id}/messages`, {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      }),
+      fetchApi<{ id: string; status: string }>(
+        `/api/conversations/${id}/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content }),
+        }
+      ),
+
     switchMode: (id: string, mode: string, version?: number) =>
-      fetchApi<{ id: string; mode: string; version: number }>(`/api/conversations/${id}/mode`, {
-        method: 'PUT',
-        body: JSON.stringify({ mode }),
-        headers: version ? { 'If-Match': version.toString() } : {},
-      }),
+      fetchApi<{ id: string; mode: string; version: number }>(
+        `/api/conversations/${id}/mode`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ mode }),
+          headers: version ? { 'If-Match': version.toString() } : {},
+        }
+      ),
   },
+
   operators: {
     list: () => fetchApi<Operator[]>('/api/operators'),
   },
+
   contacts: {
     list: (search?: string, limit = 50) =>
-      fetchApi<Contact[]>(`/api/contacts?limit=${limit}${search ? `&search=${search}` : ''}`),
-    get: (id: string) => fetchApi<Contact>(`/api/contacts/${id}`),
-    create: (data: { phoneNumber: string; name?: string; startConversation?: boolean }) =>
+      fetchApi<Contact[]>(
+        `/api/contacts?limit=${limit}${search ? `&search=${search}` : ''}`
+      ),
+
+    get: (id: string) =>
+      fetchApi<Contact>(`/api/contacts/${id}`),
+
+    create: (data: {
+      phoneNumber: string
+      name?: string
+      startConversation?: boolean
+    }) =>
       fetchApi<Contact & { conversationId?: string }>('/api/contacts', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; profilePictureUrl?: string }) =>
+
+    update: (
+      id: string,
+      data: { name?: string; profilePictureUrl?: string }
+    ) =>
       fetchApi<Contact>(`/api/contacts/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+
     startConversation: (id: string) =>
-      fetchApi<{ conversationId: string }>(`/api/contacts/${id}/start-conversation`, {
-        method: 'POST',
-      }),
+      fetchApi<{ conversationId: string }>(
+        `/api/contacts/${id}/start-conversation`,
+        {
+          method: 'POST',
+        }
+      ),
   },
+
   tags: {
-    list: () => fetchApi<ClientTag[]>('/api/client-tags'),
-    getContactTags: (contactId: string) => fetchApi<ClientTag[]>(`/api/client-tags/contacts/${contactId}/tags`),
+    list: () =>
+      fetchApi<ClientTag[]>('/api/client-tags'),
+
+    getContactTags: (contactId: string) =>
+      fetchApi<ClientTag[]>(
+        `/api/client-tags/contacts/${contactId}/tags`
+      ),
+
     assignToContact: (contactId: string, tagId: string) =>
-      fetchApi<ClientTag>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'POST' }),
+      fetchApi<ClientTag>(
+        `/api/client-tags/contacts/${contactId}/tags/${tagId}`,
+        { method: 'POST' }
+      ),
+
     removeFromContact: (contactId: string, tagId: string) =>
-      fetchApi<void>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
+      fetchApi<void>(
+        `/api/client-tags/contacts/${contactId}/tags/${tagId}`,
+        { method: 'DELETE' }
+      ),
   },
+
   plans: {
     list: () => fetchApi<Plan[]>('/api/plans'),
   },
+
   webhookEvents: {
-    list: (status?: string) => fetchApi<WebhookEvent[]>(`/api/webhook-events${status ? `?status=${status}` : ''}`),
-    reprocess: (id: string) => fetchApi<WebhookEvent>(`/api/webhook-events/${id}/reprocess`, { method: 'POST' }),
+    list: (status?: string) =>
+      fetchApi<WebhookEvent[]>(
+        `/api/webhook-events${status ? `?status=${status}` : ''}`
+      ),
+
+    reprocess: (id: string) =>
+      fetchApi<WebhookEvent>(
+        `/api/webhook-events/${id}/reprocess`,
+        { method: 'POST' }
+      ),
   },
+
   admin: {
     tenants: {
-      list: () => fetchApi<Tenant[]>('/api/admin/tenants'),
-      get: (id: string) => fetchApi<Tenant>(`/api/admin/tenants/${id}`),
-      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number }) =>
+      list: () =>
+        fetchApi<Tenant[]>('/api/admin/tenants'),
+
+      get: (id: string) =>
+        fetchApi<Tenant>(`/api/admin/tenants/${id}`),
+
+      create: (data: {
+        name: string
+        ownerEmail: string
+        ownerDisplayName?: string
+        planCode: string
+        officialApiLineCount: number
+        qrCodeLineCount: number
+        operatorLimit: number
+      }) =>
         fetchApi<CreateTenantResponse>('/api/admin/tenants', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: { name: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number }, version: number) =>
+
+      update: (
+        id: string,
+        data: {
+          name: string
+          planCode: string
+          officialApiLineCount: number
+          qrCodeLineCount: number
+          operatorLimit: number
+        },
+        version: number
+      ) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}`, {
           method: 'PUT',
           body: JSON.stringify(data),
           headers: { 'If-Match': `"${version}"` },
         }),
+
       suspend: (id: string, reason: string, version: number) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/suspend`, {
           method: 'POST',
           body: JSON.stringify({ reason }),
           headers: { 'If-Match': `"${version}"` },
         }),
+
       reactivate: (id: string, version: number) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/reactivate`, {
           method: 'POST',
           headers: { 'If-Match': `"${version}"` },
         }),
+
       registerPayment: (id: string, paidAt: string) =>
-        fetchApi<{ dueDate: string; status: string }>(`/api/admin/tenants/${id}/payments`, {
-          method: 'POST',
-          body: JSON.stringify({ paidAt }),
-        }),
+        fetchApi<{ dueDate: string; status: string }>(
+          `/api/admin/tenants/${id}/payments`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ paidAt }),
+          }
+        ),
+
       updatePlan: (id: string, planCode: string) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/plan`, {
           method: 'PUT',
           body: JSON.stringify({ planCode }),
         }),
+
       resetOwnerPassword: (id: string) =>
-        fetchApi<{ email: string; temporaryPassword: string; message: string }>(
+        fetchApi<{
+          email: string
+          temporaryPassword: string
+          message: string
+        }>(
           `/api/admin/tenants/${id}/owner/reset-password`,
-          { method: 'POST' },
+          { method: 'POST' }
         ),
     },
   },
