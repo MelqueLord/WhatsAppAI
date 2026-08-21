@@ -48,6 +48,17 @@ public sealed class AppDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
+        if (Database.IsNpgsql())
+        {
+            modelBuilder.HasDefaultSchema("whatsappai");
+
+            foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetProperties()))
+            {
+                if (property.GetColumnType() is "datetime(6)" or "char(36)")
+                    property.SetColumnType(null);
+            }
+        }
+
         var tenantId = _currentTenant.TenantId;
 
         modelBuilder.Entity<Contact>()

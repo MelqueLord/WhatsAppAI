@@ -33,7 +33,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-// Use SQLite for development, MySQL for production
+// SQLite is the local default; production supplies MySQL or PostgreSQL explicitly.
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SQLite";
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? (dbProvider == "SQLite" ? "Data Source=whatsappai.db" : "Server=localhost;Port=3306;Database=whatsappai_dev;User=root;Password=root;CharSet=utf8mb4");
@@ -95,7 +95,15 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    if (!app.Environment.IsProduction())
+    var ensureCreated = builder.Configuration.GetValue<bool>("DatabaseInitialization:EnsureCreated");
+    if (ensureCreated)
+    {
+        if (context.Database.IsNpgsql())
+            await EnsurePostgresSchemaCreatedAsync(context);
+        else
+            await context.Database.EnsureCreatedAsync();
+    }
+    else if (!app.Environment.IsProduction())
     {
         if (context.Database.IsSqlite())
         {
@@ -131,6 +139,9 @@ using (var scope = app.Services.CreateScope())
 
 // Seed subscription plans
 await app.Services.SeedDefaultPlansAsync();
+
+if (builder.Configuration.GetValue<bool>("DatabaseInitialization:Only"))
+    return;
 
 app.UseCors();
 app.UseRateLimiter();
@@ -201,3 +212,25 @@ app.MapDashboardEndpoints();
 app.MapHub<InboxHub>("/hubs/inbox");
 
 await app.RunAsync();
+
+static async Task EnsurePostgresSchemaCreatedAsync(AppDbContext context)
+{
+    var connection = context.Database.GetDbConnection();
+    var shouldClose = connection.State != System.Data.ConnectionState.Open;
+    if (shouldClose)
+        await connection.OpenAsync();
+
+    try
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT to_regclass('whatsappai.subscription_plans') IS NOT NULL";
+        var schemaExists = (bool)(await command.ExecuteScalarAsync() ?? false);
+        if (!schemaExists)
+            await context.Database.ExecuteSqlRawAsync(context.Database.GenerateCreateScript());
+    }
+    finally
+    {
+        if (shouldClose)
+            await connection.CloseAsync();
+    }
+}

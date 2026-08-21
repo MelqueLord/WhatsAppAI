@@ -1,31 +1,31 @@
-# Quick Supabase Setup
-param([string]$ProjectUrl = "https://ysgzfmircmyrghuhweze.supabase.co", [string]$DbPassword = "MelK050587!!")
-$ErrorActionPreference = 'Stop'
-$projectRef = $ProjectUrl -replace 'https://(.+)\.supabase\.co', '$1'
-$connectionString = "postgresql://postgres:$DbPassword@db.$projectRef.supabase.co:5432/postgres?sslmode=require"
+# Initializes an empty Supabase database without persisting credentials.
+param(
+    [string]$ProjectRef = "ysgzfmircmyrghuhweze",
+    [string]$PoolerHost = "aws-0-sa-east-1.pooler.supabase.com",
+    [int]$Port = 5432,
+    [System.Security.SecureString]$DbPassword = (Read-Host "Supabase database password" -AsSecureString)
+)
 
-Write-Host "Setup Supabase" -ForegroundColor Cyan
+$ErrorActionPreference = "Stop"
+$password = [System.Net.NetworkCredential]::new("", $DbPassword).Password
+$connectionString = "Host=$PoolerHost;Port=$Port;Database=postgres;Username=postgres.$ProjectRef;Password=$password;SSL Mode=Require"
 
-Write-Host "`n1 Build..."
-dotnet restore src/WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj 2>&1 > $null
-dotnet build src/WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj -c Release 2>&1 > $null
-Write-Host "OK" -ForegroundColor Green
+try {
+    $env:DatabaseProvider = "SUPABASE"
+    $env:ConnectionStrings__DefaultConnection = $connectionString
+    $env:DatabaseInitialization__EnsureCreated = "true"
+    $env:DatabaseInitialization__Only = "true"
+    $env:ASPNETCORE_ENVIRONMENT = "Production"
+    $env:Encryption__Key = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 
-Write-Host "`n2 Migrate..."
-$env:ConnectionStrings__DefaultConnection = $connectionString
-$env:DatabaseProvider = "SUPABASE"
-Push-Location src/WhatsAppAI.WebApi
-dotnet restore 2>&1 > $null
-dotnet ef database update -p ../WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj 2>&1 | Select-String "done|error|Failed" | Select-Object -Last 3
-$migCode = $LASTEXITCODE
-Pop-Location
-if ($migCode -ne 0) { Write-Host "Migration error - check connection" -ForegroundColor Red; exit 1 }
-Write-Host "OK" -ForegroundColor Green
+    dotnet run --project src/WhatsAppAI.WebApi --configuration Release
+    if ($LASTEXITCODE -ne 0) { throw "Supabase initialization failed." }
+}
+finally {
+    Remove-Item Env:ConnectionStrings__DefaultConnection -ErrorAction SilentlyContinue
+    Remove-Item Env:Encryption__Key -ErrorAction SilentlyContinue
+    $password = $null
+    $connectionString = $null
+}
 
-Write-Host "`n3 Config..."
-$cfg = @{ Logging=@{LogLevel=@{Default="Information"}}; DatabaseProvider="SUPABASE"; ConnectionStrings=@{DefaultConnection=$connectionString}; Authentication=@{JwtSecret=([guid]::NewGuid()).ToString()} } | ConvertTo-Json -Depth 10
-Set-Content -Path "src/WhatsAppAI.WebApi/appsettings.Supabase.json" -Value $cfg
-Write-Host "OK" -ForegroundColor Green
-
-Write-Host "`nDone!" -ForegroundColor Green
-Write-Host 'Run: $env:ASPNETCORE_ENVIRONMENT="Supabase"; dotnet run --project src/WhatsAppAI.WebApi' -ForegroundColor Cyan
+Write-Host "Supabase schema initialized." -ForegroundColor Green
