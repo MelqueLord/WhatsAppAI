@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Data.Sqlite;
 using System.Threading.RateLimiting;
 using Serilog;
 using WhatsAppAI.Infrastructure;
@@ -33,10 +32,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-// SQLite is the local default; production supplies MySQL or PostgreSQL explicitly.
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "SQLite";
+// PostgreSQL is the default provider; connection comes from ConnectionStrings:DefaultConnection.
+var dbProvider = builder.Configuration["DatabaseProvider"] ?? "PostgreSQL";
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? (dbProvider == "SQLite" ? "Data Source=whatsappai.db" : "Server=localhost;Port=3306;Database=whatsappai_dev;User=root;Password=root;CharSet=utf8mb4");
+    ?? "Host=localhost;Port=5432;Database=whatsappai;Username=postgres;Password=postgres";
 
 builder.Services.AddPersistence(connectionString, dbProvider);
 builder.Services.AddObservability(builder.Configuration);
@@ -105,21 +104,7 @@ using (var scope = app.Services.CreateScope())
     }
     else if (!app.Environment.IsProduction())
     {
-        if (context.Database.IsSqlite())
-        {
-            try
-            {
-                await context.Database.EnsureCreatedAsync();
-            }
-            catch (SqliteException ex) when (ex.SqliteErrorCode == 1)
-            {
-                // Table already exists.
-            }
-        }
-        else
-        {
-            await context.Database.MigrateAsync();
-        }
+        await context.Database.MigrateAsync();
     }
 
     // Optional bootstrap account. Credentials must come from configuration/user-secrets.

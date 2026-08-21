@@ -30,17 +30,14 @@ public static class PersistenceServiceCollectionExtensions
 
             switch (provider.ToUpperInvariant())
             {
-                case "SQLITE":
-                    options.UseSqlite(connectionString);
+                case "MYSQL":
+                    options.UseMySQL(connectionString);
                     break;
                 case "POSTGRESQL":
                 case "POSTGRES":
                 case "SUPABASE":
-                    options.UseNpgsql(connectionString);
-                    break;
-                case "MYSQL":
                 default:
-                    options.UseMySQL(connectionString);
+                    options.UseNpgsql(connectionString);
                     break;
             }
         });
