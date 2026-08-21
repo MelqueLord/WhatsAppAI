@@ -238,8 +238,20 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Seed subscription plans
-await app.Services
-    .SeedDefaultPlansAsync();
+try
+{
+    await app.Services
+        .SeedDefaultPlansAsync();
+
+    Log.Information(
+        "Subscription plans seed completed successfully.");
+}
+catch (Exception ex)
+{
+    Log.Error(
+        ex,
+        "Failed to seed subscription plans. Application startup will continue.");
+}
 
 if (
     builder.Configuration
