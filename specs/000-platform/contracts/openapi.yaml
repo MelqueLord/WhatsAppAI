@@ -538,6 +538,22 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ConnectionTest' }
         '400': { $ref: '#/components/responses/Problem' }
+  /integrations/ai/instructions:
+    put:
+      tags: [Integrations]
+      operationId: updateAiInstructions
+      summary: Configurar diretrizes e filas autorizadas para transferência pela IA
+      x-requirements: [FR-036, BR-016, FR-AI-008]
+      parameters:
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiInstructionsInput' }
+      responses:
+        '200': { description: Diretrizes e filas autorizadas salvas }
+        '400': { $ref: '#/components/responses/Problem' }
   /usage:
     get:
       tags: [Usage]
@@ -709,11 +725,13 @@ components:
         password: { type: string, minLength: 8, maxLength: 128, writeOnly: true }
     CreateTenantRequest:
       type: object
-      required: [name, slug, ownerEmail]
+      required: [name, slug, ownerEmail, officialApiLineCount, qrCodeLineCount]
       properties:
         name: { type: string, minLength: 1, maxLength: 150 }
         slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
         ownerEmail: { type: string, format: email }
+        officialApiLineCount: { type: integer, minimum: 0, default: 0 }
+        qrCodeLineCount: { type: integer, minimum: 0, default: 0 }
     ChangeTenantStatusRequest:
       type: object
       required: [status, reason]
@@ -722,13 +740,15 @@ components:
         reason: { type: string, minLength: 1, maxLength: 250 }
     TenantSummary:
       type: object
-      required: [id, name, slug, status, version]
+      required: [id, name, slug, status, version, officialApiLineCount, qrCodeLineCount]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         slug: { type: string }
         status: { type: string, enum: [Active, Suspended] }
         version: { type: integer, minimum: 0 }
+        officialApiLineCount: { type: integer, minimum: 0 }
+        qrCodeLineCount: { type: integer, minimum: 0 }
     TenantProvisioningResult:
       type: object
       required: [tenant, ownerInvitation]
@@ -769,6 +789,8 @@ components:
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
+        officialApiLineCount: { type: integer, minimum: 0, nullable: true }
+        qrCodeLineCount: { type: integer, minimum: 0, nullable: true }
     SessionTenant:
       type: object
       required: [id, name, slug, status]
@@ -912,6 +934,20 @@ components:
         apiKey: { type: string, writeOnly: true }
         projectRef: { type: [string, 'null'] }
         model: { type: string }
+    AiInstructionsInput:
+      type: object
+      required: [maxTokensPerResponse, routingQueueIds, routingTagIds]
+      properties:
+        systemPrompt: { type: [string, 'null'], maxLength: 4000 }
+        maxTokensPerResponse: { type: integer, minimum: 50, maximum: 2000 }
+        routingQueueIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        routingTagIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, format: uuid }
     ConnectionTest:
       type: object
       required: [success, checkedAt]

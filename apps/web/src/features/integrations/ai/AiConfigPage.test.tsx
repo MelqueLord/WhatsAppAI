@@ -46,15 +46,10 @@ describe('AiConfigPage', () => {
 
     expect(screen.getByText('Provedor de IA')).toBeInTheDocument()
     expect(screen.getByText('OpenAI')).toBeInTheDocument()
-    expect(screen.getByText('Modo de operação')).toBeInTheDocument()
-    expect(screen.getByText('Manual')).toBeInTheDocument()
-    expect(screen.getByText('Auto-reply')).toBeInTheDocument()
-    expect(screen.getByText('IA')).toBeInTheDocument()
-    expect(screen.getByText('Mensagens automáticas')).toBeInTheDocument()
-    expect(screen.getByText('Boas-vindas')).toBeInTheDocument()
-    expect(screen.getByText('Fallback')).toBeInTheDocument()
-    expect(screen.getByText('Limites')).toBeInTheDocument()
-    expect(screen.getByText('Salvar tudo')).toBeInTheDocument()
+    expect(screen.getByText('Modelo')).toBeInTheDocument()
+    expect(screen.getByText('API Key')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeInTheDocument()
   })
 
   it('calls fetch for providers and config', async () => {

@@ -120,6 +120,7 @@ internal sealed class WhatsAppClient(
 
     public Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
         // Official API doesn't support QR code connection
@@ -132,6 +133,7 @@ internal sealed class WhatsAppClient(
 
     public Task<WhatsAppSessionStatus> GetSessionStatusAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
         // Official API doesn't have session concept
@@ -144,6 +146,7 @@ internal sealed class WhatsAppClient(
 
     public Task DisconnectSessionAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
         // Official API doesn't have session concept

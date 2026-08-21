@@ -1,14 +1,23 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Webhooks;
 
 public static class WebhookEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static IEndpointRouteBuilder MapWebhookEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/webhooks/meta")
@@ -23,7 +32,109 @@ public static class WebhookEndpoints
             .AllowAnonymous()
             .DisableAntiforgery();
 
+        app.MapPost("/api/webhooks/whatsapp-web", ReceiveWhatsAppWebEventAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous()
+            .DisableAntiforgery();
+
         return app;
+    }
+
+    private static async Task<IResult> ReceiveWhatsAppWebEventAsync(
+        HttpContext httpContext,
+        IConfiguration configuration,
+        IWhatsAppAccountRepository accountRepository,
+        IWebhookEventRepository webhookEventRepository,
+        AppDbContext dbContext,
+        ILogger<Program> logger)
+    {
+        var expectedSecret = configuration["WhatsAppWeb:WebhookSecret"];
+        var receivedSecret = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(expectedSecret) || receivedSecret != expectedSecret)
+            return Results.Unauthorized();
+
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8);
+        var rawBody = await reader.ReadToEndAsync();
+        WebhookPayload? payload;
+        try
+        {
+            payload = JsonSerializer.Deserialize<WebhookPayload>(rawBody, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return Results.BadRequest("Invalid payload");
+        }
+
+        var value = payload?.Entry?.FirstOrDefault()?.Changes?.FirstOrDefault()?.Value;
+        var phoneNumberId = value?.Metadata?.PhoneNumberId;
+        var messageId = value?.Messages?.FirstOrDefault()?.Id;
+        if (string.IsNullOrWhiteSpace(phoneNumberId) || string.IsNullOrWhiteSpace(messageId))
+            return Results.BadRequest("Missing WhatsApp Web event identifiers");
+
+        var idempotencyKey = $"whatsapp-web:{phoneNumberId}:{messageId}";
+        if (await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey) is not null)
+            return Results.Ok("OK");
+
+        await EnsureWhatsAppWebAccountAsync(phoneNumberId, accountRepository, dbContext);
+
+        var webhookEvent = WebhookEvent.Create(
+            phoneNumberId,
+            idempotencyKey,
+            rawBody,
+            "whatsapp-web");
+        await webhookEventRepository.AddAsync(webhookEvent);
+
+        logger.LogInformation("WhatsApp Web event {EventId} received for {PhoneNumberId}",
+            webhookEvent.Id, phoneNumberId);
+        return Results.Ok("OK");
+    }
+
+    private static async Task EnsureWhatsAppWebAccountAsync(
+        string phoneNumberId,
+        IWhatsAppAccountRepository accountRepository,
+        AppDbContext dbContext)
+    {
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3 || !Guid.TryParse(parts[1], out var tenantId) ||
+            !int.TryParse(parts[2], out var lineNumber) || lineNumber < 1)
+            return;
+
+        var existingAccount = await accountRepository.GetByTenantAndSlotAsync(
+            tenantId,
+            WhatsAppConnectionType.QrCode,
+            lineNumber);
+        if (existingAccount is not null)
+        {
+            if (!string.Equals(existingAccount.PhoneNumberId, phoneNumberId, StringComparison.Ordinal))
+            {
+                existingAccount.Update(
+                    existingAccount.WabaId,
+                    phoneNumberId,
+                    existingAccount.AccessTokenRef);
+                await accountRepository.UpdateAsync(existingAccount);
+            }
+            return;
+        }
+
+        var account = WhatsAppAccount.Create(
+            tenantId,
+            "whatsapp-web",
+            phoneNumberId,
+            $"whatsapp-web:session:{tenantId:D}:{lineNumber}",
+            WhatsAppConnectionType.QrCode,
+            lineNumber);
+        try
+        {
+            await accountRepository.AddAsync(account);
+        }
+        catch (DbUpdateException)
+        {
+            // Another concurrent event may have created this unique slot first.
+            dbContext.Entry(account).State = EntityState.Detached;
+        }
     }
 
     private static async Task<IResult> VerifyChallengeAsync(
@@ -88,7 +199,7 @@ public static class WebhookEndpoints
         WebhookPayload? payload;
         try
         {
-            payload = JsonSerializer.Deserialize<WebhookPayload>(rawBody);
+            payload = JsonSerializer.Deserialize<WebhookPayload>(rawBody, JsonOptions);
         }
         catch (JsonException ex)
         {
@@ -179,6 +290,7 @@ public sealed class WebhookChange
 
 public sealed class WebhookValue
 {
+    [JsonPropertyName("messaging_product")]
     public string? MessagingProduct { get; set; }
     public WebhookMetadata? Metadata { get; set; }
     public List<WebhookContact>? Contacts { get; set; }
@@ -190,12 +302,16 @@ public sealed class WebhookValue
 
 public sealed class WebhookMetadata
 {
+    [JsonPropertyName("display_phone_number")]
     public string? DisplayPhoneNumber { get; set; }
+
+    [JsonPropertyName("phone_number_id")]
     public string? PhoneNumberId { get; set; }
 }
 
 public sealed class WebhookContact
 {
+    [JsonPropertyName("wa_id")]
     public string? WaId { get; set; }
     public WebhookProfile? Profile { get; set; }
 }

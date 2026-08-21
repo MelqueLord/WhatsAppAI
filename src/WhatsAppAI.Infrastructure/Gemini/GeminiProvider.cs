@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Automation;
+using WhatsAppAI.Infrastructure.Ai;
 
 namespace WhatsAppAI.Infrastructure.Gemini;
 
@@ -18,7 +19,21 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
     {
         var contents = new List<object>();
 
-        foreach (var msg in request.Messages)
+        var lastUserMessageIndex = -1;
+        for (var index = request.Messages.Count - 1; index >= 0; index--)
+        {
+            if (request.Messages[index].Role != "assistant")
+            {
+                lastUserMessageIndex = index;
+                break;
+            }
+        }
+
+        var messages = lastUserMessageIndex >= 0
+            ? request.Messages.Take(lastUserMessageIndex + 1)
+            : request.Messages;
+
+        foreach (var msg in messages)
         {
             contents.Add(new
             {
@@ -70,7 +85,7 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
             throw new InvalidOperationException("Failed to parse Gemini response");
 
         var outputText = ExtractOutputText(result);
-        var decision = ParseDecision(outputText);
+        var decision = AiDecisionJsonParser.Parse(outputText);
 
         return new AiResponse
         {
@@ -141,13 +156,15 @@ public sealed class GeminiProvider(HttpClient httpClient, ILogger<GeminiProvider
             var text = root.TryGetProperty("text", out var textProp) ? textProp.GetString() : output;
             var reason = root.TryGetProperty("handoff_reason", out var reasonProp) ? reasonProp.GetString() : null;
             var confidence = root.TryGetProperty("confidence", out var confProp) ? confProp.GetDouble() : 0.8;
+            var queueName = root.TryGetProperty("queue", out var queueProp) ? queueProp.GetString() : null;
 
             return new AiDecision
             {
                 Action = action,
                 Text = text,
                 HandoffReason = reason,
-                Confidence = confidence
+                Confidence = confidence,
+                QueueName = queueName
             };
         }
         catch

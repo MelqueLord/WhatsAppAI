@@ -103,7 +103,7 @@ public static class ClientTagEndpoints
         var contact = await contactRepo.GetByIdAsync(contactId);
         if (contact is null || contact.TenantId != currentTenant.TenantId) return Results.NotFound();
 
-        if (await contactTagRepo.ExistsAsync(contactId, tagId))
+        if (await contactTagRepo.ExistsAsync(currentTenant.TenantId.Value, contactId, tagId))
             return Results.Ok(new { alreadyAssigned = true });
 
         var ct = ContactTag.Create(contactId, tagId, currentTenant.TenantId.Value);

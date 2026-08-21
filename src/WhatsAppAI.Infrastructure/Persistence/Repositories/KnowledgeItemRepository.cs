@@ -24,6 +24,7 @@ public sealed class KnowledgeItemRepository(AppDbContext context) : IKnowledgeIt
     public async Task<IReadOnlyList<KnowledgeItem>> GetActiveByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await context.Set<KnowledgeItem>()
+            .IgnoreQueryFilters()
             .Where(k => k.TenantId == tenantId && k.IsActive)
             .OrderByDescending(k => k.Priority)
             .ToListAsync(cancellationToken);

@@ -1,5 +1,7 @@
 namespace WhatsAppAI.Domain.Identity;
 
+using WhatsAppAI.Domain.Integrations;
+
 public sealed class TenantMembership
 {
     public Guid Id { get; private set; }
@@ -11,6 +13,8 @@ public sealed class TenantMembership
     public DateTime? DeactivatedAt { get; private set; }
     public DateTime? ReactivatedAt { get; private set; }
     public uint Version { get; private set; }
+    public WhatsAppConnectionType? AssignedConnectionType { get; private set; }
+    public int? AssignedLineNumber { get; private set; }
 
     public Tenant Tenant { get; private set; } = null!;
     public User User { get; private set; } = null!;
@@ -62,6 +66,21 @@ public sealed class TenantMembership
 
         Status = MembershipStatus.Active;
         ReactivatedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public void AssignLine(WhatsAppConnectionType connectionType, int lineNumber)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(lineNumber, 1);
+        AssignedConnectionType = connectionType;
+        AssignedLineNumber = lineNumber;
+        Version++;
+    }
+
+    public void ClearLineAssignment()
+    {
+        AssignedConnectionType = null;
+        AssignedLineNumber = null;
         Version++;
     }
 }

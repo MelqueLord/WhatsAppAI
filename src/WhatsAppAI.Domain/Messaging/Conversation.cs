@@ -9,6 +9,7 @@ public sealed class Conversation
     public ConversationMode Mode { get; private set; }
     public ConversationStatus Status { get; private set; }
     public string? AssignedToUserId { get; private set; }
+    public Guid? QueueId { get; private set; }
     public uint Version { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -80,6 +81,12 @@ public sealed class Conversation
         Status = ConversationStatus.Open;
         UpdatedAt = DateTime.UtcNow;
         Version++;
+    }
+
+    public void AssignQueue(Guid? queueId)
+    {
+        QueueId = queueId;
+        UpdatedAt = DateTime.UtcNow;
     }
 }
 

@@ -10,10 +10,10 @@ public sealed class ClientTagRepository(AppDbContext context) : IClientTagReposi
         => await context.Set<ClientTag>().FirstOrDefaultAsync(t => t.Id == id, ct);
 
     public async Task<IReadOnlyList<ClientTag>> GetByTenantAsync(Guid tenantId, CancellationToken ct = default)
-        => await context.Set<ClientTag>().Where(t => t.TenantId == tenantId).OrderBy(t => t.Name).ToListAsync(ct);
+        => await context.Set<ClientTag>().IgnoreQueryFilters().Where(t => t.TenantId == tenantId).OrderBy(t => t.Name).ToListAsync(ct);
 
     public async Task<IReadOnlyList<ClientTag>> GetActiveByTenantAsync(Guid tenantId, CancellationToken ct = default)
-        => await context.Set<ClientTag>().Where(t => t.TenantId == tenantId && t.IsActive).OrderBy(t => t.Name).ToListAsync(ct);
+        => await context.Set<ClientTag>().IgnoreQueryFilters().Where(t => t.TenantId == tenantId && t.IsActive).OrderBy(t => t.Name).ToListAsync(ct);
 
     public async Task AddAsync(ClientTag tag, CancellationToken ct = default)
     {

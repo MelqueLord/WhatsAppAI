@@ -31,6 +31,21 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasColumnType("char(36)")
             .IsRequired();
 
+        builder.Property(t => t.OfficialApiLineCount)
+            .HasColumnName("official_api_line_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(t => t.QrCodeLineCount)
+            .HasColumnName("qr_code_line_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(t => t.OperatorLimit)
+            .HasColumnName("operator_limit")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.Property(t => t.Status)
             .HasColumnName("status")
             .HasConversion<string>()
@@ -46,6 +61,10 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasColumnName("due_date")
             .HasColumnType("datetime(6)")
             .IsRequired();
+
+        builder.Property(t => t.LastPaymentAt)
+            .HasColumnName("last_payment_at")
+            .HasColumnType("datetime(6)");
 
         builder.Property(t => t.ActivatedAt)
             .HasColumnName("activated_at")

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using System.Threading.RateLimiting;
 using Serilog;
 using WhatsAppAI.Infrastructure;
@@ -21,6 +23,7 @@ using WhatsAppAI.WebApi.Integrations;
 using WhatsAppAI.WebApi.Knowledge;
 using WhatsAppAI.WebApi.Media;
 using WhatsAppAI.WebApi.Operators;
+using WhatsAppAI.WebApi.Queues;
 using WhatsAppAI.WebApi.Tags;
 using WhatsAppAI.WebApi.Usage;
 using WhatsAppAI.WebApi.WebhookEvents;
@@ -37,7 +40,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddPersistence(connectionString, dbProvider);
 builder.Services.AddObservability(builder.Configuration);
-builder.Services.AddIdentityServices();
+builder.Services.AddIdentityServices(builder.Environment);
 builder.Services.AddSecretServices();
 builder.Services.AddMetaServices(builder.Environment);
 builder.Services.AddAiProviderServices();
@@ -92,13 +95,23 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
+    if (!app.Environment.IsProduction())
     {
-        await context.Database.EnsureCreatedAsync();
-    }
-    catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
-    {
-        // Table already exists — schema is present
+        if (context.Database.IsSqlite())
+        {
+            try
+            {
+                await context.Database.EnsureCreatedAsync();
+            }
+            catch (SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                // Table already exists.
+            }
+        }
+        else
+        {
+            await context.Database.MigrateAsync();
+        }
     }
 
     // Optional bootstrap account. Credentials must come from configuration/user-secrets.
@@ -122,6 +135,31 @@ await app.Services.SeedDefaultPlansAsync();
 app.UseCors();
 app.UseRateLimiter();
 app.UseObservability();
+
+if (app.Environment.IsProduction())
+{
+    app.Use(async (context, next) =>
+    {
+        var isMutatingMethod = HttpMethods.IsPost(context.Request.Method)
+            || HttpMethods.IsPut(context.Request.Method)
+            || HttpMethods.IsPatch(context.Request.Method)
+            || HttpMethods.IsDelete(context.Request.Method);
+
+        var isApiRequest = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase);
+        var isWebhookRequest = context.Request.Path.StartsWithSegments("/api/webhooks", StringComparison.OrdinalIgnoreCase);
+        var isLoginRequest = context.Request.Path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase);
+        var isAuthenticatedMutation = context.User.Identity?.IsAuthenticated == true;
+        var requiresCsrf = isLoginRequest || isAuthenticatedMutation;
+
+        if (isMutatingMethod && isApiRequest && !isWebhookRequest && requiresCsrf)
+        {
+            var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+            await antiforgery.ValidateRequestAsync(context);
+        }
+
+        await next();
+    });
+}
 
 // Security headers
 app.Use(async (context, next) =>
@@ -158,6 +196,7 @@ app.MapWebhookEndpoints();
 app.MapWebhookEventEndpoints();
 app.MapClientTagEndpoints();
 app.MapBotConfigurationEndpoints();
+app.MapServiceLineEndpoints();
 app.MapDashboardEndpoints();
 app.MapHub<InboxHub>("/hubs/inbox");
 

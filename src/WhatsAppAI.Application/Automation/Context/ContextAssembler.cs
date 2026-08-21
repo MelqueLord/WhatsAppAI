@@ -15,6 +15,8 @@ public sealed class ContextAssembler(
         Guid tenantId,
         Guid conversationId,
         string? systemPrompt,
+        IReadOnlyList<RoutingQueueContext>? routingQueues = null,
+        IReadOnlyList<RoutingTagContext>? routingTags = null,
         CancellationToken cancellationToken = default)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
@@ -37,7 +39,7 @@ public sealed class ContextAssembler(
             .Select(k => k.Content)
             .ToList();
 
-        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts);
+        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
 
         return new ConversationContext
         {
@@ -46,7 +48,11 @@ public sealed class ContextAssembler(
         };
     }
 
-    private static string BuildSystemPrompt(string? basePrompt, List<string> knowledgeItems)
+    private static string BuildSystemPrompt(
+        string? basePrompt,
+        List<string> knowledgeItems,
+        IReadOnlyList<RoutingQueueContext>? routingQueues,
+        IReadOnlyList<RoutingTagContext>? routingTags)
     {
         var parts = new List<string>();
 
@@ -60,9 +66,35 @@ public sealed class ContextAssembler(
                 parts.Add($"- {item}");
         }
 
+        if (routingQueues is { Count: > 0 })
+        {
+            parts.Add("Queues authorized for human transfer:");
+            foreach (var queue in routingQueues)
+                parts.Add(string.IsNullOrWhiteSpace(queue.Description)
+                    ? $"- {queue.Name}"
+                    : $"- {queue.Name}: {queue.Description}");
+            parts.Add("When the customer explicitly chooses or requests one of these queues, return action \"handoff\" and the exact queue name in the \"queue\" field. Never invent a queue. If unsure, omit \"queue\".");
+        }
+
+        if (routingTags is { Count: > 0 })
+        {
+            parts.Add("Tags authorized for customer categorization:");
+            foreach (var tag in routingTags)
+                parts.Add(string.IsNullOrWhiteSpace(tag.Description)
+                    ? $"- {tag.Name}"
+                    : $"- {tag.Name}: {tag.Description}");
+            parts.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
+        }
+
+        if (routingQueues is { Count: > 0 } || routingTags is { Count: > 0 })
+            parts.Add("Return only one JSON object with: action (reply, handoff or no_action), text, confidence, handoff_reason, queue and tags. Keep queue null and tags empty when they do not apply.");
+
         return string.Join("\n\n", parts);
     }
 }
+
+public sealed record RoutingQueueContext(string Name, string? Description);
+public sealed record RoutingTagContext(string Name, string? Description);
 
 public sealed record ConversationContext
 {

@@ -3,6 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { Plus, X, Loader2 } from 'lucide-react'
 
+interface ClientTag {
+  id: string
+  name: string
+  color?: string
+  description?: string
+  isActive: boolean
+}
+
 interface TagAssignerProps {
   contactId: string
   compact?: boolean
@@ -12,12 +20,12 @@ export function TagAssigner({ contactId, compact = false }: TagAssignerProps) {
   const [showPicker, setShowPicker] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: allTags = [] } = useQuery({
+  const { data: allTags = [] } = useQuery<ClientTag[]>({
     queryKey: ['client-tags'],
     queryFn: () => api.tags.list(),
   })
 
-  const { data: contactTags = [], isLoading } = useQuery({
+  const { data: contactTags = [], isLoading } = useQuery<ClientTag[]>({
     queryKey: ['contact-tags', contactId],
     queryFn: () => api.tags.getContactTags(contactId),
     enabled: !!contactId,
@@ -37,8 +45,8 @@ export function TagAssigner({ contactId, compact = false }: TagAssignerProps) {
     },
   })
 
-  const contactTagIds = new Set(contactTags.map((t: any) => t.id))
-  const availableTags = allTags.filter((t: any) => t.isActive && !contactTagIds.has(t.id))
+  const contactTagIds = new Set(contactTags.map((tag) => tag.id))
+  const availableTags = allTags.filter((tag) => tag.isActive && !contactTagIds.has(tag.id))
 
   if (isLoading) {
     return compact ? <Loader2 className="w-3 h-3 animate-spin text-slate-400" /> : null
@@ -48,7 +56,7 @@ export function TagAssigner({ contactId, compact = false }: TagAssignerProps) {
     <div className="relative">
       {/* Current Tags */}
       <div className="flex items-center gap-1 flex-wrap">
-        {contactTags.map((tag: any) => (
+        {contactTags.map((tag) => (
           <span
             key={tag.id}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
@@ -84,7 +92,7 @@ export function TagAssigner({ contactId, compact = false }: TagAssignerProps) {
               {allTags.length === 0 ? 'Nenhuma tag criada' : 'Todas as tags já atribuídas'}
             </div>
           ) : (
-            availableTags.map((tag: any) => (
+            availableTags.map((tag) => (
               <button
                 key={tag.id}
                 onClick={() => {

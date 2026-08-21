@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
+import { useAuth } from '../../lib/auth'
 
 interface Operator {
   id: string
@@ -22,9 +23,12 @@ interface Operator {
   createdAt: string
   deactivatedAt?: string
   reactivatedAt?: string
+  assignedConnectionType?: string
+  assignedLineNumber?: number
 }
 
 export function OperatorsPage() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showResetForm, setShowResetForm] = useState(false)
@@ -107,6 +111,27 @@ export function OperatorsPage() {
     },
   })
 
+  const assignLineMutation = useMutation({
+    mutationFn: async ({ operatorId, value }: { operatorId: string; value: string }) => {
+      const [connectionType, lineNumber] = value ? value.split(':') : ['', '']
+      const res = await fetch(`/api/operators/${operatorId}/line`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          connectionType: connectionType || null,
+          lineNumber: lineNumber ? Number(lineNumber) : null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao atribuir linha')
+      }
+      return res.json()
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
+  })
+
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
@@ -130,6 +155,13 @@ export function OperatorsPage() {
     op.email.toLowerCase().includes(search.toLowerCase()) ||
     (op.displayName ?? '').toLowerCase().includes(search.toLowerCase())
   )
+  const activeOperatorCount = (operators ?? []).filter((operator) => operator.status !== 'Inactive').length
+  const operatorLimit = user?.operatorLimit ?? 0
+  const limitReached = operatorLimit > 0 && activeOperatorCount >= operatorLimit
+  const lineOptions = [
+    ...Array.from({ length: user?.officialApiLineCount ?? 0 }, (_, index) => ({ type: 'OfficialApi', number: index + 1, label: `API oficial ${index + 1}` })),
+    ...Array.from({ length: user?.qrCodeLineCount ?? 0 }, (_, index) => ({ type: 'QrCode', number: index + 1, label: `QR Code ${index + 1}` })),
+  ]
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -173,11 +205,16 @@ export function OperatorsPage() {
               createMutation.reset()
               setShowCreateForm(true)
             }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
+            disabled={limitReached}
+            title={limitReached ? 'Limite de operadores atingido' : 'Novo operador'}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" /> Novo Operador
           </button>
         </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Operadores cadastrados: <strong>{activeOperatorCount}</strong> / {operatorLimit || 'Ilimitado'}
+        </p>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -254,6 +291,9 @@ export function OperatorsPage() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Linha atendida
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Criado em
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -264,7 +304,7 @@ export function OperatorsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredOperators.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                       {search ? 'Nenhum operador encontrado com esse filtro.' : 'Nenhum operador cadastrado.'}
                     </td>
                   </tr>
@@ -281,6 +321,17 @@ export function OperatorsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500">{operator.email}</td>
                       <td className="px-6 py-4">{getStatusBadge(operator.status)}</td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={operator.assignedConnectionType && operator.assignedLineNumber ? `${operator.assignedConnectionType}:${operator.assignedLineNumber}` : ''}
+                          onChange={(event) => assignLineMutation.mutate({ operatorId: operator.id, value: event.target.value })}
+                          disabled={assignLineMutation.isPending}
+                          className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50"
+                        >
+                          <option value="">Sem atribuição</option>
+                          {lineOptions.map((line) => <option key={`${line.type}:${line.number}`} value={`${line.type}:${line.number}`}>{line.label}</option>)}
+                        </select>
+                      </td>
                       <td className="px-6 py-4 text-sm text-slate-500">
                         {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
                       </td>

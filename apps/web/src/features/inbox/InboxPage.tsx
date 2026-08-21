@@ -6,8 +6,11 @@ import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
 import { useSignalR } from '../../lib/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { useAuth } from '../../lib/auth'
+import { LockKeyhole } from 'lucide-react'
 
 export function InboxPage() {
+  const { user } = useAuth()
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [showMobileList, setShowMobileList] = useState(true)
   const queryClient = useQueryClient()
@@ -33,6 +36,10 @@ export function InboxPage() {
   useEffect(() => {
     startSignalR()
   }, [startSignalR])
+
+  if (user?.tenantStatus === 'Suspended') {
+    return <SuspendedInbox />
+  }
 
   const handleSelect = (conversation: Conversation) => {
     setSelectedConversation(conversation)
@@ -84,6 +91,18 @@ export function InboxPage() {
             <EmptyState isConnected={isConnected} />
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SuspendedInbox() {
+  return (
+    <div className="h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="max-w-md text-center">
+        <div className="w-16 h-16 mx-auto mb-5 rounded-lg bg-red-50 flex items-center justify-center"><LockKeyhole className="w-8 h-8 text-red-600" /></div>
+        <h1 className="text-xl font-semibold text-slate-800">Atendimento suspenso</h1>
+        <p className="mt-2 text-sm text-slate-500">A caixa de atendimento, Bot e IA ficam indisponíveis até a regularização do pagamento.</p>
       </div>
     </div>
   )

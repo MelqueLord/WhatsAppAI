@@ -3,7 +3,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
+using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.Infrastructure.Workers;
 
@@ -53,7 +56,9 @@ public sealed class OutboxProcessingWorker(
         using var scope = serviceProvider.CreateScope();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
         var messageRepository = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
+        var conversationRepository = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
         var contactRepository = scope.ServiceProvider.GetRequiredService<IContactRepository>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var whatsAppAccountRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
         var whatsAppClient = scope.ServiceProvider.GetRequiredService<IWhatsAppClient>();
         var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
@@ -66,7 +71,9 @@ public sealed class OutboxProcessingWorker(
                 outboxMessage,
                 outboxRepository,
                 messageRepository,
+                conversationRepository,
                 contactRepository,
+                dbContext,
                 whatsAppAccountRepository,
                 whatsAppClient,
                 secretStore,
@@ -78,7 +85,9 @@ public sealed class OutboxProcessingWorker(
         OutboxMessage outboxMessage,
         IOutboxMessageRepository outboxRepository,
         IMessageRepository messageRepository,
+        IConversationRepository conversationRepository,
         IContactRepository contactRepository,
+        AppDbContext dbContext,
         IWhatsAppAccountRepository whatsAppAccountRepository,
         IWhatsAppClient whatsAppClient,
         ISecretStore secretStore,
@@ -98,6 +107,18 @@ public sealed class OutboxProcessingWorker(
                 return;
             }
 
+            var tenant = await dbContext.Tenants.FindAsync([outboxMessage.TenantId], cancellationToken);
+            if (tenant?.Status != TenantStatus.Active)
+            {
+                message.MarkFailed("Tenant suspended");
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                outboxMessage.MarkDead("Tenant suspended");
+                await outboxRepository.UpdateAsync(outboxMessage);
+                logger.LogInformation("Outbox {OutboxId} blocked for suspended tenant {TenantId}", outboxMessage.Id, outboxMessage.TenantId);
+                return;
+            }
+
+            var conversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
             var contact = await contactRepository.GetByIdAsync(message.ContactId, cancellationToken);
             if (contact is null)
             {
@@ -107,8 +128,12 @@ public sealed class OutboxProcessingWorker(
                 return;
             }
 
-            var account = await whatsAppAccountRepository.GetByTenantAsync(outboxMessage.TenantId, cancellationToken);
-            if (account is null || !account.IsActive)
+            var account = conversation is null
+                ? await whatsAppAccountRepository.GetByTenantAsync(outboxMessage.TenantId, cancellationToken)
+                : await whatsAppAccountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId, cancellationToken);
+            var qrPhoneNumberId = conversation?.PhoneNumberId;
+            var isQrSession = qrPhoneNumberId?.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) == true;
+            if (account is null && !isQrSession)
             {
                 outboxMessage.MarkDead("WhatsApp account not found or inactive");
                 await outboxRepository.UpdateAsync(outboxMessage);
@@ -116,7 +141,26 @@ public sealed class OutboxProcessingWorker(
                 return;
             }
 
-            var token = await secretStore.GetAsync(account.AccessTokenRef, cancellationToken);
+            if (account is not null && !account.IsActive)
+            {
+                outboxMessage.MarkDead("WhatsApp account not found or inactive");
+                await outboxRepository.UpdateAsync(outboxMessage);
+                return;
+            }
+
+            var outboundPhoneNumberId = account?.PhoneNumberId ?? qrPhoneNumberId;
+            if (string.IsNullOrWhiteSpace(outboundPhoneNumberId))
+            {
+                outboxMessage.MarkDead("WhatsApp phone number not found");
+                await outboxRepository.UpdateAsync(outboxMessage);
+                return;
+            }
+
+            string? token;
+            if (isQrSession || account!.ConnectionType == WhatsAppConnectionType.QrCode)
+                token = "whatsapp-web";
+            else
+                token = await secretStore.GetAsync(account!.AccessTokenRef, cancellationToken);
             if (string.IsNullOrEmpty(token))
             {
                 outboxMessage.MarkDead("Access token not available");
@@ -125,7 +169,7 @@ public sealed class OutboxProcessingWorker(
             }
 
             var result = await whatsAppClient.SendTextMessageAsync(
-                account.PhoneNumberId,
+                outboundPhoneNumberId,
                 token,
                 contact.PhoneNumber,
                 message.Content ?? string.Empty,

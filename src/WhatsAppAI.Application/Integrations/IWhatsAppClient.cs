@@ -17,14 +17,17 @@ public interface IWhatsAppClient
     // QR Code connection for development/unofficial API
     Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default);
 
     Task<WhatsAppSessionStatus> GetSessionStatusAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default);
 
     Task DisconnectSessionAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default);
 }
 

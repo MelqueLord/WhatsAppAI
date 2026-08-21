@@ -87,4 +87,41 @@ public class TenantTests
         Assert.Equal("Test", tenant.Name);
         Assert.Equal("test-slug", tenant.Slug);
     }
+
+    [Fact]
+    public void Create_SetsLineCounts()
+    {
+        var tenant = Tenant.Create("Test", "test", Guid.NewGuid(), 3, 2);
+
+        Assert.Equal(3, tenant.OfficialApiLineCount);
+        Assert.Equal(2, tenant.QrCodeLineCount);
+    }
+
+    [Fact]
+    public void Create_RejectsNegativeLineCounts()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Tenant.Create("Test", "test", Guid.NewGuid(), -1, 0));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Tenant.Create("Test", "test", Guid.NewGuid(), 0, -1));
+    }
+
+    [Fact]
+    public void UpdateDetails_ChangesCompanyDataAndIncrementsVersion()
+    {
+        var tenant = Tenant.Create("Old name", "old-name", Guid.NewGuid(), 1, 2);
+        var newPlanId = Guid.NewGuid();
+        var originalVersion = tenant.Version;
+
+        tenant.UpdateDetails("New name", "new-name", newPlanId, 4, 5, 3);
+
+        Assert.Equal("New name", tenant.Name);
+        Assert.Equal("new-name", tenant.Slug);
+        Assert.Equal(newPlanId, tenant.PlanId);
+        Assert.Equal(4, tenant.OfficialApiLineCount);
+        Assert.Equal(5, tenant.QrCodeLineCount);
+        Assert.Equal(3, tenant.OperatorLimit);
+        Assert.Equal(originalVersion + 1, tenant.Version);
+    }
 }

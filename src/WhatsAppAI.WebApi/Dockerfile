@@ -15,6 +15,9 @@ RUN dotnet build "WhatsAppAI.WebApi.csproj" -c Release -o /app/build
 
 FROM build AS publish
 RUN dotnet publish "WhatsAppAI.WebApi.csproj" -c Release -o /app/publish /p:UseAppHost=false
+WORKDIR /src
+RUN dotnet tool restore
+RUN dotnet ef migrations bundle --project src/WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj --startup-project src/WhatsAppAI.WebApi/WhatsAppAI.WebApi.csproj --output /app/publish/efbundle
 
 FROM base AS final
 WORKDIR /app

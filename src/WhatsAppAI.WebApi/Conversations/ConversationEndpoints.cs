@@ -2,9 +2,11 @@
 using Microsoft.AspNetCore.SignalR;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 using WhatsAppAI.WebApi.Hubs;
 
 namespace WhatsAppAI.WebApi.Conversations;
@@ -35,6 +37,9 @@ public static class ConversationEndpoints
     private static async Task<IResult> ListConversationsAsync(
         ICurrentTenant currentTenant,
         IConversationQueries conversationQueries,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        AppDbContext dbContext,
         string? cursor = null,
         int limit = 50,
         string? operatorUserId = null)
@@ -42,10 +47,56 @@ public static class ConversationEndpoints
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        string? phoneNumberId = null;
+        if (currentTenant.UserRole == "TenantOwner" &&
+            !string.IsNullOrWhiteSpace(operatorUserId) &&
+            !operatorUserId.Equals("unassigned", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Guid.TryParse(operatorUserId, out var selectedOperatorUserId))
+                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
+            var selectedMembership = await membershipRepository.GetByUserAndTenantAsync(
+                selectedOperatorUserId,
+                currentTenant.TenantId.Value);
+            if (selectedMembership?.Role != MembershipRole.Operator ||
+                selectedMembership.AssignedConnectionType is null ||
+                selectedMembership.AssignedLineNumber is null)
+                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
+            var selectedAccount = await accountRepository.GetByTenantAndSlotAsync(
+                currentTenant.TenantId.Value,
+                selectedMembership.AssignedConnectionType.Value,
+                selectedMembership.AssignedLineNumber.Value);
+            phoneNumberId = selectedAccount?.PhoneNumberId;
+            if (string.IsNullOrWhiteSpace(phoneNumberId))
+                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
+            operatorUserId = null;
+        }
+
+        if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            if (membership?.AssignedConnectionType is null || membership.AssignedLineNumber is null)
+                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
+            var account = await accountRepository.GetByTenantAndSlotAsync(
+                currentTenant.TenantId.Value,
+                membership.AssignedConnectionType.Value,
+                membership.AssignedLineNumber.Value);
+            phoneNumberId = account?.PhoneNumberId;
+            if (string.IsNullOrWhiteSpace(phoneNumberId))
+                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+        }
+
         var result = await conversationQueries.GetConversationsAsync(
             currentTenant.TenantId.Value,
             new CursorPaginationRequest { Cursor = cursor, Limit = limit },
-            operatorUserId);
+            operatorUserId,
+            phoneNumberId);
 
         return Results.Ok(result);
     }
@@ -53,10 +104,20 @@ public static class ConversationEndpoints
     private static async Task<IResult> GetConversationAsync(
         Guid conversationId,
         ICurrentTenant currentTenant,
-        IConversationQueries conversationQueries)
+        IConversationQueries conversationQueries,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant, conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
 
         var conversation = await conversationQueries.GetConversationByIdAsync(
             currentTenant.TenantId.Value, conversationId);
@@ -68,11 +129,21 @@ public static class ConversationEndpoints
         Guid conversationId,
         ICurrentTenant currentTenant,
         IConversationQueries conversationQueries,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        AppDbContext dbContext,
         string? cursor = null,
         int limit = 50)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant, conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
 
         var result = await conversationQueries.GetMessagesAsync(
             currentTenant.TenantId.Value,
@@ -88,16 +159,32 @@ public static class ConversationEndpoints
         ICurrentTenant currentTenant,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
         IOutboxMessageRepository outboxMessageRepository,
         IClock clock,
-        IHubContext<InboxHub> hubContext)
+        IHubContext<InboxHub> hubContext,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
 
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
         var conversation = await conversationRepository.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId)
             return Results.NotFound();
+
+        if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            var account = membership?.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
+                ? await accountRepository.GetByTenantAndSlotAsync(currentTenant.TenantId.Value, membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)
+                : null;
+            if (account is null || conversation.PhoneNumberId != account.PhoneNumberId)
+                return Results.Forbid();
+        }
 
         if (!conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
@@ -136,6 +223,35 @@ public static class ConversationEndpoints
             });
 
         return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
+    }
+
+    private static async Task<bool> IsTenantActiveAsync(Guid tenantId, AppDbContext dbContext)
+    {
+        var tenant = await dbContext.Tenants.FindAsync(tenantId);
+        return tenant?.Status == TenantStatus.Active;
+    }
+
+    private static async Task<bool> OperatorCanAccessConversationAsync(
+        Guid conversationId,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository)
+    {
+        if (currentTenant.UserRole != "Operator" || currentTenant.UserId is null || currentTenant.TenantId is null)
+            return true;
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
+        if (conversation is null || membership?.AssignedConnectionType is null || membership.AssignedLineNumber is null)
+            return false;
+
+        var account = await accountRepository.GetByTenantAndSlotAsync(
+            currentTenant.TenantId.Value,
+            membership.AssignedConnectionType.Value,
+            membership.AssignedLineNumber.Value);
+
+        return account is not null && conversation.PhoneNumberId == account.PhoneNumberId;
     }
 }
 

@@ -54,6 +54,14 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
             .IsConcurrencyToken()
             .HasDefaultValue(0);
 
+        builder.Property(m => m.AssignedConnectionType)
+            .HasColumnName("assigned_connection_type")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(m => m.AssignedLineNumber)
+            .HasColumnName("assigned_line_number");
+
         builder.HasOne(m => m.Tenant)
             .WithMany(t => t.Memberships)
             .HasForeignKey(m => m.TenantId)

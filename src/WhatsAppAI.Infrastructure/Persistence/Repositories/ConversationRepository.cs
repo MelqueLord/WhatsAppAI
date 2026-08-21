@@ -8,9 +8,11 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
 {
     public async Task<Conversation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await context.Set<Conversation>()
+        var conversations = await context.Set<Conversation>()
+            .IgnoreQueryFilters()
             .Include(c => c.Contact)
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .ToListAsync(cancellationToken);
+        return conversations.Find(conversation => conversation.Id == id);
     }
 
     public async Task<Conversation?> GetByContactAndPhoneAsync(
@@ -19,13 +21,14 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
         string phoneNumberId,
         CancellationToken cancellationToken = default)
     {
-        return await context.Set<Conversation>()
+        var conversations = await context.Set<Conversation>()
+            .IgnoreQueryFilters()
             .Include(c => c.Contact)
-            .FirstOrDefaultAsync(c =>
-                c.TenantId == tenantId &&
-                c.ContactId == contactId &&
-                c.PhoneNumberId == phoneNumberId,
-                cancellationToken);
+            .ToListAsync(cancellationToken);
+        return conversations.Find(conversation =>
+            conversation.TenantId == tenantId &&
+            conversation.ContactId == contactId &&
+            string.Equals(conversation.PhoneNumberId, phoneNumberId, StringComparison.Ordinal));
     }
 
     public async Task<IReadOnlyList<Conversation>> GetByTenantAsync(
@@ -54,8 +57,16 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
 
     public async Task AddAsync(Conversation conversation, CancellationToken cancellationToken = default)
     {
-        await context.Set<Conversation>().AddAsync(conversation, cancellationToken);
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.Set<Conversation>().AddAsync(conversation, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("FOREIGN KEY") == true)
+        {
+            // Conversa já existe ou referência de contato inválida; detach para permitir retry
+            context.Entry(conversation).State = EntityState.Detached;
+        }
     }
 
     public async Task UpdateAsync(Conversation conversation, CancellationToken cancellationToken = default)

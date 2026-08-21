@@ -53,13 +53,15 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 
 ## 4. Requisitos funcionais
 
-- **FR-AI-001:** a entidade `AiProviderCredential` já suporta campo `Provider` (string). O sistema deve aceitar os valores `openai`, `gemini`, `anthropic`, `xiaomi`.
+- **FR-AI-001:** a entidade `AiProviderCredential` já suporta campo `Provider` (string). O sistema deve aceitar os valores `openai`, `gemini`, `anthropic`, `xiaomi`, `grok`.
 - **FR-AI-002:** implementar adaptadores `IAiProvider` para Gemini, Anthropic e Xiaomi, além do OpenAI existente.
 - **FR-AI-003:** a tela unificada substitui `AiConfigPage` e `BotConfigPage`. O menu lateral exibe apenas "Atendimento com IA".
 - **FR-AI-004:** credenciais são armazenadas por provedor no `ISecretStore` com chave `ai:{tenantId}:{provider}:apikey`.
 - **FR-AI-005:** o `BotConfiguration` (modo, mensagens, limites) permanece como entidade separada mas é editado na mesma tela.
 - **FR-AI-006:** o seletor de provedor deve exibir nome amigável e ícone/distintivo de cada provedor.
 - **FR-AI-007:** modelos sugeridos devem ser carregados por provedor (lista estática ou configuração).
+- **FR-AI-008:** as diretrizes da IA devem permitir selecionar filas ativas do tenant para encaminhamento automático conforme a escolha ou intenção expressa pelo cliente.
+- **FR-AI-009:** as diretrizes da IA devem permitir selecionar tags ativas do tenant para categorização automática do contato conforme o conteúdo da conversa.
 
 ## 5. Regras de negócio
 
@@ -79,6 +81,7 @@ Cada provedor implementa `IAiProvider` com sua API específica:
 | Gemini | `generativelanguage.googleapis.com/v1beta` | API key query param | GenerateContent |
 | Anthropic | `api.anthropic.com/v1/messages` | `x-api-key` header | Messages API |
 | Xiaomi | `api.xiaomi.com/v1/chat/completions` (ou endpoint MiMo) | Bearer token | Chat Completions compatível |
+| Grok | `api.x.ai/v1/chat/completions` | Bearer token | Chat Completions compatível |
 
 Todos os adaptadores convertem sua resposta nativa para o formato comum `AiResponse` com `AiDecision`.
 

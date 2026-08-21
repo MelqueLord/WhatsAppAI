@@ -14,6 +14,8 @@ public sealed class BotConfigurationConfiguration : IEntityTypeConfiguration<Bot
         builder.Property(b => b.TenantId).HasColumnName("tenant_id").IsRequired().IsConcurrencyToken(false);
         builder.Property(b => b.Mode).HasColumnName("mode").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(b => b.WelcomeMessage).HasColumnName("welcome_message").HasMaxLength(1000);
+        builder.Property(b => b.ReturningMessage).HasColumnName("returning_message").HasMaxLength(1000);
+        builder.Property(b => b.FlowStepsJson).HasColumnName("flow_steps_json").HasMaxLength(20000);
         builder.Property(b => b.OfflineMessage).HasColumnName("offline_message").HasMaxLength(1000);
         builder.Property(b => b.FallbackMessage).HasColumnName("fallback_message").HasMaxLength(1000);
         builder.Property(b => b.MaxTokensPerResponse).HasColumnName("max_tokens_per_response").IsRequired();

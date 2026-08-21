@@ -10,6 +10,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<OutboxProcessingWorker>();
         services.AddHostedService<AiOrchestrationWorker>();
         services.AddHostedService<RetentionWorker>();
+            services.AddHostedService<TenantSuspensionWorker>();
         return services;
     }
 }

@@ -3,6 +3,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Integrations;
 
@@ -24,13 +25,13 @@ public static class WhatsAppEndpoints
             .WithName("TestWhatsAppConnection");
 
         // QR Code connection endpoints
-        group.MapGet("/qrcode", GetQrCodeAsync)
+        group.MapGet("/qrcode/{lineNumber:int}", GetQrCodeAsync)
             .WithName("GetWhatsAppQrCode");
 
-        group.MapGet("/session/status", GetSessionStatusAsync)
+        group.MapGet("/session/status/{lineNumber:int}", GetSessionStatusAsync)
             .WithName("GetWhatsAppSessionStatus");
 
-        group.MapPost("/session/disconnect", DisconnectSessionAsync)
+        group.MapPost("/session/disconnect/{lineNumber:int}", DisconnectSessionAsync)
             .WithName("DisconnectWhatsAppSession");
 
         return app;
@@ -42,13 +43,17 @@ public static class WhatsAppEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
-        var account = await accountRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var accounts = await accountRepository.GetAllByTenantAsync(currentTenant.TenantId.Value);
+        var account = accounts.FirstOrDefault(a => a.ConnectionType == WhatsAppConnectionType.OfficialApi);
 
         if (account is null)
             return Results.Ok(new WhatsAppConfigResponse
             {
-                IsConfigured = false
+                IsConfigured = false,
+                Lines = []
             });
 
         return Results.Ok(new WhatsAppConfigResponse
@@ -56,7 +61,14 @@ public static class WhatsAppEndpoints
             IsConfigured = true,
             WabaId = account.WabaId,
             PhoneNumberId = account.PhoneNumberId,
-            IsActive = account.IsActive
+            IsActive = account.IsActive,
+            Lines = accounts.Select(a => new WhatsAppLineResponse
+            {
+                LineNumber = a.LineNumber,
+                ConnectionType = a.ConnectionType.ToString(),
+                PhoneNumberId = a.PhoneNumberId,
+                IsActive = a.IsActive
+            }).ToArray()
         });
     }
 
@@ -64,10 +76,13 @@ public static class WhatsAppEndpoints
         [FromBody] SaveWhatsAppConfigRequest request,
         ICurrentTenant currentTenant,
         IWhatsAppAccountRepository accountRepository,
-        ISecretStore secretStore)
+        ISecretStore secretStore,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         if (string.IsNullOrWhiteSpace(request.WabaId) ||
             string.IsNullOrWhiteSpace(request.PhoneNumberId) ||
@@ -76,10 +91,20 @@ public static class WhatsAppEndpoints
             return Results.BadRequest(new { error = "All fields are required." });
         }
 
-        var secretKey = $"whatsapp:token:{currentTenant.TenantId}";
+        if (request.LineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null || request.LineNumber > tenant.OfficialApiLineCount)
+            return Results.BadRequest(new { error = "The selected official API line is outside the contracted quota." });
+
+        var secretKey = $"whatsapp:token:{currentTenant.TenantId}:line:{request.LineNumber}";
         await secretStore.SetAsync(secretKey, request.AccessToken);
 
-        var account = await accountRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var account = await accountRepository.GetByTenantAndSlotAsync(
+            currentTenant.TenantId.Value,
+            WhatsAppConnectionType.OfficialApi,
+            request.LineNumber);
 
         if (account is null)
         {
@@ -87,7 +112,9 @@ public static class WhatsAppEndpoints
                 currentTenant.TenantId.Value,
                 request.WabaId,
                 request.PhoneNumberId,
-                secretKey);
+                secretKey,
+                WhatsAppConnectionType.OfficialApi,
+                request.LineNumber);
 
             await accountRepository.AddAsync(account);
         }
@@ -114,6 +141,8 @@ public static class WhatsAppEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         var account = await accountRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (account is null)
@@ -147,12 +176,40 @@ public static class WhatsAppEndpoints
 
     private static async Task<IResult> GetQrCodeAsync(
         ICurrentTenant currentTenant,
-        IWhatsAppClient whatsAppClient)
+        int lineNumber,
+        IWhatsAppClient whatsAppClient,
+        IWhatsAppAccountRepository accountRepository,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
-        var result = await whatsAppClient.GetQrCodeAsync(currentTenant.TenantId.Value);
+        if (lineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null || lineNumber > tenant.QrCodeLineCount)
+            return Results.BadRequest(new { error = "The selected QR Code line is outside the contracted quota." });
+
+        var account = await accountRepository.GetByTenantAndSlotAsync(
+            currentTenant.TenantId.Value,
+            WhatsAppConnectionType.QrCode,
+            lineNumber);
+        if (account is null)
+        {
+            account = WhatsAppAccount.Create(
+                currentTenant.TenantId.Value,
+                "whatsapp-web",
+                $"qr:{currentTenant.TenantId.Value:D}:{lineNumber}",
+                $"whatsapp-web:session:{currentTenant.TenantId.Value:D}:{lineNumber}",
+                WhatsAppConnectionType.QrCode,
+                lineNumber);
+            await accountRepository.AddAsync(account);
+        }
+
+        var result = await whatsAppClient.GetQrCodeAsync(currentTenant.TenantId.Value, lineNumber);
 
         if (!result.IsSuccess)
             return Results.BadRequest(new { error = result.ErrorMessage });
@@ -167,12 +224,23 @@ public static class WhatsAppEndpoints
 
     private static async Task<IResult> GetSessionStatusAsync(
         ICurrentTenant currentTenant,
-        IWhatsAppClient whatsAppClient)
+        int lineNumber,
+        IWhatsAppClient whatsAppClient,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
-        var result = await whatsAppClient.GetSessionStatusAsync(currentTenant.TenantId.Value);
+        if (lineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null || lineNumber > tenant.QrCodeLineCount)
+            return Results.BadRequest(new { error = "The selected QR Code line is outside the contracted quota." });
+
+        var result = await whatsAppClient.GetSessionStatusAsync(currentTenant.TenantId.Value, lineNumber);
 
         return Results.Ok(new
         {
@@ -184,12 +252,23 @@ public static class WhatsAppEndpoints
 
     private static async Task<IResult> DisconnectSessionAsync(
         ICurrentTenant currentTenant,
-        IWhatsAppClient whatsAppClient)
+        int lineNumber,
+        IWhatsAppClient whatsAppClient,
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
-        await whatsAppClient.DisconnectSessionAsync(currentTenant.TenantId.Value);
+        if (lineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null || lineNumber > tenant.QrCodeLineCount)
+            return Results.BadRequest(new { error = "The selected QR Code line is outside the contracted quota." });
+
+        await whatsAppClient.DisconnectSessionAsync(currentTenant.TenantId.Value, lineNumber);
 
         return Results.Ok(new { message = "Session disconnected successfully." });
     }
@@ -201,6 +280,15 @@ public sealed class WhatsAppConfigResponse
     public string? WabaId { get; init; }
     public string? PhoneNumberId { get; init; }
     public bool IsActive { get; init; }
+    public IReadOnlyList<WhatsAppLineResponse> Lines { get; init; } = [];
+}
+
+public sealed class WhatsAppLineResponse
+{
+    public int LineNumber { get; init; }
+    public string ConnectionType { get; init; } = string.Empty;
+    public string PhoneNumberId { get; init; } = string.Empty;
+    public bool IsActive { get; init; }
 }
 
 public sealed class SaveWhatsAppConfigRequest
@@ -208,4 +296,5 @@ public sealed class SaveWhatsAppConfigRequest
     public string WabaId { get; init; } = string.Empty;
     public string PhoneNumberId { get; init; } = string.Empty;
     public string AccessToken { get; init; } = string.Empty;
+    public int LineNumber { get; init; } = 1;
 }

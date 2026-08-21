@@ -8,5 +8,5 @@ public interface IContactTagRepository
     Task<IReadOnlyList<ContactTag>> GetByTagAsync(Guid tagId, CancellationToken ct = default);
     Task AddAsync(ContactTag contactTag, CancellationToken ct = default);
     Task RemoveAsync(Guid contactId, Guid tagId, CancellationToken ct = default);
-    Task<bool> ExistsAsync(Guid contactId, Guid tagId, CancellationToken ct = default);
+    Task<bool> ExistsAsync(Guid tenantId, Guid contactId, Guid tagId, CancellationToken ct = default);
 }

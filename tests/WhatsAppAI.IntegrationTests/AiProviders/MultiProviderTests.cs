@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -52,11 +53,13 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
 
         var providers = await response.Content.ReadFromJsonAsync<ProviderDto[]>();
         Assert.NotNull(providers);
-        Assert.Equal(4, providers.Length);
+        Assert.Equal(6, providers.Length);
         Assert.Contains(providers, p => p.Id == "openai");
         Assert.Contains(providers, p => p.Id == "gemini");
         Assert.Contains(providers, p => p.Id == "anthropic");
         Assert.Contains(providers, p => p.Id == "xiaomi");
+        Assert.Contains(providers, p => p.Id == "grok");
+        Assert.Contains(providers, p => p.Id == "groq");
     }
 
     [Fact]
@@ -121,16 +124,14 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         var response = await client.GetAsync("/api/integrations/ai");
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadFromJsonAsync<ConfigResponseDto>();
-        Assert.NotNull(json);
-        Assert.True(json.Configured);
-        Assert.Equal("xiaomi", json.Provider);
-        Assert.NotNull(json.BotConfig);
-        Assert.Equal("AiPowered", json.BotConfig.Mode);
-        Assert.Equal("Olá!", json.BotConfig.WelcomeMessage);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+
+        Assert.True(root.GetProperty("configured").GetBoolean());
+        Assert.Equal("xiaomi", root.GetProperty("provider").GetString());
+        Assert.Equal("mimo-v2.5-pro", root.GetProperty("modelId").GetString());
+        Assert.False(root.GetProperty("aiActive").GetBoolean());
     }
 
     private sealed record ProviderDto(string Id, string Name, object[] Models);
-    private sealed record ConfigResponseDto(bool Configured, string? Provider, string? ModelId, bool? IsActive, BotConfigDto? BotConfig);
-    private sealed record BotConfigDto(string Mode, string? WelcomeMessage, string? FallbackMessage, int MaxTokensPerResponse, bool Enabled);
 }

@@ -41,6 +41,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<ClientTag> ClientTags => Set<ClientTag>();
     public DbSet<ContactTag> ContactTags => Set<ContactTag>();
     public DbSet<BotConfiguration> BotConfigurations => Set<BotConfiguration>();
+    public DbSet<ServiceLine> ServiceLines => Set<ServiceLine>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -76,6 +77,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<ContactTag>()
             .HasQueryFilter(e => e.TenantId == tenantId);
         modelBuilder.Entity<BotConfiguration>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ServiceLine>()
             .HasQueryFilter(e => e.TenantId == tenantId);
         modelBuilder.Entity<Invitation>()
             .HasQueryFilter(e => e.TenantId == tenantId);

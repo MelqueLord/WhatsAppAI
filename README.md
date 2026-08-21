@@ -13,12 +13,12 @@ Implementado:
 - Persistencia MySQL 8.4 LTS em producao/testes e SQLite em desenvolvimento local.
 - Docker, Nginx, scripts de backup/restore, observabilidade, runbooks e testes unitarios/integracao/arquitetura.
 
-Falta validar antes de considerar pronto para piloto real:
+Atualizacao de readiness (2026-08-21):
 
-- Rodar a suite completa local/CI e revisar resultados recentes.
-- Confirmar limpeza de artefatos locais versionados, especialmente arquivos SQLite de desenvolvimento.
-- Revisar uso de migrations versus `EnsureCreatedAsync()` antes de producao.
-- Executar checklist de deploy/piloto com credenciais reais em cofre.
+- P0 implementado em codigo/configuracao: cookies e CSRF em producao, remocao de `cookies.txt`, compose com segredos obrigatorios, nginx por template e migration bundle com servico `migrate`.
+- Validacao local executada: `dotnet restore` e `dotnet build -c Release` ok; `npm run build` ok.
+- Pendencias atuais: 3 testes .NET falhando, 23 erros de lint frontend, 1 teste frontend falhando e 8 testes de webhook ainda ignorados.
+- Validacao operacional de deploy continua pendente em host com Docker/TLS (`docker compose --profile production config`, `nginx -t` e smoke HTTPS/SignalR).
 
 ## Premissas fechadas
 

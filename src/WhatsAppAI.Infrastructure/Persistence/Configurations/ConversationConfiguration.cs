@@ -45,6 +45,9 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
             .HasColumnName("assigned_to_user_id")
             .HasMaxLength(50);
 
+        builder.Property(c => c.QueueId)
+            .HasColumnName("queue_id");
+
         builder.Property(c => c.Version)
             .HasColumnName("version")
             .IsConcurrencyToken()

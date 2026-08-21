@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
@@ -39,6 +40,8 @@ public static class BotConfigurationEndpoints
             configured = true,
             mode = config.Mode.ToString(),
             welcomeMessage = config.WelcomeMessage,
+            returningMessage = config.ReturningMessage,
+            flowSteps = ParseFlowSteps(config.FlowStepsJson),
             offlineMessage = config.OfflineMessage,
             fallbackMessage = config.FallbackMessage,
             handoffMessage = config.HandoffMessage,
@@ -61,15 +64,17 @@ public static class BotConfigurationEndpoints
         if (config is null)
         {
             config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
-            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
+            config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
             config.UpdateTokenLimit(request.MaxTokensPerResponse ?? 500);
+            config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
             await repo.AddAsync(config);
         }
         else
         {
             config.UpdateMode(mode);
-            config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
+            config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
             config.UpdateTokenLimit(request.MaxTokensPerResponse ?? config.MaxTokensPerResponse);
+            config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
             if (!config.Enabled)
                 config.Toggle(true);
             await repo.UpdateAsync(config);
@@ -108,7 +113,7 @@ public static class BotConfigurationEndpoints
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
 
-        config.UpdateMessages(request.WelcomeMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
+        config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.MediaMessage);
         await repo.UpdateAsync(config);
         return Results.Ok(new { saved = true });
     }
@@ -152,18 +157,32 @@ public static class BotConfigurationEndpoints
         await repo.UpdateAsync(config);
         return Results.Ok(new { enabled = config.Enabled, mode = config.Mode.ToString() });
     }
+
+    private static JsonElement[] ParseFlowSteps(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try { return JsonSerializer.Deserialize<JsonElement[]>(value) ?? []; }
+        catch (JsonException) { return []; }
+    }
+
+    private static string? SerializeFlowSteps(JsonElement? value) =>
+        value is { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined }
+            ? value.Value.GetRawText()
+            : null;
 }
 
 public sealed record SaveBotConfigRequest(
     string Mode,
     string? WelcomeMessage,
+    string? ReturningMessage,
     string? OfflineMessage,
     string? FallbackMessage,
     string? HandoffMessage,
     string? MediaMessage,
-    int? MaxTokensPerResponse);
+    int? MaxTokensPerResponse,
+    JsonElement? FlowSteps);
 
 public sealed record UpdateModeRequest(string Mode);
-public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? MediaMessage);
+public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? ReturningMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? MediaMessage);
 public sealed record UpdateTokenLimitRequest(int MaxTokens);
 public sealed record ToggleBotRequest(bool Enabled, string? Mode = null);

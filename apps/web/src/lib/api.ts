@@ -1,13 +1,44 @@
 const API_BASE = ''
+let csrfToken: string | undefined
+
+async function ensureCsrfToken(): Promise<string> {
+  if (csrfToken) {
+    return csrfToken
+  }
+
+  const response = await fetch(`${API_BASE}/api/auth/csrf`, {
+    cache: 'no-store',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const csrf = (await response.json()) as { token: string }
+  csrfToken = csrf.token
+  return csrfToken
+}
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
+  const method = options?.method?.toUpperCase()
+  const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE'
+
+  let mutationHeaders: HeadersInit | undefined
+  if (isMutation) {
+    const token = await ensureCsrfToken()
+    mutationHeaders = { 'X-CSRF-TOKEN': token }
+  }
+
   const response = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    cache: options?.method ? undefined : 'no-store',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...mutationHeaders,
       ...options?.headers,
     },
-    ...options,
   })
 
   if (!response.ok) {
@@ -25,6 +56,7 @@ export interface Conversation {
   contactPhone: string
   mode: string
   status: string
+  version: number
   lastMessage?: string
   lastMessageAt?: string
   isWindowOpen: boolean
@@ -60,6 +92,13 @@ export interface User {
   mustChangePassword: boolean
   planCode?: string
   aiEnabled?: boolean
+  officialApiLineCount?: number
+  qrCodeLineCount?: number
+  operatorLimit?: number
+  dueDate?: string
+  tenantStatus?: string
+  assignedConnectionType?: string
+  assignedLineNumber?: number
 }
 
 export interface Operator {
@@ -79,6 +118,10 @@ export interface Tenant {
   version: number
   createdAt: string
   dueDate: string
+  lastPaymentAt?: string
+  officialApiLineCount: number
+  qrCodeLineCount: number
+  operatorLimit: number
   ownerEmail?: string
   ownerDisplayName?: string
   suspendedAt?: string
@@ -113,6 +156,9 @@ export interface CreateTenantResponse {
   ownerEmail: string
   ownerDisplayName?: string
   dueDate: string
+  officialApiLineCount: number
+  qrCodeLineCount: number
+  operatorLimit: number
   temporaryPassword: string
   message: string
 }
@@ -123,20 +169,44 @@ export interface DashboardStats {
   activeConversations: number
 }
 
+export interface WebhookEvent {
+  id: string
+  phoneNumberId: string
+  status: string
+  createdAt: string
+  processedAt?: string
+  retryCount: number
+  errorMessage?: string
+}
+
+export interface ClientTag {
+  id: string
+  name: string
+  color?: string
+  description?: string
+  isActive: boolean
+}
+
 export const api = {
   auth: {
     getMe: () => fetchApi<User>('/api/auth/me'),
-    login: (email: string, password: string) =>
-      fetchApi<User>('/api/auth/login', {
+    login: async (email: string, password: string) => {
+      return fetchApi<User>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      }),
-    logout: () => fetchApi<void>('/api/auth/logout', { method: 'POST' }),
-    changePassword: (currentPassword: string, newPassword: string) =>
-      fetchApi<{ message: string; mustChangePassword: boolean }>('/api/auth/change-password', {
+      })
+    },
+    logout: async () => {
+      return fetchApi<void>('/api/auth/logout', {
+        method: 'POST',
+      })
+    },
+    changePassword: async (currentPassword: string, newPassword: string) => {
+      return fetchApi<{ message: string; mustChangePassword: boolean }>('/api/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
-      }),
+      })
+    },
     getCsrf: () => fetchApi<{ token: string; headerName: string }>('/api/auth/csrf'),
   },
   dashboard: {
@@ -187,24 +257,34 @@ export const api = {
       }),
   },
   tags: {
-    list: () => fetchApi<any[]>('/api/client-tags'),
-    getContactTags: (contactId: string) => fetchApi<any[]>(`/api/client-tags/contacts/${contactId}/tags`),
+    list: () => fetchApi<ClientTag[]>('/api/client-tags'),
+    getContactTags: (contactId: string) => fetchApi<ClientTag[]>(`/api/client-tags/contacts/${contactId}/tags`),
     assignToContact: (contactId: string, tagId: string) =>
-      fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'POST' }),
+      fetchApi<ClientTag>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'POST' }),
     removeFromContact: (contactId: string, tagId: string) =>
-      fetchApi<any>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
+      fetchApi<void>(`/api/client-tags/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' }),
   },
   plans: {
     list: () => fetchApi<Plan[]>('/api/plans'),
+  },
+  webhookEvents: {
+    list: (status?: string) => fetchApi<WebhookEvent[]>(`/api/webhook-events${status ? `?status=${status}` : ''}`),
+    reprocess: (id: string) => fetchApi<WebhookEvent>(`/api/webhook-events/${id}/reprocess`, { method: 'POST' }),
   },
   admin: {
     tenants: {
       list: () => fetchApi<Tenant[]>('/api/admin/tenants'),
       get: (id: string) => fetchApi<Tenant>(`/api/admin/tenants/${id}`),
-      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string }) =>
+      create: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number }) =>
         fetchApi<CreateTenantResponse>('/api/admin/tenants', {
           method: 'POST',
           body: JSON.stringify(data),
+        }),
+      update: (id: string, data: { name: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number }, version: number) =>
+        fetchApi<Tenant>(`/api/admin/tenants/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+          headers: { 'If-Match': `"${version}"` },
         }),
       suspend: (id: string, reason: string, version: number) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/suspend`, {
@@ -216,6 +296,11 @@ export const api = {
         fetchApi<Tenant>(`/api/admin/tenants/${id}/reactivate`, {
           method: 'POST',
           headers: { 'If-Match': `"${version}"` },
+        }),
+      registerPayment: (id: string, paidAt: string) =>
+        fetchApi<{ dueDate: string; status: string }>(`/api/admin/tenants/${id}/payments`, {
+          method: 'POST',
+          body: JSON.stringify({ paidAt }),
         }),
       updatePlan: (id: string, planCode: string) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/plan`, {

@@ -7,6 +7,10 @@ public sealed class AiProviderCredential
     public string Provider { get; private set; } = "OpenAI";
     public string ModelId { get; private set; } = string.Empty;
     public string ApiKeyRef { get; private set; } = string.Empty;
+    public string? SystemPrompt { get; private set; }
+    public string? RoutingQueueIdsJson { get; private set; }
+    public string? RoutingTagIdsJson { get; private set; }
+    public int MaxTokensPerResponse { get; private set; } = 500;
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -40,6 +44,30 @@ public sealed class AiProviderCredential
         Version++;
     }
 
+    public void UpdateInstructions(
+        string? systemPrompt,
+        int maxTokensPerResponse,
+        IEnumerable<Guid>? routingQueueIds = null,
+        IEnumerable<Guid>? routingTagIds = null)
+    {
+        SystemPrompt = systemPrompt?.Trim();
+        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 50, 2000);
+        RoutingQueueIdsJson = SerializeGuidList(routingQueueIds);
+        RoutingTagIdsJson = SerializeGuidList(routingTagIds);
+        UpdatedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public IReadOnlyList<Guid> GetRoutingTagIds()
+    {
+        return ParseGuidList(RoutingTagIdsJson);
+    }
+
+    public IReadOnlyList<Guid> GetRoutingQueueIds()
+    {
+        return ParseGuidList(RoutingQueueIdsJson);
+    }
+
     public void Deactivate()
     {
         IsActive = false;
@@ -52,5 +80,28 @@ public sealed class AiProviderCredential
         IsActive = true;
         UpdatedAt = DateTime.UtcNow;
         Version++;
+    }
+
+    private static string SerializeGuidList(IEnumerable<Guid>? ids)
+    {
+        return string.Join(',', (ids ?? []).Distinct().OrderBy(id => id).Select(id => id.ToString("D")));
+    }
+
+    private static List<Guid> ParseGuidList(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return [];
+
+        var list = new List<Guid>();
+        var parts = value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            if (Guid.TryParse(part, out var id))
+            {
+                list.Add(id);
+            }
+        }
+
+        return list;
     }
 }

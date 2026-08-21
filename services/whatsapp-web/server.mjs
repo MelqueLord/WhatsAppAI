@@ -5,6 +5,8 @@ import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeys
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
+const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
+const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
 const sessions = new Map()
 const botConfigs = new Map()
 
@@ -47,6 +49,7 @@ async function getSession(tenantId) {
     status: 'connecting',
     qr: null,
     phoneNumber: null,
+    acceptInboundAt: Number.POSITIVE_INFINITY,
     sock: null,
     conversations: new Map(),
     messages: new Map(),
@@ -70,6 +73,7 @@ async function getSession(tenantId) {
     }
     if (connection === 'open') {
       session.status = 'connected'
+      session.acceptInboundAt = Date.now() + 120_000
       session.qr = null
       session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
     }
@@ -149,6 +153,24 @@ app.post('/sessions/:tenantId/logout', async (req, res) => {
   res.json({ ok: true })
 })
 
+app.post('/sessions/:tenantId/send-message', async (req, res) => {
+  const session = sessions.get(req.params.tenantId)
+  const { recipientPhone, text } = req.body ?? {}
+  if (!session?.sock || !recipientPhone || !text) {
+    return res.status(400).json({ success: false, error: 'Session, recipientPhone and text are required.' })
+  }
+
+  try {
+    const lidJid = `${recipientPhone}@lid`
+    const phoneJid = `${recipientPhone}@s.whatsapp.net`
+    const recipientJid = session.conversations.has(lidJid) ? lidJid : phoneJid
+    const result = await session.sock.sendMessage(recipientJid, { text })
+    res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
+  } catch {
+    res.status(502).json({ success: false, error: 'WhatsApp Web message could not be sent.' })
+  }
+})
+
 app.get('/sessions/:tenantId/bot-config', async (req, res) => {
   res.json(await getBotConfig(req.params.tenantId))
 })
@@ -219,7 +241,56 @@ function addMessage(session, msg, shouldAutoReply = false) {
   })
   session.messages.set(key, list)
   void saveSnapshot(session)
-  if (shouldAutoReply && !msg.key?.fromMe) void sendAutoReply(session, jid, text)
+  if (!msg.key?.fromMe && shouldAutoReply && Date.now() >= session.acceptInboundAt) {
+    void forwardInboundMessage(session, msg, text, createdAt)
+  }
+}
+
+async function forwardInboundMessage(session, msg, text, createdAt) {
+  const match = session.tenantId.match(/^(.+)-qr-(\d+)$/)
+  if (!match || !msg.key?.id) return
+
+  const [, tenantId, lineNumber] = match
+  const payload = {
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: `whatsapp-web-${tenantId}-${lineNumber}`,
+      time: Math.floor(new Date(createdAt).getTime() / 1000),
+      changes: [{
+        field: 'messages',
+        value: {
+          messaging_product: 'whatsapp',
+          metadata: {
+            phone_number_id: `qr:${tenantId}:${lineNumber}`,
+          },
+          contacts: [{
+            wa_id: msg.key.remoteJid?.split('@')[0],
+            profile: { name: msg.pushName },
+          }],
+          messages: [{
+            from: msg.key.remoteJid?.split('@')[0],
+            id: msg.key.id,
+            timestamp: Math.floor(new Date(createdAt).getTime() / 1000),
+            type: msg.message?.conversation || msg.message?.extendedTextMessage?.text ? 'text' : 'image',
+            text: text !== '[midia]' ? { body: text } : undefined,
+          }],
+        },
+      }],
+    }],
+  }
+
+  try {
+    await fetch(apiWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WhatsApp-Web-Secret': apiWebhookSecret,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    console.error('Failed to forward WhatsApp Web message', error)
+  }
 }
 
 async function sendAutoReply(session, jid, inboundText) {

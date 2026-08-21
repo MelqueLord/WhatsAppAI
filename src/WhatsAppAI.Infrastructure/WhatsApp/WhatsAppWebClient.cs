@@ -28,21 +28,68 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         string text,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new SendMessageResult
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
         {
-            IsSuccess = true,
-            MessageId = $"dev-msg-{Guid.NewGuid():N}"
-        });
+            return Task.FromResult(new SendMessageResult
+            {
+                IsSuccess = true,
+                MessageId = $"dev-msg-{Guid.NewGuid():N}"
+            });
+        }
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3)
+        {
+            return Task.FromResult(new SendMessageResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "Invalid WhatsApp Web session reference."
+            });
+        }
+
+        return SendWhatsAppWebMessageAsync(parts[1], parts[2], recipientPhone, text, cancellationToken);
+    }
+
+    private async Task<SendMessageResult> SendWhatsAppWebMessageAsync(
+        string tenantId,
+        string lineNumber,
+        string recipientPhone,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync(
+                $"{BaseUrl}/sessions/{tenantId}-qr-{lineNumber}/send-message",
+                new { recipientPhone, text },
+                cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult
+            {
+                IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                MessageId = result?.MessageId,
+                ErrorMessage = result?.Error ?? "WhatsApp Web message could not be sent."
+            };
+        }
+        catch
+        {
+            return new SendMessageResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "Serviço WhatsApp Web indisponível."
+            };
+        }
     }
 
     public async Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var result = await httpClient.GetFromJsonAsync<BridgeQrResponse>(
-                $"{BaseUrl}/sessions/{tenantId:D}/qr",
+                $"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/qr",
                 cancellationToken);
 
             return new WhatsAppQrCodeResult
@@ -65,12 +112,13 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
 
     public async Task<WhatsAppSessionStatus> GetSessionStatusAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var result = await httpClient.GetFromJsonAsync<BridgeStatusResponse>(
-                $"{BaseUrl}/sessions/{tenantId:D}/status",
+                $"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/status",
                 cancellationToken);
 
             return new WhatsAppSessionStatus
@@ -88,9 +136,10 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
 
     public async Task DisconnectSessionAsync(
         Guid tenantId,
+        int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
-        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:D}/logout", null, cancellationToken);
+        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/logout", null, cancellationToken);
     }
 
     private sealed record BridgeQrResponse
@@ -105,5 +154,12 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         public bool IsConnected { get; init; }
         public string? PhoneNumber { get; init; }
         public string? Status { get; init; }
+    }
+
+    private sealed record BridgeSendResponse
+    {
+        public bool Success { get; init; }
+        public string? MessageId { get; init; }
+        public string? Error { get; init; }
     }
 }

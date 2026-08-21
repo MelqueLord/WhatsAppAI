@@ -35,6 +35,8 @@ public sealed record AiDecision
     public string? Text { get; init; }
     public string? HandoffReason { get; init; }
     public double Confidence { get; init; }
+    public string? QueueName { get; init; }
+    public IReadOnlyList<string> TagNames { get; init; } = [];
 }
 
 public enum AiAction

@@ -117,11 +117,29 @@ public static class AuthEndpoints
 
         string? planCode = null;
         bool? aiEnabled = null;
+        int? officialApiLineCount = null;
+        int? qrCodeLineCount = null;
+        int? operatorLimit = null;
+        DateTime? dueDate = null;
+        string? tenantStatus = null;
+        string? assignedConnectionType = null;
+        int? assignedLineNumber = null;
         if (currentTenant.TenantId is not null)
         {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(
+                user.Id,
+                currentTenant.TenantId.Value);
+            assignedConnectionType = membership?.AssignedConnectionType?.ToString();
+            assignedLineNumber = membership?.AssignedLineNumber;
+
             var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
             if (tenant is not null)
             {
+            officialApiLineCount = tenant.OfficialApiLineCount;
+            qrCodeLineCount = tenant.QrCodeLineCount;
+                operatorLimit = tenant.OperatorLimit;
+                dueDate = tenant.DueDate;
+                tenantStatus = tenant.Status.ToString();
                 var plan = await dbContext.SubscriptionPlans.FindAsync(tenant.PlanId);
                 if (plan is not null)
                 {
@@ -141,7 +159,14 @@ public static class AuthEndpoints
             IsPlatformAdmin = currentTenant.IsPlatformAdmin,
             MustChangePassword = user.MustChangePassword,
             PlanCode = planCode,
-            AiEnabled = aiEnabled
+            AiEnabled = aiEnabled,
+            OfficialApiLineCount = officialApiLineCount,
+            QrCodeLineCount = qrCodeLineCount,
+            OperatorLimit = operatorLimit,
+            DueDate = dueDate,
+            TenantStatus = tenantStatus,
+            AssignedConnectionType = assignedConnectionType,
+            AssignedLineNumber = assignedLineNumber
         });
     }
 
@@ -196,4 +221,11 @@ public sealed class UserResponse
     public bool MustChangePassword { get; init; }
     public string? PlanCode { get; init; }
     public bool? AiEnabled { get; init; }
+    public int? OfficialApiLineCount { get; init; }
+    public int? QrCodeLineCount { get; init; }
+    public int? OperatorLimit { get; init; }
+    public DateTime? DueDate { get; init; }
+    public string? TenantStatus { get; init; }
+    public string? AssignedConnectionType { get; init; }
+    public int? AssignedLineNumber { get; init; }
 }

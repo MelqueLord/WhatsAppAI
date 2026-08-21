@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   RefreshCw,
   CheckCircle2,
@@ -8,24 +9,21 @@ import {
   HelpCircle,
   Loader2,
 } from 'lucide-react'
-
-const MOCK_EVENTS = [
-  { id: 'evt-a1b2c3d4e5f6', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:30:00Z', retryCount: 0 },
-  { id: 'evt-b2c3d4e5f6a1', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:25:00Z', retryCount: 0 },
-  { id: 'evt-c3d4e5f6a1b2', phoneNumberId: '123456789012345', status: 'Pending', createdAt: '2026-08-14T08:20:00Z', retryCount: 0 },
-  { id: 'evt-d4e5f6a1b2c3', phoneNumberId: '123456789012345', status: 'Failed', createdAt: '2026-08-14T08:15:00Z', retryCount: 2, errorMessage: 'Timeout ao processar mensagem' },
-  { id: 'evt-e5f6a1b2c3d4', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T08:10:00Z', retryCount: 0 },
-  { id: 'evt-f6a1b2c3d4e5', phoneNumberId: '987654321098765', status: 'Dead', createdAt: '2026-08-14T07:50:00Z', retryCount: 5, errorMessage: 'Assinatura inválida após 5 tentativas' },
-  { id: 'evt-a1b2c3d4e5f7', phoneNumberId: '123456789012345', status: 'Unknown', createdAt: '2026-08-14T07:45:00Z', retryCount: 0, errorMessage: 'Tipo de evento não reconhecido: referral' },
-  { id: 'evt-b2c3d4e5f6a2', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T07:40:00Z', retryCount: 1 },
-  { id: 'evt-c3d4e5f6a1b3', phoneNumberId: '987654321098765', status: 'Processing', createdAt: '2026-08-14T07:35:00Z', retryCount: 0 },
-  { id: 'evt-d4e5f6a1b2c4', phoneNumberId: '123456789012345', status: 'Processed', createdAt: '2026-08-14T07:30:00Z', retryCount: 0 },
-]
+import { api, type WebhookEvent } from '../../../lib/api'
 
 export function WebhookEventsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const queryClient = useQueryClient()
+  const eventsQuery = useQuery({
+    queryKey: ['webhook-events', statusFilter],
+    queryFn: () => api.webhookEvents.list(statusFilter === 'all' ? undefined : statusFilter),
+  })
+  const reprocessMutation = useMutation({
+    mutationFn: (eventId: string) => api.webhookEvents.reprocess(eventId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['webhook-events'] }),
+  })
 
-  const filteredEvents = statusFilter === 'all' ? MOCK_EVENTS : MOCK_EVENTS.filter(e => e.status.toLowerCase() === statusFilter)
+  const events: WebhookEvent[] = eventsQuery.data ?? []
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -77,7 +75,10 @@ export function WebhookEventsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredEvents.map((event) => (
+              {eventsQuery.isLoading && <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Carregando eventos...</td></tr>}
+              {eventsQuery.isError && <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-red-600">Não foi possível carregar os eventos.</td></tr>}
+              {!eventsQuery.isLoading && !eventsQuery.isError && events.length === 0 && <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-500">Nenhum evento encontrado.</td></tr>}
+              {events.map((event) => (
                 <tr key={event.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4"><code className="text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded">{event.id.slice(0, 12)}...</code></td>
                   <td className="px-6 py-4 text-sm text-slate-700">{event.phoneNumberId}</td>
@@ -87,7 +88,7 @@ export function WebhookEventsPage() {
                   <td className="px-6 py-4 text-sm text-red-600 max-w-[200px] truncate">{event.errorMessage || '-'}</td>
                   <td className="px-6 py-4 text-right">
                     {(event.status === 'Failed' || event.status === 'Dead') && (
-                      <button className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium ml-auto"><RefreshCw className="w-3.5 h-3.5" /> Reprocessar</button>
+                      <button onClick={() => reprocessMutation.mutate(event.id)} disabled={reprocessMutation.isPending} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium ml-auto disabled:opacity-50"><RefreshCw className="w-3.5 h-3.5" /> Reprocessar</button>
                     )}
                   </td>
                 </tr>

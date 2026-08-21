@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Infrastructure.Anthropic;
 using WhatsAppAI.Infrastructure.Gemini;
+using WhatsAppAI.Infrastructure.Grok;
+using WhatsAppAI.Infrastructure.Groq;
 using WhatsAppAI.Infrastructure.OpenAI;
 using WhatsAppAI.Infrastructure.Xiaomi;
 
@@ -33,6 +35,18 @@ public static class AiProviderServiceCollectionExtensions
         services.AddHttpClient("xiaomi", client =>
         {
             client.BaseAddress = new Uri("https://api.xiaomi.com/");
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.AddHttpClient("grok", client =>
+        {
+            client.BaseAddress = new Uri("https://api.x.ai/");
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.AddHttpClient("groq", client =>
+        {
+            client.BaseAddress = new Uri("https://api.groq.com/");
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
@@ -68,6 +82,20 @@ public static class AiProviderServiceCollectionExtensions
             return new XiaomiProvider(factory.CreateClient("xiaomi"), logger);
         });
 
+        services.AddScoped<GrokProvider>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<GrokProvider>>();
+            return new GrokProvider(factory.CreateClient("grok"), logger);
+        });
+
+        services.AddScoped<GroqProvider>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<GroqProvider>>();
+            return new GroqProvider(factory.CreateClient("groq"), logger);
+        });
+
         // Register the resolver with all providers
         services.AddScoped<IAiProviderResolver>(sp =>
         {
@@ -75,13 +103,17 @@ public static class AiProviderServiceCollectionExtensions
             var gemini = sp.GetRequiredService<GeminiProvider>();
             var anthropic = sp.GetRequiredService<AnthropicProvider>();
             var xiaomi = sp.GetRequiredService<XiaomiProvider>();
+            var grok = sp.GetRequiredService<GrokProvider>();
+            var groq = sp.GetRequiredService<GroqProvider>();
 
             var providers = new List<KeyValuePair<string, IAiProvider>>
             {
                 new("openai", openai),
                 new("gemini", gemini),
                 new("anthropic", anthropic),
-                new("xiaomi", xiaomi)
+                new("xiaomi", xiaomi),
+                new("grok", grok),
+                new("groq", groq)
             };
 
             return new AiProviderResolver(providers);

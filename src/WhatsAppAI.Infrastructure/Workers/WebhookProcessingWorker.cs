@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Meta.Models;
+using WhatsAppAI.Infrastructure.Secrets;
 
 namespace WhatsAppAI.Infrastructure.Workers;
 
@@ -92,7 +93,13 @@ public sealed class WebhookProcessingWorker(
             var account = await whatsAppAccountRepository.GetByPhoneNumberIdAsync(
                 webhookEvent.PhoneNumberId, cancellationToken);
 
-            if (account is null)
+            Guid? tenantId = null;
+            if (TryGetWhatsAppWebTenant(webhookEvent.PhoneNumberId, out var webTenantId))
+                tenantId = webTenantId;
+            else
+                tenantId = account?.TenantId;
+
+            if (tenantId is null)
             {
                 logger.LogWarning("No WhatsApp account found for {PhoneNumberId}", webhookEvent.PhoneNumberId);
                 webhookEvent.MarkFailed("No account found");
@@ -101,7 +108,7 @@ public sealed class WebhookProcessingWorker(
             }
 
             // Process the webhook payload
-            var success = await ProcessWebhookPayloadAsync(webhookEvent, account.TenantId, scope.ServiceProvider, cancellationToken);
+            var success = await ProcessWebhookPayloadAsync(webhookEvent, tenantId.Value, scope.ServiceProvider, cancellationToken);
 
             if (success)
             {
@@ -124,6 +131,15 @@ public sealed class WebhookProcessingWorker(
         }
     }
 
+    private static bool TryGetWhatsAppWebTenant(string phoneNumberId, out Guid tenantId)
+    {
+        tenantId = Guid.Empty;
+        var parts = phoneNumberId.Split(':', 3);
+        return parts.Length == 3 &&
+               parts[0].Equals("qr", StringComparison.OrdinalIgnoreCase) &&
+               Guid.TryParse(parts[1], out tenantId);
+    }
+
     private async Task<bool> ProcessWebhookPayloadAsync(
         WebhookEvent webhookEvent,
         Guid tenantId,
@@ -133,11 +149,13 @@ public sealed class WebhookProcessingWorker(
         var contactRepository = serviceProvider.GetRequiredService<IContactRepository>();
         var conversationRepository = serviceProvider.GetRequiredService<IConversationRepository>();
         var messageRepository = serviceProvider.GetRequiredService<IMessageRepository>();
+        var encryptionService = serviceProvider.GetRequiredService<IEncryptionService>();
 
         try
         {
             // Decrypt and parse the payload
-            var payload = JsonSerializer.Deserialize<WebhookPayload>(webhookEvent.EncryptedPayload, JsonOptions);
+            var decryptedPayload = encryptionService.Decrypt(webhookEvent.EncryptedPayload);
+            var payload = JsonSerializer.Deserialize<WebhookPayload>(decryptedPayload, JsonOptions);
             if (payload?.Entry is null || payload.Entry.Count == 0)
             {
                 logger.LogWarning("Empty payload for event {EventId}", webhookEvent.Id);
@@ -208,6 +226,8 @@ public sealed class WebhookProcessingWorker(
             return;
         }
 
+        var phoneNumber = NormalizePhoneNumber(whatsappMessage.From);
+
         // Check for duplicate message
         var existingMessage = await messageRepository.GetByExternalIdAsync(whatsappMessage.Id, cancellationToken);
         if (existingMessage is not null)
@@ -217,11 +237,12 @@ public sealed class WebhookProcessingWorker(
         }
 
         // Get or create contact
-        var contact = await contactRepository.GetByPhoneAsync(tenantId, whatsappMessage.From, cancellationToken);
+        var contact = await contactRepository.GetByPhoneAsync(tenantId, phoneNumber, cancellationToken);
         if (contact is null)
         {
-            contact = Contact.Create(tenantId, whatsappMessage.From, webhookContact?.Profile?.Name);
+            contact = Contact.Create(tenantId, phoneNumber, webhookContact?.Profile?.Name);
             await contactRepository.AddAsync(contact, cancellationToken);
+            contact = await contactRepository.GetByPhoneAsync(tenantId, phoneNumber, cancellationToken) ?? contact;
         }
         else
         {
@@ -239,6 +260,8 @@ public sealed class WebhookProcessingWorker(
             conversation = Conversation.Create(tenantId, contact.Id, phoneNumberId);
             conversation.RenewWindow();
             await conversationRepository.AddAsync(conversation, cancellationToken);
+            conversation = await conversationRepository.GetByContactAndPhoneAsync(
+                tenantId, contact.Id, phoneNumberId, cancellationToken) ?? conversation;
         }
         else
         {
@@ -270,6 +293,9 @@ public sealed class WebhookProcessingWorker(
         logger.LogInformation("Processed inbound message {MessageId} for contact {ContactId}",
             message.Id, contact.Id);
     }
+
+    private static string NormalizePhoneNumber(string phoneNumber) =>
+           new string(phoneNumber.Where(char.IsDigit).ToArray());
 
     private async Task ProcessStatusUpdateAsync(
         WebhookStatus status,

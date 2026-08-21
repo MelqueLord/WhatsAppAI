@@ -4,6 +4,8 @@ public sealed class WhatsAppAccount
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public WhatsAppConnectionType ConnectionType { get; private set; }
+    public int LineNumber { get; private set; }
     public string WabaId { get; private set; } = string.Empty;
     public string PhoneNumberId { get; private set; } = string.Empty;
     public string AccessTokenRef { get; private set; } = string.Empty;
@@ -18,12 +20,17 @@ public sealed class WhatsAppAccount
         Guid tenantId,
         string wabaId,
         string phoneNumberId,
-        string accessTokenRef)
+        string accessTokenRef,
+        WhatsAppConnectionType connectionType = WhatsAppConnectionType.OfficialApi,
+        int lineNumber = 1)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(lineNumber, 1);
         return new WhatsAppAccount
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            ConnectionType = connectionType,
+            LineNumber = lineNumber,
             WabaId = wabaId,
             PhoneNumberId = phoneNumberId,
             AccessTokenRef = accessTokenRef,
@@ -54,4 +61,10 @@ public sealed class WhatsAppAccount
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
+}
+
+public enum WhatsAppConnectionType
+{
+    OfficialApi = 0,
+    QrCode = 1
 }

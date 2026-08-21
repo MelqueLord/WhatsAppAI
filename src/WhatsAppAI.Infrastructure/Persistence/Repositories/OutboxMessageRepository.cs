@@ -27,6 +27,7 @@ public sealed class OutboxMessageRepository(AppDbContext context) : IOutboxMessa
     {
         var now = DateTime.UtcNow;
         return await context.Set<OutboxMessage>()
+            .IgnoreQueryFilters()
             .Where(o => o.Status == OutboxStatus.Pending && (o.NextRetryAt == null || o.NextRetryAt <= now))
             .OrderBy(o => o.CreatedAt)
             .Take(batchSize)

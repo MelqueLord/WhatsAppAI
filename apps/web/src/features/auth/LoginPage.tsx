@@ -31,8 +31,9 @@ export function LoginPage() {
 
     try {
       await login(email, password)
-      navigate('/inbox')
-    } catch (err) {
+      navigate('/dashboard')
+    } catch {
+      // eslint-disable-next-line no-empty
       setError('Email ou senha incorretos.')
     } finally {
       setIsSubmitting(false)

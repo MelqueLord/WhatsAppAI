@@ -1,7 +1,15 @@
 # Deployment Checklist — WhatsApp AI Platform
 
+> Antes deste checklist, concluir `specs/000-platform/production-readiness-plan.md` e obter `GO` em `specs/000-platform/contracts/production-readiness-gates.md`.
+
 **Version:** 1.0  
 **Date:** 2026-08-16
+
+## Atualização de status (2026-08-21)
+
+- [x] P0 de hardening implementado em código/configuração (cookies/CSRF, segredos/versionamento, Compose/Nginx, migration bundle).
+- [ ] Validação operacional P0 pendente em host com Docker/TLS (`docker compose config`, `nginx -t`, smoke HTTPS).
+- [ ] P1 de qualidade pendente (3 testes .NET, 23 erros de lint, 1 teste frontend).
 
 ## Pre-Deployment
 
@@ -18,8 +26,7 @@
 - [ ] Generate encryption key: `openssl rand -base64 32`
 - [ ] Set MySQL root password (strong, unique)
 - [ ] Set Meta Verify Token and App Secret
-- [ ] Configure CORS allowed origins
-- [ ] Set rate limiting values
+- [ ] Set DOMAIN for Nginx template rendering
 
 ### Secrets
 
@@ -42,13 +49,13 @@ docker compose up -d mysql
 docker compose ps mysql
 
 # Run migrations
-docker compose run --rm api dotnet ef database update
+docker compose run --rm migrate
 
 # Seed subscription plans
 docker compose up -d api
 
 # Start all services
-docker compose --profile frontend --profile production up -d
+docker compose --profile production up -d
 ```
 
 ### 2. Verify Services

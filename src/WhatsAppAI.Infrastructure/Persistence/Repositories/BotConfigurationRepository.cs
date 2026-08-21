@@ -7,7 +7,12 @@ namespace WhatsAppAI.Infrastructure.Persistence.Repositories;
 public sealed class BotConfigurationRepository(AppDbContext context) : IBotConfigurationRepository
 {
     public async Task<BotConfiguration?> GetByTenantAsync(Guid tenantId, CancellationToken ct = default)
-        => await context.Set<BotConfiguration>().FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+    {
+        var configurations = await context.Set<BotConfiguration>()
+            .IgnoreQueryFilters()
+            .ToListAsync(ct);
+        return configurations.Find(configuration => configuration.TenantId == tenantId);
+    }
 
     public async Task AddAsync(BotConfiguration config, CancellationToken ct = default)
     {

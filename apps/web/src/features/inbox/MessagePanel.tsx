@@ -29,7 +29,7 @@ interface MessagePanelProps {
 
 export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
   const [message, setMessage] = useState('')
-  const [mode, setMode] = useState(conversation.mode)
+  const [modeOverride, setModeOverride] = useState<string | null>(null)
   const [showSaveContact, setShowSaveContact] = useState(false)
   const [contactName, setContactName] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -50,13 +50,16 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
     },
   })
 
-  const { data: messagesData, isLoading } = useQuery({
+  const { data: messagesData, isLoading, isError } = useQuery({
     queryKey: ['messages', conversation.id],
     queryFn: () => api.conversations.getMessages(conversation.id),
     refetchInterval: 10000,
+    refetchOnMount: 'always',
+    retry: 2,
+    enabled: Boolean(conversation.id),
   })
 
-  const messages = messagesData?.items ?? []
+  const messages = [...(messagesData?.items ?? [])].reverse()
 
   const sendMutation = useMutation({
     mutationFn: (content: string) => api.conversations.sendMessage(conversation.id, content),
@@ -68,9 +71,9 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
 
   const modeMutation = useMutation({
     mutationFn: (newMode: string) =>
-      api.conversations.switchMode(conversation.id, newMode),
+      api.conversations.switchMode(conversation.id, newMode, conversation.version),
     onSuccess: (data) => {
-      setMode(data.mode)
+      setModeOverride(data.mode)
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
   })
@@ -96,12 +99,10 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
   }, [startSignalR])
 
   useEffect(() => {
-    setMode(conversation.mode)
-  }, [conversation.id, conversation.mode])
-
-  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const mode = modeOverride ?? conversation.mode
 
   const handleSend = () => {
     if (!message.trim()) return
@@ -185,16 +186,12 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
             <WifiOff className="w-4 h-4 text-slate-400" />
           )}
           {getModeBadge()}
-          <select
-            value={mode}
-            onChange={(e) => handleModeChange(e.target.value)}
-            disabled={modeMutation.isPending}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer disabled:opacity-50"
-          >
-            <option value="Automatic">Automático</option>
-            <option value="Human">Humano</option>
-            <option value="Paused">Pausado</option>
-          </select>
+          <button onClick={() => handleModeChange('Human')} disabled={modeMutation.isPending || mode === 'Human'} className="text-xs rounded-lg bg-blue-50 px-2 py-1.5 font-medium text-blue-700 disabled:opacity-50">
+            <User className="mr-1 inline h-3.5 w-3.5" />Assumir
+          </button>
+          <button onClick={() => handleModeChange('Automatic')} disabled={modeMutation.isPending || mode === 'Automatic'} className="text-xs rounded-lg bg-emerald-50 px-2 py-1.5 font-medium text-emerald-700 disabled:opacity-50">
+            <Bot className="mr-1 inline h-3.5 w-3.5" />Automático
+          </button>
         </div>
       </div>
 
@@ -203,6 +200,10 @@ export function MessagePanel({ conversation, onBack }: MessagePanelProps) {
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-red-500">Não foi possível carregar as mensagens.</div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">

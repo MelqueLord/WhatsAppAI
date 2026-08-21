@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.4.0
-**Data:** 2026-08-16
+**Versão:** 0.11.0
+**Data:** 2026-08-21
 
 ## 1. Problema
 
@@ -35,7 +35,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 ### Fora do escopo
 
 - Campanhas, listas, disparos, templates de marketing e mensagens proativas.
-- CRM, funil comercial, pagamentos, agenda, catálogo e integrações externas.
+- CRM, funil comercial, agenda, catálogo e integrações externas. O PlatformAdmin registra pagamentos manualmente; não há cobrança online integrada.
 - Construtor visual de fluxos, n8n no caminho crítico e múltiplos canais.
 - IA para áudio/imagem, treinamento de modelos e RAG vetorial no MVP.
 - Aplicativos móveis nativos, marketplace e cobrança do SaaS dentro do produto.
@@ -170,6 +170,15 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **FR-026:** permitir ao TenantOwner listar, convidar, desativar, reativar e reenviar convite apenas para Operators do tenant corrente.
 - **FR-027:** expor `GET /auth/me` com usuário, tenant, papel e permissões derivados da sessão autenticada.
 - **FR-028:** invalidar todas as sessões do usuário quando sua membership for desativada; reativação exige nova autenticação.
+- **FR-029:** permitir ao PlatformAdmin registrar no tenant a quantidade contratada de linhas via API oficial e via QR Code, aceitando somente valores inteiros não negativos e exibindo os limites no cadastro administrativo.
+- **FR-030:** permitir ao PlatformAdmin editar nome, plano e quantidades de linhas do tenant com concorrência otimista por `If-Match`, sem alterar credenciais ou o responsável pela empresa.
+- **FR-031:** permitir ao tenant conectar cada slot contratado de API oficial e QR Code de forma independente, com sessão QR e credencial associadas ao número do slot, sem sobrescrever outra linha.
+- **FR-032:** permitir ao PlatformAdmin definir o limite de Operators por tenant; a criação de Operators deve bloquear novas inclusões ao atingir o limite, e `0` representa capacidade ilimitada para compatibilidade.
+- **FR-033:** permitir ao TenantOwner atribuir uma linha API oficial ou QR Code a cada Operator do próprio tenant; a atribuição deve ser validada pela quota e aparecer no `/auth/me` e no painel do operador.
+- **FR-034:** permitir ao PlatformAdmin registrar manualmente o pagamento mensal do tenant; o próximo vencimento é sempre 30 dias após a data do lançamento.
+- **FR-035:** suspender automaticamente o tenant ativo após 35 dias de atraso. A empresa suspensa mantém login e leitura, mas não pode enviar mensagens nem executar automações WhatsApp até a reativação por pagamento.
+- **FR-036:** permitir ao TenantOwner selecionar, entre as filas ativas do próprio tenant, quais podem ser usadas pela IA; quando o cliente escolher ou solicitar uma dessas filas, a IA deve retornar seu nome e o backend deve validar, atribuir a conversa à fila e transferi-la para atendimento humano.
+- **FR-037:** permitir ao TenantOwner selecionar tags ativas do próprio tenant para categorização pela IA; após cada decisão válida, o backend deve adicionar ao contato somente as tags autorizadas reconhecidas pela IA, sem remover tags existentes.
 
 ## 6. Regras de negócio
 
@@ -188,6 +197,8 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **BR-013:** um convite expira exatamente 24 horas após `created_at`, é consumido uma única vez e o reenvio revoga qualquer convite anterior ainda utilizável para a mesma membership/purpose.
 - **BR-014:** o MVP não possui serviço de e-mail; links de ativação são entregues manualmente e nunca registrados em logs ou auditoria.
 - **BR-015:** desativar uma membership rotaciona o marcador de segurança do usuário e invalida sessões; reativar a membership não revalida cookies anteriores.
+- **BR-016:** a IA somente pode encaminhar para filas ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; nome inexistente, fila desativada ou de outro tenant não altera a conversa.
+- **BR-017:** a IA somente pode categorizar com tags ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; atribuições são idempotentes e nunca removem tags automaticamente.
 
 ## 7. Requisitos não funcionais
 

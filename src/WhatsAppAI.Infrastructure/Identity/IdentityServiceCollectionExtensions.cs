@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -11,8 +12,10 @@ namespace WhatsAppAI.Infrastructure.Identity;
 
 public static class IdentityServiceCollectionExtensions
 {
-    public static IServiceCollection AddIdentityServices(this IServiceCollection services)
+    public static IServiceCollection AddIdentityServices(this IServiceCollection services, IHostEnvironment environment)
     {
+        var requireSecureCookies = environment.IsProduction();
+
         services.AddScoped<ICurrentTenant, CurrentTenant>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<IAuthorizationHandler, TenantContextHandler>();
@@ -24,9 +27,11 @@ public static class IdentityServiceCollectionExtensions
                 options.LogoutPath = "/api/auth/logout";
                 options.AccessDeniedPath = "/api/auth/access-denied";
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+                options.Cookie.SecurePolicy = requireSecureCookies
+                    ? CookieSecurePolicy.Always
+                    : CookieSecurePolicy.SameAsRequest;
                 options.Cookie.SameSite = SameSiteMode.Lax;
-                options.Cookie.Name = "whatsappai.session";
+                options.Cookie.Name = "whatsappai.session.v2";
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
             });
@@ -41,9 +46,11 @@ public static class IdentityServiceCollectionExtensions
         services.AddAntiforgery(options =>
         {
             options.HeaderName = "X-CSRF-TOKEN";
-            options.Cookie.Name = "whatsappai.antiforgery";
+            options.Cookie.Name = "whatsappai.antiforgery.v2";
             options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+            options.Cookie.SecurePolicy = requireSecureCookies
+                ? CookieSecurePolicy.Always
+                : CookieSecurePolicy.SameAsRequest;
             options.Cookie.SameSite = SameSiteMode.Lax;
         });
 

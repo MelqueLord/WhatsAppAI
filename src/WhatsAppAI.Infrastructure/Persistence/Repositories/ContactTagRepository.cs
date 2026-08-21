@@ -28,6 +28,7 @@ public sealed class ContactTagRepository(AppDbContext context) : IContactTagRepo
         }
     }
 
-    public async Task<bool> ExistsAsync(Guid contactId, Guid tagId, CancellationToken ct = default)
-        => await context.Set<ContactTag>().AnyAsync(ct => ct.ContactId == contactId && ct.TagId == tagId, ct);
+    public async Task<bool> ExistsAsync(Guid tenantId, Guid contactId, Guid tagId, CancellationToken ct = default)
+        => await context.Set<ContactTag>().IgnoreQueryFilters()
+            .AnyAsync(item => item.TenantId == tenantId && item.ContactId == contactId && item.TagId == tagId, ct);
 }

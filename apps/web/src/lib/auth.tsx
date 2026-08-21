@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.auth.logout()
     } catch {
+      // eslint-disable-next-line no-empty
       // Ignore errors - still redirect
     }
     queryClient.clear()
@@ -65,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth must be used within AuthProvider')

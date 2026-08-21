@@ -9,9 +9,11 @@ import { InboxPage } from './features/inbox/InboxPage'
 import { OperatorsPage } from './features/operators/OperatorsPage'
 import { WhatsAppConfigPage } from './features/integrations/whatsapp/WhatsAppConfigPage'
 import { AiConfigPage } from './features/integrations/ai/AiConfigPage'
+import { AiInstructionsPage } from './features/integrations/ai/AiInstructionsPage'
 import { BotConfigPage } from './features/bot/BotConfigPage'
 import { KnowledgePage } from './features/knowledge/KnowledgePage'
 import { ClientTagsPage } from './features/tags/ClientTagsPage'
+import { QueuesPage } from './features/queues/QueuesPage'
 
 import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
@@ -58,9 +60,9 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function TenantUserRoute({ children }: { children: React.ReactNode }) {
-  const { isTenantOwner, isOperator } = useAuth()
-  if (!isTenantOwner && !isOperator) return <Navigate to="/dashboard" replace />
+function TenantRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user?.tenantId) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 
@@ -92,14 +94,16 @@ function App() {
               }
             >
               <Route path="/dashboard" element={<OperatorRoute><DashboardPage /></OperatorRoute>} />
-              <Route path="/inbox" element={<InboxPage />} />
+              <Route path="/inbox" element={<TenantRoute><InboxPage /></TenantRoute>} />
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
-              <Route path="/integrations/whatsapp" element={<TenantUserRoute><WhatsAppConfigPage /></TenantUserRoute>} />
+              <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
               <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
+              <Route path="/integrations/ai/instructions" element={<OwnerRoute><AiInstructionsPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
+              <Route path="/queues" element={<OwnerRoute><QueuesPage /></OwnerRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />

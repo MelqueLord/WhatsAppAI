@@ -3,13 +3,13 @@ import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signal
 
 interface UseSignalROptions {
   hubUrl: string
-  onMessage?: (message: any) => void
-  onStatusUpdate?: (update: any) => void
-  onConversationUpdate?: (conversation: any) => void
+  onMessage?: (message: unknown) => void
+  onStatusUpdate?: (update: unknown) => void
+  onConversationUpdate?: (conversation: unknown) => void
 }
 
 export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUpdate }: UseSignalROptions) {
-  const [connection, setConnection] = useState<HubConnection | null>(null)
+  const connectionRef = useRef<HubConnection | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const callbacksRef = useRef({ onMessage, onStatusUpdate, onConversationUpdate })
 
@@ -40,36 +40,48 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
     newConnection.onclose(() => setIsConnected(false))
     newConnection.onreconnecting(() => setIsConnected(false))
 
-    setConnection(newConnection)
+    connectionRef.current = newConnection
 
     return () => {
-      newConnection.stop().catch(() => {})
+      connectionRef.current = null
+      newConnection.stop().catch(() => undefined)
     }
   }, [hubUrl])
 
   const start = useCallback(async () => {
+    const connection = connectionRef.current
     if (connection) {
       try {
         await connection.start()
         setIsConnected(true)
       } catch {
-        // Hub not available (mock mode or server down)
+        // The hub may be unavailable while the API remains usable.
         setIsConnected(false)
       }
     }
-  }, [connection])
+  }, [])
 
   const joinConversation = useCallback(async (conversationId: string) => {
+    const connection = connectionRef.current
     if (connection && isConnected) {
-      try { await connection.invoke('JoinConversation', conversationId) } catch {}
+      try {
+        await connection.invoke('JoinConversation', conversationId)
+      } catch {
+        return
+      }
     }
-  }, [connection, isConnected])
+  }, [isConnected])
 
   const leaveConversation = useCallback(async (conversationId: string) => {
+    const connection = connectionRef.current
     if (connection && isConnected) {
-      try { await connection.invoke('LeaveConversation', conversationId) } catch {}
+      try {
+        await connection.invoke('LeaveConversation', conversationId)
+      } catch {
+        return
+      }
     }
-  }, [connection, isConnected])
+  }, [isConnected])
 
-  return { connection, isConnected, start, joinConversation, leaveConversation }
+  return { isConnected, start, joinConversation, leaveConversation }
 }

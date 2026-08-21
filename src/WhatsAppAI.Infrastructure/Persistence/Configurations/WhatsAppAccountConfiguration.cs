@@ -20,6 +20,16 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
             .HasColumnName("tenant_id")
             .IsRequired();
 
+        builder.Property(a => a.ConnectionType)
+            .HasColumnName("connection_type")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(a => a.LineNumber)
+            .HasColumnName("line_number")
+            .IsRequired();
+
         builder.Property(a => a.WabaId)
             .HasColumnName("waba_id")
             .HasMaxLength(100)
@@ -54,6 +64,9 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
             .HasDefaultValue(0);
 
         builder.HasIndex(a => a.TenantId);
+
+        builder.HasIndex(a => new { a.TenantId, a.ConnectionType, a.LineNumber })
+            .IsUnique();
 
         builder.HasIndex(a => a.PhoneNumberId)
             .IsUnique();

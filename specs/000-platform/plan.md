@@ -154,3 +154,14 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 - `docs/architecture/adr/0006-hosting-and-secrets.md`.
 
 A topologia de um Meta App compartilhado especializa ADR-0002/0003 e está registrada em **R-010**. A política normativa de IA é `docs/ai/behavior-policy.md`.
+
+## 12. Correção para prontidão de produção
+
+O incremento de endurecimento e publicação está detalhado em:
+
+- `production-readiness-plan.md` — ordem, responsáveis e aceite;
+- `research-production-readiness.md` — decisões e alternativas;
+- `contracts/production-readiness-gates.md` — contrato de Go/No-Go;
+- `production-readiness-quickstart.md` — validação da candidata.
+
+Esse incremento não cria entidades de domínio nem altera o escopo funcional. Ele fecha lacunas de **FR-001**, **FR-004**, **NFR-005**, **NFR-006**, **NFR-008** e dos gates da constituição.

@@ -11,16 +11,16 @@
 
 ### Tenant
 
-`id`, `name`, `slug`, `status`, `retention_days`, `version`, `created_at`, `suspended_at`.
+`id`, `name`, `slug`, `status`, `official_api_line_count`, `qr_code_line_count`, `operator_limit`, `retention_days`, `version`, `created_at`, `suspended_at`.
 
-Invariantes: `slug` único; status `Active|Suspended`; retenção dentro de faixa configurada.
+Invariantes: `slug` único; status `Active|Suspended`; contagens de linhas e `operator_limit` são inteiros não negativos; `operator_limit = 0` significa ilimitado; retenção dentro de faixa configurada. As contagens representam capacidade contratada e não alteram a regra do MVP de um número ativo por tenant.
 
 ### User e TenantMembership
 
 `User`: `id`, `email`, `password_hash` anulável até ativação, `status`, `security_stamp`, timestamps.
-`TenantMembership`: `id`, `tenant_id`, `user_id`, `role`, `status`, `version`, `created_at`, `deactivated_at`, `deactivated_by`.
+`TenantMembership`: `id`, `tenant_id`, `user_id`, `role`, `status`, `assigned_connection_type`, `assigned_line_number`, `version`, `created_at`, `deactivated_at`, `deactivated_by`.
 
-Status de `User` e membership: `Invited|Active|Disabled`. Papéis: `TenantOwner|Operator`; PlatformAdmin é permissão de plataforma separada. `user_id` é único em `TenantMembership`, garantindo um tenant por usuário no MVP. Desativação rotaciona `security_stamp`; reativação nunca restaura sessão anterior (**FR-026**, **FR-028**, **BR-012**, **BR-015**).
+Status de `User` e membership: `Invited|Active|Disabled`. Papéis: `TenantOwner|Operator`; PlatformAdmin é permissão de plataforma separada. `user_id` é único em `TenantMembership`, garantindo um tenant por usuário no MVP. `assigned_connection_type` e `assigned_line_number` identificam a linha de atendimento do Operator. Desativação rotaciona `security_stamp`; reativação nunca restaura sessão anterior (**FR-026**, **FR-028**, **BR-012**, **BR-015**).
 
 ### Invitation
 
@@ -30,9 +30,9 @@ Entidade tenant-owned. Purpose: `TenantOwnerActivation|OperatorActivation`. O to
 
 ### WhatsAppAccount
 
-`id`, `tenant_id`, `waba_id`, `phone_number_id`, `display_phone_masked`, `secret_ref`, `status`, `last_tested_at`, timestamps.
+`id`, `tenant_id`, `connection_type`, `line_number`, `waba_id`, `phone_number_id`, `display_phone_masked`, `secret_ref`, `status`, `last_tested_at`, timestamps.
 
-Únicos: um registro ativo por tenant; `phone_number_id` globalmente único na implantação.
+Únicos: `(tenant_id, connection_type, line_number)` e `phone_number_id` globalmente único na implantação. `connection_type` é `OfficialApi|QrCode`; `line_number` começa em 1 e não pode exceder a quota do tenant.
 
 ### PlatformIntegrationSecret
 
@@ -42,9 +42,11 @@ Configuração global, não tenant-owned, acessível somente pela infraestrutura
 
 ### AiProviderCredential
 
-`id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `is_active`, `created_at`, `updated_at`, `version`.
+`id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `routing_queue_ids_json`, `routing_tag_ids_json`, `is_active`, `created_at`, `updated_at`, `version`.
 
 Não contém chave em claro. Múltiplos provedores podem ser configurados por tenant (openai, gemini, anthropic, xiaomi), mas apenas um fica ativo por vez. Trocar de provedor desativa o anterior sem apagar a credencial (**FR-AI-001**, **BR-AI-001**, **BR-AI-002**).
+`routing_queue_ids_json` contém apenas IDs distintos de filas ativas do mesmo tenant autorizadas para roteamento pela IA (**FR-036**, **BR-016**).
+`routing_tag_ids_json` contém apenas IDs distintos de tags ativas do mesmo tenant autorizadas para categorização pela IA (**FR-037**, **BR-017**).
 
 ### Contact
 
@@ -194,3 +196,7 @@ erDiagram
 | **NFR-006, SC-005** | Toda entidade tenant-owned usa `tenant_id NOT NULL`; FKs, índices e unicidades incluem/validam tenant. |
 | **SC-001, SC-002, SC-003, SC-006** | Evidências são produzidas por testes/piloto; entidades acima fornecem status, timestamps e correlação. |
 | **FR-P001, FR-P002, BR-P001** | `SubscriptionPlan` define planos (BOT/IA_BOT); `Tenant.plan_id` controla acesso a funcionalidades de IA. |
+
+## Prontidão de produção
+
+O plano de correção de produção não adiciona entidades. Ele exige validar no MySQL 8.4 todas as migrations e restrições deste modelo, incluindo `Up`, `Down`, isolamento por `tenant_id`, backup e restauração antes da publicação.

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -30,6 +31,9 @@ public static class OperatorEndpoints
         group.MapPost("/{operatorId:guid}/reset-password", ResetPasswordAsync)
             .WithName("ResetOperatorPassword");
 
+        group.MapPut("/{operatorId:guid}/line", AssignOperatorLineAsync)
+            .WithName("AssignOperatorLine");
+
         return app;
     }
 
@@ -55,7 +59,9 @@ public static class OperatorEndpoints
                 Status = m.Status.ToString(),
                 CreatedAt = m.CreatedAt,
                 DeactivatedAt = m.DeactivatedAt,
-                ReactivatedAt = m.ReactivatedAt
+                ReactivatedAt = m.ReactivatedAt,
+                AssignedConnectionType = m.AssignedConnectionType?.ToString(),
+                AssignedLineNumber = m.AssignedLineNumber
             })
             .ToList();
 
@@ -72,6 +78,21 @@ public static class OperatorEndpoints
 
         if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null)
+            return Results.NotFound(new { error = "Tenant not found." });
+
+        if (tenant.OperatorLimit > 0)
+        {
+            var operatorCount = await dbContext.TenantMemberships
+                .IgnoreQueryFilters()
+                .CountAsync(membership => membership.TenantId == tenant.Id &&
+                                          membership.Role == MembershipRole.Operator &&
+                                          membership.Status != MembershipStatus.Inactive);
+            if (operatorCount >= tenant.OperatorLimit)
+                return Results.Conflict(new { error = $"Operator limit reached ({tenant.OperatorLimit})." });
+        }
 
         if (string.IsNullOrWhiteSpace(request.Email))
             return Results.BadRequest(new { error = "Email is required." });
@@ -135,6 +156,60 @@ public static class OperatorEndpoints
             DisplayName = request.DisplayName,
             TemporaryPassword = request.Password,
             Message = "Operator created. User must change password on first login."
+        });
+    }
+
+    private static async Task<IResult> AssignOperatorLineAsync(
+        Guid operatorId,
+        [FromBody] AssignOperatorLineRequest request,
+        ICurrentTenant currentTenant,
+        ITenantMembershipRepository membershipRepository,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var membership = await membershipRepository.GetByIdAsync(operatorId);
+        if (membership is null || membership.TenantId != currentTenant.TenantId || membership.Role != MembershipRole.Operator)
+            return Results.NotFound();
+
+        if (string.IsNullOrWhiteSpace(request.ConnectionType) && request.LineNumber is null)
+        {
+            membership.ClearLineAssignment();
+        }
+        else
+        {
+            if (!Enum.TryParse<WhatsAppConnectionType>(request.ConnectionType, true, out var connectionType) ||
+                request.LineNumber is null || request.LineNumber < 1)
+                return Results.BadRequest(new { error = "A valid connection type and line number are required." });
+
+            var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+            if (tenant is null)
+                return Results.NotFound();
+
+            var limit = connectionType == WhatsAppConnectionType.OfficialApi
+                ? tenant.OfficialApiLineCount
+                : tenant.QrCodeLineCount;
+            if (limit > 0 && request.LineNumber > limit)
+                return Results.BadRequest(new { error = "The selected line is outside the tenant quota." });
+
+            membership.AssignLine(connectionType, request.LineNumber.Value);
+        }
+
+        await membershipRepository.UpdateAsync(membership);
+
+        return Results.Ok(new OperatorResponse
+        {
+            Id = membership.Id,
+            UserId = membership.UserId,
+            Email = membership.User.Email,
+            DisplayName = membership.User.DisplayName,
+            Status = membership.Status.ToString(),
+            CreatedAt = membership.CreatedAt,
+            AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
+            AssignedLineNumber = membership.AssignedLineNumber
         });
     }
 
@@ -285,6 +360,14 @@ public sealed class OperatorResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? DeactivatedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
+    public string? AssignedConnectionType { get; init; }
+    public int? AssignedLineNumber { get; init; }
+}
+
+public sealed class AssignOperatorLineRequest
+{
+    public string? ConnectionType { get; init; }
+    public int? LineNumber { get; init; }
 }
 
 public sealed class ResetPasswordRequest

@@ -25,11 +25,17 @@ public static class AdminTenantEndpoints
         group.MapGet("/{tenantId:guid}", GetTenantByIdAsync)
             .WithName("GetTenantById");
 
+        group.MapPut("/{tenantId:guid}", UpdateTenantAsync)
+            .WithName("UpdateTenant");
+
         group.MapPost("/{tenantId:guid}/suspend", SuspendTenantAsync)
             .WithName("SuspendTenant");
 
         group.MapPost("/{tenantId:guid}/reactivate", ReactivateTenantAsync)
             .WithName("ReactivateTenant");
+
+        group.MapPost("/{tenantId:guid}/payments", RegisterPaymentAsync)
+            .WithName("RegisterTenantPayment");
 
         group.MapPut("/{tenantId:guid}/plan", UpdateTenantPlanAsync)
             .WithName("UpdateTenantPlan");
@@ -47,6 +53,11 @@ public static class AdminTenantEndpoints
     {
         try
         {
+            if (request.OfficialApiLineCount < 0 || request.QrCodeLineCount < 0)
+                return Results.BadRequest(new { error = "Line counts cannot be negative." });
+            if (request.OperatorLimit < 0)
+                return Results.BadRequest(new { error = "Operator limit cannot be negative." });
+
             var existingTenant = await dbContext.Tenants
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(t => t.Name == request.Name);
@@ -81,7 +92,13 @@ public static class AdminTenantEndpoints
             if (plan is null)
                 return Results.BadRequest(new { error = "Invalid or inactive plan code." });
 
-            var tenant = Tenant.Create(request.Name, slug, plan.Id);
+            var tenant = Tenant.Create(
+                request.Name,
+                slug,
+                plan.Id,
+                request.OfficialApiLineCount,
+                request.QrCodeLineCount,
+                request.OperatorLimit);
             tenant.Activate();
             dbContext.Tenants.Add(tenant);
 
@@ -116,6 +133,10 @@ public static class AdminTenantEndpoints
                 OwnerEmail = ownerEmail,
                 OwnerDisplayName = owner.DisplayName,
                 DueDate = tenant.DueDate,
+                LastPaymentAt = tenant.LastPaymentAt,
+                OfficialApiLineCount = tenant.OfficialApiLineCount,
+                QrCodeLineCount = tenant.QrCodeLineCount,
+                OperatorLimit = tenant.OperatorLimit,
                 TemporaryPassword = temporaryPassword,
                 Message = "Guarde a senha temporária. Ela será exigida no primeiro login e deverá ser alterada."
             });
@@ -179,6 +200,10 @@ public static class AdminTenantEndpoints
             Version = t.Version,
             CreatedAt = t.CreatedAt,
             DueDate = t.DueDate,
+            LastPaymentAt = t.LastPaymentAt,
+            OfficialApiLineCount = t.OfficialApiLineCount,
+            QrCodeLineCount = t.QrCodeLineCount,
+            OperatorLimit = t.OperatorLimit,
             OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
             OwnerDisplayName = owner?.DisplayName,
             SuspendedAt = t.SuspendedAt
@@ -203,6 +228,79 @@ public static class AdminTenantEndpoints
             Version = tenant.Version,
             CreatedAt = tenant.CreatedAt,
             DueDate = tenant.DueDate,
+            LastPaymentAt = tenant.LastPaymentAt,
+            OfficialApiLineCount = tenant.OfficialApiLineCount,
+            QrCodeLineCount = tenant.QrCodeLineCount,
+            OperatorLimit = tenant.OperatorLimit,
+            SuspendedAt = tenant.SuspendedAt,
+            SuspensionReason = tenant.SuspensionReason
+        });
+    }
+
+    private static async Task<IResult> UpdateTenantAsync(
+        Guid tenantId,
+        [FromBody] UpdateTenantRequest request,
+        ITenantRepository tenantRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(tenantId);
+        if (tenant is null)
+            return Results.NotFound();
+
+        if (!TryGetIfMatchVersion(httpContext, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header with current version is required." });
+
+        if (tenant.Version != expectedVersion)
+            return Results.Conflict(new { error = "Tenant was modified by another request. Please refresh and try again." });
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return Results.BadRequest(new { error = "Tenant name is required." });
+
+        if (request.OfficialApiLineCount < 0 || request.QrCodeLineCount < 0)
+            return Results.BadRequest(new { error = "Line counts cannot be negative." });
+        if (request.OperatorLimit < 0)
+            return Results.BadRequest(new { error = "Operator limit cannot be negative." });
+
+        var slug = TenantSlugHelper.GenerateSlug(request.Name);
+        if (string.IsNullOrWhiteSpace(slug))
+            return Results.BadRequest(new { error = "Tenant name must contain letters or numbers." });
+
+        var duplicate = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .AnyAsync(t => t.Id != tenantId && (t.Name == request.Name.Trim() || t.Slug == slug));
+        if (duplicate)
+            return Results.Conflict(new { error = "Tenant with this name or slug already exists." });
+
+        var planCode = request.PlanCode.Trim().ToUpperInvariant();
+        var plan = await dbContext.SubscriptionPlans
+            .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
+        if (plan is null)
+            return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+
+        tenant.UpdateDetails(
+            request.Name,
+            slug,
+            plan.Id,
+            request.OfficialApiLineCount,
+            request.QrCodeLineCount,
+            request.OperatorLimit);
+        await tenantRepository.UpdateAsync(tenant);
+
+        return Results.Ok(new TenantResponse
+        {
+            Id = tenant.Id,
+            Name = tenant.Name,
+            Slug = tenant.Slug,
+            PlanId = tenant.PlanId,
+            Status = tenant.Status.ToString(),
+            Version = tenant.Version,
+            CreatedAt = tenant.CreatedAt,
+            DueDate = tenant.DueDate,
+            LastPaymentAt = tenant.LastPaymentAt,
+            OfficialApiLineCount = tenant.OfficialApiLineCount,
+            QrCodeLineCount = tenant.QrCodeLineCount,
+            OperatorLimit = tenant.OperatorLimit,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -246,6 +344,24 @@ public static class AdminTenantEndpoints
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
+    }
+
+    private static async Task<IResult> RegisterPaymentAsync(
+        Guid tenantId,
+        [FromBody] RegisterPaymentRequest request,
+        ITenantRepository tenantRepository)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(tenantId);
+        if (tenant is null)
+            return Results.NotFound();
+
+        var paidAt = request.PaidAt ?? DateTime.UtcNow;
+        if (paidAt > DateTime.UtcNow.AddMinutes(5))
+            return Results.BadRequest(new { error = "Payment date cannot be in the future." });
+
+        tenant.RegisterPayment(paidAt);
+        await tenantRepository.UpdateAsync(tenant);
+        return Results.Ok(new { paidAt = tenant.LastPaymentAt, dueDate = tenant.DueDate, status = tenant.Status.ToString() });
     }
 
     private static async Task<IResult> ReactivateTenantAsync(
@@ -362,6 +478,9 @@ public sealed class CreateTenantRequest
     public string OwnerEmail { get; init; } = string.Empty;
     public string? OwnerDisplayName { get; init; }
     public string PlanCode { get; init; } = "BOT";
+    public int OfficialApiLineCount { get; init; }
+    public int QrCodeLineCount { get; init; }
+    public int OperatorLimit { get; init; }
 }
 
 public sealed class CreateTenantResponse
@@ -372,6 +491,10 @@ public sealed class CreateTenantResponse
     public string OwnerEmail { get; init; } = string.Empty;
     public string? OwnerDisplayName { get; init; }
     public DateTime DueDate { get; init; }
+    public DateTime? LastPaymentAt { get; init; }
+    public int OfficialApiLineCount { get; init; }
+    public int QrCodeLineCount { get; init; }
+    public int OperatorLimit { get; init; }
     public string TemporaryPassword { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
 }
@@ -381,9 +504,23 @@ public sealed class SuspendTenantRequest
     public string Reason { get; init; } = string.Empty;
 }
 
+public sealed class RegisterPaymentRequest
+{
+    public DateTime? PaidAt { get; init; }
+}
+
 public sealed class UpdatePlanRequest
 {
     public string PlanCode { get; init; } = string.Empty;
+}
+
+public sealed class UpdateTenantRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string PlanCode { get; init; } = string.Empty;
+    public int OfficialApiLineCount { get; init; }
+    public int QrCodeLineCount { get; init; }
+    public int OperatorLimit { get; init; }
 }
 
 public sealed class TenantResponse
@@ -396,6 +533,10 @@ public sealed class TenantResponse
     public uint Version { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime DueDate { get; init; }
+    public DateTime? LastPaymentAt { get; init; }
+    public int OfficialApiLineCount { get; init; }
+    public int QrCodeLineCount { get; init; }
+    public int OperatorLimit { get; init; }
     public string? OwnerEmail { get; init; }
     public string? OwnerDisplayName { get; init; }
     public DateTime? SuspendedAt { get; init; }

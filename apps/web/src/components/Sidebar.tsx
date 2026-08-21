@@ -16,6 +16,7 @@ import {
   LogOut,
   Tags,
   Settings,
+  ListOrdered,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -28,7 +29,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const aiEnabled = user?.aiEnabled === true
 
-  // Operators can also open the tenant WhatsApp QR code.
   if (isOperator) {
     return (
       <aside
@@ -77,20 +77,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Users className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Contatos</span>}
           </NavLink>
-          <NavLink
-            to="/integrations/whatsapp"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                isActive
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
-              )
-            }
-          >
-            <Zap className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>WhatsApp QR</span>}
-          </NavLink>
         </nav>
         <div className="border-t border-white/10 p-3">
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
@@ -124,7 +110,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
           { to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' },
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Atendimento IA' }] : []),
+          ...(aiEnabled ? [{ to: '/integrations/ai/instructions', icon: Bot, label: 'Diretrizes IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
+          { to: '/queues', icon: ListOrdered, label: 'Filas' },
           { to: '/tags', icon: Tags, label: 'Tags' },
         ]
       : []),

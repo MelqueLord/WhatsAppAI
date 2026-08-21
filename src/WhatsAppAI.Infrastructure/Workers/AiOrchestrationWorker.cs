@@ -2,12 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
@@ -59,12 +62,16 @@ public sealed class AiOrchestrationWorker(
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var botConfigRepository = scope.ServiceProvider.GetRequiredService<IBotConfigurationRepository>();
+        var queueRepository = scope.ServiceProvider.GetRequiredService<IServiceLineRepository>();
+        var tagRepository = scope.ServiceProvider.GetRequiredService<IClientTagRepository>();
+        var contactTagRepository = scope.ServiceProvider.GetRequiredService<IContactTagRepository>();
         var pendingInbound = await messageRepository.GetUnprocessedInboundAsync(20, cancellationToken);
 
         foreach (var message in pendingInbound)
         {
             await ProcessSingleInboundAsync(
-                message, dbContext, botConfigRepository, messageRepository, conversationRepository,
+                message, dbContext, botConfigRepository, queueRepository, tagRepository, contactTagRepository,
+                messageRepository, conversationRepository,
                 credentialRepository, secretStore, aiProviderResolver,
                 contextAssembler, outboxRepository, interactionRepository,
                 usageRepository, cancellationToken);
@@ -75,6 +82,9 @@ public sealed class AiOrchestrationWorker(
         Message message,
         AppDbContext dbContext,
         IBotConfigurationRepository botConfigRepository,
+        IServiceLineRepository queueRepository,
+        IClientTagRepository tagRepository,
+        IContactTagRepository contactTagRepository,
         IMessageRepository messageRepository,
         IConversationRepository conversationRepository,
         IAiProviderCredentialRepository credentialRepository,
@@ -99,29 +109,51 @@ public sealed class AiOrchestrationWorker(
             if (conversation.Mode != ConversationMode.Automatic)
                 return;
 
+            var tenant = await dbContext.Tenants.FindAsync([message.TenantId], cancellationToken);
+            if (tenant?.Status != TenantStatus.Active)
+            {
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                logger.LogInformation("Automation blocked for suspended tenant {TenantId}", message.TenantId);
+                return;
+            }
+
             // Check BotConfiguration mode
             var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
             if (botConfig is null || !botConfig.Enabled)
             {
                 logger.LogInformation("Bot not configured or disabled for tenant {TenantId}, skipping", message.TenantId);
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
                 return;
             }
 
             if (botConfig.Mode == BotMode.Manual)
             {
                 logger.LogInformation("Bot in Manual mode for tenant {TenantId}, skipping", message.TenantId);
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
                 return;
             }
 
             // Handle SimpleAutoReply mode
             if (botConfig.Mode == BotMode.SimpleAutoReply)
             {
-                var replyContent = !string.IsNullOrWhiteSpace(botConfig.FallbackMessage)
-                    ? botConfig.FallbackMessage
-                    : botConfig.WelcomeMessage;
-
-                if (!string.IsNullOrWhiteSpace(replyContent))
+                try
                 {
+                    var previousInboundCount = await dbContext.Messages
+                        .IgnoreQueryFilters()
+                        .CountAsync(item => item.ConversationId == message.ConversationId &&
+                            item.Direction == MessageDirection.Inbound && item.Id != message.Id, cancellationToken);
+                    var replyContent = FindFlowReply(botConfig.FlowStepsJson, message.Content)
+                        ?? (previousInboundCount > 0 ? botConfig.ReturningMessage : botConfig.WelcomeMessage)
+                        ?? botConfig.FallbackMessage;
+                    if (string.IsNullOrWhiteSpace(replyContent))
+                        replyContent = "Obrigado pela sua mensagem. Em breve retornaremos o contato.";
+
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+
                     var outboundMsg = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
                         MessageType.Text, replyContent, Guid.NewGuid().ToString());
@@ -130,6 +162,10 @@ public sealed class AiOrchestrationWorker(
                     var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
                     await outboxRepository.AddAsync(outboxMsg);
                     logger.LogInformation("SimpleAutoReply sent for tenant {TenantId}", message.TenantId);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "SimpleAutoReply failed for message {MessageId}", message.Id);
                 }
                 return;
             }
@@ -167,22 +203,51 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
+            var configuredQueueIds = credential.GetRoutingQueueIds().ToHashSet();
+            List<ServiceLine> routingQueues = configuredQueueIds.Count == 0
+                ? []
+                : (await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
+                    .Where(queue => configuredQueueIds.Contains(queue.Id))
+                    .ToList();
+
+            var configuredTagIds = credential.GetRoutingTagIds().ToHashSet();
+            List<ClientTag> routingTags = configuredTagIds.Count == 0
+                ? []
+                : (await tagRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
+                    .Where(tag => configuredTagIds.Contains(tag.Id))
+                    .ToList();
+
             var context = await contextAssembler.BuildAsync(
-                message.TenantId, message.ConversationId, null, cancellationToken);
+                message.TenantId, message.ConversationId, credential.SystemPrompt,
+                routingQueues
+                    .Select(queue => new RoutingQueueContext(queue.Name, queue.Description))
+                    .ToList(),
+                routingTags
+                    .Select(tag => new RoutingTagContext(tag.Name, tag.Description))
+                    .ToList(),
+                cancellationToken);
 
             var request = new AiRequest
             {
                 ModelId = credential.ModelId,
                 ApiKey = apiKey,
                 Messages = context.Messages,
-                SystemPrompt = context.SystemPrompt
+                SystemPrompt = context.SystemPrompt,
+                MaxTokens = credential.MaxTokensPerResponse
             };
 
             var response = await aiProvider.GetResponseAsync(request, cancellationToken);
 
             // Apply behavior policy
             var sanitizedDecision = BehaviorPolicy.SanitizeDecision(response.Decision);
-            response = response with { Decision = sanitizedDecision };
+            var routingResult = QueueRoutingPolicy.Apply(
+                sanitizedDecision,
+                routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
+                conversation.QueueId is not null);
+            response = response with { Decision = routingResult.Decision };
+            var categorizedTagIds = TagCategorizationPolicy.ResolveAuthorizedTagIds(
+                response.Decision.TagNames,
+                routingTags.Select(tag => new RoutingTagCandidate(tag.Id, tag.Name)).ToList());
 
             // Persist interaction (no prompt/response content)
             var interaction = AiInteraction.Create(
@@ -220,6 +285,25 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
             conversation = freshConversation;
+
+            // Auto-assign queue if AI categorized and conversation has no queue yet
+            if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId is null)
+            {
+                conversation.AssignQueue(routingQueueId);
+                await conversationRepository.UpdateAsync(conversation, cancellationToken);
+                logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName}",
+                    conversation.Id, response.Decision.QueueName);
+            }
+
+            foreach (var tagId in categorizedTagIds)
+            {
+                if (await contactTagRepository.ExistsAsync(message.TenantId, message.ContactId, tagId, cancellationToken))
+                    continue;
+
+                await contactTagRepository.AddAsync(
+                    ContactTag.Create(message.ContactId, tagId, message.TenantId),
+                    cancellationToken);
+            }
 
             if (response.Decision.Action == AiAction.Reply && !string.IsNullOrWhiteSpace(response.Content))
             {
@@ -270,6 +354,49 @@ public sealed class AiOrchestrationWorker(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error processing inbound message {MessageId} for AI", message.Id);
+
+            if (ex.Message.Contains("429", StringComparison.Ordinal) ||
+                ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase))
+            {
+                var currentConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
+                if (currentConversation is not null && currentConversation.Mode == ConversationMode.Automatic)
+                {
+                    currentConversation.SwitchMode(ConversationMode.Human, currentConversation.Version, null);
+                    await conversationRepository.UpdateAsync(currentConversation, cancellationToken);
+
+                    var unavailableMessage = Message.CreateOutbound(
+                        message.TenantId, message.ConversationId, message.ContactId,
+                        MessageType.Text, "No momento nosso atendimento automático está indisponível. Um atendente continuará seu atendimento em breve.",
+                        $"ai-quota:{message.Id}");
+                    await messageRepository.AddAsync(unavailableMessage, cancellationToken);
+                    await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, unavailableMessage.Id));
+                }
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                logger.LogWarning("AI quota exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
+            }
         }
+    }
+
+    private static string? FindFlowReply(string? flowStepsJson, string? content)
+    {
+        if (string.IsNullOrWhiteSpace(flowStepsJson) || string.IsNullOrWhiteSpace(content)) return null;
+        try
+        {
+            var normalizedContent = content.Trim().ToLowerInvariant();
+            foreach (var step in JsonSerializer.Deserialize<JsonElement[]>(flowStepsJson) ?? [])
+            {
+                if (!step.TryGetProperty("keywords", out var keywords) ||
+                    !step.TryGetProperty("response", out var response)) continue;
+                var keywordList = keywords.GetString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
+                var matches = Array.Exists(keywordList,
+                    keyword => normalizedContent.Contains(keyword.Trim().ToLowerInvariant()));
+                if (matches && !string.IsNullOrWhiteSpace(response.GetString())) return response.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+        }
+        return null;
     }
 }

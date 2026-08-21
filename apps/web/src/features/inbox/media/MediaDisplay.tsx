@@ -36,7 +36,8 @@ export function MediaDisplay({ messageId, type, mediaId, caption }: MediaDisplay
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-    } catch (err) {
+    } catch {
+      // eslint-disable-next-line no-empty
       setError('Erro ao baixar mídia')
     } finally {
       setLoading(false)

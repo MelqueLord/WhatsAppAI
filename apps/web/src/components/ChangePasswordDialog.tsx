@@ -27,7 +27,8 @@ export function ChangePasswordDialog() {
     setIsLoading(true)
     try {
       await changePassword(currentPassword, newPassword)
-    } catch (err) {
+    } catch {
+      // eslint-disable-next-line no-empty
       setError('Erro ao alterar senha. Verifique a senha atual.')
     } finally {
       setIsLoading(false)

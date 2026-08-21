@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Automation;
+using WhatsAppAI.Infrastructure.Ai;
 
 namespace WhatsAppAI.Infrastructure.Anthropic;
 
@@ -52,7 +53,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, ILogger<AnthropicPr
             throw new InvalidOperationException("Failed to parse Anthropic response");
 
         var outputText = ExtractOutputText(result);
-        var decision = ParseDecision(outputText);
+        var decision = AiDecisionJsonParser.Parse(outputText);
 
         return new AiResponse
         {
@@ -97,13 +98,15 @@ public sealed class AnthropicProvider(HttpClient httpClient, ILogger<AnthropicPr
             var text = root.TryGetProperty("text", out var textProp) ? textProp.GetString() : output;
             var reason = root.TryGetProperty("handoff_reason", out var reasonProp) ? reasonProp.GetString() : null;
             var confidence = root.TryGetProperty("confidence", out var confProp) ? confProp.GetDouble() : 0.8;
+            var queueName = root.TryGetProperty("queue", out var queueProp) ? queueProp.GetString() : null;
 
             return new AiDecision
             {
                 Action = action,
                 Text = text,
                 HandoffReason = reason,
-                Confidence = confidence
+                Confidence = confidence,
+                QueueName = queueName
             };
         }
         catch

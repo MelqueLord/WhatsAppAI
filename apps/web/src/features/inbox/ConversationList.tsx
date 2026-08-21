@@ -15,10 +15,12 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['conversations', operatorFilter],
     queryFn: () => api.conversations.list(undefined, 50, operatorFilter === 'all' ? undefined : operatorFilter),
     refetchInterval: 15000,
+    refetchOnMount: 'always',
+    retry: 2,
   })
 
   const allConversations = data?.items ?? []
@@ -29,7 +31,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     enabled: isTenantOwner,
   })
 
-  const conversations = allConversations.filter((c) => {
+  const conversations = [...allConversations].reverse().filter((c) => {
     const matchesSearch =
       c.contactName.toLowerCase().includes(search.toLowerCase()) ||
       c.contactPhone.includes(search)
@@ -77,6 +79,10 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center h-full px-8 text-center text-red-500">
+            Não foi possível carregar as conversas.
           </div>
         ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 px-8">

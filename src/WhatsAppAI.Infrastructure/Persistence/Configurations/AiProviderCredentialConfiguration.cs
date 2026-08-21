@@ -35,6 +35,22 @@ public sealed class AiProviderCredentialConfiguration : IEntityTypeConfiguration
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(c => c.SystemPrompt)
+            .HasColumnName("system_prompt")
+            .HasMaxLength(4000);
+
+        builder.Property(c => c.RoutingQueueIdsJson)
+            .HasColumnName("routing_queue_ids_json")
+            .HasColumnType("TEXT");
+
+        builder.Property(c => c.RoutingTagIdsJson)
+            .HasColumnName("routing_tag_ids_json")
+            .HasColumnType("TEXT");
+
+        builder.Property(c => c.MaxTokensPerResponse)
+            .HasColumnName("max_tokens_per_response")
+            .IsRequired();
+
         builder.Property(c => c.IsActive)
             .HasColumnName("is_active")
             .IsRequired();

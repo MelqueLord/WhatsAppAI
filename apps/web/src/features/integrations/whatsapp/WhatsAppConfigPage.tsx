@@ -12,10 +12,11 @@ import {
   Wifi,
   WifiOff,
   Smartphone,
+  LockKeyhole,
 } from 'lucide-react'
 
 export function WhatsAppConfigPage() {
-  const { isOperator } = useAuth()
+  const { isOperator, user } = useAuth()
   const queryClient = useQueryClient()
   const [wabaId, setWabaId] = useState('')
   const [phoneNumberId, setPhoneNumberId] = useState('')
@@ -24,6 +25,11 @@ export function WhatsAppConfigPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [connectionMode, setConnectionMode] = useState<'qrcode' | 'api'>('qrcode')
+  const [selectedQrLine, setSelectedQrLine] = useState(1)
+  const [selectedApiLine, setSelectedApiLine] = useState(1)
+  const qrLineCount = user?.qrCodeLineCount ?? 0
+  const apiLineCount = user?.officialApiLineCount ?? 0
+  const isSuspended = user?.tenantStatus === 'Suspended'
 
   const { isLoading } = useQuery({
     queryKey: ['whatsapp-config'],
@@ -31,39 +37,41 @@ export function WhatsAppConfigPage() {
       const res = await fetch('/api/integrations/whatsapp', { credentials: 'include' })
       return res.json()
     },
+    enabled: !isSuspended,
   })
 
   const { data: qrData, isLoading: qrLoading, refetch: refetchQr } = useQuery({
-    queryKey: ['whatsapp-qrcode'],
+    queryKey: ['whatsapp-qrcode', selectedQrLine],
     queryFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp/qrcode', { credentials: 'include' })
+      const res = await fetch(`/api/integrations/whatsapp/qrcode/${selectedQrLine}`, { credentials: 'include' })
       if (!res.ok) return null
       return res.json()
     },
-    enabled: connectionMode === 'qrcode',
+    enabled: !isSuspended && connectionMode === 'qrcode' && qrLineCount > 0,
     refetchInterval: 5000,
   })
 
   const { data: sessionStatus } = useQuery({
-    queryKey: ['whatsapp-session'],
+    queryKey: ['whatsapp-session', selectedQrLine],
     queryFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp/session/status', { credentials: 'include' })
+      const res = await fetch(`/api/integrations/whatsapp/session/status/${selectedQrLine}`, { credentials: 'include' })
       return res.json()
     },
+    enabled: !isSuspended,
     refetchInterval: 5000, // Poll every 5 seconds
   })
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp/session/disconnect', {
+      const res = await fetch(`/api/integrations/whatsapp/session/disconnect/${selectedQrLine}`, {
         method: 'POST',
         credentials: 'include',
       })
       return res.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-session'] })
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-qrcode'] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-session', selectedQrLine] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-qrcode', selectedQrLine] })
     },
   })
 
@@ -73,7 +81,7 @@ export function WhatsAppConfigPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ wabaId, phoneNumberId, accessToken }),
+        body: JSON.stringify({ wabaId, phoneNumberId, accessToken, lineNumber: selectedApiLine }),
       })
       if (!res.ok) throw new Error('Erro ao salvar')
       return res.json()
@@ -96,6 +104,18 @@ export function WhatsAppConfigPage() {
     },
     onSuccess: (data) => setTestResult(data),
   })
+
+  if (isSuspended) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 mx-auto mb-5 rounded-lg bg-red-50 flex items-center justify-center"><LockKeyhole className="w-8 h-8 text-red-600" /></div>
+          <h1 className="text-xl font-semibold text-slate-800">WhatsApp suspenso</h1>
+          <p className="mt-2 text-sm text-slate-500">A configuração e o atendimento WhatsApp ficam bloqueados até a regularização do pagamento.</p>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -143,6 +163,38 @@ export function WhatsAppConfigPage() {
             API Oficial
           </button>
         </div>}
+
+        {connectionMode === 'qrcode' && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {qrLineCount === 0 ? (
+              <p className="text-sm text-slate-500">Nenhuma linha QR Code foi contratada para esta empresa.</p>
+            ) : Array.from({ length: qrLineCount }, (_, index) => index + 1).map((line) => (
+              <button
+                key={line}
+                onClick={() => setSelectedQrLine(line)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium ${selectedQrLine === line ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+              >
+                QR Code {line}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {connectionMode === 'api' && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {apiLineCount === 0 ? (
+              <p className="text-sm text-slate-500">Nenhuma linha API oficial foi contratada para esta empresa.</p>
+            ) : Array.from({ length: apiLineCount }, (_, index) => index + 1).map((line) => (
+              <button
+                key={line}
+                onClick={() => setSelectedApiLine(line)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium ${selectedApiLine === line ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+              >
+                API oficial {line}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* QR Code Connection */}
         {connectionMode === 'qrcode' && (

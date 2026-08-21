@@ -15,7 +15,15 @@ public sealed class AiProviderCredentialRepository(AppDbContext context) : IAiPr
     public async Task<AiProviderCredential?> GetByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await context.Set<AiProviderCredential>()
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.IsActive, cancellationToken);
+    }
+
+    public async Task<AiProviderCredential?> GetByTenantAndProviderAsync(Guid tenantId, string provider, CancellationToken cancellationToken = default)
+    {
+        return await context.Set<AiProviderCredential>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Provider == provider, cancellationToken);
     }
 
     public async Task AddAsync(AiProviderCredential credential, CancellationToken cancellationToken = default)

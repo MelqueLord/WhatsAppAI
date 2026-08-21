@@ -8,7 +8,7 @@ namespace WhatsAppAI.Infrastructure.Conversations;
 internal sealed class ConversationQueries(AppDbContext context) : IConversationQueries
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
-        Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null,
+        Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, string? phoneNumberId = null,
         CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
@@ -22,6 +22,9 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             query = query.Where(c => string.IsNullOrEmpty(c.AssignedToUserId));
         else if (!string.IsNullOrWhiteSpace(operatorUserId))
             query = query.Where(c => c.AssignedToUserId == operatorUserId);
+
+        if (!string.IsNullOrWhiteSpace(phoneNumberId))
+            query = query.Where(c => c.PhoneNumberId == phoneNumberId);
 
         if (!string.IsNullOrEmpty(request.Cursor))
         {
@@ -41,10 +44,12 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Select(c => new ConversationDto
             {
                 Id = c.Id,
+                ContactId = c.ContactId,
                 ContactName = c.Contact.Name ?? c.Contact.PhoneNumber,
                 ContactPhone = c.Contact.PhoneNumber,
                 Mode = c.Mode.ToString(),
                 Status = c.Status.ToString(),
+                Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
                 IsWindowOpen = c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow
@@ -72,6 +77,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
         var limit = Math.Clamp(request.Limit, 1, 100);
 
         var query = context.Messages
+            .IgnoreQueryFilters()
             .Include(m => m.Contact)
             .Where(m => m.TenantId == tenantId && m.ConversationId == conversationId)
             .AsQueryable();
@@ -131,10 +137,12 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Select(c => new ConversationDto
             {
                 Id = c.Id,
+                ContactId = c.ContactId,
                 ContactName = c.Contact.Name ?? c.Contact.PhoneNumber,
                 ContactPhone = c.Contact.PhoneNumber,
                 Mode = c.Mode.ToString(),
                 Status = c.Status.ToString(),
+                Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
                 IsWindowOpen = c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow

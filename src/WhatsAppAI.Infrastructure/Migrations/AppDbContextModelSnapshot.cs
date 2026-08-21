@@ -15,41 +15,39 @@ namespace WhatsAppAI.Infrastructure.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
             modelBuilder.Entity("WhatsAppAI.Domain.Audit.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("action");
 
                     b.Property<string>("Details")
                         .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("details");
 
                     b.Property<string>("EntityId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("entity_id");
 
                     b.Property<string>("EntityType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("entity_type");
 
                     b.Property<string>("IpAddress")
                         .HasMaxLength(45)
-                        .HasColumnType("varchar(45)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ip_address");
 
                     b.Property<DateTime>("OccurredAt")
@@ -57,11 +55,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("occurred_at");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<Guid?>("UserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
@@ -76,15 +74,15 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Automation.AiInteraction", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<double>("Confidence")
-                        .HasColumnType("double")
+                        .HasColumnType("REAL")
                         .HasColumnName("confidence");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("conversation_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -94,43 +92,43 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Decision")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("decision");
 
                     b.Property<string>("HandoffReason")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("handoff_reason");
 
                     b.Property<int>("InputTokens")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("input_tokens");
 
                     b.Property<int>("LatencyMs")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("latency_ms");
 
                     b.Property<Guid>("MessageId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("message_id");
 
                     b.Property<string>("ModelId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("model_id");
 
                     b.Property<int>("OutputTokens")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("output_tokens");
 
                     b.Property<string>("ResponseId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("response_id");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -145,7 +143,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Automation.ModelEvaluation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<decimal>("CostPer1kTokens")
@@ -158,47 +156,47 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("EvaluatorUserId")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasColumnType("TEXT")
                         .HasColumnName("evaluator_user_id");
 
                     b.Property<double>("HandoffRate")
-                        .HasColumnType("double")
+                        .HasColumnType("REAL")
                         .HasColumnName("handoff_rate");
 
                     b.Property<bool>("IsApproved")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_approved");
 
                     b.Property<string>("ModelId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("model_id");
 
                     b.Property<int>("P95LatencyMs")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("p95_latency_ms");
 
                     b.Property<double>("QualityScore")
-                        .HasColumnType("double")
+                        .HasColumnType("REAL")
                         .HasColumnName("quality_score");
 
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("rejection_reason");
 
                     b.Property<string>("RollbackModelId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("rollback_model_id");
 
                     b.Property<double>("SafetyScore")
-                        .HasColumnType("double")
+                        .HasColumnType("REAL")
                         .HasColumnName("safety_score");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -211,7 +209,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Identity.Invitation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime?>("ConsumedAt")
@@ -223,13 +221,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("created_by_user_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("varchar(300)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("email");
 
                     b.Property<DateTime>("ExpiresAt")
@@ -239,7 +237,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Purpose")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("purpose");
 
                     b.Property<DateTime?>("RevokedAt")
@@ -247,33 +245,33 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("revoked_at");
 
                     b.Property<Guid?>("RevokedByUserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("revoked_by_user_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("token_hash");
 
                     b.Property<Guid?>("UserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("user_id");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0u)
                         .HasColumnName("version");
 
@@ -299,17 +297,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("id");
 
                     b.Property<bool>("AiEnabled")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("ai_enabled");
 
                     b.Property<bool>("AiMetrics")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("ai_metrics");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("code");
 
                     b.Property<DateTime>("CreatedAt")
@@ -318,29 +316,29 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("description");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
 
                     b.Property<int?>("MaxKnowledgeItems")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("max_knowledge_items");
 
                     b.Property<int?>("MaxOperators")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("max_operators");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("name");
 
                     b.Property<bool>("OpenAiRequired")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("openai_required");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -360,7 +358,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Identity.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime?>("ActivatedAt")
@@ -379,15 +377,37 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("due_date");
 
+                    b.Property<DateTime?>("LastPaymentAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_payment_at");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("name");
+
+                    b.Property<int>("OfficialApiLineCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("official_api_line_count");
+
+                    b.Property<int>("OperatorLimit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("operator_limit");
 
                     b.Property<Guid>("PlanId")
                         .HasColumnType("char(36)")
                         .HasColumnName("plan_id");
+
+                    b.Property<int>("QrCodeLineCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0)
+                        .HasColumnName("qr_code_line_count");
 
                     b.Property<DateTime?>("ReactivatedAt")
                         .HasColumnType("datetime(6)")
@@ -396,13 +416,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("slug");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<DateTime?>("SuspendedAt")
@@ -411,13 +431,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("SuspensionReason")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("suspension_reason");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0u)
                         .HasColumnName("version");
 
@@ -437,8 +457,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Identity.TenantMembership", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
+
+                    b.Property<string>("AssignedConnectionType")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assigned_connection_type");
+
+                    b.Property<int?>("AssignedLineNumber")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("assigned_line_number");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)")
@@ -455,27 +484,27 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("role");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("user_id");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0u)
                         .HasColumnName("version");
 
@@ -495,7 +524,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime?>("ActivatedAt")
@@ -508,22 +537,22 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("DisplayName")
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("display_name");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("varchar(300)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("email");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
 
                     b.Property<bool>("IsPlatformAdmin")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("is_platform_admin");
 
@@ -532,17 +561,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("last_login_at");
 
                     b.Property<bool>("MustChangePassword")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("password_hash");
 
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("security_stamp");
 
                     b.HasKey("Id");
@@ -558,13 +587,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Integrations.AiProviderCredential", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("ApiKeyRef")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("api_key_ref");
 
                     b.Property<DateTime>("CreatedAt")
@@ -572,23 +601,40 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
+
+                    b.Property<int>("MaxTokensPerResponse")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("max_tokens_per_response");
 
                     b.Property<string>("ModelId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("model_id");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("provider");
 
+                    b.Property<string>("SystemPrompt")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("system_prompt");
+
+                    b.Property<string>("RoutingQueueIdsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("routing_queue_ids_json");
+
+                    b.Property<string>("RoutingTagIdsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("routing_tag_ids_json");
+
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -597,7 +643,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id");
@@ -611,7 +657,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Integrations.BotConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -619,37 +665,47 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("enabled");
 
                     b.Property<string>("FallbackMessage")
                         .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("fallback_message");
 
+                    b.Property<string>("FlowStepsJson")
+                        .HasMaxLength(20000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("flow_steps_json");
+
                     b.Property<string>("HandoffMessage")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("MaxTokensPerResponse")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("max_tokens_per_response");
 
                     b.Property<string>("MediaMessage")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("mode");
 
                     b.Property<string>("OfflineMessage")
                         .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("offline_message");
 
+                    b.Property<string>("ReturningMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("returning_message");
+
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -658,12 +714,12 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.Property<string>("WelcomeMessage")
                         .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("welcome_message");
 
                     b.HasKey("Id");
@@ -677,7 +733,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Integrations.Secret", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -687,17 +743,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("EncryptedValue")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("encrypted_value");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("key");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -717,31 +773,41 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppAccount", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("AccessTokenRef")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("access_token_ref");
+
+                    b.Property<string>("ConnectionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("connection_type");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("line_number");
 
                     b.Property<string>("PhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("phone_number_id");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -751,14 +817,14 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0u)
                         .HasColumnName("version");
 
                     b.Property<string>("WabaId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("waba_id");
 
                     b.HasKey("Id");
@@ -768,18 +834,21 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("TenantId", "ConnectionType", "LineNumber")
+                        .IsUnique();
+
                     b.ToTable("whatsapp_accounts", (string)null);
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Knowledge.ClientTag", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Color")
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedAt")
@@ -788,21 +857,21 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("description");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("name");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -816,13 +885,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Knowledge.KnowledgeItem", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasMaxLength(4000)
-                        .HasColumnType("varchar(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("content");
 
                     b.Property<DateTime>("CreatedAt")
@@ -834,11 +903,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("deactivated_at");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("is_active");
 
                     b.Property<int>("Priority")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("priority");
 
                     b.Property<DateTime?>("ReactivatedAt")
@@ -846,13 +915,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("reactivated_at");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("title");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -861,7 +930,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("version");
 
                     b.HasKey("Id");
@@ -876,7 +945,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Contact", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -889,22 +958,22 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("name");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("phone_number");
 
                     b.Property<string>("ProfilePictureUrl")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("profile_picture_url");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -924,11 +993,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.ContactTag", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<Guid>("ContactId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("contact_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -936,11 +1005,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<Guid>("TagId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tag_id");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -954,16 +1023,16 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("AssignedToUserId")
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("assigned_to_user_id");
 
                     b.Property<Guid>("ContactId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("contact_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -977,23 +1046,27 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("mode");
 
                     b.Property<string>("PhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("phone_number_id");
+
+                    b.Property<Guid?>("QueueId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("queue_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -1003,7 +1076,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int unsigned")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(1u)
                         .HasColumnName("version");
 
@@ -1028,17 +1101,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.HandoffEvent", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("conversation_id");
 
                     b.Property<string>("FromMode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("from_mode");
 
                     b.Property<DateTime>("OccurredAt")
@@ -1046,23 +1119,23 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("occurred_at");
 
                     b.Property<Guid?>("OperatorUserId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("operator_user_id");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("reason");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("ToMode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("to_mode");
 
                     b.HasKey("Id");
@@ -1075,25 +1148,25 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Message", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<string>("Caption")
                         .HasMaxLength(4000)
-                        .HasColumnType("varchar(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("caption");
 
                     b.Property<Guid>("ContactId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("contact_id");
 
                     b.Property<string>("Content")
                         .HasMaxLength(4000)
-                        .HasColumnType("varchar(4000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("content");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("conversation_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1107,12 +1180,12 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Direction")
                         .IsRequired()
                         .HasMaxLength(10)
-                        .HasColumnType("varchar(10)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("direction");
 
                     b.Property<string>("ExternalId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("external_id");
 
                     b.Property<DateTime?>("FailedAt")
@@ -1121,31 +1194,31 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("failure_reason");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("idempotency_key");
 
                     b.Property<string>("MediaId")
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("media_id");
 
                     b.Property<string>("MediaUrl")
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("media_url");
 
                     b.Property<bool>("ProcessedByAi")
-                        .HasColumnType("tinyint(1)")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("processed_by_ai");
 
                     b.Property<string>("QuotedMessageId")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("quoted_message_id");
 
                     b.Property<DateTime?>("ReadAt")
@@ -1159,17 +1232,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("type");
 
                     b.HasKey("Id");
@@ -1192,7 +1265,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1201,11 +1274,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("last_error");
 
                     b.Property<Guid>("MessageId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("message_id");
 
                     b.Property<DateTime?>("NextRetryAt")
@@ -1217,17 +1290,17 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("processed_at");
 
                     b.Property<int>("RetryCount")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("retry_count");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -1239,10 +1312,56 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.ToTable("outbox_messages", (string)null);
                 });
 
+            modelBuilder.Entity("WhatsAppAI.Domain.Messaging.ServiceLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("service_queues", (string)null);
+                });
+
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.WebhookEvent", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1252,18 +1371,18 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("EncryptedPayload")
                         .IsRequired()
                         .HasMaxLength(100000)
-                        .HasColumnType("longtext")
+                        .HasColumnType("TEXT")
                         .HasColumnName("encrypted_payload");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("error_message");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("idempotency_key");
 
                     b.Property<DateTime?>("NextRetryAt")
@@ -1273,7 +1392,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("PhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("phone_number_id");
 
                     b.Property<DateTime?>("ProcessedAt")
@@ -1282,25 +1401,25 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("RawPayloadRef")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("RetryCount")
-                        .HasColumnType("int")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("retry_count");
 
                     b.Property<string>("Signature")
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("signature");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("status");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
@@ -1320,32 +1439,32 @@ namespace WhatsAppAI.Infrastructure.Migrations
             modelBuilder.Entity("WhatsAppAI.Domain.Usage.UsageLedger", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("id");
 
                     b.Property<long?>("CostMinorUnits")
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("cost_minor_units");
 
                     b.Property<string>("Currency")
                         .HasMaxLength(3)
-                        .HasColumnType("varchar(3)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("currency");
 
                     b.Property<string>("Metric")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("metric");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("provider");
 
                     b.Property<long>("Quantity")
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("quantity");
 
                     b.Property<DateTime>("RecordedAt")
@@ -1355,16 +1474,16 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<string>("SourceId")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("source_id");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("char(36)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("unit");
 
                     b.HasKey("Id");

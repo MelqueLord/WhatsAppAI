@@ -10,13 +10,23 @@ import {
   ArrowRight,
   CheckCircle2,
   Shield,
+  Phone,
+  QrCode,
+  type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import type { Conversation } from '../../lib/api'
 
 export function DashboardPage() {
   const { user, isPlatformAdmin, isTenantOwner } = useAuth()
   const planName = user?.planCode === 'IA_BOT' ? 'IA + BOT' : user?.planCode === 'BOT' ? 'BOT' : '—'
   const aiEnabled = user?.aiEnabled === true
+  const renewalDate = user?.dueDate
+    ? new Date(user.dueDate).toLocaleDateString('pt-BR')
+    : null
+  const assignedLine = user?.assignedLineNumber
+    ? `${user.assignedConnectionType === 'QrCode' ? 'QR Code' : 'API oficial'} ${user.assignedLineNumber}`
+    : null
 
   const { data: conversations } = useQuery({
     queryKey: ['conversations'],
@@ -83,8 +93,14 @@ export function DashboardPage() {
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
             <Shield className="w-4 h-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-700">Plano: {planName}</span>
+            <span className="text-sm font-medium text-slate-700">Plano: {planName}{renewalDate ? ` · Renova em ${renewalDate}` : ''}</span>
           </div>
+          {assignedLine && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg">
+              <MessageSquare className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">Linha: {assignedLine}</span>
+            </div>
+          )}
         </div>
 
         {/* Stats Grid */}
@@ -106,6 +122,34 @@ export function DashboardPage() {
           ))}
         </div>
 
+        {user?.tenantId && (
+          <div className="mb-8 bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-slate-900">Linhas contratadas</h2>
+                <p className="text-sm text-slate-500 mt-1">Capacidade cadastrada para esta empresa</p>
+              </div>
+              <Phone className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4">
+                <Phone className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{user.officialApiLineCount ?? 0}</p>
+                  <p className="text-sm text-slate-600">API oficial</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg bg-blue-50 p-4">
+                <QrCode className="w-5 h-5 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{user.qrCodeLineCount ?? 0}</p>
+                  <p className="text-sm text-slate-600">QR Code</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Conversations */}
@@ -120,7 +164,7 @@ export function DashboardPage() {
               </Link>
             </div>
             <div className="divide-y divide-slate-100">
-              {conversations?.items?.slice(0, 5).map((conv: any) => (
+              {conversations?.items?.slice(0, 5).map((conv: Conversation) => (
                 <Link
                   key={conv.id}
                   to="/inbox"
@@ -216,7 +260,7 @@ function QuickLink({
   description,
 }: {
   to: string
-  icon: any
+  icon: LucideIcon
   title: string
   description: string
 }) {

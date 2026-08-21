@@ -16,10 +16,12 @@ public sealed record CursorPaginationResponse<T>
 public sealed record ConversationDto
 {
     public Guid Id { get; init; }
+    public Guid ContactId { get; init; }
     public string ContactName { get; init; } = string.Empty;
     public string ContactPhone { get; init; } = string.Empty;
     public string Mode { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
+    public uint Version { get; init; }
     public string? LastMessage { get; init; }
     public DateTime? LastMessageAt { get; init; }
     public bool IsWindowOpen { get; init; }

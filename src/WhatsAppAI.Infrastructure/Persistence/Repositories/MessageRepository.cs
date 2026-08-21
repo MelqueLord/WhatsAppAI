@@ -9,6 +9,7 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
     public async Task<Message?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await context.Set<Message>()
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
@@ -27,8 +28,9 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
     public async Task<IReadOnlyList<Message>> GetUnprocessedInboundAsync(int limit = 20, CancellationToken cancellationToken = default)
     {
         return await context.Set<Message>()
+            .IgnoreQueryFilters()
             .Where(m => m.Direction == MessageDirection.Inbound && !m.ProcessedByAi)
-            .OrderBy(m => m.CreatedAt)
+            .OrderByDescending(m => m.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
     }

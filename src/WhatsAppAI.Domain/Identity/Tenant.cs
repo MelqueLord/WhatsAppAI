@@ -6,9 +6,13 @@ public sealed class Tenant
     public string Name { get; private set; } = string.Empty;
     public string Slug { get; private set; } = string.Empty;
     public Guid PlanId { get; private set; }
+    public int OfficialApiLineCount { get; private set; }
+    public int QrCodeLineCount { get; private set; }
+    public int OperatorLimit { get; private set; }
     public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
     public DateTime DueDate { get; private set; }
+    public DateTime? LastPaymentAt { get; private set; }
     public DateTime? ActivatedAt { get; private set; }
     public DateTime? SuspendedAt { get; private set; }
     public DateTime? ReactivatedAt { get; private set; }
@@ -21,8 +25,18 @@ public sealed class Tenant
 
     private Tenant() { }
 
-    public static Tenant Create(string name, string slug, Guid planId)
+    public static Tenant Create(
+        string name,
+        string slug,
+        Guid planId,
+        int officialApiLineCount = 0,
+        int qrCodeLineCount = 0,
+        int operatorLimit = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
+
         var createdAt = DateTime.UtcNow;
         return new Tenant
         {
@@ -30,6 +44,9 @@ public sealed class Tenant
             Name = name.Trim(),
             Slug = slug.Trim().ToLowerInvariant(),
             PlanId = planId,
+            OfficialApiLineCount = officialApiLineCount,
+            QrCodeLineCount = qrCodeLineCount,
+            OperatorLimit = operatorLimit,
             Status = TenantStatus.Pending,
             CreatedAt = createdAt,
             DueDate = createdAt.AddDays(30)
@@ -84,6 +101,33 @@ public sealed class Tenant
     public void ChangePlan(Guid planId)
     {
         PlanId = planId;
+        Version++;
+    }
+
+        public void RegisterPayment(DateTime paidAt)
+        {
+            LastPaymentAt = paidAt.ToUniversalTime();
+            DueDate = LastPaymentAt.Value.AddDays(30);
+            if (Status == TenantStatus.Suspended)
+                Reactivate();
+            else
+                Version++;
+        }
+
+    public void UpdateDetails(string name, string slug, Guid planId, int officialApiLineCount, int qrCodeLineCount, int operatorLimit)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(slug);
+        ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
+
+        Name = name.Trim();
+        Slug = slug.Trim().ToLowerInvariant();
+        PlanId = planId;
+        OfficialApiLineCount = officialApiLineCount;
+        QrCodeLineCount = qrCodeLineCount;
+        OperatorLimit = operatorLimit;
         Version++;
     }
 }
