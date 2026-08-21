@@ -33,6 +33,11 @@ public static class PersistenceServiceCollectionExtensions
                 case "SQLITE":
                     options.UseSqlite(connectionString);
                     break;
+                case "POSTGRESQL":
+                case "POSTGRES":
+                case "SUPABASE":
+                    options.UseNpgsql(connectionString);
+                    break;
                 case "MYSQL":
                 default:
                     options.UseMySQL(connectionString);
