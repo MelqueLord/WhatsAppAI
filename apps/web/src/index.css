@@ -41,6 +41,44 @@ body {
   min-height: 100vh;
 }
 
+/* Global visual identity bridge for all authenticated screens */
+.app-shell-theme {
+  color: #e2e8f0;
+}
+
+.app-shell-theme .bg-white {
+  background-color: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.app-shell-theme .bg-slate-50,
+.app-shell-theme .bg-slate-100 {
+  background-color: rgba(15, 23, 42, 0.55);
+}
+
+.app-shell-theme .border-slate-100,
+.app-shell-theme .border-slate-200,
+.app-shell-theme .border-slate-300 {
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.app-shell-theme .text-slate-900,
+.app-shell-theme .text-slate-800,
+.app-shell-theme .text-slate-700 {
+  color: #f8fafc;
+}
+
+.app-shell-theme .text-slate-600,
+.app-shell-theme .text-slate-500,
+.app-shell-theme .text-slate-400 {
+  color: #cbd5e1;
+}
+
+.app-shell-theme .hover\:bg-slate-50:hover,
+.app-shell-theme .hover\:bg-slate-100:hover {
+  background-color: rgba(30, 41, 59, 0.78);
+}
+
 /* WhatsApp Chat Styles */
 .whatsapp-gradient {
   background: linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%);

@@ -33,18 +33,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     return (
       <aside
         className={cn(
-          'h-screen flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 ease-in-out relative',
+          'h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
           collapsed ? 'w-[72px]' : 'w-[260px]'
         )}
       >
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/40">
             <MessageSquare className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="font-bold text-base tracking-tight">WhatsApp AI</h1>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Atendimento</p>
+              <h1 className="font-bold text-base tracking-tight">ATENZ</h1>
+              <p className="text-[10px] text-cyan-200/80 uppercase tracking-widest">Atendimento</p>
             </div>
           )}
         </div>
@@ -132,19 +132,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'h-screen flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 ease-in-out relative',
+        'h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
         collapsed ? 'w-[72px]' : 'w-[260px]'
       )}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-        <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/40">
           <MessageSquare className="w-5 h-5 text-white" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="font-bold text-base tracking-tight">WhatsApp AI</h1>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest">Platform</p>
+            <h1 className="font-bold text-base tracking-tight">ATENZ</h1>
+            <p className="text-[10px] text-cyan-200/80 uppercase tracking-widest">Platform</p>
           </div>
         )}
       </div>
@@ -202,7 +202,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Toggle Button */}
       <button
         onClick={onToggle}
-        className="absolute -right-3 top-20 w-6 h-6 bg-slate-700 border border-slate-600 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-600 transition-colors z-10"
+        className="absolute -right-3 top-20 w-6 h-6 bg-[#0d1a30] border border-white/20 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#10223f] transition-colors z-10"
       >
         {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
       </button>
