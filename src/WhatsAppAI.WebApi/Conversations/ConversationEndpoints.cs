@@ -186,7 +186,8 @@ public static class ConversationEndpoints
                 return Results.Forbid();
         }
 
-        if (!conversation.IsWindowOpen(clock.UtcNow))
+        var isQrConversation = conversation.PhoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase);
+        if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
 
         var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString();

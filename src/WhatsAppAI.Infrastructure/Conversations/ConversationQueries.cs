@@ -52,7 +52,8 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
-                IsWindowOpen = c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow
+                IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") ||
+                    (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })
             .ToListAsync(cancellationToken);
 
@@ -145,7 +146,8 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
-                IsWindowOpen = c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow
+                IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") ||
+                    (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })
             .FirstOrDefaultAsync(cancellationToken);
     }
