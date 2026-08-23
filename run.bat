@@ -8,7 +8,7 @@ echo ========================================
 echo.
 
 echo Starting Backend...
-start "WhatsApp AI Backend" cmd /c "set DatabaseProvider=SQLite&& dotnet run --project src\WhatsAppAI.WebApi --urls http://localhost:5000"
+start "WhatsApp AI Backend" cmd /c "set ASPNETCORE_ENVIRONMENT=Development&& set DatabaseProvider=SQLite&& dotnet run --project src\WhatsAppAI.WebApi --urls http://localhost:5000"
 
 echo Starting Frontend...
 start "WhatsApp AI Frontend" cmd /c "cd apps\web && npm run dev"

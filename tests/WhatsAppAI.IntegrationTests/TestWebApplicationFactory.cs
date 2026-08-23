@@ -15,6 +15,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     public TestWebApplicationFactory()
     {
+        Environment.SetEnvironmentVariable("DatabaseProvider", "SQLite");
+
         _dbProvider = Environment.GetEnvironmentVariable("DatabaseProvider") ?? "SQLite";
 
         if (_dbProvider == "SQLite")
@@ -36,6 +38,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["DatabaseProvider"] = "SQLite",
+                ["DatabaseInitialization:EnsureCreated"] = "true",
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
@@ -83,6 +87,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        Environment.SetEnvironmentVariable("DatabaseProvider", null);
         if (disposing) _sqliteConnection?.Dispose();
     }
 }

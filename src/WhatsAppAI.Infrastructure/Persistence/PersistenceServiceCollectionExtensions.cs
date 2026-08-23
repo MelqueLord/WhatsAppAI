@@ -30,6 +30,9 @@ public static class PersistenceServiceCollectionExtensions
 
             switch (provider.ToUpperInvariant())
             {
+                case "SQLITE":
+                    options.UseSqlite(connectionString);
+                    break;
                 case "MYSQL":
                     options.UseMySQL(connectionString);
                     break;

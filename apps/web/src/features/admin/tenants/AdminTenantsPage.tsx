@@ -395,7 +395,7 @@ export function AdminTenantsPage() {
                         {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2 min-w-[220px]">
                           <button
                             onClick={() => {
                               updateMutation.reset()
@@ -422,7 +422,9 @@ export function AdminTenantsPage() {
                             title="Redefinir senha do responsável"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
-                            {resetOwnerPasswordMutation.isPending ? 'Redefinindo...' : 'Redefinir senha'}
+                            <span className="hidden sm:inline">
+                              {resetOwnerPasswordMutation.isPending ? 'Redefinindo...' : 'Redefinir senha'}
+                            </span>
                           </button>
                           <button
                             onClick={() => {
