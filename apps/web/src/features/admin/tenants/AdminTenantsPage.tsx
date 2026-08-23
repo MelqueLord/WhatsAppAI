@@ -12,6 +12,7 @@ import {
   AlertCircle,
   KeyRound,
   Pencil,
+  DollarSign,
 } from 'lucide-react'
 import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 
@@ -344,7 +345,7 @@ export function AdminTenantsPage() {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Criado em
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <th className="sticky right-0 bg-[#10223f] px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
@@ -395,16 +396,17 @@ export function AdminTenantsPage() {
                         {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="sticky right-0 bg-[#0b1222] px-6 py-4 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2 min-w-[220px]">
+                        <div className="flex min-w-[290px] flex-nowrap items-center justify-end gap-3">
                           <button
                             onClick={() => {
                               updateMutation.reset()
                               setEditTarget(tenant)
                             }}
-                            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-emerald-700 font-medium"
+                            className="inline-flex shrink-0 items-center text-xs text-slate-600 hover:text-emerald-700 font-medium"
+                            aria-label="Editar empresa"
                             title="Editar empresa"
                           >
-                            <Pencil className="w-3.5 h-3.5" /> Editar
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <select
                             value={plans?.find(p => p.id === tenant.planId)?.code || ''}
@@ -418,13 +420,11 @@ export function AdminTenantsPage() {
                           <button
                             onClick={() => resetOwnerPasswordMutation.mutate(tenant.id)}
                             disabled={!tenant.ownerEmail || resetOwnerPasswordMutation.isPending}
-                            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 font-medium disabled:opacity-50"
+                            className="inline-flex shrink-0 items-center text-xs text-amber-700 hover:text-amber-800 font-medium disabled:opacity-50"
+                            aria-label="Redefinir senha"
                             title="Redefinir senha do responsável"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">
-                              {resetOwnerPasswordMutation.isPending ? 'Redefinindo...' : 'Redefinir senha'}
-                            </span>
                           </button>
                           <button
                             onClick={() => {
@@ -432,10 +432,11 @@ export function AdminTenantsPage() {
                               setPaymentDate(new Date().toISOString().slice(0, 10))
                             }}
                             disabled={paymentMutation.isPending}
-                            className="text-xs text-emerald-700 hover:text-emerald-800 font-medium disabled:opacity-50"
+                            className="inline-flex shrink-0 items-center text-xs text-emerald-700 hover:text-emerald-800 font-medium disabled:opacity-50"
+                            aria-label="Registrar pagamento"
                             title="Registrar pagamento manual"
                           >
-                            {paymentMutation.isPending ? 'Registrando...' : 'Pagamento'}
+                            <DollarSign className="w-4 h-4" />
                           </button>
                           {tenant.status === 'Active' ? (
                             <button
@@ -443,17 +444,21 @@ export function AdminTenantsPage() {
                                 setSuspendTarget(tenant)
                                 setSuspendReason('')
                               }}
-                              className="text-sm text-red-600 hover:text-red-700 font-medium"
+                              className="inline-flex shrink-0 items-center text-sm text-red-600 hover:text-red-700 font-medium"
+                              aria-label="Suspender empresa"
+                              title="Suspender empresa"
                             >
-                              Suspender
+                              <XCircle className="w-4 h-4" />
                             </button>
                           ) : tenant.status === 'Suspended' ? (
                             <button
                               onClick={() => reactivateMutation.mutate(tenant)}
                               disabled={reactivateMutation.isPending}
-                              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                              className="inline-flex shrink-0 items-center text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                              aria-label="Reativar empresa"
+                              title="Reativar empresa"
                             >
-                              {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
+                              <CheckCircle2 className="w-4 h-4" />
                             </button>
                           ) : null}
                         </div>
