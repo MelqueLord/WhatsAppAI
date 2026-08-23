@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../lib/api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ListOrdered, Plus, Edit2, XCircle, CheckCircle2, Loader2 } from 'lucide-react'
@@ -23,14 +24,14 @@ export function QueuesPage() {
   const { data: queues, isLoading } = useQuery({
     queryKey: ['service-queues'],
     queryFn: async () => {
-      const res = await fetch('/api/service-queues', { credentials: 'include' })
+      const res = await fetchWithCsrf('/api/service-queues')
       return res.json() as Promise<ServiceQueue[]>
     },
   })
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/service-queues', {
+      const res = await fetchWithCsrf('/api/service-queues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -44,7 +45,7 @@ export function QueuesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (q: ServiceQueue) => {
-      const res = await fetch(`/api/service-queues/${q.id}`, {
+      const res = await fetchWithCsrf(`/api/service-queues/${q.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -58,7 +59,7 @@ export function QueuesPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'deactivate' | 'reactivate' }) => {
-      const res = await fetch(`/api/service-queues/${id}/${action}`, { method: 'POST', credentials: 'include' })
+      const res = await fetchWithCsrf(`/api/service-queues/${id}/${action}`, { method: 'POST' })
       if (!res.ok) throw new Error('Erro')
       return res.json()
     },

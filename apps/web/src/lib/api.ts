@@ -11,14 +11,21 @@ async function ensureCsrfToken(): Promise<string> {
     cache: 'no-store',
     credentials: 'include',
   })
-
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`)
   }
-
   const csrf = (await response.json()) as { token: string }
   csrfToken = csrf.token
   return csrfToken
+}
+
+export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestInit = {}) {
+  const method = options.method?.toUpperCase() ?? 'GET'
+  const headers = new Headers(options.headers)
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    headers.set('X-CSRF-TOKEN', await ensureCsrfToken())
+  }
+  return fetch(input, { ...options, credentials: 'include', headers })
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
@@ -28,14 +35,11 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     method === 'PUT' ||
     method === 'PATCH' ||
     method === 'DELETE'
-
   let mutationHeaders: HeadersInit | undefined
-
   if (isMutation) {
     const token = await ensureCsrfToken()
     mutationHeaders = { 'X-CSRF-TOKEN': token }
   }
-
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
     cache: options?.method ? undefined : 'no-store',
@@ -46,12 +50,10 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   })
-
   if (!response.ok) {
     const error = await response.text()
     throw new Error(error || `HTTP ${response.status}`)
   }
-
   return response.json()
 }
 

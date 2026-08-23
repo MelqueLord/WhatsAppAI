@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../../lib/api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../../lib/auth'
@@ -61,7 +62,7 @@ export function AiConfigPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/integrations/ai', {
+      const res = await fetchWithCsrf('/api/integrations/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -85,7 +86,7 @@ export function AiConfigPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const res = await fetch('/api/integrations/ai/toggle', {
+      const res = await fetchWithCsrf('/api/integrations/ai/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -104,7 +105,7 @@ export function AiConfigPage() {
 
   const testMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/integrations/ai/test-connection', {
+      const res = await fetchWithCsrf('/api/integrations/ai/test-connection', {
         method: 'POST',
         credentials: 'include',
       })

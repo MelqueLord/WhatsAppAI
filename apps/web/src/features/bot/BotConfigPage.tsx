@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../lib/api'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, CheckCircle2, Loader2, Plus, Save, Trash2, Power } from 'lucide-react'
@@ -38,14 +39,14 @@ export function BotConfigPage() {
   const { data: config, isLoading } = useQuery({
     queryKey: ['bot-config'],
     queryFn: async () => {
-      const res = await fetch('/api/bot-config', { credentials: 'include' })
+      const res = await fetchWithCsrf('/api/bot-config')
       return res.json() as Promise<BotConfig>
     },
   })
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const res = await fetch('/api/bot-config/toggle', {
+      const res = await fetchWithCsrf('/api/bot-config/toggle', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
       })
@@ -57,7 +58,7 @@ export function BotConfigPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/bot-config', {
+      const res = await fetchWithCsrf('/api/bot-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           mode: 'SimpleAutoReply',

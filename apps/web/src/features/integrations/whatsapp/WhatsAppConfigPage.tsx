@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../../lib/api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../../lib/auth'
@@ -63,7 +64,7 @@ export function WhatsAppConfigPage() {
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/integrations/whatsapp/session/disconnect/${selectedQrLine}`, {
+      const res = await fetchWithCsrf(`/api/integrations/whatsapp/session/disconnect/${selectedQrLine}`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -77,7 +78,7 @@ export function WhatsAppConfigPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp', {
+      const res = await fetchWithCsrf('/api/integrations/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -96,7 +97,7 @@ export function WhatsAppConfigPage() {
 
   const testMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp/test-connection', {
+      const res = await fetchWithCsrf('/api/integrations/whatsapp/test-connection', {
         method: 'POST',
         credentials: 'include',
       })

@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../../lib/api'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, Loader2, Save } from 'lucide-react'
@@ -43,7 +44,7 @@ export function AiInstructionsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/integrations/ai/instructions', {
+      const response = await fetchWithCsrf('/api/integrations/ai/instructions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

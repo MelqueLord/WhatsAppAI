@@ -1,3 +1,4 @@
+import { fetchWithCsrf } from '../../lib/api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Tags, Plus, Edit2, XCircle, CheckCircle2, Loader2 } from 'lucide-react'
@@ -21,14 +22,14 @@ export function ClientTagsPage() {
   const { data: tags, isLoading } = useQuery({
     queryKey: ['client-tags'],
     queryFn: async () => {
-      const res = await fetch('/api/client-tags', { credentials: 'include' })
+      const res = await fetchWithCsrf('/api/client-tags')
       return res.json() as Promise<ClientTag[]>
     },
   })
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/client-tags', {
+      const res = await fetchWithCsrf('/api/client-tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -45,7 +46,7 @@ export function ClientTagsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (tag: ClientTag) => {
-      const res = await fetch(`/api/client-tags/${tag.id}`, {
+      const res = await fetchWithCsrf(`/api/client-tags/${tag.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -62,7 +63,7 @@ export function ClientTagsPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'deactivate' | 'reactivate' }) => {
-      const res = await fetch(`/api/client-tags/${id}/${action}`, {
+      const res = await fetchWithCsrf(`/api/client-tags/${id}/${action}`, {
         method: 'POST',
         credentials: 'include',
       })
