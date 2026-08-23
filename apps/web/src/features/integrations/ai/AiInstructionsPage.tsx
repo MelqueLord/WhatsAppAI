@@ -52,9 +52,14 @@ export function AiInstructionsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ systemPrompt: `Tipo de negócio: ${businessType || 'Não informado'}\n\n${systemPrompt}`, maxTokensPerResponse: maxTokens, routingQueueIds, routingTagIds }),
+        body: JSON.stringify({ systemPrompt: `Tipo de negócio: ${businessType || 'Não informado'}\n\n${systemPrompt}`.slice(0, 4000), maxTokensPerResponse: maxTokens, routingQueueIds, routingTagIds }),
       })
-      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || 'Não foi possível salvar as diretrizes.')
+      if (!response.ok) {
+        const body = await response.text()
+        let message = 'Não foi possível salvar as diretrizes.'
+        try { message = JSON.parse(body).error || message } catch { if (body) message = body }
+        throw new Error(message)
+      }
       return response.json()
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-config'] }),
@@ -67,7 +72,7 @@ export function AiInstructionsPage() {
       <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center"><BookOpen className="w-5 h-5" /></div><div><h1 className="text-xl font-bold text-slate-900">Diretrizes da IA</h1><p className="text-sm text-slate-500">Defina o que a IA precisa saber para atender com respostas curtas e objetivas.</p></div></div>
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
         <div><label className="block text-sm font-medium text-slate-700 mb-1">Tipo de negócio *</label><select value={businessType} onChange={(event) => setBusinessType(event.target.value)} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg"><option value="">Selecione o segmento</option><option>Clínica e saúde</option><option>Restaurante e alimentação</option><option>Comércio e varejo</option><option>Serviços profissionais</option><option>Educação</option><option>Imobiliária</option><option>Outro</option></select><p className="text-xs text-slate-500 mt-1">A IA usará somente o contexto necessário para atender este segmento.</p></div>
-        <div><label className="block text-sm font-medium text-slate-700 mb-1">Instruções de atendimento</label><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={12} maxLength={4000} placeholder="Ex.: Você atende a Clínica X. Responda em português, seja breve, confirme informações antes de prometer prazos e encaminhe ao humano para pagamentos ou situações urgentes." className="w-full px-4 py-3 border border-slate-300 rounded-lg resize-y" /><p className="text-xs text-slate-500 mt-1">{systemPrompt.length}/4000 caracteres. Use informações essenciais; detalhes extensos devem ficar em Conhecimento.</p></div>
+        <div><label className="block text-sm font-medium text-slate-700 mb-1">Instruções de atendimento</label><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={12} maxLength={3900} placeholder="Ex.: Você atende a Clínica X. Responda em português, seja breve, confirme informações antes de prometer prazos e encaminhe ao humano para pagamentos ou situações urgentes." className="w-full px-4 py-3 border border-slate-300 rounded-lg resize-y" /><p className="text-xs text-slate-500 mt-1">{systemPrompt.length}/3900 caracteres. Use informações essenciais; detalhes extensos devem ficar em Conhecimento.</p></div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Filas para encaminhamento automático</label>
           {queues.filter(queue => queue.isActive).length === 0 ? <p className="text-sm text-slate-500">Cadastre e ative uma fila no menu Filas.</p> : <div className="space-y-2">{queues.filter(queue => queue.isActive).map(queue => <label key={queue.id} className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" checked={routingQueueIds.includes(queue.id)} onChange={() => setRoutingQueueIds(current => current.includes(queue.id) ? current.filter(id => id !== queue.id) : [...current, queue.id])} className="mt-1" /><span><span className="block text-sm font-medium text-slate-800">{queue.name}</span>{queue.description && <span className="block text-xs text-slate-500">{queue.description}</span>}</span></label>)}</div>}
