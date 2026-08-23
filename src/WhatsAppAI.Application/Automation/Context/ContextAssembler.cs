@@ -59,7 +59,7 @@ public sealed class ContextAssembler(
         if (!string.IsNullOrWhiteSpace(basePrompt))
             parts.Add(basePrompt);
 
-        parts.Add("Atenda somente a solicitação atual e as regras explícitas abaixo. Não converse sobre assuntos fora do atendimento. Seja breve e não invente informações.");
+        parts.Add("As diretrizes configuradas pela empresa acima são regras prioritárias do atendimento. Atenda somente a solicitação atual dentro dessas diretrizes e do conhecimento autorizado abaixo. Não invente informações, políticas, preços, prazos ou disponibilidade. Seja breve e responda no idioma do cliente.");
 
         if (knowledgeItems.Count > 0)
         {
@@ -88,8 +88,7 @@ public sealed class ContextAssembler(
             parts.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
         }
 
-        if (routingQueues is { Count: > 0 } || routingTags is { Count: > 0 })
-            parts.Add("Return only one JSON object with: action (reply, handoff or no_action), text, confidence, handoff_reason, queue and tags. Keep queue null and tags empty when they do not apply.");
+        parts.Add("Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply. Use handoff when the customer requests a human, the answer is unsafe, or a configured queue is selected.");
 
         return string.Join("\n\n", parts).Length > MaxContextCharacters
             ? string.Join("\n\n", parts)[..MaxContextCharacters]
