@@ -37,14 +37,14 @@ export function ChangePasswordDialog() {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-[#0b1222] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/40">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
             <Lock className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Alterar Senha</h2>
-            <p className="text-sm text-slate-500">Primeiro acesso - defina sua nova senha</p>
+            <h2 className="text-lg font-semibold text-white">Alterar Senha</h2>
+            <p className="text-sm text-slate-300">Primeiro acesso - defina sua nova senha</p>
           </div>
         </div>
 
@@ -57,7 +57,7 @@ export function ChangePasswordDialog() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-slate-200 mb-1.5">
               Senha Atual
             </label>
             <input
@@ -71,7 +71,7 @@ export function ChangePasswordDialog() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-slate-200 mb-1.5">
               Nova Senha
             </label>
             <input
@@ -86,7 +86,7 @@ export function ChangePasswordDialog() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-slate-200 mb-1.5">
               Confirmar Nova Senha
             </label>
             <input

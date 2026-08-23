@@ -249,9 +249,9 @@ export function MessagePanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-full bg-[#070b16] text-white">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center shadow-sm">
+      <div className="bg-[#0b1222] border-b border-white/10 px-4 py-3 flex items-center shadow-sm">
         {onBack && (
           <button
             onClick={onBack}
@@ -268,7 +268,7 @@ export function MessagePanel({
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-800 truncate">
+          <h3 className="font-semibold text-white truncate">
             {conversation.contactName}
           </h3>
 
@@ -390,7 +390,7 @@ export function MessagePanel({
                     msg.direction ===
                       'Outbound'
                       ? 'bg-emerald-500 text-white rounded-br-md'
-                      : 'bg-white text-slate-800 rounded-bl-md shadow-sm'
+                      : 'bg-[#10223f] text-slate-100 rounded-bl-md shadow-sm'
                   )}
                 >
                   {msg.direction ===
@@ -452,7 +452,7 @@ export function MessagePanel({
       </div>
 
       {/* Input */}
-      <div className="bg-white border-t border-slate-200 p-4">
+      <div className="bg-[#0b1222] border-t border-white/10 p-4">
         {!conversation.isWindowOpen && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -492,7 +492,7 @@ export function MessagePanel({
               !conversation.isWindowOpen ||
               sendMutation.isPending
             }
-            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 bg-[#10223f] border border-white/10 rounded-xl text-sm text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           />
 
           <button
@@ -516,8 +516,8 @@ export function MessagePanel({
       {/* Save Contact Modal */}
       {showSaveContact && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          <div className="bg-[#0b1222] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/40">
+            <h2 className="text-lg font-semibold text-white mb-4">
               Salvar Contato
             </h2>
 

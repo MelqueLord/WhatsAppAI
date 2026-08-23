@@ -40,9 +40,9 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   })
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="p-4 border-b border-slate-200 space-y-3">
-        <h2 className="text-lg font-semibold text-slate-800">Conversas</h2>
+    <div className="flex flex-col h-full bg-[#0b1222] text-white">
+      <div className="p-4 border-b border-white/10 space-y-3">
+        <h2 className="text-lg font-semibold text-white">Conversas</h2>
 
         {/* Search */}
         <div className="relative">
@@ -52,7 +52,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
             placeholder="Buscar conversas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#10223f] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
@@ -63,7 +63,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
             <select
               value={operatorFilter}
               onChange={(e) => setOperatorFilter(e.target.value)}
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              className="flex-1 text-sm border border-white/10 rounded-lg px-3 py-1.5 bg-[#10223f] text-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">Todos os operadores</option>
               <option value="unassigned">Não atribuídas</option>
@@ -98,8 +98,8 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
               key={conv.id}
               onClick={() => onSelect(conv)}
               className={cn(
-                'w-full flex items-center p-4 hover:bg-slate-50 transition-all duration-200 border-b border-slate-100',
-                selectedId === conv.id && 'bg-emerald-50/50 border-l-2 border-l-emerald-500'
+                'w-full flex items-center p-4 hover:bg-[#10223f] transition-all duration-200 border-b border-white/10',
+                selectedId === conv.id && 'bg-blue-500/15 border-l-2 border-l-cyan-400'
               )}
             >
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold mr-3 flex-shrink-0 shadow-sm">
@@ -107,7 +107,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-slate-800 truncate">{conv.contactName}</h3>
+                  <h3 className="font-medium text-white truncate">{conv.contactName}</h3>
                   {conv.lastMessageAt && (
                     <span className="text-[11px] text-slate-400 ml-2 flex-shrink-0">
                       {formatTime(conv.lastMessageAt)}
