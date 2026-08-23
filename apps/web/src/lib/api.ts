@@ -267,6 +267,25 @@ export const api = {
 
   operators: {
     list: () => fetchApi<Operator[]>('/api/operators'),
+    create: (data: { email: string; displayName?: string; password: string }) =>
+      fetchApi<{ email: string; temporaryPassword: string }>('/api/operators', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deactivate: (id: string) =>
+      fetchApi<Operator>(`/api/operators/${id}/deactivate`, { method: 'POST' }),
+    reactivate: (id: string) =>
+      fetchApi<Operator>(`/api/operators/${id}/reactivate`, { method: 'POST' }),
+    resetPassword: (id: string, newPassword: string) =>
+      fetchApi<{ email: string; temporaryPassword: string }>(`/api/operators/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword }),
+      }),
+    assignLine: (id: string, connectionType: string | null, lineNumber: number | null) =>
+      fetchApi<Operator>(`/api/operators/${id}/line`, {
+        method: 'PUT',
+        body: JSON.stringify({ connectionType, lineNumber }),
+      }),
   },
 
   contacts: {

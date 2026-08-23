@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
+import { api } from '../../lib/api'
 
 interface Operator {
   id: string
@@ -47,19 +48,7 @@ export function OperatorsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async (data: { email: string; displayName?: string; password: string }) => {
-      const res = await fetch('/api/operators', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Erro ao criar operador')
-      }
-      return res.json()
-    },
+    mutationFn: (data: { email: string; displayName?: string; password: string }) => api.operators.create(data),
     onSuccess: (data) => {
       setCreatedCredentials({ email: data.email, password: data.temporaryPassword })
       setShowCreateForm(false)
@@ -68,43 +57,18 @@ export function OperatorsPage() {
   })
 
   const deactivateMutation = useMutation({
-    mutationFn: async (operatorId: string) => {
-      const res = await fetch(`/api/operators/${operatorId}/deactivate`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) throw new Error('Erro ao desativar')
-      return res.json()
-    },
+    mutationFn: (operatorId: string) => api.operators.deactivate(operatorId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
   })
 
   const reactivateMutation = useMutation({
-    mutationFn: async (operatorId: string) => {
-      const res = await fetch(`/api/operators/${operatorId}/reactivate`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) throw new Error('Erro ao reativar')
-      return res.json()
-    },
+    mutationFn: (operatorId: string) => api.operators.reactivate(operatorId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
   })
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async ({ operatorId, newPassword }: { operatorId: string; newPassword: string }) => {
-      const res = await fetch(`/api/operators/${operatorId}/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ newPassword }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Erro ao resetar senha')
-      }
-      return res.json()
-    },
+    mutationFn: ({ operatorId, newPassword }: { operatorId: string; newPassword: string }) =>
+      api.operators.resetPassword(operatorId, newPassword),
     onSuccess: (data) => {
       setCreatedCredentials({ email: data.email, password: data.temporaryPassword })
       queryClient.invalidateQueries({ queryKey: ['operators'] })
@@ -112,22 +76,9 @@ export function OperatorsPage() {
   })
 
   const assignLineMutation = useMutation({
-    mutationFn: async ({ operatorId, value }: { operatorId: string; value: string }) => {
+    mutationFn: ({ operatorId, value }: { operatorId: string; value: string }) => {
       const [connectionType, lineNumber] = value ? value.split(':') : ['', '']
-      const res = await fetch(`/api/operators/${operatorId}/line`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          connectionType: connectionType || null,
-          lineNumber: lineNumber ? Number(lineNumber) : null,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Erro ao atribuir linha')
-      }
-      return res.json()
+      return api.operators.assignLine(operatorId, connectionType || null, lineNumber ? Number(lineNumber) : null)
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
   })
