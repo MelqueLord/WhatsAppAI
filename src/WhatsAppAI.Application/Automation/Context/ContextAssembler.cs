@@ -7,9 +7,9 @@ public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
     IKnowledgeItemRepository knowledgeRepository)
 {
-    private const int MaxMessages = 20;
-    private const int MaxKnowledgeItems = 10;
-    private const int MaxTotalTokens = 3000;
+    private const int MaxMessages = 8;
+    private const int MaxKnowledgeItems = 6;
+    private const int MaxContextCharacters = 9000;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -59,6 +59,8 @@ public sealed class ContextAssembler(
         if (!string.IsNullOrWhiteSpace(basePrompt))
             parts.Add(basePrompt);
 
+        parts.Add("Atenda somente a solicitação atual e as regras explícitas abaixo. Não converse sobre assuntos fora do atendimento. Seja breve e não invente informações.");
+
         if (knowledgeItems.Count > 0)
         {
             parts.Add("Relevant knowledge:");
@@ -89,7 +91,9 @@ public sealed class ContextAssembler(
         if (routingQueues is { Count: > 0 } || routingTags is { Count: > 0 })
             parts.Add("Return only one JSON object with: action (reply, handoff or no_action), text, confidence, handoff_reason, queue and tags. Keep queue null and tags empty when they do not apply.");
 
-        return string.Join("\n\n", parts);
+        return string.Join("\n\n", parts).Length > MaxContextCharacters
+            ? string.Join("\n\n", parts)[..MaxContextCharacters]
+            : string.Join("\n\n", parts);
     }
 }
 
