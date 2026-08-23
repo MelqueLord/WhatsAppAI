@@ -52,7 +52,7 @@ export function InboxPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50">
+    <div className="inbox-page h-screen flex flex-col bg-[#070b16] text-white">
       {/* Connection status bar */}
       {!isConnected && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-center gap-2">
