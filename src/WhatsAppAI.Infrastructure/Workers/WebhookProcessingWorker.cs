@@ -257,11 +257,23 @@ public sealed class WebhookProcessingWorker(
 
         if (conversation is null)
         {
-            conversation = Conversation.Create(tenantId, contact.Id, phoneNumberId);
-            conversation.RenewWindow();
-            await conversationRepository.AddAsync(conversation, cancellationToken);
             conversation = await conversationRepository.GetByContactAndPhoneAsync(
-                tenantId, contact.Id, phoneNumberId, cancellationToken) ?? conversation;
+                tenantId, contact.Id, "manual", cancellationToken);
+            if (conversation is not null)
+            {
+                conversation.SetPhoneNumberId(phoneNumberId);
+                conversation.RenewWindow();
+                conversation.RecordMessage();
+                await conversationRepository.UpdateAsync(conversation, cancellationToken);
+            }
+            else
+            {
+                conversation = Conversation.Create(tenantId, contact.Id, phoneNumberId);
+                conversation.RenewWindow();
+                await conversationRepository.AddAsync(conversation, cancellationToken);
+                conversation = await conversationRepository.GetByContactAndPhoneAsync(
+                    tenantId, contact.Id, phoneNumberId, cancellationToken) ?? conversation;
+            }
         }
         else
         {

@@ -61,6 +61,15 @@ public sealed class Conversation
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void SetPhoneNumberId(string phoneNumberId)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumberId))
+            throw new ArgumentException("Phone number ID is required.", nameof(phoneNumberId));
+
+        PhoneNumberId = phoneNumberId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public bool IsWindowOpen(DateTime utcNow) => WindowExpiresAt.HasValue && WindowExpiresAt.Value > utcNow;
 
     public void RecordMessage()
