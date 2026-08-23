@@ -25,7 +25,10 @@ export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestIn
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     headers.set('X-CSRF-TOKEN', await ensureCsrfToken())
   }
-  return fetch(input, { ...options, credentials: 'include', headers })
+  const requestUrl = typeof input === 'string' && input.startsWith('/')
+    ? `${API_BASE}${input}`
+    : input
+  return fetch(requestUrl, { ...options, credentials: 'include', headers })
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
