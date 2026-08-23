@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Plus, Search, X, Loader2, MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../../lib/api'
 
 interface Contact {
   id: string
@@ -23,11 +24,6 @@ function normalizeBrazilPhone(value: string) {
   return digits.startsWith('55') ? digits : `55${digits}`
 }
 
-async function readJson<T>(response: Response): Promise<T | undefined> {
-  const body = await response.text()
-  return body ? (JSON.parse(body) as T) : undefined
-}
-
 export function ContactsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -45,19 +41,8 @@ export function ContactsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; name?: string; startConversation?: boolean }) => {
-      const res = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) {
-        const err = await readJson<{ error?: string }>(res)
-        throw new Error(err?.error || 'Erro ao criar contato')
-      }
-      return readJson<{ conversationId?: string }>(res)
-    },
+    mutationFn: (data: { phoneNumber: string; name?: string; startConversation?: boolean }) =>
+      api.contacts.create(data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setShowCreateForm(false)
@@ -68,13 +53,7 @@ export function ContactsPage() {
   })
 
   const startConversationMutation = useMutation({
-    mutationFn: async (contactId: string) => {
-      const res = await fetch(`/api/contacts/${contactId}/start-conversation`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      return readJson<{ conversationId?: string }>(res)
-    },
+    mutationFn: (contactId: string) => api.contacts.startConversation(contactId),
     onSuccess: (data) => {
       if (data?.conversationId) {
         navigate('/inbox')
