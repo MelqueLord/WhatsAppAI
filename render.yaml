@@ -49,7 +49,7 @@ services:
       - key: PORT
         value: "10000"
       - key: WHATSAPP_WEB_API_URL
-        value: https://whatsappai-api.onrender.com/api/webhooks/whatsapp-web
+        value: https://whatsappai-api-u61i.onrender.com/api/webhooks/whatsapp-web
       - key: WHATSAPP_WEB_WEBHOOK_SECRET
         fromService:
           type: web

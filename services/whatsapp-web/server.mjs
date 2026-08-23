@@ -5,9 +5,7 @@ import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeys
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
-const apiWebhookUrl = process.env.WHATSAPP_WEB_API_HOSTPORT
-  ? `http://${process.env.WHATSAPP_WEB_API_HOSTPORT}/api/webhooks/whatsapp-web`
-  : (process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web')
+const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
 const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
 const sessions = new Map()
 const botConfigs = new Map()
