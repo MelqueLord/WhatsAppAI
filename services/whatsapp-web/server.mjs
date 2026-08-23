@@ -241,8 +241,11 @@ function addMessage(session, msg, shouldAutoReply = false) {
   })
   session.messages.set(key, list)
   void saveSnapshot(session)
-  if (!msg.key?.fromMe && shouldAutoReply) {
+  if (!msg.key?.fromMe) {
     void forwardInboundMessage(session, msg, text, createdAt)
+  }
+  if (!msg.key?.fromMe && shouldAutoReply && Date.now() >= session.acceptInboundAt) {
+    void sendAutoReply(session, jid, text)
   }
 }
 
