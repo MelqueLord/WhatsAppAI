@@ -5,7 +5,9 @@ import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeys
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
-const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
+const apiWebhookUrl = process.env.WHATSAPP_WEB_API_HOSTPORT
+  ? `http://${process.env.WHATSAPP_WEB_API_HOSTPORT}/api/webhooks/whatsapp-web`
+  : (process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web')
 const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
 const sessions = new Map()
 const botConfigs = new Map()
@@ -49,7 +51,6 @@ async function getSession(tenantId) {
     status: 'connecting',
     qr: null,
     phoneNumber: null,
-    acceptInboundAt: Number.POSITIVE_INFINITY,
     sock: null,
     conversations: new Map(),
     messages: new Map(),
@@ -73,7 +74,6 @@ async function getSession(tenantId) {
     }
     if (connection === 'open') {
       session.status = 'connected'
-      session.acceptInboundAt = Date.now() + 120_000
       session.qr = null
       session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
     }
@@ -241,7 +241,7 @@ function addMessage(session, msg, shouldAutoReply = false) {
   })
   session.messages.set(key, list)
   void saveSnapshot(session)
-  if (!msg.key?.fromMe && shouldAutoReply && Date.now() >= session.acceptInboundAt) {
+  if (!msg.key?.fromMe && shouldAutoReply) {
     void forwardInboundMessage(session, msg, text, createdAt)
   }
 }
@@ -280,7 +280,7 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
   }
 
   try {
-    await fetch(apiWebhookUrl, {
+    const response = await fetch(apiWebhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -288,6 +288,9 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
       },
       body: JSON.stringify(payload),
     })
+    if (!response.ok) {
+      throw new Error(`Webhook returned HTTP ${response.status}`)
+    }
   } catch (error) {
     console.error('Failed to forward WhatsApp Web message', error)
   }
