@@ -40,7 +40,7 @@ export function AiConfigPage() {
   const { data: providers = [] } = useQuery({
     queryKey: ['ai-providers'],
     queryFn: async () => {
-      const response = await fetch('/api/integrations/ai/providers', { credentials: 'include' })
+      const response = await fetchWithCsrf('/api/integrations/ai/providers')
       return response.json() as Promise<ProviderInfo[]>
     },
     enabled: aiEnabled,
@@ -49,7 +49,7 @@ export function AiConfigPage() {
   const { data: config, isLoading } = useQuery({
     queryKey: ['ai-config'],
     queryFn: async () => {
-      const response = await fetch('/api/integrations/ai', { credentials: 'include' })
+      const response = await fetchWithCsrf('/api/integrations/ai')
       return response.json() as Promise<AiConfigResponse>
     },
     enabled: aiEnabled,
@@ -163,7 +163,7 @@ export function AiConfigPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="font-semibold text-slate-900 mb-4">Provedor de IA</h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
             {providers.map((item) => (
               <button
                 key={item.id}

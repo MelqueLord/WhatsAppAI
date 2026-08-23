@@ -15,7 +15,7 @@ export function AiInstructionsPage() {
   const { data: queues = [] } = useQuery({
     queryKey: ['service-queues'],
     queryFn: async () => {
-      const response = await fetch('/api/service-queues', { credentials: 'include' })
+      const response = await fetchWithCsrf('/api/service-queues')
       if (!response.ok) throw new Error('Não foi possível carregar as filas.')
       return response.json() as Promise<Array<{ id: string; name: string; description?: string; isActive: boolean }>>
     },
@@ -24,7 +24,7 @@ export function AiInstructionsPage() {
   const { data: tags = [] } = useQuery({
     queryKey: ['client-tags'],
     queryFn: async () => {
-      const response = await fetch('/api/client-tags', { credentials: 'include' })
+      const response = await fetchWithCsrf('/api/client-tags')
       if (!response.ok) throw new Error('Não foi possível carregar as tags.')
       return response.json() as Promise<Array<{ id: string; name: string; description?: string; color?: string; isActive: boolean }>>
     },
@@ -32,7 +32,7 @@ export function AiInstructionsPage() {
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['ai-config'],
-    queryFn: async () => (await fetch('/api/integrations/ai', { credentials: 'include' })).json(),
+    queryFn: async () => (await fetchWithCsrf('/api/integrations/ai')).json(),
   })
 
   if (config && loadedVersion !== (config.version ?? 0)) {
