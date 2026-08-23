@@ -11,11 +11,29 @@ interface Contact {
   createdAt: string
 }
 
+function maskBrazilPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
+function normalizeBrazilPhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  return digits.startsWith('55') ? digits : `55${digits}`
+}
+
+async function readJson<T>(response: Response): Promise<T | undefined> {
+  const body = await response.text()
+  return body ? (JSON.parse(body) as T) : undefined
+}
+
 export function ContactsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts'],
@@ -35,15 +53,15 @@ export function ContactsPage() {
         body: JSON.stringify(data),
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Erro ao criar contato')
+        const err = await readJson<{ error?: string }>(res)
+        throw new Error(err?.error || 'Erro ao criar contato')
       }
-      return res.json()
+      return readJson<{ conversationId?: string }>(res)
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setShowCreateForm(false)
-      if (data.conversationId) {
+      if (data?.conversationId) {
         navigate('/inbox')
       }
     },
@@ -55,10 +73,10 @@ export function ContactsPage() {
         method: 'POST',
         credentials: 'include',
       })
-      return res.json()
+      return readJson<{ conversationId?: string }>(res)
     },
     onSuccess: (data) => {
-      if (data.conversationId) {
+      if (data?.conversationId) {
         navigate('/inbox')
       }
     },
@@ -68,7 +86,7 @@ export function ContactsPage() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     createMutation.mutate({
-      phoneNumber: formData.get('phoneNumber') as string,
+      phoneNumber: normalizeBrazilPhone(phoneNumber),
       name: (formData.get('name') as string) || undefined,
       startConversation: formData.get('startConversation') === 'on',
     })
@@ -189,7 +207,9 @@ export function ContactsPage() {
                   name="phoneNumber"
                   type="text"
                   required
-                  placeholder="+5511999999999"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(maskBrazilPhone(e.target.value))}
+                  placeholder="(11) 99999-9999"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
