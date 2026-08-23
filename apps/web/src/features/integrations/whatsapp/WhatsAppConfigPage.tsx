@@ -35,7 +35,7 @@ export function WhatsAppConfigPage() {
   const { isLoading } = useQuery({
     queryKey: ['whatsapp-config'],
     queryFn: async () => {
-      const res = await fetch('/api/integrations/whatsapp', { credentials: 'include' })
+      const res = await fetchWithCsrf('/api/integrations/whatsapp')
       return res.json()
     },
     enabled: !isSuspended,
@@ -44,7 +44,7 @@ export function WhatsAppConfigPage() {
   const { data: qrData, isLoading: qrLoading, refetch: refetchQr } = useQuery({
     queryKey: ['whatsapp-qrcode', selectedQrLine],
     queryFn: async () => {
-      const res = await fetch(`/api/integrations/whatsapp/qrcode/${selectedQrLine}`, { credentials: 'include' })
+      const res = await fetchWithCsrf(`/api/integrations/whatsapp/qrcode/${selectedQrLine}`)
       if (res.status === 202) return { status: 'connecting' }
       if (!res.ok) return null
       return res.json()
@@ -56,7 +56,7 @@ export function WhatsAppConfigPage() {
   const { data: sessionStatus } = useQuery({
     queryKey: ['whatsapp-session', selectedQrLine],
     queryFn: async () => {
-      const res = await fetch(`/api/integrations/whatsapp/session/status/${selectedQrLine}`, { credentials: 'include' })
+      const res = await fetchWithCsrf(`/api/integrations/whatsapp/session/status/${selectedQrLine}`)
       return res.json()
     },
     enabled: !isSuspended,
