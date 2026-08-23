@@ -542,3 +542,26 @@ CREATE INDEX "IX_whatsapp_accounts_tenant_id" ON whatsappai.whatsapp_accounts (t
 CREATE UNIQUE INDEX "IX_whatsapp_accounts_tenant_id_connection_type_line_number" ON whatsappai.whatsapp_accounts (tenant_id, connection_type, line_number);
 
 
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" character varying(150) NOT NULL,
+    "ProductVersion" character varying(32) NOT NULL,
+    CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES
+('20260814000000_InitialSchema', '10.0.10'),
+('20260816000000_AddUserIsPlatformAdmin', '10.0.10'),
+('20260816010000_EnforceIdentityBoundaries', '10.0.10'),
+('20260816180733_AddSubscriptionPlan', '10.0.10'),
+('20260817104719_AddMustChangePassword', '10.0.10'),
+('20260819113003_AddHandoffAndMediaMessages', '10.0.10'),
+('20260819185249_AddTenantDueDate', '10.0.10'),
+('20260819205641_AddTenantLineCounts', '10.0.10'),
+('20260819211358_AddWhatsAppLineSlots', '10.0.10'),
+('20260819212417_AddTenantOperatorLimit', '10.0.10'),
+('20260819213121_AddOperatorLineAssignment', '10.0.10'),
+('20260820150000_AddAiInstructions', '10.0.10'),
+('20260821102557_AddServiceLinesAndAiQueueRouting', '10.0.10')
+ON CONFLICT ("MigrationId") DO NOTHING;
+
+
