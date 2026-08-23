@@ -3,7 +3,7 @@ services:
     name: whatsappai-api
     runtime: docker
     dockerfilePath: ./src/WhatsAppAI.WebApi/Dockerfile
-    plan: starter
+    plan: free
     autoDeploy: true
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
@@ -35,7 +35,7 @@ services:
     name: whatsappai-whatsapp-web
     runtime: docker
     dockerfilePath: ./services/whatsapp-web/Dockerfile
-    plan: starter
+    plan: free
     autoDeploy: true
     envVars:
       - key: NODE_ENV
