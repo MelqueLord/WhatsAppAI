@@ -38,6 +38,9 @@ services:
     runtime: docker
     dockerfilePath: ./services/whatsapp-web/Dockerfile
     dockerContext: ./services/whatsapp-web
+    buildFilter:
+      paths:
+        - services/whatsapp-web/**
     plan: free
     autoDeploy: true
     envVars:
