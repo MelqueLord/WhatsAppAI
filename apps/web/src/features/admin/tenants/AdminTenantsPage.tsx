@@ -193,12 +193,12 @@ export function AdminTenantsPage() {
   const isOverdue = (dueDate?: string) => dueDate ? new Date(dueDate) < new Date() : false
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+    <div className="companies-page h-full flex flex-col bg-[#070b16] text-white">
+      <div className="border-b border-white/10 bg-[#0b1222] px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-800">Empresas</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Gerencie as empresas da plataforma</p>
+            <h1 className="text-xl font-semibold text-white">Empresas</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Gerencie as empresas da plataforma</p>
           </div>
           <button
             onClick={() => {
@@ -305,7 +305,7 @@ export function AdminTenantsPage() {
               placeholder="Buscar tenants..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#0b1222] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -316,35 +316,35 @@ export function AdminTenantsPage() {
             <span className="ml-2 text-slate-500">Carregando tenants...</span>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="min-w-full">
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#0b1222] shadow-xl shadow-black/20">
+            <table className="min-w-[1250px] w-full">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="border-b border-white/10 bg-[#10223f]">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Nome
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Gerência
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Plano
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Linhas
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Operadores
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Vencimento
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Criado em
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
@@ -394,8 +394,8 @@ export function AdminTenantsPage() {
                       <td className="px-6 py-4 text-sm text-slate-500">
                         {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-2 min-w-[220px]">
+                      <td className="sticky right-0 bg-[#0b1222] px-6 py-4 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-2 min-w-[220px]">
                           <button
                             onClick={() => {
                               updateMutation.reset()

@@ -41,6 +41,23 @@ body {
   min-height: 100vh;
 }
 
+.companies-page tbody tr:hover {
+  background-color: rgba(30, 41, 59, 0.7);
+}
+
+.companies-page tbody td {
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.companies-page tbody td .text-slate-800,
+.companies-page tbody td .text-slate-700,
+.companies-page tbody td .text-slate-600,
+.companies-page tbody td .text-slate-500,
+.companies-page tbody td .text-slate-400 {
+  color: #cbd5e1;
+}
+
 /* WhatsApp Chat Styles */
 .whatsapp-gradient {
   background: linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%);
