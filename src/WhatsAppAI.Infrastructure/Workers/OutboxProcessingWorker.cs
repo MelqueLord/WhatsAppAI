@@ -131,8 +131,15 @@ public sealed class OutboxProcessingWorker(
             var account = conversation is null
                 ? await whatsAppAccountRepository.GetByTenantAsync(outboxMessage.TenantId, cancellationToken)
                 : await whatsAppAccountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId, cancellationToken);
+            if (account is null && conversation?.PhoneNumberId == "manual")
+                account = await whatsAppAccountRepository.GetByTenantAndSlotAsync(
+                    outboxMessage.TenantId,
+                    WhatsAppConnectionType.QrCode,
+                    1,
+                    cancellationToken);
             var qrPhoneNumberId = conversation?.PhoneNumberId;
-            var isQrSession = qrPhoneNumberId?.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) == true;
+            var isQrSession = qrPhoneNumberId?.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) == true ||
+                account?.ConnectionType == WhatsAppConnectionType.QrCode;
             if (account is null && !isQrSession)
             {
                 outboxMessage.MarkDead("WhatsApp account not found or inactive");

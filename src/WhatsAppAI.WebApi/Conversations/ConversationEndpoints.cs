@@ -188,6 +188,11 @@ public static class ConversationEndpoints
         }
 
         var conversationAccount = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        if (conversationAccount is null && conversation.PhoneNumberId == "manual")
+            conversationAccount = await accountRepository.GetByTenantAndSlotAsync(
+                currentTenant.TenantId.Value,
+                WhatsAppConnectionType.QrCode,
+                1);
         var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
             conversationAccount?.ConnectionType == WhatsAppConnectionType.QrCode;
         if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))

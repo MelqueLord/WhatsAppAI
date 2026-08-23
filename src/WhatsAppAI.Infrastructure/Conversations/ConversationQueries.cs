@@ -54,9 +54,11 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
                 IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
+                    (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
                     context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),
                 IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId) ||
+                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive &&
+                        (a.PhoneNumberId == c.PhoneNumberId || c.PhoneNumberId == "manual")) ||
                     (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })
             .ToListAsync(cancellationToken);
@@ -151,9 +153,11 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
                 IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
+                    (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
                     context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),
                 IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId) ||
+                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive &&
+                        (a.PhoneNumberId == c.PhoneNumberId || c.PhoneNumberId == "manual")) ||
                     (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })
             .FirstOrDefaultAsync(cancellationToken);
