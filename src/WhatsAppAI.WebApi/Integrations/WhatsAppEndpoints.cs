@@ -212,7 +212,12 @@ public static class WhatsAppEndpoints
         var result = await whatsAppClient.GetQrCodeAsync(currentTenant.TenantId.Value, lineNumber);
 
         if (!result.IsSuccess)
+        {
+            if (result.ErrorMessage?.Contains("QR ainda não disponível", StringComparison.OrdinalIgnoreCase) == true)
+                return Results.StatusCode(StatusCodes.Status202Accepted);
+
             return Results.BadRequest(new { error = result.ErrorMessage });
+        }
 
         return Results.Ok(new
         {

@@ -45,6 +45,7 @@ export function WhatsAppConfigPage() {
     queryKey: ['whatsapp-qrcode', selectedQrLine],
     queryFn: async () => {
       const res = await fetch(`/api/integrations/whatsapp/qrcode/${selectedQrLine}`, { credentials: 'include' })
+      if (res.status === 202) return { status: 'connecting' }
       if (!res.ok) return null
       return res.json()
     },
@@ -243,6 +244,11 @@ export function WhatsAppConfigPage() {
                 {qrLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                  </div>
+                ) : qrData?.status === 'connecting' ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <Loader2 className="w-8 h-8 mx-auto mb-3 text-emerald-500 animate-spin" />
+                    <p>Iniciando conexão do WhatsApp. O QR Code aparecerá em alguns segundos.</p>
                   </div>
                 ) : qrData?.qrCode ? (
                   <>
