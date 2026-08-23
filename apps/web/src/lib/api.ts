@@ -54,6 +54,10 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     },
   })
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('INVALID_CREDENTIALS')
+    }
+
     const error = await response.text()
     throw new Error(error || `HTTP ${response.status}`)
   }

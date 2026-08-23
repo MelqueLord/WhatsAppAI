@@ -51,9 +51,10 @@ export function LoginPage() {
     try {
       await login(email, password)
       navigate('/dashboard')
-    } catch {
-      // eslint-disable-next-line no-empty
-      setError('Email ou senha incorretos.')
+    } catch (error) {
+      setError(error instanceof Error && error.message === 'INVALID_CREDENTIALS'
+        ? 'E-mail ou senha incorretos.'
+        : 'Não foi possível acessar agora. Verifique sua conexão e tente novamente.')
     } finally {
       setIsSubmitting(false)
     }
@@ -145,6 +146,10 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="username"
+                  spellCheck={false}
                   className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="seu@email.com"
                 />
@@ -160,6 +165,10 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="current-password"
+                  spellCheck={false}
                   className="w-full pl-12 pr-12 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="••••••••••"
                 />
