@@ -24,6 +24,7 @@ public sealed record ConversationDto
     public uint Version { get; init; }
     public string? LastMessage { get; init; }
     public DateTime? LastMessageAt { get; init; }
+    public bool IsQrCode { get; init; }
     public bool IsWindowOpen { get; init; }
 }
 

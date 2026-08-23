@@ -282,20 +282,25 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
     }],
   }
 
-  try {
-    const response = await fetch(apiWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-WhatsApp-Web-Secret': apiWebhookSecret,
-      },
-      body: JSON.stringify(payload),
-    })
-    if (!response.ok) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const response = await fetch(apiWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WhatsApp-Web-Secret': apiWebhookSecret,
+        },
+        body: JSON.stringify(payload),
+      })
+      if (response.ok) return
       throw new Error(`Webhook returned HTTP ${response.status}`)
+    } catch (error) {
+      if (attempt === 5) {
+        console.error('Failed to forward WhatsApp Web message', error)
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000))
     }
-  } catch (error) {
-    console.error('Failed to forward WhatsApp Web message', error)
   }
 }
 

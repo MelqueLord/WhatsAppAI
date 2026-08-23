@@ -70,6 +70,7 @@ export interface Conversation {
   version: number
   lastMessage?: string
   lastMessageAt?: string
+  isQrCode?: boolean
   isWindowOpen: boolean
   assignedToUserId?: string
   assignedToUserName?: string

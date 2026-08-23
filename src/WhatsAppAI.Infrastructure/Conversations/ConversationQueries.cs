@@ -52,6 +52,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
+                IsQrCode = c.PhoneNumberId.StartsWith("qr:"),
                 IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") ||
                     (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })
@@ -146,6 +147,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
+                IsQrCode = c.PhoneNumberId.StartsWith("qr:"),
                 IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") ||
                     (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
             })

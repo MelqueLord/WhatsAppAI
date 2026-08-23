@@ -42,6 +42,7 @@ export function MessagePanel({
   const isPhoneNumber = /^\+?\d+$/.test(
     conversation.contactName.replace(/\s/g, '')
   )
+  const isConversationOpen = conversation.isQrCode || conversation.isWindowOpen
 
   const saveContactMutation = useMutation({
     mutationFn: (name: string) =>
@@ -453,7 +454,7 @@ export function MessagePanel({
 
       {/* Input */}
       <div className="bg-[#0b1222] border-t border-white/10 p-4">
-        {!conversation.isWindowOpen && (
+        {!isConversationOpen && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
 
@@ -489,7 +490,7 @@ export function MessagePanel({
             }
             placeholder="Digite uma mensagem..."
             disabled={
-              !conversation.isWindowOpen ||
+              !isConversationOpen ||
               sendMutation.isPending
             }
             className="flex-1 px-4 py-2.5 bg-[#10223f] border border-white/10 rounded-xl text-sm text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
@@ -499,7 +500,7 @@ export function MessagePanel({
             onClick={handleSend}
             disabled={
               !message.trim() ||
-              !conversation.isWindowOpen ||
+              !isConversationOpen ||
               sendMutation.isPending
             }
             className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
