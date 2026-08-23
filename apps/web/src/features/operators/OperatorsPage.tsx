@@ -40,11 +40,7 @@ export function OperatorsPage() {
 
   const { data: operators, isLoading, error } = useQuery({
     queryKey: ['operators'],
-    queryFn: async () => {
-      const res = await fetch('/api/operators', { credentials: 'include' })
-      if (!res.ok) throw new Error('Erro ao carregar operadores')
-      return res.json() as Promise<Operator[]>
-    },
+    queryFn: api.operators.list,
   })
 
   const createMutation = useMutation({
@@ -52,6 +48,17 @@ export function OperatorsPage() {
     onSuccess: (data) => {
       setCreatedCredentials({ email: data.email, password: data.temporaryPassword })
       setShowCreateForm(false)
+      queryClient.setQueryData<Operator[]>(['operators'], (current = []) => [
+        {
+          id: data.membershipId,
+          userId: data.membershipId,
+          email: data.email,
+          displayName: data.displayName,
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+        },
+        ...current,
+      ])
       queryClient.invalidateQueries({ queryKey: ['operators'] })
     },
   })

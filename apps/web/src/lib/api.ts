@@ -115,6 +115,11 @@ export interface Operator {
   email: string
   displayName?: string
   status: string
+  createdAt: string
+  deactivatedAt?: string
+  reactivatedAt?: string
+  assignedConnectionType?: string
+  assignedLineNumber?: number
 }
 
 export interface Tenant {
@@ -270,7 +275,7 @@ export const api = {
   operators: {
     list: () => fetchApi<Operator[]>('/api/operators'),
     create: (data: { email: string; displayName?: string; password: string }) =>
-      fetchApi<{ email: string; temporaryPassword: string }>('/api/operators', {
+      fetchApi<{ membershipId: string; email: string; displayName?: string; temporaryPassword: string }>('/api/operators', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
