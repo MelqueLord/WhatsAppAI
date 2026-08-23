@@ -8,6 +8,8 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: DOTNET_hostBuilder__reloadConfigOnChange
+        value: "false"
       - key: DatabaseProvider
         value: PostgreSQL
       - key: ConnectionStrings__DefaultConnection
