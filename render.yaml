@@ -35,6 +35,7 @@ services:
     name: whatsappai-whatsapp-web
     runtime: docker
     dockerfilePath: ./services/whatsapp-web/Dockerfile
+    dockerContext: ./services/whatsapp-web
     plan: free
     autoDeploy: true
     envVars:
