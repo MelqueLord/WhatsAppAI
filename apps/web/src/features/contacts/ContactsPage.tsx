@@ -33,19 +33,20 @@ export function ContactsPage() {
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts'],
-    queryFn: async () => {
-      const res = await fetch(`/api/contacts?limit=100`, { credentials: 'include' })
-      if (!res.ok) throw new Error('Erro ao carregar contatos')
-      return res.json() as Promise<Contact[]>
-    },
+    queryFn: () => api.contacts.list(undefined, 100),
   })
 
   const createMutation = useMutation({
     mutationFn: (data: { phoneNumber: string; name?: string; startConversation?: boolean }) =>
       api.contacts.create(data),
     onSuccess: (data) => {
+      queryClient.setQueryData<Contact[]>(['contacts'], (current = []) => [
+        data,
+        ...current.filter((contact) => contact.id !== data.id),
+      ])
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setShowCreateForm(false)
+      setPhoneNumber('')
       if (data?.conversationId) {
         navigate('/inbox')
       }
