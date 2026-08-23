@@ -5,6 +5,7 @@ using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 using WhatsAppAI.WebApi.Hubs;
@@ -186,7 +187,9 @@ public static class ConversationEndpoints
                 return Results.Forbid();
         }
 
-        var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId);
+        var conversationAccount = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
+            conversationAccount?.ConnectionType == WhatsAppConnectionType.QrCode;
         if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
 
