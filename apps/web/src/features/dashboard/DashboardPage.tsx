@@ -132,15 +132,15 @@ export function DashboardPage() {
               <Phone className="w-5 h-5 text-slate-400" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4">
-                <Phone className="w-5 h-5 text-emerald-600" />
+              <div className="flex items-center gap-3 rounded-lg border border-emerald-400/20 bg-emerald-500/15 p-4">
+                <Phone className="w-5 h-5 text-emerald-300" />
                 <div>
                   <p className="text-2xl font-bold text-slate-900">{user.officialApiLineCount ?? 0}</p>
                   <p className="text-sm text-slate-600">API oficial</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-lg bg-blue-50 p-4">
-                <QrCode className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-3 rounded-lg border border-blue-400/20 bg-blue-500/15 p-4">
+                <QrCode className="w-5 h-5 text-blue-300" />
                 <div>
                   <p className="text-2xl font-bold text-slate-900">{user.qrCodeLineCount ?? 0}</p>
                   <p className="text-sm text-slate-600">QR Code</p>
