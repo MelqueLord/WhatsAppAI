@@ -48,11 +48,8 @@ services:
         value: production
       - key: PORT
         value: "10000"
-      - key: WHATSAPP_WEB_API_HOSTPORT
-        fromService:
-          type: web
-          name: whatsappai-api
-          property: hostport
+      - key: WHATSAPP_WEB_API_URL
+        value: https://whatsappai-api.onrender.com/api/webhooks/whatsapp-web
       - key: WHATSAPP_WEB_WEBHOOK_SECRET
         fromService:
           type: web
