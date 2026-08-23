@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using WhatsAppAI.Application.Abstractions;
@@ -8,15 +9,19 @@ namespace WhatsAppAI.Infrastructure.Meta;
 
 public static class MetaServiceCollectionExtensions
 {
-    public static IServiceCollection AddMetaServices(this IServiceCollection services, IHostEnvironment environment)
+    public static IServiceCollection AddMetaServices(
+        this IServiceCollection services,
+        IHostEnvironment environment,
+        IConfiguration configuration)
     {
-        if (environment.IsDevelopment())
+        var useBridge = configuration.GetValue<bool>("WhatsAppWeb:Enabled") || environment.IsDevelopment();
+
+        if (useBridge)
         {
             services.AddHttpClient<IWhatsAppClient, WhatsAppWebClient>();
         }
         else
         {
-            // Use official WhatsApp Cloud API for production
             services.AddHttpClient<IWhatsAppClient, WhatsAppClient>();
         }
 

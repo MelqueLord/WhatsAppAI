@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: whatsappai-api
+    runtime: docker
+    dockerfilePath: ./src/WhatsAppAI.WebApi/Dockerfile
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DatabaseProvider
+        value: PostgreSQL
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Encryption__Key
+        generateValue: true
+      - key: Meta__VerifyToken
+        sync: false
+      - key: Meta__AppSecret
+        sync: false
+      - key: WhatsAppWeb__Enabled
+        value: "true"
+      - key: WhatsAppWeb__BaseUrl
+        value: https://whatsappai-whatsapp-web.onrender.com
+      - key: WhatsAppWeb__WebhookSecret
+        sync: false
+      - key: WHATSAPP_WEB_WEBHOOK_SECRET
+        sync: false
+      - key: PORT
+        value: "10000"
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+
+  - type: web
+    name: whatsappai-whatsapp-web
+    runtime: docker
+    dockerfilePath: ./services/whatsapp-web/Dockerfile
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: WHATSAPP_WEB_API_URL
+        value: https://whatsappai-api.onrender.com/api/webhooks/whatsapp-web
+      - key: WHATSAPP_WEB_WEBHOOK_SECRET
+        sync: false

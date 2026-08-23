@@ -69,7 +69,8 @@ builder.Services.AddIdentityServices(
 builder.Services.AddSecretServices();
 
 builder.Services.AddMetaServices(
-    builder.Environment);
+    builder.Environment,
+    builder.Configuration);
 
 builder.Services.AddAiProviderServices();
 
