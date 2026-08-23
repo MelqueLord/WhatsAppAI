@@ -186,7 +186,7 @@ public static class ConversationEndpoints
                 return Results.Forbid();
         }
 
-        var isQrConversation = conversation.PhoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase);
+        var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId);
         if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
 
@@ -231,6 +231,10 @@ public static class ConversationEndpoints
         var tenant = await dbContext.Tenants.FindAsync(tenantId);
         return tenant?.Status == TenantStatus.Active;
     }
+
+    private static bool IsQrPhoneNumberId(string phoneNumberId) =>
+        phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) ||
+        phoneNumberId.Equals("whatsapp-web", StringComparison.OrdinalIgnoreCase);
 
     private static async Task<bool> OperatorCanAccessConversationAsync(
         Guid conversationId,
