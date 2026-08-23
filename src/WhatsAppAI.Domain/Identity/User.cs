@@ -80,6 +80,13 @@ public sealed class User
         SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
+    public void UpdateEmail(string email)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        Email = email.Trim().ToLowerInvariant();
+        SecurityStamp = Guid.NewGuid().ToString("N");
+    }
+
     public void GrantPlatformAdmin()
     {
         IsPlatformAdmin = true;

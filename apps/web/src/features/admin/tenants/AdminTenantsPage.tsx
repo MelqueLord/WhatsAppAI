@@ -97,7 +97,7 @@ export function AdminTenantsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number } }) =>
+    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number } }) =>
       api.admin.tenants.update(tenant.id, data, tenant.version),
     onSuccess: () => {
       setEditTarget(null)
@@ -150,6 +150,7 @@ export function AdminTenantsPage() {
       tenant: editTarget,
       data: {
         name: String(formData.get('name') ?? '').trim(),
+        ownerEmail: String(formData.get('ownerEmail') ?? '').trim(),
         planCode: String(formData.get('planCode') ?? ''),
         officialApiLineCount: Number(formData.get('officialApiLineCount') ?? 0),
         qrCodeLineCount: Number(formData.get('qrCodeLineCount') ?? 0),
@@ -656,6 +657,16 @@ export function AdminTenantsPage() {
                   type="text"
                   required
                   defaultValue={editTarget.name}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email do responsável *</label>
+                <input
+                  name="ownerEmail"
+                  type="email"
+                  required
+                  defaultValue={editTarget.ownerEmail ?? ''}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>

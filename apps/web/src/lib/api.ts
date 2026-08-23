@@ -371,6 +371,7 @@ export const api = {
         id: string,
         data: {
           name: string
+          ownerEmail: string
           planCode: string
           officialApiLineCount: number
           qrCodeLineCount: number

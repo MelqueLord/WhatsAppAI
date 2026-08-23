@@ -256,6 +256,8 @@ public static class AdminTenantEndpoints
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return Results.BadRequest(new { error = "Tenant name is required." });
+        if (string.IsNullOrWhiteSpace(request.OwnerEmail) || !request.OwnerEmail.Contains('@'))
+            return Results.BadRequest(new { error = "Owner email is required." });
 
         if (request.OfficialApiLineCount < 0 || request.QrCodeLineCount < 0)
             return Results.BadRequest(new { error = "Line counts cannot be negative." });
@@ -278,6 +280,18 @@ public static class AdminTenantEndpoints
         if (plan is null)
             return Results.BadRequest(new { error = "Invalid or inactive plan code." });
 
+        var owner = await dbContext.TenantMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.TenantId == tenantId && m.Role == MembershipRole.TenantOwner)
+            .Select(m => m.User)
+            .SingleOrDefaultAsync();
+        if (owner is null)
+            return Results.NotFound(new { error = "Tenant owner not found." });
+
+        var ownerEmail = request.OwnerEmail.Trim().ToLowerInvariant();
+        if (await dbContext.Users.AnyAsync(u => u.Id != owner.Id && u.Email == ownerEmail))
+            return Results.Conflict(new { error = "This email is already in use." });
+
         tenant.UpdateDetails(
             request.Name,
             slug,
@@ -285,6 +299,7 @@ public static class AdminTenantEndpoints
             request.OfficialApiLineCount,
             request.QrCodeLineCount,
             request.OperatorLimit);
+        owner.UpdateEmail(ownerEmail);
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
@@ -517,6 +532,7 @@ public sealed class UpdatePlanRequest
 public sealed class UpdateTenantRequest
 {
     public string Name { get; init; } = string.Empty;
+    public string OwnerEmail { get; init; } = string.Empty;
     public string PlanCode { get; init; } = string.Empty;
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
