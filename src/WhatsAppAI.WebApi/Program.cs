@@ -127,6 +127,10 @@ var allowedOrigins =
         "http://localhost:3000"
     ];
 
+Log.Information(
+    "CORS AllowedOrigins: {Origins}",
+    string.Join(", ", allowedOrigins));
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
