@@ -161,21 +161,7 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
-    var ensureCreated =
-        builder.Configuration
-            .GetValue<bool>(
-                "DatabaseInitialization:EnsureCreated");
-
-    if (ensureCreated)
-    {
-        await context.Database
-            .EnsureCreatedAsync();
-    }
-    else
-    {
-        await context.Database
-            .MigrateAsync();
-    }
+    await context.Database.MigrateAsync();
 
     // Optional bootstrap account.
     // Credentials must come from configuration/user-secrets.
