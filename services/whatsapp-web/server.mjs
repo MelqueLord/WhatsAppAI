@@ -69,17 +69,21 @@ async function getSession(tenantId) {
     if (qr) {
       session.qr = qr
       session.status = 'qr_pending'
+      console.log(`QR code generated for session ${tenantId}`)
     }
     if (connection === 'open') {
       session.status = 'connected'
       session.qr = null
       session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
+      console.log(`WhatsApp session connected for ${tenantId} (${session.phoneNumber ?? 'unknown phone'})`)
     }
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
+      const errorMessage = lastDisconnect?.error?.message ?? 'unknown connection error'
       session.status = 'disconnected'
       session.sock = null
       sessions.delete(tenantId)
+      console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage}`)
       if (code === DisconnectReason.loggedOut) {
         await rm(`sessions/${tenantId}`, { recursive: true, force: true })
       }
@@ -290,8 +294,12 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
         },
         body: JSON.stringify(payload),
       })
-      if (response.ok) return
-      throw new Error(`Webhook returned HTTP ${response.status}`)
+      if (response.ok) {
+        console.log(`Inbound message forwarded for ${session.tenantId}: HTTP ${response.status}`)
+        return
+      }
+      const responseBody = await response.text()
+      throw new Error(`Webhook returned HTTP ${response.status}: ${responseBody.slice(0, 200)}`)
     } catch (error) {
       if (attempt === 5) {
         console.error('Failed to forward WhatsApp Web message', error)
