@@ -68,6 +68,8 @@ public static class WebhookEndpoints
         var value = payload?.Entry?.FirstOrDefault()?.Changes?.FirstOrDefault()?.Value;
         var phoneNumberId = value?.Metadata?.PhoneNumberId;
         var messageId = value?.Messages?.FirstOrDefault()?.Id;
+        logger.LogInformation("WhatsApp Web webhook received: phoneNumberId={PhoneNumberId}, messageCount={MessageCount}",
+            phoneNumberId, value?.Messages?.Count ?? 0);
         if (string.IsNullOrWhiteSpace(phoneNumberId) || string.IsNullOrWhiteSpace(messageId))
             return Results.BadRequest("Missing WhatsApp Web event identifiers");
 

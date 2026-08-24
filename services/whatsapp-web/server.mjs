@@ -97,6 +97,7 @@ async function getSession(tenantId) {
   })
 
   sock.ev.on('messages.upsert', ({ messages, type }) => {
+    console.log(`WhatsApp messages.upsert: type=${type} count=${messages?.length ?? 0}`)
     for (const message of messages ?? []) addMessage(session, message, type === 'notify')
   })
 
