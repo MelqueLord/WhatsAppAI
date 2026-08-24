@@ -31,7 +31,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     enabled: isTenantOwner,
   })
 
-  const conversations = [...allConversations].reverse().filter((c) => {
+  const conversations = allConversations.filter((c) => {
     const matchesSearch =
       c.contactName.toLowerCase().includes(search.toLowerCase()) ||
       c.contactPhone.includes(search)
