@@ -43,32 +43,25 @@ public static class WhatsAppEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
-        if (currentTenant.UserRole != "TenantOwner")
-            return Results.Forbid();
 
         var accounts = await accountRepository.GetAllByTenantAsync(currentTenant.TenantId.Value);
-        var account = accounts.FirstOrDefault(a => a.ConnectionType == WhatsAppConnectionType.OfficialApi);
+        var officialAccount = accounts.FirstOrDefault(a => a.ConnectionType == WhatsAppConnectionType.OfficialApi);
 
-        if (account is null)
-            return Results.Ok(new WhatsAppConfigResponse
-            {
-                IsConfigured = false,
-                Lines = []
-            });
+        var lines = accounts.Select(a => new WhatsAppLineResponse
+        {
+            LineNumber = a.LineNumber,
+            ConnectionType = a.ConnectionType.ToString(),
+            PhoneNumberId = a.PhoneNumberId,
+            IsActive = a.IsActive
+        }).ToArray();
 
         return Results.Ok(new WhatsAppConfigResponse
         {
-            IsConfigured = true,
-            WabaId = account.WabaId,
-            PhoneNumberId = account.PhoneNumberId,
-            IsActive = account.IsActive,
-            Lines = accounts.Select(a => new WhatsAppLineResponse
-            {
-                LineNumber = a.LineNumber,
-                ConnectionType = a.ConnectionType.ToString(),
-                PhoneNumberId = a.PhoneNumberId,
-                IsActive = a.IsActive
-            }).ToArray()
+            IsConfigured = officialAccount is not null,
+            WabaId = officialAccount?.WabaId,
+            PhoneNumberId = officialAccount?.PhoneNumberId,
+            IsActive = officialAccount?.IsActive ?? false,
+            Lines = lines
         });
     }
 
