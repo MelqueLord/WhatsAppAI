@@ -75,7 +75,8 @@ function OperatorRoute({ children }: { children: React.ReactNode }) {
 }
 
 function NavigateToHome() {
-  const { isOperator } = useAuth()
+  const { isOperator, isPlatformAdmin } = useAuth()
+  if (isPlatformAdmin) return <Navigate to="/admin/tenants" replace />
   return <Navigate to={isOperator ? '/inbox' : '/dashboard'} replace />
 }
 

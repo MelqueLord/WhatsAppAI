@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, MessageCircle } from 'lucide-react'
 
@@ -23,7 +23,6 @@ function AtenzLogo({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth()
-  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -40,7 +39,7 @@ export function LoginPage() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/inbox" replace />
+    return <Navigate to="/" replace />
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +49,7 @@ export function LoginPage() {
 
     try {
       await login(email, password)
-      navigate('/dashboard')
+      // Redirecionamento feito pelo <Navigate> abaixo quando isAuthenticated virar true
     } catch (error) {
       setError(error instanceof Error && error.message === 'INVALID_CREDENTIALS'
         ? 'E-mail ou senha incorretos.'
