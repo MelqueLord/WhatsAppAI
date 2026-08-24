@@ -11,7 +11,8 @@ interface UseSignalROptions {
 
 export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUpdate }: UseSignalROptions) {
   const connectionRef = useRef<HubConnection | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
+  // null = still connecting (initial), true = connected, false = lost connection
+  const [isConnected, setIsConnected] = useState<boolean | null>(null)
   const callbacksRef = useRef({ onMessage, onStatusUpdate, onConversationUpdate })
 
   useEffect(() => {
@@ -43,6 +44,9 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
     newConnection.onclose(() => setIsConnected(false))
     newConnection.onreconnecting(() => setIsConnected(false))
 
+    // Reset to "connecting" state whenever the effect re-runs (page navigation)
+    setIsConnected(null)
+
     connectionRef.current = newConnection
 
     return () => {
@@ -58,7 +62,7 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
         await connection.start()
         setIsConnected(true)
       } catch {
-        // The hub may be unavailable while the API remains usable.
+        // Hub unavailable — mark as disconnected (not just unknown)
         setIsConnected(false)
       }
     }

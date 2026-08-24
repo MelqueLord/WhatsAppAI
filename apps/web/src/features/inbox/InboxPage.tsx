@@ -53,8 +53,8 @@ export function InboxPage() {
 
   return (
     <div className="inbox-page h-screen flex flex-col bg-[#070b16] text-white">
-      {/* Connection status bar */}
-      {!isConnected && (
+      {/* Connection status bar — only shown after a confirmed disconnection, not during initial connect */}
+      {isConnected === false && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-center gap-2">
           <WifiOff className="w-3.5 h-3.5 text-amber-600" />
           <span className="text-xs text-amber-700">Reconectando ao servidor...</span>
@@ -108,7 +108,7 @@ function SuspendedInbox() {
   )
 }
 
-function EmptyState({ isConnected }: { isConnected: boolean }) {
+function EmptyState({ isConnected }: { isConnected: boolean | null }) {
   return (
     <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="text-center">
@@ -121,23 +121,25 @@ function EmptyState({ isConnected }: { isConnected: boolean }) {
         <p className="text-slate-500 max-w-sm mx-auto mb-6">
           Selecione uma conversa para visualizar as mensagens.
         </p>
-        <span
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full mx-auto w-fit ${
-            isConnected
-              ? 'text-emerald-600 bg-emerald-50'
-              : 'text-amber-600 bg-amber-50'
-          }`}
-        >
-          {isConnected ? (
-            <>
-              <Wifi className="w-3 h-3" /> Conectado
-            </>
-          ) : (
-            <>
-              <WifiOff className="w-3 h-3" /> Desconectado
-            </>
-          )}
-        </span>
+        {isConnected !== null && (
+          <span
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full mx-auto w-fit ${
+              isConnected
+                ? 'text-emerald-600 bg-emerald-50'
+                : 'text-amber-600 bg-amber-50'
+            }`}
+          >
+            {isConnected ? (
+              <>
+                <Wifi className="w-3 h-3" /> Conectado
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3 h-3" /> Desconectado
+              </>
+            )}
+          </span>
+        )}
       </div>
     </div>
   )
