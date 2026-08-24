@@ -171,7 +171,7 @@ using (var scope = app.Services.CreateScope())
         await context.Database
             .EnsureCreatedAsync();
     }
-    else if (!app.Environment.IsProduction())
+    else
     {
         await context.Database
             .MigrateAsync();
