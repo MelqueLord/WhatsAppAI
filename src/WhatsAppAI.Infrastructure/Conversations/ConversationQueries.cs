@@ -58,6 +58,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
+                QueueId = c.QueueId,
                 IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
                     (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
                     context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),
@@ -157,6 +158,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Version = c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 LastMessageAt = c.LastMessageAt,
+                QueueId = c.QueueId,
                 IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
                     (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
                     context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),

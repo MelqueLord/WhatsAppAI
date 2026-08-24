@@ -74,10 +74,22 @@ export interface Conversation {
   version: number
   lastMessage?: string
   lastMessageAt?: string
+  queueId?: string
+  queueName?: string
+  queueColor?: string
   isQrCode?: boolean
   isWindowOpen: boolean
   assignedToUserId?: string
   assignedToUserName?: string
+}
+
+export interface ServiceQueue {
+  id: string
+  name: string
+  description?: string | null
+  color?: string | null
+  sortOrder: number
+  isActive: boolean
 }
 
 export interface Message {
@@ -277,6 +289,15 @@ export const api = {
           body: JSON.stringify({ mode }),
           headers: version ? { 'If-Match': version.toString() } : {},
         }
+      ),
+  },
+
+  serviceQueues: {
+    list: () => fetchApi<ServiceQueue[]>('/api/service-queues'),
+    assign: (conversationId: string, queueId: string | null) =>
+      fetchApi<{ conversationId: string; queueId: string | null }>(
+        `/api/service-queues/conversations/${conversationId}/assign`,
+        { method: 'POST', body: JSON.stringify({ queueId }) }
       ),
   },
 

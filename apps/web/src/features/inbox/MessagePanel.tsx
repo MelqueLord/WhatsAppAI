@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type Conversation } from '../../lib/api'
+import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatTime } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
@@ -43,6 +43,14 @@ export function MessagePanel({
     conversation.contactName.replace(/\s/g, '')
   )
   const isConversationOpen = conversation.isQrCode || conversation.isWindowOpen
+
+  const { data: serviceQueues = [] } = useQuery({
+    queryKey: ['service-queues', 'active'],
+    queryFn: async () => {
+      const response = await api.serviceQueues.list()
+      return response.filter((queue) => queue.isActive)
+    },
+  })
 
   const saveContactMutation = useMutation({
     mutationFn: (name: string) =>
@@ -114,6 +122,15 @@ export function MessagePanel({
       queryClient.invalidateQueries({
         queryKey: ['conversations'],
       })
+    },
+  })
+
+  const queueMutation = useMutation({
+    mutationFn: (queueId: string | null) =>
+      api.serviceQueues.assign(conversation.id, queueId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
     },
   })
 
@@ -301,6 +318,20 @@ export function MessagePanel({
             </button>
           )}
 
+          {serviceQueues.length > 0 && (
+            <select
+              value={conversation.queueId ?? ''}
+              onChange={(event) => queueMutation.mutate(event.target.value || null)}
+              disabled={queueMutation.isPending}
+              aria-label="Fila da conversa"
+              className="max-w-36 rounded-lg border border-white/10 bg-[#10223f] px-2 py-1.5 text-xs text-white"
+            >
+              <option value="">Sem fila</option>
+              {serviceQueues.map((queue: ServiceQueue) => (
+                <option key={queue.id} value={queue.id}>{queue.name}</option>
+              ))}
+            </select>
+          )}
           {isConnected ? (
             <Wifi className="w-4 h-4 text-emerald-500" />
           ) : (

@@ -100,7 +100,7 @@ public static class ServiceLineEndpoints
         if (request.QueueId.HasValue)
         {
             var queue = await queueRepo.GetByIdAsync(request.QueueId.Value);
-            if (queue is null || queue.TenantId != currentTenant.TenantId)
+            if (queue is null || queue.TenantId != currentTenant.TenantId || !queue.IsActive)
                 return Results.BadRequest(new { error = "Queue not found." });
         }
 
