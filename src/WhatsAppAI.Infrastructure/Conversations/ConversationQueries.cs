@@ -25,7 +25,12 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             query = query.Where(c => c.AssignedToUserId == operatorUserId);
 
         if (!string.IsNullOrWhiteSpace(phoneNumberId))
-            query = query.Where(c => c.PhoneNumberId == phoneNumberId);
+        {
+            var isQrLine = phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase);
+            query = isQrLine
+                ? query.Where(c => c.PhoneNumberId == phoneNumberId || c.PhoneNumberId == "manual")
+                : query.Where(c => c.PhoneNumberId == phoneNumberId);
+        }
 
         if (!string.IsNullOrEmpty(request.Cursor))
         {

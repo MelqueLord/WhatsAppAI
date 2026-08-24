@@ -183,7 +183,8 @@ public static class ConversationEndpoints
             var account = membership?.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
                 ? await accountRepository.GetByTenantAndSlotAsync(currentTenant.TenantId.Value, membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)
                 : null;
-            if (account is null || conversation.PhoneNumberId != account.PhoneNumberId)
+            if (account is null ||
+                (conversation.PhoneNumberId != account.PhoneNumberId && conversation.PhoneNumberId != "manual"))
                 return Results.Forbid();
         }
 
@@ -264,7 +265,8 @@ public static class ConversationEndpoints
             membership.AssignedConnectionType.Value,
             membership.AssignedLineNumber.Value);
 
-        return account is not null && conversation.PhoneNumberId == account.PhoneNumberId;
+        return account is not null &&
+            (conversation.PhoneNumberId == account.PhoneNumberId || conversation.PhoneNumberId == "manual");
     }
 }
 
