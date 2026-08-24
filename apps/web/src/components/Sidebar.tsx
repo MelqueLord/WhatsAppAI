@@ -129,7 +129,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/queues', icon: ListOrdered, label: 'Filas' },
           { to: '/tags', icon: Tags, label: 'Tags' },
-          { to: '/broadcast', icon: Radio, label: 'Transmissões' },
+          { to: '/broadcast', icon: Radio, label: 'Disparo em massa' },
         ]
       : []),
     { to: '/usage', icon: BarChart3, label: 'Uso' },

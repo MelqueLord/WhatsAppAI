@@ -108,7 +108,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800">Nova Lista de Transmissão</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Nova Lista de Disparo em Massa</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
             <X className="w-5 h-5 text-slate-400" />
           </button>
@@ -293,7 +293,7 @@ function DispatchDialog({
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800">Disparar Transmissão</h2>
+            <h2 className="text-lg font-semibold text-slate-800">Disparar em Massa</h2>
             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
               <X className="w-5 h-5 text-slate-400" />
             </button>
@@ -340,7 +340,7 @@ function DispatchDialog({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800">Disparar Transmissão</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Disparar em Massa</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
             <X className="w-5 h-5 text-slate-400" />
           </button>
@@ -578,7 +578,7 @@ export function BroadcastPage() {
       <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-slate-800">Transmissões</h1>
+            <h1 className="text-xl font-semibold text-slate-800">Disparo em Massa</h1>
             <p className="text-sm text-slate-500 mt-0.5">
               Envie mensagens em massa via linha QR Code
             </p>
@@ -588,7 +588,7 @@ export function BroadcastPage() {
             className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nova Transmissão</span>
+            <span className="hidden sm:inline">Novo Disparo</span>
           </button>
         </div>
       </div>
