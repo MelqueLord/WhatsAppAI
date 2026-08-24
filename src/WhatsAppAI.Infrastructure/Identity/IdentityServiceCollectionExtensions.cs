@@ -37,9 +37,7 @@ public static class IdentityServiceCollectionExtensions
                     ? CookieSecurePolicy.Always
                     : CookieSecurePolicy.SameAsRequest;
 
-                options.Cookie.SameSite = requireSecureCookies
-                    ? SameSiteMode.None
-                    : SameSiteMode.Lax;
+                options.Cookie.SameSite = SameSiteMode.Lax;
 
                 options.Cookie.Name = "whatsappai.session.v2";
 
@@ -71,9 +69,7 @@ public static class IdentityServiceCollectionExtensions
                 ? CookieSecurePolicy.Always
                 : CookieSecurePolicy.SameAsRequest;
 
-            options.Cookie.SameSite = requireSecureCookies
-                ? SameSiteMode.None
-                : SameSiteMode.Lax;
+            options.Cookie.SameSite = SameSiteMode.Lax;
         });
 
         return services;

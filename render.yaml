@@ -10,6 +10,8 @@ services:
         value: Production
       - key: DOTNET_hostBuilder__reloadConfigOnChange
         value: "false"
+      - key: Cors__AllowedOrigins__0
+        sync: false
       - key: DatabaseProvider
         value: PostgreSQL
       - key: DatabaseInitialization__EnsureCreated
