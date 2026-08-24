@@ -303,8 +303,6 @@ if (app.Environment.IsProduction())
                 ?.IsAuthenticated == true;
 
         var requiresCsrf =
-            isLoginRequest
-            ||
             isAuthenticatedMutation;
 
         if (

@@ -225,10 +225,18 @@ export const api = {
     getMe: () => fetchApi<User>('/api/auth/me'),
 
     login: async (email: string, password: string) => {
-      return fetchApi<User>('/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('INVALID_CREDENTIALS')
+        const error = await response.text()
+        throw new Error(error || `HTTP ${response.status}`)
+      }
+      return response.json() as Promise<User>
     },
 
     logout: async () => {
