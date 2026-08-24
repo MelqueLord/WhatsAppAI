@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Radio,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import type { BroadcastList, Contact } from '../../lib/api'
+import { useAuth } from '../../lib/auth'
 
 // ──────────────────────────────── helpers ────────────────────────────────────
 
@@ -246,8 +247,16 @@ function DispatchDialog({
   broadcast: BroadcastList
   onClose: () => void
 }) {
+  const { user, isOperator } = useAuth()
   const queryClient = useQueryClient()
   const [selectedLine, setSelectedLine] = useState('')
+
+  const operatorLine =
+    isOperator &&
+    user?.assignedConnectionType === 'QrCode' &&
+    (user?.assignedLineNumber ?? 0) > 0
+      ? user.assignedLineNumber!
+      : null
 
   const { data: lines, isLoading: loadingLines } = useQuery({
     queryKey: ['whatsapp-lines'],
@@ -255,14 +264,78 @@ function DispatchDialog({
     select: (data) => data.filter((l) => l.connectionType === 'QrCode' && l.isActive),
   })
 
+  // Resolve the operator's assigned line phoneNumberId once lines are loaded
+  const operatorPhoneNumberId =
+    operatorLine != null
+      ? (lines?.find((l) => l.lineNumber === operatorLine)?.phoneNumberId ?? null)
+      : null
+
   const dispatchMutation = useMutation({
-    mutationFn: () => api.broadcasts.dispatch(broadcast.id, selectedLine),
+    mutationFn: (linePhoneNumberId: string) =>
+      api.broadcasts.dispatch(broadcast.id, linePhoneNumberId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] })
       onClose()
     },
   })
 
+  // Auto-dispatch as soon as the operator's line is resolved
+  useEffect(() => {
+    if (operatorPhoneNumberId && !dispatchMutation.isPending && !dispatchMutation.isError) {
+      dispatchMutation.mutate(operatorPhoneNumberId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatorPhoneNumberId])
+
+  // Operator path: show a minimal loading/error state — no selector needed
+  if (operatorLine != null) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800">Disparar Transmissão</h2>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+
+          <div className="px-6 py-6 space-y-4">
+            {dispatchMutation.isError ? (
+              <>
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                  {(dispatchMutation.error as Error).message}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    onClick={() => operatorPhoneNumberId && dispatchMutation.mutate(operatorPhoneNumberId)}
+                    disabled={!operatorPhoneNumberId || dispatchMutation.isPending}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
+                  >
+                    <Play className="w-4 h-4" /> Tentar novamente
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                <p className="text-sm text-slate-600">
+                  Disparando via linha QR Code {operatorLine}…
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Owner / manual path: show line selector as before
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
@@ -320,7 +393,7 @@ function DispatchDialog({
             Cancelar
           </button>
           <button
-            onClick={() => dispatchMutation.mutate()}
+            onClick={() => dispatchMutation.mutate(selectedLine)}
             disabled={!selectedLine || dispatchMutation.isPending}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
           >
