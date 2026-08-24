@@ -52,6 +52,7 @@ async function getSession(tenantId) {
     sock: null,
     conversations: new Map(),
     messages: new Map(),
+    seenMessageIds: new Set(),
   }
 
   if (!existing) {
@@ -253,6 +254,17 @@ function addMessage(session, msg, isLiveInbound = false) {
   const jid = msg.key?.remoteJid
   if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
 
+  const messageId = msg.key?.id
+  if (messageId) {
+    if (!msg.key?.fromMe && session.seenMessageIds.has(messageId)) {
+      console.log(`Duplicate inbound message ignored for ${session.tenantId}: ${messageId}`)
+      return
+    }
+    if (!msg.key?.fromMe) {
+      session.seenMessageIds.add(messageId)
+    }
+  }
+
   const text =
     msg.message?.conversation ||
     msg.message?.extendedTextMessage?.text ||
@@ -272,7 +284,7 @@ function addMessage(session, msg, isLiveInbound = false) {
   const key = encodeURIComponent(jid)
   const list = session.messages.get(key) ?? []
   list.push({
-    id: msg.key?.id ?? `${key}-${Date.now()}`,
+    id: messageId ?? `${key}-${Date.now()}`,
     direction: msg.key?.fromMe ? 'Outbound' : 'Inbound',
     status: 'Read',
     type: 'Text',
