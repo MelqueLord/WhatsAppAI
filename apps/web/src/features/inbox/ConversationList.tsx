@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, type Conversation } from '../../lib/api'
+import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { cn, formatTime, truncate } from '../../lib/utils'
 import { useAuth } from '../../lib/auth'
 import { MessageCircle, Search, Bot, User, Pause, Loader2, Filter } from 'lucide-react'
@@ -14,6 +14,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   const { isTenantOwner } = useAuth()
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
+  const [queueFilter, setQueueFilter] = useState<string>('all')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['conversations', operatorFilter],
@@ -25,6 +26,14 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
 
   const allConversations = data?.items ?? []
 
+  const { data: queues = [] } = useQuery({
+    queryKey: ['service-queues', 'active'],
+    queryFn: async () => {
+      const response = await api.serviceQueues.list()
+      return response.filter((queue) => queue.isActive)
+    },
+  })
+
   const { data: operators = [] } = useQuery({
     queryKey: ['operators'],
     queryFn: api.operators.list,
@@ -35,8 +44,10 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     const matchesSearch =
       c.contactName.toLowerCase().includes(search.toLowerCase()) ||
       c.contactPhone.includes(search)
+    const matchesQueue = queueFilter === 'all' ||
+      (queueFilter === 'none' ? !c.queueId : c.queueId === queueFilter)
 
-    return matchesSearch
+    return matchesSearch && matchesQueue
   })
 
   return (
@@ -72,6 +83,21 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
               ))}
             </select>
           </div>
+        )}
+
+        {queues.length > 0 && (
+          <select
+            value={queueFilter}
+            onChange={(event) => setQueueFilter(event.target.value)}
+            aria-label="Filtrar por fila"
+            className="w-full text-sm border border-white/10 rounded-lg px-3 py-1.5 bg-[#10223f] text-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="all">Todas as filas</option>
+            <option value="none">Sem fila</option>
+            {queues.map((queue: ServiceQueue) => (
+              <option key={queue.id} value={queue.id}>{queue.name}</option>
+            ))}
+          </select>
         )}
       </div>
 
