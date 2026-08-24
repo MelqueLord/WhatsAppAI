@@ -150,6 +150,7 @@ public sealed class WebhookProcessingWorker(
         var conversationRepository = serviceProvider.GetRequiredService<IConversationRepository>();
         var messageRepository = serviceProvider.GetRequiredService<IMessageRepository>();
         var encryptionService = serviceProvider.GetRequiredService<IEncryptionService>();
+        var notifier = serviceProvider.GetRequiredService<IRealtimeNotifier>();
 
         try
         {
@@ -183,6 +184,7 @@ public sealed class WebhookProcessingWorker(
                                 contactRepository,
                                 conversationRepository,
                                 messageRepository,
+                                notifier,
                                 cancellationToken);
                         }
                     }
@@ -218,6 +220,7 @@ public sealed class WebhookProcessingWorker(
         IContactRepository contactRepository,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
+        IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
         if (whatsappMessage.From is null || whatsappMessage.Id is null)
@@ -304,6 +307,17 @@ public sealed class WebhookProcessingWorker(
 
         logger.LogInformation("Processed inbound message {MessageId} for contact {ContactId}",
             message.Id, contact.Id);
+
+        // Notify frontend via SignalR so the conversation bubbles to the top immediately
+        try
+        {
+            await notifier.NotifyTenantAsync(tenantId, "NewMessage", new { conversationId = conversation.Id }, cancellationToken);
+            await notifier.NotifyTenantAsync(tenantId, "ConversationUpdated", new { conversationId = conversation.Id }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "SignalR notification failed for inbound message {MessageId}", message.Id);
+        }
     }
 
     private static string NormalizePhoneNumber(string phoneNumber) =>

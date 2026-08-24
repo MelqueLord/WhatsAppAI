@@ -79,6 +79,8 @@ builder.Services.AddAiProviderServices();
 builder.Services.AddWorkers();
 
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<WhatsAppAI.Application.Abstractions.IRealtimeNotifier,
+    WhatsAppAI.WebApi.Hubs.SignalRRealtimeNotifier>();
 
 // Rate limiting
 builder.Services.AddRateLimiter(options =>

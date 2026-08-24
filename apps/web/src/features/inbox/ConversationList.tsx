@@ -19,7 +19,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   const { data, isLoading, isError } = useQuery({
     queryKey: ['conversations', operatorFilter],
     queryFn: () => api.conversations.list(undefined, 50, operatorFilter === 'all' ? undefined : operatorFilter),
-    refetchInterval: 15000,
+    refetchInterval: 30000,
     refetchOnMount: 'always',
     retry: 2,
   })
