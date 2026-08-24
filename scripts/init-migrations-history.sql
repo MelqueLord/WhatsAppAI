@@ -24,5 +24,6 @@ INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES
 ('20260824225616_AddAssignedLinesJson', '10.0.0'),
 ('20260824230732_AddKeywordsToServiceLine', '10.0.0'),
 ('20260824231517_AddQueueTransferMessage', '10.0.0'),
-('20260824232650_SyncPendingModelChanges', '10.0.0')
+('20260824232650_SyncPendingModelChanges', '10.0.0'),
+('20260824234214_FinalSyncPendingChanges', '10.0.0')
 ON CONFLICT DO NOTHING;
