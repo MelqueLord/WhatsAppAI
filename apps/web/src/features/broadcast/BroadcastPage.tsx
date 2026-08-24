@@ -12,7 +12,8 @@ import {
   ChevronUp,
   Search,
 } from 'lucide-react'
-import { api, BroadcastList, Contact } from '../../lib/api'
+import { api } from '../../lib/api'
+import type { BroadcastList, Contact } from '../../lib/api'
 
 // ──────────────────────────────── helpers ────────────────────────────────────
 
