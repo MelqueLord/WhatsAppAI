@@ -42,6 +42,7 @@ public static class AuthEndpoints
         IUserRepository userRepository,
         ITenantMembershipRepository membershipRepository,
         IAuthenticationService authenticationService,
+        IJwtTokenService jwtTokenService,
         HttpContext httpContext)
     {
         var user = await userRepository.GetByEmailAsync(request.Email);
@@ -58,16 +59,21 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
 
             await authenticationService.SignInAsync(httpContext, user, null, true);
+            var token = jwtTokenService.Generate(user, null, isPlatformAdmin: true);
 
-            return Results.Ok(new UserResponse
+            return Results.Ok(new LoginResponse
             {
-                Id = user.Id,
-                Email = user.Email,
-                DisplayName = user.DisplayName,
-                TenantId = null,
-                Role = "PlatformAdmin",
-                IsPlatformAdmin = true,
-                MustChangePassword = user.MustChangePassword
+                Token = token,
+                User = new UserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    DisplayName = user.DisplayName,
+                    TenantId = null,
+                    Role = "PlatformAdmin",
+                    IsPlatformAdmin = true,
+                    MustChangePassword = user.MustChangePassword
+                }
             });
         }
 
@@ -80,16 +86,21 @@ public static class AuthEndpoints
 
         var activeMembership = activeMemberships[0];
         await authenticationService.SignInAsync(httpContext, user, activeMembership);
+        var memberToken = jwtTokenService.Generate(user, activeMembership);
 
-        return Results.Ok(new UserResponse
+        return Results.Ok(new LoginResponse
         {
-            Id = user.Id,
-            Email = user.Email,
-            DisplayName = user.DisplayName,
-            TenantId = activeMembership.TenantId,
-            Role = activeMembership.Role.ToString(),
-            IsPlatformAdmin = user.IsPlatformAdmin,
-            MustChangePassword = user.MustChangePassword
+            Token = memberToken,
+            User = new UserResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                TenantId = activeMembership.TenantId,
+                Role = activeMembership.Role.ToString(),
+                IsPlatformAdmin = user.IsPlatformAdmin,
+                MustChangePassword = user.MustChangePassword
+            }
         });
     }
 
@@ -196,6 +207,12 @@ public static class AuthEndpoints
 
         return Results.Ok(new { message = "Password changed successfully.", mustChangePassword = false });
     }
+}
+
+public sealed class LoginResponse
+{
+    public string Token { get; init; } = string.Empty;
+    public UserResponse User { get; init; } = new();
 }
 
 public sealed class LoginRequest

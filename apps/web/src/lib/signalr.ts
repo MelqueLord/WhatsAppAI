@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr'
+import { getStoredToken } from './api'
 
 interface UseSignalROptions {
   hubUrl: string
@@ -19,7 +20,9 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
 
   useEffect(() => {
     const newConnection = new HubConnectionBuilder()
-      .withUrl(hubUrl, { withCredentials: true })
+      .withUrl(hubUrl, {
+        accessTokenFactory: () => getStoredToken() ?? '',
+      })
       .withAutomaticReconnect({ nextRetryDelayInMilliseconds: () => 10000 })
       .configureLogging(LogLevel.Warning)
       .build()

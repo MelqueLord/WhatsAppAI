@@ -1,11 +1,15 @@
+using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -15,16 +19,36 @@ public static class IdentityServiceCollectionExtensions
 {
     public static IServiceCollection AddIdentityServices(
         this IServiceCollection services,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IConfiguration configuration)
     {
         var requireSecureCookies = environment.IsProduction();
 
         services.AddScoped<ICurrentTenant, CurrentTenant>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IAuthorizationHandler, TenantContextHandler>();
 
+        var jwtSecret = configuration["Jwt:Secret"] ?? string.Empty;
+        var jwtIssuer = configuration["Jwt:Issuer"] ?? "whatsappai";
+        var jwtAudience = configuration["Jwt:Audience"] ?? "whatsappai";
+
         services
-            .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddAuthentication(options =>
+            {
+                options.DefaultScheme = "Smart";
+                options.DefaultChallengeScheme = "Smart";
+            })
+            .AddPolicyScheme("Smart", "Cookie or Bearer", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    var auth = context.Request.Headers.Authorization.ToString();
+                    if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                        return JwtBearerDefaults.AuthenticationScheme;
+                    return CookieAuthenticationDefaults.AuthenticationScheme;
+                };
+            })
             .AddCookie(options =>
             {
                 options.LoginPath = "/api/auth/login";
@@ -45,6 +69,32 @@ public static class IdentityServiceCollectionExtensions
 
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtIssuer,
+                    ValidAudience = jwtAudience,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtSecret)),
+                    NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier,
+                    RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+                };
+                // Do not redirect on 401 — return JSON
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = ctx =>
+                    {
+                        ctx.HandleResponse();
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         services

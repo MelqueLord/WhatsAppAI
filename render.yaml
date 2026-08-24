@@ -20,6 +20,12 @@ services:
         sync: false
       - key: Encryption__Key
         generateValue: true
+      - key: Jwt__Secret
+        generateValue: true
+      - key: Jwt__Issuer
+        value: whatsappai
+      - key: Jwt__Audience
+        value: whatsappai
       - key: Meta__VerifyToken
         sync: false
       - key: Meta__AppSecret

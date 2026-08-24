@@ -1,6 +1,6 @@
 import { createContext, useContext, useCallback, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type User } from './api'
+import { api, clearStoredToken, type User } from './api'
 
 interface AuthContextType {
   user: User | null
@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line no-empty
       // Ignore errors - still redirect
     }
+    clearStoredToken()
     queryClient.clear()
     window.location.replace('/login')
   }, [queryClient])

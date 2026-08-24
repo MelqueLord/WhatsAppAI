@@ -64,7 +64,8 @@ builder.Services.AddObservability(
     builder.Configuration);
 
 builder.Services.AddIdentityServices(
-    builder.Environment);
+    builder.Environment,
+    builder.Configuration);
 
 builder.Services.AddSecretServices();
 
@@ -293,17 +294,17 @@ if (app.Environment.IsProduction())
                     "/api/webhooks",
                     StringComparison.OrdinalIgnoreCase);
 
-        var isLoginRequest =
-            context.Request.Path.Equals(
-                "/api/auth/login",
-                StringComparison.OrdinalIgnoreCase);
-
         var isAuthenticatedMutation =
             context.User.Identity
                 ?.IsAuthenticated == true;
 
+        var isBearerAuthenticated =
+            context.Request.Headers.Authorization
+                .ToString()
+                .StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+
         var requiresCsrf =
-            isAuthenticatedMutation;
+            isAuthenticatedMutation && !isBearerAuthenticated;
 
         if (
             isMutatingMethod

@@ -1,55 +1,39 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
-let csrfToken: string | undefined
+const TOKEN_KEY = 'whatsappai.token'
 
-async function ensureCsrfToken(): Promise<string> {
-  if (csrfToken) {
-    return csrfToken
-  }
-
-  const response = await fetch(`${API_BASE}/api/auth/csrf`, {
-    cache: 'no-store',
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
-  }
-  const csrf = (await response.json()) as { token: string }
-  csrfToken = csrf.token
-  return csrfToken
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
 }
 
+export function setStoredToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearStoredToken(): void {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+// fetchWithCsrf kept for backward compat (used by SignalR hub connection, etc.)
 export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestInit = {}) {
-  const method = options.method?.toUpperCase() ?? 'GET'
-  const headers = new Headers(options.headers)
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    headers.set('X-CSRF-TOKEN', await ensureCsrfToken())
-  }
   const requestUrl = typeof input === 'string' && input.startsWith('/')
     ? `${API_BASE}${input}`
     : input
-  return fetch(requestUrl, { ...options, credentials: 'include', headers })
+  const headers = new Headers(options.headers)
+  const token = getStoredToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  return fetch(requestUrl, { ...options, headers })
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
-  const method = options?.method?.toUpperCase()
-  const isMutation =
-    method === 'POST' ||
-    method === 'PUT' ||
-    method === 'PATCH' ||
-    method === 'DELETE'
-  let mutationHeaders: HeadersInit | undefined
-  if (isMutation) {
-    const token = await ensureCsrfToken()
-    mutationHeaders = { 'X-CSRF-TOKEN': token }
-  }
+  const token = getStoredToken()
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
     cache: options?.method ? undefined : 'no-store',
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...mutationHeaders,
+      ...authHeader,
       ...options?.headers,
     },
   })
@@ -57,7 +41,6 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     if (response.status === 401) {
       throw new Error('INVALID_CREDENTIALS')
     }
-
     const error = await response.text()
     throw new Error(error || `HTTP ${response.status}`)
   }
@@ -227,7 +210,6 @@ export const api = {
     login: async (email: string, password: string) => {
       const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
@@ -236,7 +218,9 @@ export const api = {
         const error = await response.text()
         throw new Error(error || `HTTP ${response.status}`)
       }
-      return response.json() as Promise<User>
+      const data = (await response.json()) as { token: string; user: User }
+      setStoredToken(data.token)
+      return data.user
     },
 
     logout: async () => {
