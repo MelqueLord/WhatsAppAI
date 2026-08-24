@@ -77,6 +77,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Users className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Contatos</span>}
           </NavLink>
+          <NavLink
+            to="/queue-inbox"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                isActive ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              )
+            }
+          >
+            <ListOrdered className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Filas Inbox</span>}
+          </NavLink>
         </nav>
         <div className="border-t border-white/10 p-3">
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
@@ -104,6 +116,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     ...(isPlatformAdmin ? [] : [{ to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }]),
     ...(isPlatformAdmin ? [] : [{ to: '/inbox', icon: MessageSquare, label: 'Inbox' }]),
     ...(isPlatformAdmin ? [] : [{ to: '/contacts', icon: Users, label: 'Contatos' }]),
+    ...(isPlatformAdmin ? [] : [{ to: '/queue-inbox', icon: ListOrdered, label: 'Filas Inbox' }]),
     ...(isTenantOwner
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },

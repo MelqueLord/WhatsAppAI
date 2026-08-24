@@ -14,6 +14,7 @@ import { BotConfigPage } from './features/bot/BotConfigPage'
 import { KnowledgePage } from './features/knowledge/KnowledgePage'
 import { ClientTagsPage } from './features/tags/ClientTagsPage'
 import { QueuesPage } from './features/queues/QueuesPage'
+import { QueueInboxPage } from './features/queues/QueueInboxPage'
 
 import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
@@ -104,6 +105,7 @@ function App() {
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
               <Route path="/queues" element={<OwnerRoute><QueuesPage /></OwnerRoute>} />
+              <Route path="/queue-inbox" element={<TenantRoute><QueueInboxPage /></TenantRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
