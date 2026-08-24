@@ -160,16 +160,8 @@ using (var scope = app.Services.CreateScope())
 
     if (ensureCreated)
     {
-        if (context.Database.IsNpgsql())
-        {
-            await EnsurePostgresSchemaCreatedAsync(
-                context);
-        }
-        else
-        {
-            await context.Database
-                .EnsureCreatedAsync();
-        }
+        await context.Database
+            .EnsureCreatedAsync();
     }
     else if (!app.Environment.IsProduction())
     {
@@ -395,49 +387,3 @@ app.MapHub<InboxHub>(
     "/hubs/inbox");
 
 await app.RunAsync();
-
-static async Task EnsurePostgresSchemaCreatedAsync(
-    AppDbContext context)
-{
-    var connection =
-        context.Database
-            .GetDbConnection();
-
-    var shouldClose =
-        connection.State
-        != System.Data.ConnectionState.Open;
-
-    if (shouldClose)
-    {
-        await connection.OpenAsync();
-    }
-
-    try
-    {
-        await using var command =
-            connection.CreateCommand();
-
-        command.CommandText =
-            "SELECT to_regclass('whatsappai.subscription_plans') IS NOT NULL";
-
-        var schemaExists =
-            (bool)(
-                await command.ExecuteScalarAsync()
-                ?? false);
-
-        if (!schemaExists)
-        {
-            await context.Database
-                .ExecuteSqlRawAsync(
-                    context.Database
-                        .GenerateCreateScript());
-        }
-    }
-    finally
-    {
-        if (shouldClose)
-        {
-            await connection.CloseAsync();
-        }
-    }
-}
