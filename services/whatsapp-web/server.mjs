@@ -61,6 +61,7 @@ async function getSession(tenantId) {
     browser: ['Mac OS', 'Chrome', '14.4.1'],
     printQRInTerminal: false,
     markOnlineOnConnect: false,
+    keepAliveIntervalMs: 15_000,
   })
   session.sock = sock
 
@@ -80,12 +81,16 @@ async function getSession(tenantId) {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
       const errorMessage = lastDisconnect?.error?.message ?? 'unknown connection error'
+      const shouldReconnect = code !== DisconnectReason.loggedOut
       session.status = 'disconnected'
       session.sock = null
       sessions.delete(tenantId)
-      console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage}`)
+      console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage} reconnect=${shouldReconnect}`)
       if (code === DisconnectReason.loggedOut) {
         await rm(`sessions/${tenantId}`, { recursive: true, force: true })
+      } else if (shouldReconnect) {
+        // Reuse saved creds — no new QR is generated if the session was already authenticated
+        setTimeout(() => getSession(tenantId), 3000)
       }
     }
   })
@@ -119,7 +124,11 @@ app.get('/sessions/:tenantId/qr', async (req, res) => {
 })
 
 app.get('/sessions/:tenantId/status', async (req, res) => {
-  const session = sessions.get(req.params.tenantId)
+  let session = sessions.get(req.params.tenantId)
+  // If no in-memory session exists, trigger reconnect so creds are reused on restart
+  if (!session) {
+    session = await getSession(req.params.tenantId)
+  }
   res.json({
     isConnected: session?.status === 'connected',
     status: session?.status ?? 'disconnected',
