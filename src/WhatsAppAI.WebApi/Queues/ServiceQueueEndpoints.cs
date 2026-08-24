@@ -105,6 +105,8 @@ public static class ServiceLineEndpoints
         }
 
         conversation.AssignQueue(request.QueueId);
+        if (request.QueueId.HasValue && conversation.Mode != ConversationMode.Human)
+            conversation.SwitchMode(ConversationMode.Human, conversation.Version);
         await convRepo.UpdateAsync(conversation);
         return Results.Ok(new { conversationId, queueId = request.QueueId });
     }

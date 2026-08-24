@@ -35,6 +35,7 @@ export function MessagePanel({
   const [modeOverride, setModeOverride] = useState<string | null>(null)
   const [showSaveContact, setShowSaveContact] = useState(false)
   const [contactName, setContactName] = useState('')
+  const [selectedQueueId, setSelectedQueueId] = useState(conversation.queueId ?? '')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
@@ -128,7 +129,8 @@ export function MessagePanel({
   const queueMutation = useMutation({
     mutationFn: (queueId: string | null) =>
       api.serviceQueues.assign(conversation.id, queueId),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setSelectedQueueId(data.queueId ?? '')
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
     },
@@ -320,7 +322,7 @@ export function MessagePanel({
 
           {serviceQueues.length > 0 && (
             <select
-              value={conversation.queueId ?? ''}
+              value={selectedQueueId}
               onChange={(event) => queueMutation.mutate(event.target.value || null)}
               disabled={queueMutation.isPending}
               aria-label="Fila da conversa"
