@@ -210,7 +210,7 @@ function upsertConversation(session, jid, name, timestamp) {
   })
 }
 
-function addMessage(session, msg, shouldAutoReply = false) {
+function addMessage(session, msg, isLiveInbound = false) {
   const jid = msg.key?.remoteJid
   if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
 
@@ -243,11 +243,8 @@ function addMessage(session, msg, shouldAutoReply = false) {
   })
   session.messages.set(key, list)
   void saveSnapshot(session)
-  if (!msg.key?.fromMe) {
+  if (!msg.key?.fromMe && isLiveInbound) {
     void forwardInboundMessage(session, msg, text, createdAt)
-  }
-  if (!msg.key?.fromMe && shouldAutoReply && Date.now() >= session.acceptInboundAt) {
-    void sendAutoReply(session, jid, text)
   }
 }
 
