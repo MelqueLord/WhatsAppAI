@@ -35,8 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const login = useCallback(async (email: string, password: string) => {
-    await api.auth.login(email, password)
-    await refetch()
+    const user = await api.auth.login(email, password)
+    console.log('[auth] login response user:', user)
+    console.log('[auth] token in storage:', localStorage.getItem('whatsappai.token'))
+    const result = await refetch()
+    console.log('[auth] refetch result:', result.data)
   }, [refetch])
 
   const logout = useCallback(async () => {
