@@ -9,6 +9,7 @@ const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000
 const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
 const sessions = new Map()
 const botConfigs = new Map()
+const reconnectTimers = new Map()
 
 const defaultBotConfig = {
   configured: true,
@@ -41,10 +42,9 @@ app.use((req, res, next) => {
 
 async function getSession(tenantId) {
   const existing = sessions.get(tenantId)
-  if (existing) return existing
+  if (existing?.sock) return existing
 
-  const { state, saveCreds } = await useMultiFileAuthState(`sessions/${tenantId}`)
-  const session = {
+  const session = existing ?? {
     tenantId,
     status: 'connecting',
     qr: null,
@@ -53,58 +53,87 @@ async function getSession(tenantId) {
     conversations: new Map(),
     messages: new Map(),
   }
-  await loadSnapshot(tenantId, session)
-  sessions.set(tenantId, session)
 
-  const sock = makeWASocket({
-    auth: state,
-    browser: ['Mac OS', 'Chrome', '14.4.1'],
-    printQRInTerminal: false,
-    markOnlineOnConnect: false,
-    keepAliveIntervalMs: 15_000,
-  })
-  session.sock = sock
+  if (!existing) {
+    await loadSnapshot(tenantId, session)
+    sessions.set(tenantId, session)
+  }
 
-  sock.ev.on('creds.update', saveCreds)
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      session.qr = qr
-      session.status = 'qr_pending'
-      console.log(`QR code generated for session ${tenantId}`)
-    }
-    if (connection === 'open') {
-      session.status = 'connected'
-      session.qr = null
-      session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
-      console.log(`WhatsApp session connected for ${tenantId} (${session.phoneNumber ?? 'unknown phone'})`)
-    }
-    if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode
-      const errorMessage = lastDisconnect?.error?.message ?? 'unknown connection error'
-      const shouldReconnect = code !== DisconnectReason.loggedOut
-      session.status = 'disconnected'
-      session.sock = null
-      sessions.delete(tenantId)
-      console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage} reconnect=${shouldReconnect}`)
-      if (code === DisconnectReason.loggedOut) {
-        await rm(`sessions/${tenantId}`, { recursive: true, force: true })
-      } else if (shouldReconnect) {
-        // Reuse saved creds — no new QR is generated if the session was already authenticated
-        setTimeout(() => getSession(tenantId), 3000)
+  if (session.sock) return session
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(`sessions/${tenantId}`)
+    const sock = makeWASocket({
+      auth: state,
+      browser: ['Mac OS', 'Chrome', '14.4.1'],
+      printQRInTerminal: false,
+      markOnlineOnConnect: false,
+      keepAliveIntervalMs: 15_000,
+    })
+
+    session.sock = sock
+    session.status = 'connecting'
+
+    sock.ev.on('creds.update', saveCreds)
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      if (qr) {
+        session.qr = qr
+        session.status = 'qr_pending'
+        console.log(`QR code generated for session ${tenantId}`)
       }
+      if (connection === 'open') {
+        session.status = 'connected'
+        session.qr = null
+        session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
+        reconnectTimers.delete(tenantId)
+        console.log(`WhatsApp session connected for ${tenantId} (${session.phoneNumber ?? 'unknown phone'})`)
+      }
+      if (connection === 'close') {
+        const code = lastDisconnect?.error?.output?.statusCode
+        const errorMessage = lastDisconnect?.error?.message ?? 'unknown connection error'
+        const shouldReconnect = code !== DisconnectReason.loggedOut
+        session.status = shouldReconnect ? 'reconnecting' : 'disconnected'
+        session.sock = null
+        console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage} reconnect=${shouldReconnect}`)
+
+        if (code === DisconnectReason.loggedOut) {
+          sessions.delete(tenantId)
+          await rm(`sessions/${tenantId}`, { recursive: true, force: true })
+          return
+        }
+
+        if (shouldReconnect && !reconnectTimers.has(tenantId)) {
+          const timer = setTimeout(() => {
+            reconnectTimers.delete(tenantId)
+            void getSession(tenantId)
+          }, 3000)
+          reconnectTimers.set(tenantId, timer)
+        }
+      }
+    })
+
+    sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
+      const names = new Map((contacts ?? []).map((c) => [c.id, c.name || c.notify || c.verifiedName]))
+      for (const chat of chats ?? []) upsertConversation(session, chat.id, names.get(chat.id), chat.conversationTimestamp)
+      for (const message of messages ?? []) addMessage(session, message, false)
+    })
+
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
+      console.log(`WhatsApp messages.upsert: type=${type} count=${messages?.length ?? 0}`)
+      for (const message of messages ?? []) addMessage(session, message, type === 'notify')
+    })
+  } catch (error) {
+    session.status = 'disconnected'
+    session.sock = null
+    console.error(`Failed to initialize WhatsApp session ${tenantId}:`, error)
+    if (!reconnectTimers.has(tenantId)) {
+      const timer = setTimeout(() => {
+        reconnectTimers.delete(tenantId)
+        void getSession(tenantId)
+      }, 5000)
+      reconnectTimers.set(tenantId, timer)
     }
-  })
-
-  sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
-    const names = new Map((contacts ?? []).map((c) => [c.id, c.name || c.notify || c.verifiedName]))
-    for (const chat of chats ?? []) upsertConversation(session, chat.id, names.get(chat.id), chat.conversationTimestamp)
-    for (const message of messages ?? []) addMessage(session, message, false)
-  })
-
-  sock.ev.on('messages.upsert', ({ messages, type }) => {
-    console.log(`WhatsApp messages.upsert: type=${type} count=${messages?.length ?? 0}`)
-    for (const message of messages ?? []) addMessage(session, message, type === 'notify')
-  })
+  }
 
   return session
 }
