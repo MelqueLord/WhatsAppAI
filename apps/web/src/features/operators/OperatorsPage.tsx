@@ -152,9 +152,9 @@ export function OperatorsPage() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold text-slate-800">Operadores</h1>
             <p className="text-sm text-slate-500 mt-0.5">Gerencie os operadores de atendimento</p>
           </div>
@@ -165,9 +165,9 @@ export function OperatorsPage() {
             }}
             disabled={limitReached}
             title={limitReached ? 'Limite de operadores atingido' : 'Novo operador'}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" /> Novo Operador
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Operador</span>
           </button>
         </div>
         <p className="mt-2 text-sm text-slate-500">
@@ -175,7 +175,7 @@ export function OperatorsPage() {
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         {createdCredentials && (
           <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
             <div className="flex items-start gap-3">
@@ -236,107 +236,97 @@ export function OperatorsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Nome
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Linha atendida
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Criado em
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredOperators.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                      {search ? 'Nenhum operador encontrado com esse filtro.' : 'Nenhum operador cadastrado.'}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Nome</th>
+                    <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Linha</th>
+                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Criado em</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
                   </tr>
-                ) : (
-                  filteredOperators.map((operator) => (
-                    <tr key={operator.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <Users className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <span className="font-medium text-slate-800">{operator.displayName || operator.email}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{operator.email}</td>
-                      <td className="px-6 py-4">{getStatusBadge(operator.status)}</td>
-                      <td className="px-6 py-4">
-                        <select
-                          value={operator.assignedConnectionType && operator.assignedLineNumber ? `${operator.assignedConnectionType}:${operator.assignedLineNumber}` : ''}
-                          onChange={(event) => assignLineMutation.mutate({ operatorId: operator.id, value: event.target.value })}
-                          disabled={assignLineMutation.isPending}
-                          className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50"
-                        >
-                          <option value="">Sem atribuição</option>
-                          {lineOptions.map((line) => <option key={`${line.type}:${line.number}`} value={`${line.type}:${line.number}`}>{line.label}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">
-                        {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {operator.status === 'Active' && (
-                            <button
-                              onClick={() => {
-                                setResetTarget(operator)
-                                setShowResetForm(true)
-                              }}
-                              className="text-sm text-amber-600 hover:text-amber-700 font-medium"
-                            >
-                              Resetar Senha
-                            </button>
-                          )}
-                          {operator.status === 'Active' ? (
-                            <button
-                              onClick={() => deactivateMutation.mutate(operator.id)}
-                              disabled={deactivateMutation.isPending}
-                              className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-                            >
-                              Desativar
-                            </button>
-                          ) : operator.status === 'Inactive' ? (
-                            <button
-                              onClick={() => reactivateMutation.mutate(operator.id)}
-                              disabled={reactivateMutation.isPending}
-                              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
-                            >
-                              {reactivateMutation.isPending ? 'Reativando...' : 'Reativar'}
-                            </button>
-                          ) : null}
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredOperators.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                        {search ? 'Nenhum operador encontrado com esse filtro.' : 'Nenhum operador cadastrado.'}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredOperators.map((operator) => (
+                      <tr key={operator.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 sm:px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <Users className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-medium text-slate-800 text-sm block truncate max-w-[120px] sm:max-w-none">{operator.displayName || operator.email}</span>
+                              <span className="sm:hidden text-xs text-slate-400 truncate block max-w-[120px]">{operator.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-slate-500">{operator.email}</td>
+                        <td className="px-4 sm:px-6 py-4">{getStatusBadge(operator.status)}</td>
+                        <td className="hidden md:table-cell px-6 py-4">
+                          <select
+                            value={operator.assignedConnectionType && operator.assignedLineNumber ? `${operator.assignedConnectionType}:${operator.assignedLineNumber}` : ''}
+                            onChange={(event) => assignLineMutation.mutate({ operatorId: operator.id, value: event.target.value })}
+                            disabled={assignLineMutation.isPending}
+                            className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50"
+                          >
+                            <option value="">Sem atribuição</option>
+                            {lineOptions.map((line) => <option key={`${line.type}:${line.number}`} value={`${line.type}:${line.number}`}>{line.label}</option>)}
+                          </select>
+                        </td>
+                        <td className="hidden md:table-cell px-6 py-4 text-sm text-slate-500">
+                          {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {operator.status === 'Active' && (
+                              <button
+                                onClick={() => { setResetTarget(operator); setShowResetForm(true) }}
+                                className="text-xs sm:text-sm text-amber-600 hover:text-amber-700 font-medium whitespace-nowrap"
+                              >
+                                Resetar
+                              </button>
+                            )}
+                            {operator.status === 'Active' ? (
+                              <button
+                                onClick={() => deactivateMutation.mutate(operator.id)}
+                                disabled={deactivateMutation.isPending}
+                                className="text-xs sm:text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50 whitespace-nowrap"
+                              >
+                                Desativar
+                              </button>
+                            ) : operator.status === 'Inactive' ? (
+                              <button
+                                onClick={() => reactivateMutation.mutate(operator.id)}
+                                disabled={reactivateMutation.isPending}
+                                className="text-xs sm:text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {reactivateMutation.isPending ? '...' : 'Reativar'}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Reset password modal */}
       {showResetForm && resetTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-slate-800">Resetar Senha</h2>
@@ -403,7 +393,7 @@ export function OperatorsPage() {
 
       {/* Create operator modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-slate-800">Novo Operador</h2>

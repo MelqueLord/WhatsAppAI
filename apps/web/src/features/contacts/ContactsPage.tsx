@@ -79,22 +79,22 @@ export function ContactsPage() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold text-slate-800">Contatos</h1>
             <p className="text-sm text-slate-500 mt-0.5">Gerencie seus contatos</p>
           </div>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" /> Novo Contato
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -114,58 +114,60 @@ export function ContactsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Nome</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Telefone</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Última msg</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredContacts.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                      Nenhum contato cadastrado.
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Nome</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Telefone</th>
+                    <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Última msg</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ações</th>
                   </tr>
-                ) : (
-                  filteredContacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
-                            <Users className="w-4 h-4 text-emerald-600" />
-                          </div>
-                          <span className="font-medium text-slate-800">{contact.name || 'Sem nome'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{contact.phoneNumber}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500">
-                        {contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => startConversationMutation.mutate(contact.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          Conversar
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredContacts.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                        Nenhum contato cadastrado.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredContacts.map((contact) => (
+                      <tr key={contact.id} className="hover:bg-slate-50">
+                        <td className="px-4 sm:px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                              <Users className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <span className="font-medium text-slate-800 text-sm truncate max-w-[100px] sm:max-w-none">{contact.name || 'Sem nome'}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{contact.phoneNumber}</td>
+                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-slate-500">
+                          {contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-right">
+                          <button
+                            onClick={() => startConversationMutation.mutate(contact.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span className="hidden sm:inline">Conversar</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Create contact modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-slate-800">Novo Contato</h2>

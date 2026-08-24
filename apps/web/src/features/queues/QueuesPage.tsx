@@ -77,17 +77,17 @@ export function QueuesPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <ListOrdered className="w-6 h-6 text-indigo-500" /> Filas de Atendimento
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <ListOrdered className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-500 flex-shrink-0" /> Filas de Atendimento
           </h1>
           <p className="text-sm text-slate-500 mt-1">Crie filas para categorizar os atendimentos</p>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /> Nova Fila
+          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors shadow-sm whitespace-nowrap">
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nova Fila</span>
         </button>
       </div>
 

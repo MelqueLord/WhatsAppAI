@@ -22,9 +22,10 @@ import {
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  onMobileClose?: () => void
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   const { user, isPlatformAdmin, isTenantOwner, isOperator, logout } = useAuth()
 
   const aiEnabled = user?.aiEnabled === true
@@ -169,6 +170,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             key={item.to}
             to={item.to}
             end={item.to === '/dashboard'}
+            onClick={onMobileClose}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
