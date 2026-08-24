@@ -125,6 +125,7 @@ public static class ContactEndpoints
                 contact.Id,
                 "manual",
                 ConversationMode.Human);
+            conversation.RecordMessage();
 
             dbContext.Conversations.Add(conversation);
             await dbContext.SaveChangesAsync();
@@ -242,6 +243,7 @@ public static class ContactEndpoints
             contact.Id,
             "manual",
             ConversationMode.Human);
+        conversation.RecordMessage();
 
         dbContext.Conversations.Add(conversation);
         await dbContext.SaveChangesAsync();

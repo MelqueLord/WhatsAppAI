@@ -37,14 +37,27 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             var cursorData = DecodeCursor(request.Cursor);
             if (cursorData is not null)
             {
-                query = query.Where(c =>
-                    c.LastMessageAt < cursorData.Value.timestamp ||
-                    (c.LastMessageAt == cursorData.Value.timestamp && c.Id.CompareTo(cursorData.Value.id) < 0));
+                var cursorTimestamp = cursorData.Value.timestamp;
+                var cursorId = cursorData.Value.id;
+
+                if (cursorTimestamp == DateTime.MinValue)
+                {
+                    // Paginating through conversations with null LastMessageAt
+                    query = query.Where(c => c.LastMessageAt == null && c.Id.CompareTo(cursorId) < 0);
+                }
+                else
+                {
+                    // Paginating through conversations with non-null LastMessageAt
+                    query = query.Where(c =>
+                        (c.LastMessageAt != null && c.LastMessageAt < cursorTimestamp) ||
+                        (c.LastMessageAt == cursorTimestamp && c.Id.CompareTo(cursorId) < 0));
+                }
             }
         }
 
         var conversations = await query
-            .OrderByDescending(c => c.LastMessageAt)
+            .OrderByDescending(c => c.LastMessageAt != null)
+            .ThenByDescending(c => c.LastMessageAt)
             .ThenByDescending(c => c.Id)
             .Take(limit + 1)
             .Select(c => new ConversationDto

@@ -39,7 +39,8 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
         return await context.Set<Conversation>()
             .Include(c => c.Contact)
             .Where(c => c.TenantId == tenantId)
-            .OrderByDescending(c => c.LastMessageAt)
+            .OrderByDescending(c => c.LastMessageAt != null)
+            .ThenByDescending(c => c.LastMessageAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
     }
@@ -51,7 +52,8 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
         return await context.Set<Conversation>()
             .Include(c => c.Contact)
             .Where(c => c.TenantId == tenantId && c.Status == ConversationStatus.Open)
-            .OrderByDescending(c => c.LastMessageAt)
+            .OrderByDescending(c => c.LastMessageAt != null)
+            .ThenByDescending(c => c.LastMessageAt)
             .ToListAsync(cancellationToken);
     }
 

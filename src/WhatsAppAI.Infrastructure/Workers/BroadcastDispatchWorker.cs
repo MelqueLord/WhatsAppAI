@@ -116,6 +116,7 @@ public sealed class BroadcastDispatchWorker(
             {
                 conversation = Conversation.Create(
                     broadcast.TenantId, contact.Id, broadcast.LinePhoneNumberId);
+                conversation.RecordMessage();
                 await conversationRepo.AddAsync(conversation, ct);
             }
             else if (conversation.Mode == ConversationMode.Human)

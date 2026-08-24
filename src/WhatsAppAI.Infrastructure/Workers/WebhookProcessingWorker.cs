@@ -273,6 +273,7 @@ public sealed class WebhookProcessingWorker(
             {
                 conversation = Conversation.Create(tenantId, contact.Id, phoneNumberId);
                 conversation.RenewWindow();
+                conversation.RecordMessage();
                 await conversationRepository.AddAsync(conversation, cancellationToken);
                 conversation = await conversationRepository.GetByContactAndPhoneAsync(
                     tenantId, contact.Id, phoneNumberId, cancellationToken) ?? conversation;
