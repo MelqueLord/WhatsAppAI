@@ -293,6 +293,19 @@ public sealed class AiOrchestrationWorker(
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
                 logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName}",
                     conversation.Id, response.Decision.QueueName);
+
+                // Send queue transfer message to client
+                var queueTransferText = !string.IsNullOrWhiteSpace(botConfig.QueueTransferMessage)
+                    ? botConfig.QueueTransferMessage
+                    : "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
+
+                var queueTransferMsg = Message.CreateOutbound(
+                    message.TenantId, conversation.Id, message.ContactId,
+                    MessageType.Text, queueTransferText, Guid.NewGuid().ToString());
+                await messageRepository.AddAsync(queueTransferMsg, cancellationToken);
+
+                var queueTransferOutbox = OutboxMessage.Create(message.TenantId, queueTransferMsg.Id);
+                await outboxRepository.AddAsync(queueTransferOutbox);
             }
 
             foreach (var tagId in categorizedTagIds)

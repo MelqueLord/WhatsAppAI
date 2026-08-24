@@ -19,6 +19,7 @@ interface BotConfig {
   fallbackMessage: string | null
   mediaMessage?: string | null
   handoffMessage?: string | null
+  queueTransferMessage?: string | null
   enabled: boolean
   flowSteps?: FlowStep[]
 }
@@ -33,6 +34,7 @@ export function BotConfigPage() {
   const [fallbackMessage, setFallbackMessage] = useState<string | undefined>(undefined)
   const [mediaMessage, setMediaMessage] = useState<string | undefined>(undefined)
   const [handoffMessage, setHandoffMessage] = useState<string | undefined>(undefined)
+  const [queueTransferMessage, setQueueTransferMessage] = useState<string | undefined>(undefined)
   const [flowSteps, setFlowSteps] = useState<FlowStep[] | undefined>(undefined)
   const [success, setSuccess] = useState(false)
 
@@ -68,6 +70,7 @@ export function BotConfigPage() {
           fallbackMessage: fallbackMessage ?? config?.fallbackMessage ?? '',
           mediaMessage: mediaMessage ?? config?.mediaMessage ?? '',
           handoffMessage: handoffMessage ?? config?.handoffMessage ?? '',
+          queueTransferMessage: queueTransferMessage ?? config?.queueTransferMessage ?? '',
           flowSteps: (flowSteps ?? config?.flowSteps ?? [newStep()]).filter((step) => step.title && step.response),
         }),
       })
@@ -111,6 +114,7 @@ export function BotConfigPage() {
           <textarea value={fallbackMessage ?? config?.fallbackMessage ?? ''} onChange={(e) => setFallbackMessage(e.target.value)} rows={2} placeholder="Fallback" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
           <textarea value={mediaMessage ?? config?.mediaMessage ?? ''} onChange={(e) => setMediaMessage(e.target.value)} rows={2} placeholder="Recebimento de mídia" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
           <textarea value={handoffMessage ?? config?.handoffMessage ?? ''} onChange={(e) => setHandoffMessage(e.target.value)} rows={2} placeholder="Transferência para atendente" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
+          <textarea value={queueTransferMessage ?? config?.queueTransferMessage ?? ''} onChange={(e) => setQueueTransferMessage(e.target.value)} rows={2} placeholder="Transferência para fila (ex: Estou transferindo para a fila especializada. Aguarde.)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">

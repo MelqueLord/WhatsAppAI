@@ -10,6 +10,7 @@ public sealed class BotConfiguration
     public string? OfflineMessage { get; private set; }
     public string? FallbackMessage { get; private set; }
     public string? HandoffMessage { get; private set; }
+    public string? QueueTransferMessage { get; private set; }
     public string? MediaMessage { get; private set; }
     public string? FlowStepsJson { get; private set; }
     public int MaxTokensPerResponse { get; private set; }
@@ -40,21 +41,22 @@ public sealed class BotConfiguration
         Version++;
     }
 
-    public void UpdateMessages(string? welcome, string? returning, string? offline, string? fallback, string? handoff, string? media)
+    public void UpdateMessages(string? welcome, string? returning, string? offline, string? fallback, string? handoff, string? queueTransfer, string? media)
     {
         WelcomeMessage = welcome?.Trim();
         ReturningMessage = returning?.Trim();
         OfflineMessage = offline?.Trim();
         FallbackMessage = fallback?.Trim();
         HandoffMessage = handoff?.Trim();
+        QueueTransferMessage = queueTransfer?.Trim();
         MediaMessage = media?.Trim();
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
 
-    public void UpdateMessages(string? welcome, string? offline, string? fallback, string? handoff, string? media)
+    public void UpdateMessages(string? welcome, string? offline, string? fallback, string? handoff, string? queueTransfer, string? media)
     {
-        UpdateMessages(welcome, ReturningMessage, offline, fallback, handoff, media);
+        UpdateMessages(welcome, ReturningMessage, offline, fallback, handoff, queueTransfer, media);
     }
 
     public void UpdateTokenLimit(int maxTokens)
