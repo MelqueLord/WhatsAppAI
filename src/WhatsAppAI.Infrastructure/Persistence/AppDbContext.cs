@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Audit;
+using WhatsAppAI.Domain.Broadcast;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Knowledge;
@@ -43,6 +44,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<BotConfiguration> BotConfigurations => Set<BotConfiguration>();
     public DbSet<ServiceLine> ServiceLines => Set<ServiceLine>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<BroadcastList> BroadcastLists => Set<BroadcastList>();
+    public DbSet<BroadcastRecipient> BroadcastRecipients => Set<BroadcastRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +93,10 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<BotConfiguration>()
             .HasQueryFilter(e => e.TenantId == tenantId);
         modelBuilder.Entity<ServiceLine>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<BroadcastList>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<BroadcastRecipient>()
             .HasQueryFilter(e => e.TenantId == tenantId);
         modelBuilder.Entity<Invitation>()
             .HasQueryFilter(e => e.TenantId == tenantId);

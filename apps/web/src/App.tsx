@@ -20,6 +20,7 @@ import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
 import { ContactsPage } from './features/contacts/ContactsPage'
+import { BroadcastPage } from './features/broadcast/BroadcastPage'
 import { Loader2 } from 'lucide-react'
 
 const queryClient = new QueryClient({
@@ -105,6 +106,7 @@ function App() {
               <Route path="/integrations/ai/instructions" element={<OwnerRoute><AiInstructionsPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
+              <Route path="/broadcast" element={<OwnerRoute><BroadcastPage /></OwnerRoute>} />
               <Route path="/queues" element={<OwnerRoute><QueuesPage /></OwnerRoute>} />
               <Route path="/queue-inbox" element={<TenantRoute><QueueInboxPage /></TenantRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />

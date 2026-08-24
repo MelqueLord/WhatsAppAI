@@ -68,6 +68,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IUsageLedgerRepository, UsageLedgerRepository>();
         services.AddScoped<IModelEvaluationRepository, ModelEvaluationRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IBroadcastRepository, BroadcastRepository>();
         services.AddScoped<AuditService>();
         services.AddScoped<IConversationQueries, ConversationQueries>();
         services.AddSingleton<IClock, SystemClock>();

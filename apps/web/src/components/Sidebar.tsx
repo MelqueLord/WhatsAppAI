@@ -17,6 +17,7 @@ import {
   Tags,
   Settings,
   ListOrdered,
+  Radio,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -128,6 +129,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/queues', icon: ListOrdered, label: 'Filas' },
           { to: '/tags', icon: Tags, label: 'Tags' },
+          { to: '/broadcast', icon: Radio, label: 'Transmissões' },
         ]
       : []),
     { to: '/usage', icon: BarChart3, label: 'Uso' },

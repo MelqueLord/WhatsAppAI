@@ -12,6 +12,7 @@ using WhatsAppAI.Infrastructure.Persistence;
 using WhatsAppAI.Infrastructure.Secrets;
 using WhatsAppAI.Infrastructure.Workers;
 using WhatsAppAI.WebApi.Admin;
+using WhatsAppAI.WebApi.Broadcast;
 using WhatsAppAI.WebApi.Auth;
 using WhatsAppAI.WebApi.Auth.Activate;
 using WhatsAppAI.WebApi.Bot;
@@ -385,6 +386,7 @@ app.MapClientTagEndpoints();
 app.MapBotConfigurationEndpoints();
 app.MapServiceLineEndpoints();
 app.MapDashboardEndpoints();
+app.MapBroadcastEndpoints();
 
 app.MapHub<InboxHub>(
     "/hubs/inbox");

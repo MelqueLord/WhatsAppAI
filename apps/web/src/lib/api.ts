@@ -198,6 +198,40 @@ export interface WebhookEvent {
   errorMessage?: string
 }
 
+export interface WhatsAppLine {
+  lineNumber: number
+  connectionType: string
+  phoneNumberId: string
+  isActive: boolean
+}
+
+export interface BroadcastList {
+  id: string
+  name: string
+  message: string
+  status: string
+  linePhoneNumberId?: string
+  totalCount: number
+  sentCount: number
+  failedCount: number
+  createdAt: string
+  startedAt?: string
+  finishedAt?: string
+}
+
+export interface BroadcastRecipient {
+  id: string
+  contactId: string
+  status: string
+  errorMessage?: string
+  sentAt?: string
+}
+
+export interface BroadcastDetail {
+  broadcast: BroadcastList
+  recipients: BroadcastRecipient[]
+}
+
 export interface ClientTag {
   id: string
   name: string
@@ -393,6 +427,39 @@ export const api = {
         `/api/webhook-events/${id}/reprocess`,
         { method: 'POST' }
       ),
+  },
+
+  broadcasts: {
+    list: () => fetchApi<BroadcastList[]>('/api/broadcasts'),
+
+    get: (id: string) => fetchApi<BroadcastDetail>(`/api/broadcasts/${id}`),
+
+    create: (data: { name: string; message: string; contactIds: string[] }) =>
+      fetchApi<BroadcastList>('/api/broadcasts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    dispatch: (id: string, linePhoneNumberId: string) =>
+      fetchApi<BroadcastList>(`/api/broadcasts/${id}/dispatch`, {
+        method: 'POST',
+        body: JSON.stringify({ linePhoneNumberId }),
+      }),
+
+    cancel: (id: string) =>
+      fetchApi<BroadcastList>(`/api/broadcasts/${id}/cancel`, { method: 'POST' }),
+
+    delete: (id: string) =>
+      fetchApi<void>(`/api/broadcasts/${id}`, { method: 'DELETE' }),
+  },
+
+  whatsapp: {
+    getLines: async (): Promise<WhatsAppLine[]> => {
+      const res = await fetchApi<{ isConfigured: boolean; lines: WhatsAppLine[] }>(
+        '/api/integrations/whatsapp'
+      )
+      return res.lines ?? []
+    },
   },
 
   admin: {
