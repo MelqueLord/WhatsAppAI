@@ -32,7 +32,8 @@ public static class ServiceLineEndpoints
         return Results.Ok(queues.Select(q => new
         {
             id = q.Id, name = q.Name, description = q.Description,
-            color = q.Color, sortOrder = q.SortOrder, isActive = q.IsActive
+            color = q.Color, sortOrder = q.SortOrder, isActive = q.IsActive,
+            keywords = q.Keywords
         }));
     }
 
@@ -47,6 +48,7 @@ public static class ServiceLineEndpoints
         var queue = ServiceLine.Create(
             currentTenant.TenantId.Value, request.Name,
             request.Description, request.Color, request.SortOrder);
+        queue.SetKeywords(request.Keywords);
         await repo.AddAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -60,6 +62,7 @@ public static class ServiceLineEndpoints
         if (queue is null || queue.TenantId != currentTenant.TenantId) return Results.NotFound();
 
         queue.Update(request.Name, request.Description, request.Color, request.SortOrder);
+        queue.SetKeywords(request.Keywords);
         await repo.UpdateAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -125,6 +128,6 @@ public static class ServiceLineEndpoints
     }
 }
 
-public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder);
-public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder);
+public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords);
+public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords);
 public sealed record AssignQueueRequest(Guid? QueueId);

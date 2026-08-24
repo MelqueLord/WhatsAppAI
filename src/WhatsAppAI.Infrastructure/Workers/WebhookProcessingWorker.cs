@@ -151,6 +151,7 @@ public sealed class WebhookProcessingWorker(
         var messageRepository = serviceProvider.GetRequiredService<IMessageRepository>();
         var encryptionService = serviceProvider.GetRequiredService<IEncryptionService>();
         var notifier = serviceProvider.GetRequiredService<IRealtimeNotifier>();
+        var queueRepository = serviceProvider.GetRequiredService<IServiceLineRepository>();
 
         try
         {
@@ -184,6 +185,7 @@ public sealed class WebhookProcessingWorker(
                                 contactRepository,
                                 conversationRepository,
                                 messageRepository,
+                                queueRepository,
                                 notifier,
                                 cancellationToken);
                         }
@@ -220,6 +222,7 @@ public sealed class WebhookProcessingWorker(
         IContactRepository contactRepository,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
+        IServiceLineRepository queueRepository,
         IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
@@ -308,6 +311,20 @@ public sealed class WebhookProcessingWorker(
 
         logger.LogInformation("Processed inbound message {MessageId} for contact {ContactId}",
             message.Id, contact.Id);
+
+        // Auto-assign queue based on keywords if conversation has no queue yet
+        if (conversation.QueueId is null && !string.IsNullOrWhiteSpace(content))
+        {
+            var queues = await queueRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
+            var matchedQueue = queues.FirstOrDefault(q => q.MatchesKeywords(content));
+            if (matchedQueue is not null)
+            {
+                conversation.AssignQueue(matchedQueue.Id);
+                await conversationRepository.UpdateAsync(conversation, cancellationToken);
+                logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName} by keyword match",
+                    conversation.Id, matchedQueue.Name);
+            }
+        }
 
         // Notify frontend via SignalR so the conversation bubbles to the top immediately
         try

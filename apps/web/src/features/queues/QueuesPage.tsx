@@ -10,6 +10,7 @@ interface ServiceQueue {
   color: string | null
   sortOrder: number
   isActive: boolean
+  keywords: string | null
 }
 
 export function QueuesPage() {
@@ -20,6 +21,7 @@ export function QueuesPage() {
   const [description, setDescription] = useState('')
   const [color, setColor] = useState('#6366F1')
   const [sortOrder, setSortOrder] = useState(0)
+  const [keywords, setKeywords] = useState('')
 
   const { data: queues, isLoading } = useQuery({
     queryKey: ['service-queues'],
@@ -35,7 +37,7 @@ export function QueuesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords }),
       })
       if (!res.ok) throw new Error('Erro ao criar fila')
       return res.json()
@@ -49,7 +51,7 @@ export function QueuesPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords }),
       })
       if (!res.ok) throw new Error('Erro ao atualizar fila')
       return res.json()
@@ -68,12 +70,12 @@ export function QueuesPage() {
 
   const resetForm = () => {
     setShowForm(false); setEditing(null)
-    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0)
+    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords('')
   }
 
   const startEdit = (q: ServiceQueue) => {
     setEditing(q); setName(q.name); setDescription(q.description || '')
-    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setShowForm(true)
+    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setShowForm(true)
   }
 
   return (
@@ -105,6 +107,9 @@ export function QueuesPage() {
             </div>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" rows={2}
               className="md:col-span-2 px-4 py-2.5 border border-slate-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500" />
+            <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="Palavras-chave (separadas por vírgula)"
+              className="md:col-span-2 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <p className="md:col-span-2 text-xs text-slate-500 -mt-2">Ex: suporte, técnico, problema. Conversas com essas palavras serão roteadas automaticamente para esta fila.</p>
           </div>
           <div className="flex gap-3 mt-4">
             <button onClick={() => editing ? updateMutation.mutate(editing) : createMutation.mutate()}
@@ -133,6 +138,7 @@ export function QueuesPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-slate-800">{q.name}</h3>
                 {q.description && <p className="text-sm text-slate-500 truncate">{q.description}</p>}
+                {q.keywords && <p className="text-xs text-indigo-500 truncate mt-0.5">Palavras-chave: {q.keywords}</p>}
               </div>
               <span className="text-xs text-slate-400">#{q.sortOrder}</span>
               <div className="flex gap-1">

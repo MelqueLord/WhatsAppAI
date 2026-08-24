@@ -7,6 +7,7 @@ public sealed class ServiceLine
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public string? Color { get; private set; }
+    public string? Keywords { get; private set; }
     public int SortOrder { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -34,6 +35,21 @@ public sealed class ServiceLine
         Description = description?.Trim();
         Color = color?.Trim();
         SortOrder = sortOrder;
+    }
+
+    public void SetKeywords(string? keywords)
+    {
+        Keywords = string.IsNullOrWhiteSpace(keywords) ? null : keywords.Trim();
+    }
+
+    public bool MatchesKeywords(string text)
+    {
+        if (string.IsNullOrWhiteSpace(Keywords) || string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var textLower = text.ToLowerInvariant();
+        var keywords = Keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return Array.Exists(keywords, keyword => textLower.Contains(keyword.ToLowerInvariant()));
     }
 
     public void Deactivate() { IsActive = false; }
