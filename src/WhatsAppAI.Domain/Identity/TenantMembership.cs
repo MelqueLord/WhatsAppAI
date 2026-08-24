@@ -15,9 +15,13 @@ public sealed class TenantMembership
     public uint Version { get; private set; }
     public WhatsAppConnectionType? AssignedConnectionType { get; private set; }
     public int? AssignedLineNumber { get; private set; }
+    public string? AssignedLinesJson { get; private set; }
 
     public Tenant Tenant { get; private set; } = null!;
     public User User { get; private set; } = null!;
+
+    private readonly List<LineAssignment> _assignedLines = [];
+    public IReadOnlyList<LineAssignment> AssignedLines => _assignedLines.AsReadOnly();
 
     private TenantMembership() { }
 
@@ -83,7 +87,81 @@ public sealed class TenantMembership
         AssignedLineNumber = null;
         Version++;
     }
+
+    public void SetAssignedLines(IEnumerable<LineAssignment> lines)
+    {
+        _assignedLines.Clear();
+        _assignedLines.AddRange(lines);
+        SyncAssignedLinesJson();
+        Version++;
+    }
+
+    public void AddAssignedLine(WhatsAppConnectionType connectionType, int lineNumber)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(lineNumber, 1);
+        if (_assignedLines.Exists(l => l.ConnectionType == connectionType && l.LineNumber == lineNumber))
+            return;
+        _assignedLines.Add(new LineAssignment(connectionType, lineNumber));
+        SyncAssignedLinesJson();
+        Version++;
+    }
+
+    public void RemoveAssignedLine(WhatsAppConnectionType connectionType, int lineNumber)
+    {
+        _assignedLines.RemoveAll(l => l.ConnectionType == connectionType && l.LineNumber == lineNumber);
+        SyncAssignedLinesJson();
+        Version++;
+    }
+
+    public void ClearAssignedLines()
+    {
+        _assignedLines.Clear();
+        SyncAssignedLinesJson();
+        Version++;
+    }
+
+    public void LoadAssignedLinesFromJson()
+    {
+        if (string.IsNullOrWhiteSpace(AssignedLinesJson))
+        {
+            _assignedLines.Clear();
+            return;
+        }
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<List<LineAssignmentDto>>(AssignedLinesJson);
+        _assignedLines.Clear();
+        if (parsed is not null)
+        {
+            foreach (var item in parsed)
+            {
+                if (Enum.TryParse<WhatsAppConnectionType>(item.ConnectionType, true, out var ct))
+                    _assignedLines.Add(new LineAssignment(ct, item.LineNumber));
+            }
+        }
+    }
+
+    private void SyncAssignedLinesJson()
+    {
+        if (_assignedLines.Count == 0)
+        {
+            AssignedLinesJson = null;
+            return;
+        }
+        var dtos = _assignedLines.Select(l => new LineAssignmentDto
+        {
+            ConnectionType = l.ConnectionType.ToString(),
+            LineNumber = l.LineNumber
+        }).ToList();
+        AssignedLinesJson = System.Text.Json.JsonSerializer.Serialize(dtos);
+    }
+
+    private sealed class LineAssignmentDto
+    {
+        public string ConnectionType { get; init; } = string.Empty;
+        public int LineNumber { get; init; }
+    }
 }
+
+public sealed record LineAssignment(WhatsAppConnectionType ConnectionType, int LineNumber);
 
 public enum MembershipRole
 {

@@ -11,22 +11,10 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Check,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
-import { api } from '../../lib/api'
-
-interface Operator {
-  id: string
-  userId: string
-  email: string
-  displayName?: string
-  status: string
-  createdAt: string
-  deactivatedAt?: string
-  reactivatedAt?: string
-  assignedConnectionType?: string
-  assignedLineNumber?: number
-}
+import { api, type Operator, type LineAssignment } from '../../lib/api'
 
 export function OperatorsPage() {
   const { user } = useAuth()
@@ -82,11 +70,9 @@ export function OperatorsPage() {
     },
   })
 
-  const assignLineMutation = useMutation({
-    mutationFn: ({ operatorId, value }: { operatorId: string; value: string }) => {
-      const [connectionType, lineNumber] = value ? value.split(':') : ['', '']
-      return api.operators.assignLine(operatorId, connectionType || null, lineNumber ? Number(lineNumber) : null)
-    },
+  const assignLinesMutation = useMutation({
+    mutationFn: ({ operatorId, lines }: { operatorId: string; lines: LineAssignment[] }) =>
+      api.operators.assignLines(operatorId, lines),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
   })
 
@@ -272,15 +258,12 @@ export function OperatorsPage() {
                         <td className="hidden sm:table-cell px-6 py-4 text-sm text-slate-500">{operator.email}</td>
                         <td className="px-4 sm:px-6 py-4">{getStatusBadge(operator.status)}</td>
                         <td className="hidden md:table-cell px-6 py-4">
-                          <select
-                            value={operator.assignedConnectionType && operator.assignedLineNumber ? `${operator.assignedConnectionType}:${operator.assignedLineNumber}` : ''}
-                            onChange={(event) => assignLineMutation.mutate({ operatorId: operator.id, value: event.target.value })}
-                            disabled={assignLineMutation.isPending}
-                            className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50"
-                          >
-                            <option value="">Sem atribuição</option>
-                            {lineOptions.map((line) => <option key={`${line.type}:${line.number}`} value={`${line.type}:${line.number}`}>{line.label}</option>)}
-                          </select>
+                          <LineMultiSelect
+                            operator={operator}
+                            lineOptions={lineOptions}
+                            isLoading={assignLinesMutation.isPending}
+                            onAssign={(lines) => assignLinesMutation.mutate({ operatorId: operator.id, lines })}
+                          />
                         </td>
                         <td className="hidden md:table-cell px-6 py-4 text-sm text-slate-500">
                           {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
@@ -477,6 +460,94 @@ export function OperatorsPage() {
             </form>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+interface LineOption {
+  type: string
+  number: number
+  label: string
+}
+
+function LineMultiSelect({
+  operator,
+  lineOptions,
+  isLoading,
+  onAssign,
+}: {
+  operator: Operator
+  lineOptions: LineOption[]
+  isLoading: boolean
+  onAssign: (lines: LineAssignment[]) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const assignedLines = operator.assignedLines ?? []
+
+  const isAssigned = (type: string, number: number) =>
+    assignedLines.some((l) => l.connectionType === type && l.lineNumber === number)
+
+  const toggleLine = (type: string, number: number) => {
+    const newLines = isAssigned(type, number)
+      ? assignedLines.filter((l) => !(l.connectionType === type && l.lineNumber === number))
+      : [...assignedLines, { connectionType: type, lineNumber: number }]
+    onAssign(newLines)
+  }
+
+  const displayText = assignedLines.length === 0
+    ? 'Sem atribuição'
+    : assignedLines.length === 1
+      ? lineOptions.find((l) => l.type === assignedLines[0].connectionType && l.number === assignedLines[0].lineNumber)?.label ?? '1 linha'
+      : `${assignedLines.length} linhas`
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isLoading}
+        className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50 flex items-center gap-1 min-w-[100px] justify-between"
+      >
+        <span className="truncate">{displayText}</span>
+        {isLoading ? (
+          <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+        ) : (
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-20 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[180px] max-h-[200px] overflow-y-auto">
+            {lineOptions.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-slate-400">Nenhuma linha disponível</div>
+            ) : (
+              lineOptions.map((line) => (
+                <button
+                  key={`${line.type}:${line.number}`}
+                  type="button"
+                  onClick={() => toggleLine(line.type, line.number)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                    isAssigned(line.type, line.number)
+                      ? 'bg-emerald-500 border-emerald-500'
+                      : 'border-slate-300'
+                  }`}>
+                    {isAssigned(line.type, line.number) && (
+                      <Check className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                  <span className="text-slate-700">{line.label}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
       )}
     </div>
   )

@@ -115,6 +115,11 @@ export interface User {
   assignedLineNumber?: number
 }
 
+export interface LineAssignment {
+  connectionType: string
+  lineNumber: number
+}
+
 export interface Operator {
   id: string
   userId: string
@@ -126,6 +131,7 @@ export interface Operator {
   reactivatedAt?: string
   assignedConnectionType?: string
   assignedLineNumber?: number
+  assignedLines?: LineAssignment[]
 }
 
 export interface Tenant {
@@ -350,6 +356,11 @@ export const api = {
       fetchApi<Operator>(`/api/operators/${id}/line`, {
         method: 'PUT',
         body: JSON.stringify({ connectionType, lineNumber }),
+      }),
+    assignLines: (id: string, lines: { connectionType: string; lineNumber: number }[]) =>
+      fetchApi<Operator>(`/api/operators/${id}/line`, {
+        method: 'PUT',
+        body: JSON.stringify({ lines }),
       }),
   },
 

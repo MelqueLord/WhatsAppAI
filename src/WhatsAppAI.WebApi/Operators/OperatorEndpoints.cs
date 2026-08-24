@@ -50,18 +50,27 @@ public static class OperatorEndpoints
         var memberships = await membershipRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var operators = memberships
             .Where(m => m.Role == MembershipRole.Operator)
-            .Select(m => new OperatorResponse
+            .Select(m =>
             {
-                Id = m.Id,
-                UserId = m.UserId,
-                Email = m.User.Email,
-                DisplayName = m.User.DisplayName,
-                Status = m.Status.ToString(),
-                CreatedAt = m.CreatedAt,
-                DeactivatedAt = m.DeactivatedAt,
-                ReactivatedAt = m.ReactivatedAt,
-                AssignedConnectionType = m.AssignedConnectionType?.ToString(),
-                AssignedLineNumber = m.AssignedLineNumber
+                m.LoadAssignedLinesFromJson();
+                return new OperatorResponse
+                {
+                    Id = m.Id,
+                    UserId = m.UserId,
+                    Email = m.User.Email,
+                    DisplayName = m.User.DisplayName,
+                    Status = m.Status.ToString(),
+                    CreatedAt = m.CreatedAt,
+                    DeactivatedAt = m.DeactivatedAt,
+                    ReactivatedAt = m.ReactivatedAt,
+                    AssignedConnectionType = m.AssignedConnectionType?.ToString(),
+                    AssignedLineNumber = m.AssignedLineNumber,
+                    AssignedLines = m.AssignedLines.Select(l => new LineAssignmentResponse
+                    {
+                        ConnectionType = l.ConnectionType.ToString(),
+                        LineNumber = l.LineNumber
+                    }).ToList()
+                };
             })
             .ToList();
 
@@ -175,9 +184,47 @@ public static class OperatorEndpoints
         if (membership is null || membership.TenantId != currentTenant.TenantId || membership.Role != MembershipRole.Operator)
             return Results.NotFound();
 
-        if (string.IsNullOrWhiteSpace(request.ConnectionType) && request.LineNumber is null)
+        membership.LoadAssignedLinesFromJson();
+
+        // Support both single line (legacy) and multiple lines
+        if (request.Lines is not null && request.Lines.Count > 0)
+        {
+            var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+            if (tenant is null)
+                return Results.NotFound();
+
+            var newLines = new List<LineAssignment>();
+            foreach (var line in request.Lines)
+            {
+                if (!Enum.TryParse<WhatsAppConnectionType>(line.ConnectionType, true, out var connectionType) ||
+                    line.LineNumber < 1)
+                    return Results.BadRequest(new { error = "A valid connection type and line number are required." });
+
+                var limit = connectionType == WhatsAppConnectionType.OfficialApi
+                    ? tenant.OfficialApiLineCount
+                    : tenant.QrCodeLineCount;
+                if (limit > 0 && line.LineNumber > limit)
+                    return Results.BadRequest(new { error = $"Line {line.LineNumber} is outside the tenant quota for {line.ConnectionType}." });
+
+                newLines.Add(new LineAssignment(connectionType, line.LineNumber));
+            }
+
+            membership.SetAssignedLines(newLines);
+
+            // Keep legacy fields in sync with first line
+            if (newLines.Count > 0)
+            {
+                membership.AssignLine(newLines[0].ConnectionType, newLines[0].LineNumber);
+            }
+            else
+            {
+                membership.ClearLineAssignment();
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(request.ConnectionType) && request.LineNumber is null)
         {
             membership.ClearLineAssignment();
+            membership.ClearAssignedLines();
         }
         else
         {
@@ -196,6 +243,7 @@ public static class OperatorEndpoints
                 return Results.BadRequest(new { error = "The selected line is outside the tenant quota." });
 
             membership.AssignLine(connectionType, request.LineNumber.Value);
+            membership.SetAssignedLines([new LineAssignment(connectionType, request.LineNumber.Value)]);
         }
 
         await membershipRepository.UpdateAsync(membership);
@@ -209,7 +257,12 @@ public static class OperatorEndpoints
             Status = membership.Status.ToString(),
             CreatedAt = membership.CreatedAt,
             AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
-            AssignedLineNumber = membership.AssignedLineNumber
+            AssignedLineNumber = membership.AssignedLineNumber,
+            AssignedLines = membership.AssignedLines.Select(l => new LineAssignmentResponse
+            {
+                ConnectionType = l.ConnectionType.ToString(),
+                LineNumber = l.LineNumber
+            }).ToList()
         });
     }
 
@@ -362,12 +415,26 @@ public sealed class OperatorResponse
     public DateTime? ReactivatedAt { get; init; }
     public string? AssignedConnectionType { get; init; }
     public int? AssignedLineNumber { get; init; }
+    public List<LineAssignmentResponse> AssignedLines { get; init; } = [];
+}
+
+public sealed class LineAssignmentResponse
+{
+    public string ConnectionType { get; init; } = string.Empty;
+    public int LineNumber { get; init; }
 }
 
 public sealed class AssignOperatorLineRequest
 {
     public string? ConnectionType { get; init; }
     public int? LineNumber { get; init; }
+    public List<LineAssignmentItem>? Lines { get; init; }
+}
+
+public sealed class LineAssignmentItem
+{
+    public string ConnectionType { get; init; } = string.Empty;
+    public int LineNumber { get; init; }
 }
 
 public sealed class ResetPasswordRequest
