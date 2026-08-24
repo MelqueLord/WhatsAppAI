@@ -7,7 +7,7 @@ export function AiInstructionsPage() {
   const queryClient = useQueryClient()
   const [systemPrompt, setSystemPrompt] = useState('')
   const [businessType, setBusinessType] = useState('')
-  const [maxTokens, setMaxTokens] = useState(300)
+  const [maxTokens, setMaxTokens] = useState(180)
   const [routingQueueIds, setRoutingQueueIds] = useState<string[]>([])
   const [routingTagIds, setRoutingTagIds] = useState<string[]>([])
   const [loadedVersion, setLoadedVersion] = useState<number | null>(null)
@@ -41,7 +41,7 @@ export function AiInstructionsPage() {
     const businessLine = storedPrompt.match(/^Tipo de negócio: (.+)\n\n/)
     setBusinessType(businessLine?.[1] || '')
     setSystemPrompt(businessLine ? storedPrompt.slice(businessLine[0].length) : storedPrompt)
-    setMaxTokens(config.maxTokensPerResponse || 300)
+    setMaxTokens(config.maxTokensPerResponse || 180)
     setRoutingQueueIds(config.routingQueueIds || [])
     setRoutingTagIds(config.routingTagIds || [])
   }
@@ -83,7 +83,7 @@ export function AiInstructionsPage() {
           {tags.filter(tag => tag.isActive).length === 0 ? <p className="text-sm text-slate-500">Cadastre e ative uma tag no menu Tags.</p> : <div className="space-y-2">{tags.filter(tag => tag.isActive).map(tag => <label key={tag.id} className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer"><input type="checkbox" checked={routingTagIds.includes(tag.id)} onChange={() => setRoutingTagIds(current => current.includes(tag.id) ? current.filter(id => id !== tag.id) : [...current, tag.id])} className="mt-1" /><span className="flex-1"><span className="flex items-center gap-2 text-sm font-medium text-slate-800"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color || '#64748b' }} />{tag.name}</span>{tag.description && <span className="block text-xs text-slate-500 mt-1">{tag.description}</span>}</span></label>)}</div>}
           <p className="text-xs text-slate-500 mt-2">A IA adicionará somente as tags selecionadas que correspondam ao conteúdo da conversa.</p>
         </div>
-        <div><label className="block text-sm font-medium text-slate-700 mb-1">Máximo de tokens por resposta</label><input type="number" value={maxTokens} onChange={(event) => setMaxTokens(Number(event.target.value))} min={50} max={1000} className="w-36 px-4 py-2.5 border border-slate-300 rounded-lg" /><p className="text-xs text-slate-500 mt-1">Respostas objetivas reduzem custo. Use 150 a 300 para atendimento comum.</p></div>
+        <div><label className="block text-sm font-medium text-slate-700 mb-1">Máximo de tokens por resposta</label><input type="number" value={maxTokens} onChange={(event) => setMaxTokens(Math.min(300, Math.max(80, Number(event.target.value))))} min={80} max={300} className="w-36 px-4 py-2.5 border border-slate-300 rounded-lg" /><p className="text-xs text-slate-500 mt-1">A IA usa respostas curtas, resume o contexto do cliente e pode usar de 80 a 300 tokens.</p></div>
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !config?.configured || !businessType} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50">{saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Salvar diretrizes</button>
         {saveMutation.isError && <p className="text-sm text-red-600">{(saveMutation.error as Error).message}</p>}{saveMutation.isSuccess && <p className="text-sm text-emerald-600">Diretrizes salvas.</p>}
       </div>

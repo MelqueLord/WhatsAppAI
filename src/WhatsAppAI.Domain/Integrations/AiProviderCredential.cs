@@ -51,7 +51,7 @@ public sealed class AiProviderCredential
         IEnumerable<Guid>? routingTagIds = null)
     {
         SystemPrompt = systemPrompt?.Trim();
-        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 50, 2000);
+        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 300);
         RoutingQueueIdsJson = SerializeGuidList(routingQueueIds);
         RoutingTagIdsJson = SerializeGuidList(routingTagIds);
         UpdatedAt = DateTime.UtcNow;

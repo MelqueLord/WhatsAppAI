@@ -7,7 +7,9 @@ public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
     IKnowledgeItemRepository knowledgeRepository)
 {
-    private const int MaxMessages = 8;
+    private const int MaxMessages = 6;
+    private const int MaxMessageCharacters = 360;
+    private const int MaxSummaryCharacters = 1200;
     private const int MaxKnowledgeItems = 6;
     private const int MaxContextCharacters = 9000;
 
@@ -29,9 +31,15 @@ public sealed class ContextAssembler(
             .Select(m => new AiMessage
             {
                 Role = m.Direction == "Inbound" ? "user" : "assistant",
-                Content = m.Content ?? string.Empty
+                Content = Limit(m.Content, MaxMessageCharacters)
             })
             .ToList();
+
+        var customerSummary = string.Join(" | ", messagesResponse.Items
+            .Where(m => m.Direction == "Inbound")
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(4)
+            .Select(m => Limit(m.Content, 280)));
 
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
         var knowledgeTexts = knowledge
@@ -39,7 +47,7 @@ public sealed class ContextAssembler(
             .Select(k => k.Content)
             .ToList();
 
-        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
+        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags, customerSummary);
 
         return new ConversationContext
         {
@@ -52,14 +60,18 @@ public sealed class ContextAssembler(
         string? basePrompt,
         List<string> knowledgeItems,
         IReadOnlyList<RoutingQueueContext>? routingQueues,
-        IReadOnlyList<RoutingTagContext>? routingTags)
+        IReadOnlyList<RoutingTagContext>? routingTags,
+        string customerSummary)
     {
         var parts = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(basePrompt))
             parts.Add(basePrompt);
 
-        parts.Add("As diretrizes configuradas pela empresa acima são regras prioritárias do atendimento. Atenda somente a solicitação atual dentro dessas diretrizes e do conhecimento autorizado abaixo. Não invente informações, políticas, preços, prazos ou disponibilidade. Seja breve e responda no idioma do cliente.");
+        parts.Add("As diretrizes configuradas pela empresa acima são regras prioritárias. Atenda somente a solicitação atual dentro dessas diretrizes e do conhecimento autorizado. Recuse ou encaminhe assuntos fora do escopo, sem tentar conversar sobre temas gerais. Não invente informações, políticas, preços, prazos ou disponibilidade. Responda em no máximo 2 frases curtas, com até 300 caracteres, no idioma do cliente.");
+
+        if (!string.IsNullOrWhiteSpace(customerSummary))
+            parts.Add($"Resumo do que o cliente enviou (use somente para manter contexto): {customerSummary}");
 
         if (knowledgeItems.Count > 0)
         {
@@ -90,9 +102,14 @@ public sealed class ContextAssembler(
 
         parts.Add("Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply. Use handoff when the customer requests a human, the answer is unsafe, or a configured queue is selected.");
 
-        return string.Join("\n\n", parts).Length > MaxContextCharacters
-            ? string.Join("\n\n", parts)[..MaxContextCharacters]
-            : string.Join("\n\n", parts);
+        var prompt = string.Join("\n\n", parts);
+        return prompt.Length > MaxContextCharacters ? prompt[..MaxContextCharacters] : prompt;
+    }
+
+    private static string Limit(string? value, int maxCharacters)
+    {
+        var text = value?.Trim() ?? string.Empty;
+        return text.Length <= maxCharacters ? text : $"{text[..maxCharacters]}...";
     }
 }
 

@@ -233,7 +233,7 @@ public sealed class AiOrchestrationWorker(
                 ApiKey = apiKey,
                 Messages = context.Messages,
                 SystemPrompt = context.SystemPrompt,
-                MaxTokens = credential.MaxTokensPerResponse
+                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 80, 300)
             };
 
             var response = await aiProvider.GetResponseAsync(request, cancellationToken);
