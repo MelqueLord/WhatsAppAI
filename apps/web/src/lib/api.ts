@@ -27,14 +27,14 @@ export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestIn
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken()
-  const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
     cache: options?.method ? undefined : 'no-store',
     headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-      ...options?.headers,
+      ...headers,
+      ...options?.headers as Record<string, string>,
     },
   })
   if (!response.ok) {
