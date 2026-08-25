@@ -21,6 +21,7 @@ import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
 import { ContactsPage } from './features/contacts/ContactsPage'
 import { BroadcastPage } from './features/broadcast/BroadcastPage'
+import LandingPage from './features/landing/LandingPage'
 import { Loader2 } from 'lucide-react'
 
 const queryClient = new QueryClient({
@@ -76,7 +77,9 @@ function OperatorRoute({ children }: { children: React.ReactNode }) {
 }
 
 function NavigateToHome() {
-  const { isOperator, isPlatformAdmin } = useAuth()
+  const { isAuthenticated, isOperator, isPlatformAdmin, isLoading } = useAuth()
+  if (isLoading) return null
+  if (!isAuthenticated) return <Navigate to="/" replace />
   if (isPlatformAdmin) return <Navigate to="/admin/tenants" replace />
   return <Navigate to={isOperator ? '/inbox' : '/dashboard'} replace />
 }
@@ -87,6 +90,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/activate" element={<ActivatePage />} />
             <Route
@@ -113,7 +117,7 @@ function App() {
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
             </Route>
-            <Route path="/" element={<NavigateToHome />} />
+            <Route path="/app" element={<NavigateToHome />} />
             <Route path="*" element={<NavigateToHome />} />
           </Routes>
         </AuthProvider>
