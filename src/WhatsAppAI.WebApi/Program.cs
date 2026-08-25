@@ -169,8 +169,8 @@ using (var scope = app.Services.CreateScope())
     }
     catch
     {
-        // Fallback for databases created with EnsureCreated
-        await context.Database.EnsureCreatedAsync();
+        // Fallback for databases created with EnsureCreated - add missing columns
+        await AddMissingColumnsAsync(context);
     }
 
     // Optional bootstrap account.
@@ -416,4 +416,32 @@ static async Task EnsureMigrationsHistoryTableAsync(AppDbContext context)
             CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
         )";
     await db.ExecuteSqlRawAsync(createSql);
+}
+
+static async Task AddMissingColumnsAsync(AppDbContext context)
+{
+    var db = context.Database;
+    var schema = db.IsNpgsql() ? "whatsappai" : "public";
+
+    var columns = new (string Table, string Column, string Type)[]
+    {
+        ("tenant_memberships", "assigned_lines", "json"),
+        ("service_queues", "keywords", "character varying(500)"),
+        ("bot_configurations", "handoff_message", "character varying(1000)"),
+        ("bot_configurations", "queue_transfer_message", "character varying(1000)"),
+        ("bot_configurations", "media_message", "character varying(1000)")
+    };
+
+    foreach (var (table, column, type) in columns)
+    {
+        var exists = await db.SqlQueryRaw<int>(
+            "SELECT 1 FROM information_schema.columns WHERE table_schema = {0} AND table_name = {1} AND column_name = {2}",
+            schema, table, column).AnyAsync();
+
+        if (!exists)
+        {
+            var sql = $"ALTER TABLE \"{schema}\".\"{table}\" ADD COLUMN \"{column}\" {type}";
+            await db.ExecuteSqlRawAsync(sql);
+        }
+    }
 }
