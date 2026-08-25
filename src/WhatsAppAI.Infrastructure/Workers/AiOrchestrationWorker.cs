@@ -306,6 +306,24 @@ public sealed class AiOrchestrationWorker(
 
                 var queueTransferOutbox = OutboxMessage.Create(message.TenantId, queueTransferMsg.Id);
                 await outboxRepository.AddAsync(queueTransferOutbox);
+
+                // Apply tag with same name as the queue (if it exists for this tenant)
+                var queueName = response.Decision.QueueName;
+                if (!string.IsNullOrWhiteSpace(queueName))
+                {
+                    var allTenantTags = await tagRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken);
+                    var queueTag = allTenantTags.FirstOrDefault(t =>
+                        t.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
+                    if (queueTag is not null &&
+                        !await contactTagRepository.ExistsAsync(message.TenantId, message.ContactId, queueTag.Id, cancellationToken))
+                    {
+                        await contactTagRepository.AddAsync(
+                            ContactTag.Create(message.ContactId, queueTag.Id, message.TenantId),
+                            cancellationToken);
+                        logger.LogInformation("Tag '{TagName}' applied to contact {ContactId} via queue routing",
+                            queueTag.Name, message.ContactId);
+                    }
+                }
             }
 
             foreach (var tagId in categorizedTagIds)
