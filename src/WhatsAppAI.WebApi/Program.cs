@@ -399,7 +399,7 @@ static async Task EnsureMigrationsHistoryTableAsync(AppDbContext context)
 
     if (tableExists) return;
 
-    // Create the table and mark all existing migrations as applied
+    // Create only the history table - MigrateAsync will apply the actual migrations
     var schema = isNpgsql ? "whatsappai." : "";
     var createSql = $@"
         CREATE TABLE IF NOT EXISTS {schema}""__EFMigrationsHistory"" (
@@ -408,28 +408,4 @@ static async Task EnsureMigrationsHistoryTableAsync(AppDbContext context)
             CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
         )";
     await db.ExecuteSqlRawAsync(createSql);
-
-    var migrations = new[]
-    {
-        "20260816180733_AddSubscriptionPlan",
-        "20260817104719_AddMustChangePassword",
-        "20260819113003_AddHandoffAndMediaMessages",
-        "20260819185249_AddTenantDueDate",
-        "20260819205641_AddTenantLineCounts",
-        "20260819211358_AddWhatsAppLineSlots",
-        "20260819212417_AddTenantOperatorLimit",
-        "20260821102557_AddServiceLinesAndAiQueueRouting",
-        "20260824163708_AddBroadcastTables",
-        "20260824225616_AddAssignedLinesJson",
-        "20260824230732_AddKeywordsToServiceLine",
-        "20260824231517_AddQueueTransferMessage",
-        "20260824232650_SyncPendingModelChanges",
-        "20260824234214_FinalSyncPendingChanges"
-    };
-
-    foreach (var migration in migrations)
-    {
-        var insertSql = $"INSERT INTO {schema}\"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({0}, {1}) ON CONFLICT DO NOTHING";
-        await db.ExecuteSqlRawAsync(insertSql, migration, "10.0.0");
-    }
 }
