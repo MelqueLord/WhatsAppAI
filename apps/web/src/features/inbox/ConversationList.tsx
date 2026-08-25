@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, type Conversation, type ServiceQueue } from '../../lib/api'
+import { api, type Conversation, type ServiceQueue, type LineAssignment } from '../../lib/api'
 import { cn, formatTime, truncate } from '../../lib/utils'
 import { useAuth } from '../../lib/auth'
 import { MessageCircle, Search, Bot, User, Pause, Loader2, Filter } from 'lucide-react'
@@ -10,15 +10,34 @@ interface ConversationListProps {
   onSelect: (conversation: Conversation) => void
 }
 
+function lineLabel(line: LineAssignment) {
+  const type = line.connectionType === 'OfficialApi' ? 'API' : 'QR'
+  return `${type} ${line.lineNumber}`
+}
+
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
-  const { isTenantOwner } = useAuth()
+  const { isTenantOwner, user } = useAuth()
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
   const [queueFilter, setQueueFilter] = useState<string>('all')
 
+  // For operators with multiple lines: which line tab is selected (null = all)
+  const assignedLines = user?.assignedLines ?? []
+  const isMultiLine = !isTenantOwner && assignedLines.length > 1
+  const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null) // null = all lines
+
+  const activeLineFilter = isMultiLine && activeLineIndex !== null
+    ? assignedLines[activeLineIndex]
+    : undefined
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['conversations', operatorFilter],
-    queryFn: () => api.conversations.list(undefined, 50, operatorFilter === 'all' ? undefined : operatorFilter),
+    queryKey: ['conversations', operatorFilter, activeLineFilter ?? 'all'],
+    queryFn: () => api.conversations.list(
+      undefined,
+      50,
+      operatorFilter === 'all' ? undefined : operatorFilter,
+      activeLineFilter
+    ),
     refetchInterval: 30000,
     refetchOnMount: 'always',
     retry: 2,
@@ -46,7 +65,6 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
       c.contactPhone.includes(search)
     const matchesQueue = queueFilter === 'all' ||
       (queueFilter === 'none' ? !c.queueId : c.queueId === queueFilter)
-
     return matchesSearch && matchesQueue
   })
 
@@ -67,7 +85,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
           />
         </div>
 
-        {/* Operator Filter */}
+        {/* Operator Filter (TenantOwner only) */}
         {isTenantOwner && (
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -85,6 +103,38 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
           </div>
         )}
 
+        {/* Line tabs (operator with 2+ lines) */}
+        {isMultiLine && (
+          <div className="flex gap-1 bg-[#10223f] rounded-lg p-1">
+            <button
+              onClick={() => setActiveLineIndex(null)}
+              className={cn(
+                'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
+                activeLineIndex === null
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              )}
+            >
+              Todas
+            </button>
+            {assignedLines.map((line, i) => (
+              <button
+                key={`${line.connectionType}:${line.lineNumber}`}
+                onClick={() => setActiveLineIndex(i)}
+                className={cn(
+                  'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
+                  activeLineIndex === i
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                )}
+              >
+                {lineLabel(line)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Queue filter */}
         {queues.length > 0 && (
           <select
             value={queueFilter}

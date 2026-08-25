@@ -43,7 +43,9 @@ public static class ConversationEndpoints
         AppDbContext dbContext,
         string? cursor = null,
         int limit = 50,
-        string? operatorUserId = null)
+        string? operatorUserId = null,
+        string? lineConnectionType = null,
+        int? lineNumber = null)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -79,8 +81,21 @@ public static class ConversationEndpoints
             var membership = await membershipRepository.GetByUserAndTenantAsync(
                 currentTenant.UserId.Value, currentTenant.TenantId.Value);
             membership?.LoadAssignedLinesFromJson();
-            phoneNumberIds = await ResolvePhoneNumberIdsAsync(
-                membership, currentTenant.TenantId.Value, accountRepository);
+
+            // If the operator requested a specific line tab, resolve only that line
+            if (!string.IsNullOrWhiteSpace(lineConnectionType) && lineNumber is not null &&
+                Enum.TryParse<WhatsAppConnectionType>(lineConnectionType, true, out var lineType))
+            {
+                var account = await accountRepository.GetByTenantAndSlotAsync(
+                    currentTenant.TenantId.Value, lineType, lineNumber.Value);
+                phoneNumberIds = account?.PhoneNumberId is not null ? [account.PhoneNumberId] : [];
+            }
+            else
+            {
+                phoneNumberIds = await ResolvePhoneNumberIdsAsync(
+                    membership, currentTenant.TenantId.Value, accountRepository);
+            }
+
             if (phoneNumberIds.Count == 0)
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
         }

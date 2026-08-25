@@ -113,6 +113,7 @@ export interface User {
   tenantStatus?: string
   assignedConnectionType?: string
   assignedLineNumber?: number
+  assignedLines?: LineAssignment[]
 }
 
 export interface LineAssignment {
@@ -294,10 +295,17 @@ export const api = {
   },
 
   conversations: {
-    list: (cursor?: string, limit = 50, operatorUserId?: string) =>
-      fetchApi<CursorPaginationResponse<Conversation>>(
-        `/api/conversations?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}${operatorUserId ? `&operatorUserId=${encodeURIComponent(operatorUserId)}` : ''}`
-      ),
+    list: (cursor?: string, limit = 50, operatorUserId?: string, lineFilter?: { connectionType: string; lineNumber: number }) => {
+      const params = new URLSearchParams()
+      params.set('limit', String(limit))
+      if (cursor) params.set('cursor', cursor)
+      if (operatorUserId) params.set('operatorUserId', operatorUserId)
+      if (lineFilter) {
+        params.set('lineConnectionType', lineFilter.connectionType)
+        params.set('lineNumber', String(lineFilter.lineNumber))
+      }
+      return fetchApi<CursorPaginationResponse<Conversation>>(`/api/conversations?${params.toString()}`)
+    },
 
     get: (id: string) =>
       fetchApi<Conversation>(`/api/conversations/${id}`),

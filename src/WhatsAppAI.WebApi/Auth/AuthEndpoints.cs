@@ -6,6 +6,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.WebApi.Operators;
 
 namespace WhatsAppAI.WebApi.Auth;
 
@@ -135,6 +136,7 @@ public static class AuthEndpoints
         string? tenantStatus = null;
         string? assignedConnectionType = null;
         int? assignedLineNumber = null;
+        List<LineAssignmentResponse> assignedLines = [];
         if (currentTenant.TenantId is not null)
         {
             var membership = await membershipRepository.GetByUserAndTenantAsync(
@@ -142,6 +144,17 @@ public static class AuthEndpoints
                 currentTenant.TenantId.Value);
             assignedConnectionType = membership?.AssignedConnectionType?.ToString();
             assignedLineNumber = membership?.AssignedLineNumber;
+            if (membership is not null)
+            {
+                membership.LoadAssignedLinesFromJson();
+                assignedLines = membership.AssignedLines
+                    .Select(l => new LineAssignmentResponse
+                    {
+                        ConnectionType = l.ConnectionType.ToString(),
+                        LineNumber = l.LineNumber
+                    })
+                    .ToList();
+            }
 
             var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
             if (tenant is not null)
@@ -177,7 +190,8 @@ public static class AuthEndpoints
             DueDate = dueDate,
             TenantStatus = tenantStatus,
             AssignedConnectionType = assignedConnectionType,
-            AssignedLineNumber = assignedLineNumber
+            AssignedLineNumber = assignedLineNumber,
+            AssignedLines = assignedLines
         });
     }
 
@@ -245,4 +259,5 @@ public sealed class UserResponse
     public string? TenantStatus { get; init; }
     public string? AssignedConnectionType { get; init; }
     public int? AssignedLineNumber { get; init; }
+    public List<LineAssignmentResponse> AssignedLines { get; init; } = [];
 }
