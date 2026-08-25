@@ -486,7 +486,7 @@ function LineMultiSelect({
   // Local draft — only sent to server when user confirms
   const [draft, setDraft] = useState<LineAssignment[] | null>(null)
   const [btnRef, setBtnRef] = useState<HTMLButtonElement | null>(null)
-  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; above: boolean } | null>(null)
 
   const committed = operator.assignedLines ?? []
   const current = draft ?? committed
@@ -504,10 +504,17 @@ function LineMultiSelect({
   const openDropdown = () => {
     if (btnRef) {
       const rect = btnRef.getBoundingClientRect()
+      const dropdownHeight = Math.min(
+        208 + 44, // max-h-52 (208px) + confirm bar (~44px)
+        window.innerHeight * 0.6
+      )
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      const above = spaceBelow < dropdownHeight
       setDropPos({
-        top: rect.bottom + 4,
+        top: above ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
         left: rect.left,
         width: Math.max(rect.width, 180),
+        above,
       })
     }
     setDraft(null) // reset draft to committed on open
@@ -530,8 +537,6 @@ function LineMultiSelect({
     : committed.length === 1
       ? lineOptions.find((l) => l.type === committed[0].connectionType && l.number === committed[0].lineNumber)?.label ?? '1 linha'
       : `${committed.length} linhas`
-
-  const isDirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(committed)
 
   return (
     <div>
@@ -558,11 +563,17 @@ function LineMultiSelect({
 
           {/* dropdown rendered at fixed position to escape table overflow */}
           <div
-            className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden"
-            style={{ top: dropPos.top, left: dropPos.left, minWidth: dropPos.width }}
+            className="fixed z-50 rounded-lg shadow-xl overflow-hidden"
+            style={{
+              top: dropPos.top,
+              left: dropPos.left,
+              minWidth: dropPos.width,
+              backgroundColor: '#0b1222',
+              border: '1px solid rgba(148,163,184,0.25)',
+            }}
           >
             {lineOptions.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-slate-400">Nenhuma linha disponível</div>
+              <div className="px-3 py-3 text-xs" style={{ color: '#94a3b8' }}>Nenhuma linha disponível</div>
             ) : (
               <div className="max-h-52 overflow-y-auto">
                 {lineOptions.map((line) => (
@@ -570,36 +581,44 @@ function LineMultiSelect({
                     key={`${line.type}:${line.number}`}
                     type="button"
                     onClick={() => toggleLine(line.type, line.number)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs hover:bg-slate-50 transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors text-left"
+                    style={{ color: '#f1f5f9' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#10223f')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                   >
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
                       isAssigned(line.type, line.number)
-                        ? 'bg-emerald-500 border-emerald-500'
-                        : 'border-slate-300'
-                    }`}>
+                        ? 'bg-emerald-500'
+                        : ''
+                    }`}
+                    style={isAssigned(line.type, line.number) ? {} : { border: '1px solid rgba(148,163,184,0.5)' }}
+                    >
                       {isAssigned(line.type, line.number) && (
                         <Check className="w-3 h-3 text-white" />
                       )}
                     </div>
-                    <span className="text-slate-700">{line.label}</span>
+                    <span>{line.label}</span>
                   </button>
                 ))}
               </div>
             )}
 
             {/* confirm / cancel bar */}
-            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-slate-100 bg-slate-50">
+            <div className="flex items-center justify-end gap-2 px-3 py-2"
+              style={{ borderTop: '1px solid rgba(148,163,184,0.2)', backgroundColor: '#0d1829' }}
+            >
               <button
                 type="button"
                 onClick={cancel}
-                className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 rounded transition-colors"
+                className="px-2.5 py-1 text-xs rounded transition-colors"
+                style={{ color: '#94a3b8' }}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={confirm}
-                disabled={!isDirty && draft === null}
+                disabled={draft === null}
                 className="px-3 py-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded font-medium transition-colors disabled:opacity-40"
               >
                 Confirmar

@@ -50,6 +50,11 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   return response.json()
 }
 
+export interface ConversationTag {
+  name: string
+  color?: string | null
+}
+
 export interface Conversation {
   id: string
   contactId: string
@@ -67,6 +72,7 @@ export interface Conversation {
   isWindowOpen: boolean
   assignedToUserId?: string
   assignedToUserName?: string
+  tags?: ConversationTag[]
 }
 
 export interface ServiceQueue {

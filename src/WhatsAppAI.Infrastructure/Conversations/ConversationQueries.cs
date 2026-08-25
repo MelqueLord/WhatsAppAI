@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -59,32 +60,66 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             }
         }
 
-        var conversations = await query
+        var rawConversations = await query
             .OrderByDescending(c => c.LastMessageAt != null)
             .ThenByDescending(c => c.LastMessageAt)
             .ThenByDescending(c => c.Id)
             .Take(limit + 1)
-            .Select(c => new ConversationDto
+            .Select(c => new
             {
-                Id = c.Id,
-                ContactId = c.ContactId,
+                c.Id,
+                c.ContactId,
                 ContactName = c.Contact.Name ?? c.Contact.PhoneNumber,
                 ContactPhone = c.Contact.PhoneNumber,
                 Mode = c.Mode.ToString(),
                 Status = c.Status.ToString(),
-                Version = c.Version,
+                c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
-                LastMessageAt = c.LastMessageAt,
-                QueueId = c.QueueId,
-                IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),
-                IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive &&
-                        (a.PhoneNumberId == c.PhoneNumberId || c.PhoneNumberId == "manual")) ||
-                    (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
+                c.LastMessageAt,
+                c.QueueId,
+                c.PhoneNumberId,
+                c.WindowExpiresAt,
             })
             .ToListAsync(cancellationToken);
+
+        var contactIds = rawConversations.Select(c => c.ContactId).Distinct().ToList();
+        var tagsByContact = await (
+            from ct in context.ContactTags
+            join t in context.ClientTags on ct.TagId equals t.Id
+            where contactIds.Contains(ct.ContactId) && t.IsActive
+            select new { ct.ContactId, t.Name, t.Color }
+        ).ToListAsync(cancellationToken);
+        var tagsLookup = tagsByContact
+            .GroupBy(x => x.ContactId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<ConversationTagDto>)g.Select(x => new ConversationTagDto(x.Name, x.Color)).ToList());
+
+        var activeQrExists = await context.WhatsAppAccounts
+            .AnyAsync(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
+        var qrPhoneNumberIds = await context.WhatsAppAccounts
+            .Where(a => a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Select(a => a.PhoneNumberId)
+            .ToListAsync(cancellationToken);
+
+        var conversations = rawConversations.Select(c => new ConversationDto
+        {
+            Id = c.Id,
+            ContactId = c.ContactId,
+            ContactName = c.ContactName,
+            ContactPhone = c.ContactPhone,
+            Mode = c.Mode,
+            Status = c.Status,
+            Version = c.Version,
+            LastMessage = c.LastMessage,
+            LastMessageAt = c.LastMessageAt,
+            QueueId = c.QueueId,
+            Tags = tagsLookup.GetValueOrDefault(c.ContactId, []),
+            IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
+                (c.PhoneNumberId == "manual" && activeQrExists) ||
+                qrPhoneNumberIds.Contains(c.PhoneNumberId),
+            IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
+                (activeQrExists && (qrPhoneNumberIds.Contains(c.PhoneNumberId) || c.PhoneNumberId == "manual")) ||
+                (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow),
+        }).ToList();
 
         var hasMore = conversations.Count > limit;
         if (hasMore) conversations.RemoveAt(conversations.Count - 1);
@@ -161,30 +196,62 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
     public async Task<ConversationDto?> GetConversationByIdAsync(
         Guid tenantId, Guid conversationId, CancellationToken cancellationToken = default)
     {
-        return await context.Conversations
+        var raw = await context.Conversations
             .Include(c => c.Contact)
             .Where(c => c.TenantId == tenantId && c.Id == conversationId)
-            .Select(c => new ConversationDto
+            .Select(c => new
             {
-                Id = c.Id,
-                ContactId = c.ContactId,
+                c.Id,
+                c.ContactId,
                 ContactName = c.Contact.Name ?? c.Contact.PhoneNumber,
                 ContactPhone = c.Contact.PhoneNumber,
                 Mode = c.Mode.ToString(),
                 Status = c.Status.ToString(),
-                Version = c.Version,
+                c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
-                LastMessageAt = c.LastMessageAt,
-                QueueId = c.QueueId,
-                IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    (c.PhoneNumberId == "manual" && context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive)) ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.PhoneNumberId == c.PhoneNumberId),
-                IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
-                    context.WhatsAppAccounts.Any(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive &&
-                        (a.PhoneNumberId == c.PhoneNumberId || c.PhoneNumberId == "manual")) ||
-                    (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow)
+                c.LastMessageAt,
+                c.QueueId,
+                c.PhoneNumberId,
+                c.WindowExpiresAt,
             })
             .FirstOrDefaultAsync(cancellationToken);
+
+        if (raw is null) return null;
+
+        var tags = await (
+            from ct in context.ContactTags
+            join t in context.ClientTags on ct.TagId equals t.Id
+            where ct.ContactId == raw.ContactId && t.IsActive
+            select new ConversationTagDto(t.Name, t.Color)
+        ).ToListAsync(cancellationToken);
+
+        var activeQrExists = await context.WhatsAppAccounts
+            .AnyAsync(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
+        var qrPhoneNumberIds = await context.WhatsAppAccounts
+            .Where(a => a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Select(a => a.PhoneNumberId)
+            .ToListAsync(cancellationToken);
+
+        return new ConversationDto
+        {
+            Id = raw.Id,
+            ContactId = raw.ContactId,
+            ContactName = raw.ContactName,
+            ContactPhone = raw.ContactPhone,
+            Mode = raw.Mode,
+            Status = raw.Status,
+            Version = raw.Version,
+            LastMessage = raw.LastMessage,
+            LastMessageAt = raw.LastMessageAt,
+            QueueId = raw.QueueId,
+            Tags = tags,
+            IsQrCode = raw.PhoneNumberId.StartsWith("qr:") || raw.PhoneNumberId == "whatsapp-web" ||
+                (raw.PhoneNumberId == "manual" && activeQrExists) ||
+                qrPhoneNumberIds.Contains(raw.PhoneNumberId),
+            IsWindowOpen = raw.PhoneNumberId.StartsWith("qr:") || raw.PhoneNumberId == "whatsapp-web" ||
+                (activeQrExists && (qrPhoneNumberIds.Contains(raw.PhoneNumberId) || raw.PhoneNumberId == "manual")) ||
+                (raw.WindowExpiresAt.HasValue && raw.WindowExpiresAt.Value > DateTime.UtcNow),
+        };
     }
 
     private static string EncodeCursor(DateTime timestamp, Guid id)

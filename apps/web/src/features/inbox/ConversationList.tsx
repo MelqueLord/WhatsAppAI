@@ -182,18 +182,33 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                 {conv.contactName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-white truncate">{conv.contactName}</h3>
-                  {conv.lastMessageAt && (
-                    <span className="text-[11px] text-slate-400 ml-2 flex-shrink-0">
-                      {formatTime(conv.lastMessageAt)}
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-white truncate">{conv.contactName}</h3>
+                {conv.lastMessageAt && (
+                  <span className="text-[11px] text-slate-400 ml-2 flex-shrink-0">
+                    {formatTime(conv.lastMessageAt)}
+                  </span>
+                )}
+              </div>
+              {conv.tags && conv.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {conv.tags.map((tag) => (
+                    <span
+                      key={tag.name}
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={tag.color
+                        ? { backgroundColor: tag.color + '33', color: tag.color }
+                        : { backgroundColor: '#334155', color: '#94a3b8' }}
+                    >
+                      {tag.name}
                     </span>
-                  )}
+                  ))}
                 </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-sm text-slate-500 truncate">
-                    {truncate(conv.lastMessage || 'Sem mensagens', 32)}
-                  </p>
+              )}
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-sm text-slate-500 truncate">
+                  {truncate(conv.lastMessage || 'Sem mensagens', 32)}
+                </p>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                     {conv.assignedToUserName && (
                       <span

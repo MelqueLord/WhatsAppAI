@@ -27,7 +27,10 @@ public sealed record ConversationDto
     public Guid? QueueId { get; init; }
     public bool IsQrCode { get; init; }
     public bool IsWindowOpen { get; init; }
+    public IReadOnlyList<ConversationTagDto> Tags { get; init; } = [];
 }
+
+public sealed record ConversationTagDto(string Name, string? Color);
 
 public sealed record MessageDto
 {
