@@ -65,17 +65,11 @@
   border: none;
 }
 
-.atenz-site .brand-symbol {
+.atenz-site .brand-symbol-image {
   width: 46px;
   height: 46px;
-  display: grid;
-  place-items: center;
-  font-size: 29px;
-  font-weight: 900;
-  font-style: italic;
-  background: var(--gradient);
-  color: white;
-  clip-path: polygon(50% 0, 100% 100%, 75% 100%, 61% 68%, 39% 68%, 25% 100%, 0 100%);
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .atenz-site .brand-name {
@@ -299,17 +293,18 @@
   align-items: center;
 }
 
-.atenz-site .giant-a {
+.atenz-site .giant-a-logo {
   position: absolute;
-  right: -65px;
-  top: -95px;
-  font-size: 680px;
-  line-height: 1;
-  font-weight: 900;
-  font-style: italic;
-  color: transparent;
-  -webkit-text-stroke: 2px rgba(0, 156, 255, 0.1);
+  width: 620px;
+  height: 620px;
+  object-fit: contain;
+  right: -170px;
+  top: -120px;
+  opacity: 0.08;
+  pointer-events: none;
+  user-select: none;
   transform: rotate(-4deg);
+  filter: hue-rotate(200deg) saturate(2);
 }
 
 .atenz-site .mockup-window {
@@ -387,16 +382,14 @@
   border-right: 1px solid var(--border);
 }
 
-.atenz-site .fake-logo {
-  width: 31px;
-  height: 31px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  color: white;
-  font-weight: 800;
-  background: var(--gradient);
+.atenz-site .fake-logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
   margin-bottom: 12px;
+  background: var(--gradient);
+  padding: 3px;
 }
 
 .atenz-site .mock-nav {
@@ -1551,13 +1544,10 @@
   border: 1px solid rgba(0, 178, 222, 0.23);
 }
 
-.atenz-site .cta-logo span {
-  font-size: 37px;
-  font-style: italic;
-  font-weight: 900;
-  background: var(--gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.atenz-site .cta-logo-img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
 }
 
 .atenz-site .final-cta h2 {
@@ -1753,10 +1743,9 @@
     display: none;
   }
 
-  .atenz-site .brand-symbol {
+  .atenz-site .brand-symbol-image {
     width: 37px;
     height: 37px;
-    font-size: 23px;
   }
 
   .atenz-site .brand-name {

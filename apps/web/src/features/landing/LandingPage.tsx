@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./LandingPage.css";
+import atenzLogo from "../../assets/atenz-logo-a.png";
 
 type IconProps = {
   size?: number;
@@ -256,7 +257,7 @@ export default function LandingPage() {
       <header className="navbar">
         <div className="container navbar-content">
           <button className="brand" onClick={() => scrollTo("inicio")} aria-label="ATENZ">
-            <span className="brand-symbol">A</span>
+            <img src={atenzLogo} alt="ATENZ" className="brand-symbol-image" />
             <span className="brand-name">ATEN<span>Z</span></span>
           </button>
           <nav className="nav-links">
@@ -309,7 +310,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="hero-visual">
-              <div className="giant-a">A</div>
+              <img src={atenzLogo} alt="" aria-hidden="true" className="giant-a-logo" />
               <div className="mockup-window">
                 <div className="mockup-top">
                   <div className="mockup-dots"><span /><span /><span /></div>
@@ -318,7 +319,7 @@ export default function LandingPage() {
                 </div>
                 <div className="mockup-content">
                   <aside className="mockup-sidebar">
-                    <div className="fake-logo">A</div>
+                    <img src={atenzLogo} alt="" className="fake-logo-img" />
                     <span className="mock-nav active" />
                     <span className="mock-nav" />
                     <span className="mock-nav" />
@@ -773,7 +774,7 @@ export default function LandingPage() {
           <div className="cta-glow cta-glow-one" />
           <div className="cta-glow cta-glow-two" />
           <div className="container final-cta-content">
-            <div className="cta-logo"><span>A</span></div>
+            <div className="cta-logo"><img src={atenzLogo} alt="ATENZ" className="cta-logo-img" /></div>
             <span className="section-label">COMECE AGORA</span>
             <h2>Seu próximo cliente provavelmente<br />vai falar com você pelo WhatsApp.</h2>
             <p>
@@ -801,7 +802,7 @@ export default function LandingPage() {
         <div className="container footer-main">
           <div className="footer-brand">
             <div className="brand">
-              <span className="brand-symbol">A</span>
+              <img src={atenzLogo} alt="ATENZ" className="brand-symbol-image" />
               <span className="brand-name">ATEN<span>Z</span></span>
             </div>
             <p>Atendimento inteligente para empresas que querem crescer com organização, automação e tecnologia.</p>
