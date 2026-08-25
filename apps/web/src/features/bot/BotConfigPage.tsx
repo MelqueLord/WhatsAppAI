@@ -1,7 +1,12 @@
 import { fetchWithCsrf } from '../../lib/api'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, CheckCircle2, Loader2, Plus, Save, Trash2, Power } from 'lucide-react'
+import {
+  Bot, CheckCircle2, Loader2, Plus, Save, Trash2,
+  MessageSquare, UserCheck, WifiOff, HelpCircle,
+  Image, ArrowRightLeft, GitBranch, ChevronDown, ChevronUp,
+  ToggleLeft, ToggleRight, Info,
+} from 'lucide-react'
 
 interface FlowStep {
   id: string
@@ -26,6 +31,60 @@ interface BotConfig {
 
 const newStep = (): FlowStep => ({ id: `step-${Date.now()}`, title: '', keywords: '', response: '' })
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
+function MessageField({
+  icon: Icon,
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+}: {
+  icon: React.ElementType
+  label: string
+  hint: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        <label className="text-sm font-medium text-slate-700">{label}</label>
+        <span className="group relative ml-auto cursor-default">
+          <Info className="w-3.5 h-3.5 text-slate-300 hover:text-slate-500" />
+          <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 w-52 rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg">
+            {hint}
+          </span>
+        </span>
+      </div>
+      <textarea
+        rows={2}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+      />
+    </div>
+  )
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function BotConfigPage() {
   const queryClient = useQueryClient()
   const [welcomeMessage, setWelcomeMessage] = useState<string | undefined>(undefined)
@@ -37,6 +96,7 @@ export function BotConfigPage() {
   const [queueTransferMessage, setQueueTransferMessage] = useState<string | undefined>(undefined)
   const [flowSteps, setFlowSteps] = useState<FlowStep[] | undefined>(undefined)
   const [success, setSuccess] = useState(false)
+  const [expandedStep, setExpandedStep] = useState<string | null>(null)
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['bot-config'],
@@ -49,7 +109,9 @@ export function BotConfigPage() {
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const res = await fetchWithCsrf('/api/bot-config/toggle', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
       })
       if (!res.ok) throw new Error('Erro ao alterar status')
@@ -60,8 +122,13 @@ export function BotConfigPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const steps = (flowSteps ?? config?.flowSteps ?? []).filter(
+        (s) => s.title.trim() && s.response.trim()
+      )
       const res = await fetchWithCsrf('/api/bot-config', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           mode: 'SimpleAutoReply',
           welcomeMessage: welcomeMessage ?? config?.welcomeMessage ?? '',
@@ -71,7 +138,7 @@ export function BotConfigPage() {
           mediaMessage: mediaMessage ?? config?.mediaMessage ?? '',
           handoffMessage: handoffMessage ?? config?.handoffMessage ?? '',
           queueTransferMessage: queueTransferMessage ?? config?.queueTransferMessage ?? '',
-          flowSteps: (flowSteps ?? config?.flowSteps ?? [newStep()]).filter((step) => step.title && step.response),
+          flowSteps: steps,
         }),
       })
       if (!res.ok) throw new Error('Erro ao salvar')
@@ -84,45 +151,306 @@ export function BotConfigPage() {
     },
   })
 
-  const updateStep = (id: string, patch: Partial<FlowStep>) => {
-    setFlowSteps((items) => (items ?? []).map((item) => item.id === id ? { ...item, ...patch } : item))
+  const updateStep = (id: string, patch: Partial<FlowStep>) =>
+    setFlowSteps((prev) => (prev ?? effectiveSteps).map((s) => (s.id === id ? { ...s, ...patch } : s)))
+
+  const removeStep = (id: string) =>
+    setFlowSteps((prev) => (prev ?? effectiveSteps).filter((s) => s.id !== id))
+
+  const addStep = () => {
+    const s = newStep()
+    setFlowSteps((prev) => [...(prev ?? effectiveSteps), s])
+    setExpandedStep(s.id)
   }
 
-  if (isLoading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-500 animate-spin" /></div>
+  if (isLoading)
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+      </div>
+    )
 
-  const effectiveFlowSteps = flowSteps ?? (config?.flowSteps?.length ? config.flowSteps : [newStep()])
+  const effectiveSteps = config?.flowSteps?.length ? config.flowSteps : []
+  const steps = flowSteps ?? effectiveSteps
   const isBotActive = config?.enabled === true && config.mode === 'SimpleAutoReply'
 
+  const val = (local: string | undefined, remote: string | null | undefined) =>
+    local ?? remote ?? ''
+
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><Bot className="w-5 h-5" /></div>
-            <div><h1 className="text-xl font-bold text-slate-900">Fluxo do bot</h1><p className="text-sm text-slate-500">Atendimento automático usado no WhatsApp</p></div>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Fluxo do Bot</h1>
+              <p className="text-sm text-slate-500">Configure as respostas automáticas do WhatsApp</p>
+            </div>
           </div>
-          <button onClick={() => toggleMutation.mutate(!isBotActive)} disabled={toggleMutation.isPending} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${isBotActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
-            {toggleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}{isBotActive ? 'Bot ativo' : 'Bot inativo'}
+
+          {/* Toggle on/off */}
+          <button
+            onClick={() => toggleMutation.mutate(!isBotActive)}
+            disabled={toggleMutation.isPending || !config?.configured}
+            title={!config?.configured ? 'Salve a configuração antes de ativar' : undefined}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors
+              ${isBotActive
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {toggleMutation.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : isBotActive
+                ? <ToggleRight className="w-5 h-5 text-emerald-500" />
+                : <ToggleLeft className="w-5 h-5 text-slate-400" />
+            }
+            {isBotActive ? 'Bot ativo' : 'Bot inativo'}
           </button>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Mensagens automáticas</h2>
-          <textarea value={welcomeMessage ?? config?.welcomeMessage ?? ''} onChange={(e) => setWelcomeMessage(e.target.value)} rows={2} placeholder="Primeiro contato" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={returningMessage ?? config?.returningMessage ?? ''} onChange={(e) => setReturningMessage(e.target.value)} rows={2} placeholder="Cliente que já conversou" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={offlineMessage ?? config?.offlineMessage ?? ''} onChange={(e) => setOfflineMessage(e.target.value)} rows={2} placeholder="Quando não há atendente" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={fallbackMessage ?? config?.fallbackMessage ?? ''} onChange={(e) => setFallbackMessage(e.target.value)} rows={2} placeholder="Fallback" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={mediaMessage ?? config?.mediaMessage ?? ''} onChange={(e) => setMediaMessage(e.target.value)} rows={2} placeholder="Recebimento de mídia" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={handoffMessage ?? config?.handoffMessage ?? ''} onChange={(e) => setHandoffMessage(e.target.value)} rows={2} placeholder="Transferência para atendente" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
-          <textarea value={queueTransferMessage ?? config?.queueTransferMessage ?? ''} onChange={(e) => setQueueTransferMessage(e.target.value)} rows={2} placeholder="Transferência para fila (ex: Estou transferindo para a fila especializada. Aguarde.)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" />
+        {/* ── Status banner when inactive ── */}
+        {!isBotActive && config?.configured && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <Info className="w-4 h-4 flex-shrink-0 text-amber-500" />
+            O bot está <strong>inativo</strong>. As mensagens automáticas não serão enviadas.
+          </div>
+        )}
+
+        {/* ── 1. Saudações ── */}
+        <Section
+          title="Saudações"
+          description="Mensagens enviadas quando um cliente inicia ou retoma o contato."
+        >
+          <div className="space-y-5">
+            <MessageField
+              icon={MessageSquare}
+              label="Primeiro contato"
+              hint="Enviada quando um novo cliente envia a primeira mensagem."
+              value={val(welcomeMessage, config?.welcomeMessage)}
+              onChange={setWelcomeMessage}
+              placeholder="Olá! Bem-vindo(a). Como posso ajudar?"
+            />
+            <MessageField
+              icon={UserCheck}
+              label="Cliente recorrente"
+              hint="Enviada quando um cliente que já conversou anteriormente envia nova mensagem."
+              value={val(returningMessage, config?.returningMessage)}
+              onChange={setReturningMessage}
+              placeholder="Olá! Que bom ter você de volta. No que posso ajudar?"
+            />
+          </div>
+        </Section>
+
+        {/* ── 2. Situações especiais ── */}
+        <Section
+          title="Situações especiais"
+          description="Respostas automáticas para situações fora do fluxo normal."
+        >
+          <div className="space-y-5">
+            <MessageField
+              icon={WifiOff}
+              label="Fora do horário / sem atendente"
+              hint="Enviada quando não há operadores disponíveis para atender."
+              value={val(offlineMessage, config?.offlineMessage)}
+              onChange={setOfflineMessage}
+              placeholder="No momento estamos fora do horário de atendimento. Retornaremos em breve!"
+            />
+            <MessageField
+              icon={HelpCircle}
+              label="Resposta padrão (fallback)"
+              hint="Enviada quando o bot não consegue identificar a intenção do cliente."
+              value={val(fallbackMessage, config?.fallbackMessage)}
+              onChange={setFallbackMessage}
+              placeholder="Não entendi sua mensagem. Pode reformular ou aguardar um atendente?"
+            />
+            <MessageField
+              icon={Image}
+              label="Recebimento de mídia"
+              hint="Enviada quando o cliente envia uma imagem, vídeo ou arquivo."
+              value={val(mediaMessage, config?.mediaMessage)}
+              onChange={setMediaMessage}
+              placeholder="Recebi seu arquivo! Um atendente irá analisá-lo em breve."
+            />
+          </div>
+        </Section>
+
+        {/* ── 3. Transferências ── */}
+        <Section
+          title="Transferências"
+          description="Mensagens enviadas ao transferir o atendimento para um operador ou fila."
+        >
+          <div className="space-y-5">
+            <MessageField
+              icon={ArrowRightLeft}
+              label="Transferência para atendente"
+              hint="Enviada ao encaminhar o cliente para um operador humano."
+              value={val(handoffMessage, config?.handoffMessage)}
+              onChange={setHandoffMessage}
+              placeholder="Estou transferindo você para um atendente. Aguarde um momento!"
+            />
+            <MessageField
+              icon={GitBranch}
+              label="Transferência para fila"
+              hint="Enviada ao mover o cliente para uma fila de atendimento especializada."
+              value={val(queueTransferMessage, config?.queueTransferMessage)}
+              onChange={setQueueTransferMessage}
+              placeholder="Estou encaminhando para a fila especializada. Em breve um atendente irá te chamar."
+            />
+          </div>
+        </Section>
+
+        {/* ── 4. Menu / Perguntas e respostas ── */}
+        <Section
+          title="Menu de opções"
+          description='Palavras-chave que ativam respostas automáticas específicas. Ex: cliente digita "boleto" e recebe as instruções.'
+        >
+          {steps.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <Bot className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-medium text-slate-600 mb-1">Nenhuma opção configurada</p>
+              <p className="text-xs text-slate-400 mb-4">Adicione itens para criar um menu automático de atendimento.</p>
+              <button
+                onClick={addStep}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Adicionar primeira opção
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {steps.map((step, index) => {
+                const isOpen = expandedStep === step.id
+                return (
+                  <div
+                    key={step.id}
+                    className="border border-slate-200 rounded-lg overflow-hidden"
+                  >
+                    {/* Step header */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedStep(isOpen ? null : step.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                        {index + 1}
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-slate-700 truncate">
+                        {step.title || <span className="text-slate-400 font-normal">Nova opção</span>}
+                      </span>
+                      {step.keywords && (
+                        <span className="hidden sm:flex items-center gap-1 flex-wrap max-w-xs">
+                          {step.keywords.split(',').slice(0, 3).map((kw) => (
+                            <span key={kw} className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-xs truncate max-w-[80px]">
+                              {kw.trim()}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removeStep(step.id) }}
+                          className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          title="Remover opção"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        {isOpen
+                          ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                          : <ChevronDown className="w-4 h-4 text-slate-400" />
+                        }
+                      </div>
+                    </button>
+
+                    {/* Step body */}
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-1 bg-slate-50 border-t border-slate-100 space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Título da opção</label>
+                          <input
+                            value={step.title}
+                            onChange={(e) => updateStep(step.id, { title: e.target.value })}
+                            placeholder="Ex: Segunda via de boleto"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            Palavras-chave <span className="text-slate-400 font-normal">(separe por vírgula)</span>
+                          </label>
+                          <input
+                            value={step.keywords}
+                            onChange={(e) => updateStep(step.id, { keywords: e.target.value })}
+                            placeholder="boleto, segunda via, pagamento"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                          />
+                          <p className="mt-1 text-xs text-slate-400">Quando o cliente digitar uma dessas palavras, a resposta abaixo será enviada.</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Resposta automática</label>
+                          <textarea
+                            rows={3}
+                            value={step.response}
+                            onChange={(e) => updateStep(step.id, { response: e.target.value })}
+                            placeholder="Para obter a segunda via do boleto, acesse o link..."
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              <button
+                type="button"
+                onClick={addStep}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-lg text-sm text-slate-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Adicionar opção
+              </button>
+            </div>
+          )}
+        </Section>
+
+        {/* ── Save bar ── */}
+        <div className="flex items-center justify-between gap-4 py-4 border-t border-slate-200 sticky bottom-0 bg-slate-50">
+          <div className="text-xs text-slate-400">
+            As alterações só são aplicadas após salvar.
+          </div>
+          <div className="flex items-center gap-3">
+            {success && (
+              <span className="flex items-center gap-1.5 text-emerald-600 text-sm">
+                <CheckCircle2 className="w-4 h-4" /> Salvo com sucesso
+              </span>
+            )}
+            {saveMutation.isError && (
+              <span className="text-red-600 text-sm">
+                {(saveMutation.error as Error).message || 'Erro ao salvar'}
+              </span>
+            )}
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            >
+              {saveMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Save className="w-4 h-4" />
+              }
+              Salvar configuração
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4"><h2 className="font-semibold text-slate-900">Perguntas e respostas</h2><button type="button" onClick={() => setFlowSteps((items) => [...(items ?? effectiveFlowSteps), newStep()])} className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-lg text-sm text-slate-700"><Plus className="w-4 h-4" /> Adicionar</button></div>
-          <div className="space-y-4">{effectiveFlowSteps.map((step, index) => <div key={step.id} className="border border-slate-200 rounded-lg p-4"><div className="flex items-center justify-between mb-3"><span className="text-sm font-medium text-slate-700">Passo {index + 1}</span><button type="button" onClick={() => setFlowSteps((items) => (items ?? effectiveFlowSteps).filter((item) => item.id !== step.id))} className="p-2 text-slate-400 hover:text-red-600" title="Remover passo"><Trash2 className="w-4 h-4" /></button></div><input value={step.title} onChange={(e) => updateStep(step.id, { title: e.target.value })} placeholder="Título" className="w-full mb-3 px-4 py-2.5 border border-slate-300 rounded-lg" /><input value={step.keywords} onChange={(e) => updateStep(step.id, { keywords: e.target.value })} placeholder="Palavras-chave" className="w-full mb-3 px-4 py-2.5 border border-slate-300 rounded-lg" /><textarea value={step.response} onChange={(e) => updateStep(step.id, { response: e.target.value })} rows={3} placeholder="Resposta enviada ao cliente" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg resize-none" /></div>)}</div>
-        </div>
-
-        <div className="flex items-center gap-3"><button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50">{saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar fluxo</button>{success && <span className="flex items-center gap-1 text-emerald-600 text-sm"><CheckCircle2 className="w-4 h-4" /> Fluxo salvo com sucesso</span>}{saveMutation.isError && <span className="text-red-600 text-sm">{(saveMutation.error as Error).message || 'Erro ao salvar fluxo'}</span>}</div>
       </div>
     </div>
   )
