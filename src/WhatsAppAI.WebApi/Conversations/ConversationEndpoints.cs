@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
@@ -51,7 +51,7 @@ public static class ConversationEndpoints
         if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
             return Results.StatusCode(StatusCodes.Status423Locked);
 
-        string? phoneNumberId = null;
+        List<string>? phoneNumberIds = null;
         if (currentTenant.UserRole == "TenantOwner" &&
             !string.IsNullOrWhiteSpace(operatorUserId) &&
             !operatorUserId.Equals("unassigned", StringComparison.OrdinalIgnoreCase))
@@ -62,17 +62,13 @@ public static class ConversationEndpoints
             var selectedMembership = await membershipRepository.GetByUserAndTenantAsync(
                 selectedOperatorUserId,
                 currentTenant.TenantId.Value);
-            if (selectedMembership?.Role != MembershipRole.Operator ||
-                selectedMembership.AssignedConnectionType is null ||
-                selectedMembership.AssignedLineNumber is null)
+            if (selectedMembership?.Role != MembershipRole.Operator)
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
 
-            var selectedAccount = await accountRepository.GetByTenantAndSlotAsync(
-                currentTenant.TenantId.Value,
-                selectedMembership.AssignedConnectionType.Value,
-                selectedMembership.AssignedLineNumber.Value);
-            phoneNumberId = selectedAccount?.PhoneNumberId;
-            if (string.IsNullOrWhiteSpace(phoneNumberId))
+            selectedMembership.LoadAssignedLinesFromJson();
+            phoneNumberIds = await ResolvePhoneNumberIdsAsync(
+                selectedMembership, currentTenant.TenantId.Value, accountRepository);
+            if (phoneNumberIds.Count == 0)
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
 
             operatorUserId = null;
@@ -80,16 +76,12 @@ public static class ConversationEndpoints
 
         if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
         {
-            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
-            if (membership?.AssignedConnectionType is null || membership.AssignedLineNumber is null)
-                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
-
-            var account = await accountRepository.GetByTenantAndSlotAsync(
-                currentTenant.TenantId.Value,
-                membership.AssignedConnectionType.Value,
-                membership.AssignedLineNumber.Value);
-            phoneNumberId = account?.PhoneNumberId;
-            if (string.IsNullOrWhiteSpace(phoneNumberId))
+            var membership = await membershipRepository.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            membership?.LoadAssignedLinesFromJson();
+            phoneNumberIds = await ResolvePhoneNumberIdsAsync(
+                membership, currentTenant.TenantId.Value, accountRepository);
+            if (phoneNumberIds.Count == 0)
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
         }
 
@@ -97,7 +89,7 @@ public static class ConversationEndpoints
             currentTenant.TenantId.Value,
             new CursorPaginationRequest { Cursor = cursor, Limit = limit },
             operatorUserId,
-            phoneNumberId);
+            phoneNumberIds);
 
         return Results.Ok(result);
     }
@@ -180,11 +172,10 @@ public static class ConversationEndpoints
         if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
         {
             var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
-            var account = membership?.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
-                ? await accountRepository.GetByTenantAndSlotAsync(currentTenant.TenantId.Value, membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)
-                : null;
-            if (account is null ||
-                (conversation.PhoneNumberId != account.PhoneNumberId && conversation.PhoneNumberId != "manual"))
+            membership?.LoadAssignedLinesFromJson();
+            var phoneNumberIds = await ResolvePhoneNumberIdsAsync(membership, currentTenant.TenantId.Value, accountRepository);
+            if (phoneNumberIds.Count == 0 ||
+                (!phoneNumberIds.Contains(conversation.PhoneNumberId) && conversation.PhoneNumberId != "manual"))
                 return Results.Forbid();
         }
 
@@ -256,17 +247,45 @@ public static class ConversationEndpoints
             return true;
 
         var conversation = await conversationRepository.GetByIdAsync(conversationId);
-        var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
-        if (conversation is null || membership?.AssignedConnectionType is null || membership.AssignedLineNumber is null)
+        if (conversation is null)
             return false;
 
-        var account = await accountRepository.GetByTenantAndSlotAsync(
-            currentTenant.TenantId.Value,
-            membership.AssignedConnectionType.Value,
-            membership.AssignedLineNumber.Value);
+        var membership = await membershipRepository.GetByUserAndTenantAsync(
+            currentTenant.UserId.Value, currentTenant.TenantId.Value);
+        membership?.LoadAssignedLinesFromJson();
+        var phoneNumberIds = await ResolvePhoneNumberIdsAsync(
+            membership, currentTenant.TenantId.Value, accountRepository);
 
-        return account is not null &&
-            (conversation.PhoneNumberId == account.PhoneNumberId || conversation.PhoneNumberId == "manual");
+        return phoneNumberIds.Count > 0 &&
+            (phoneNumberIds.Contains(conversation.PhoneNumberId) || conversation.PhoneNumberId == "manual");
+    }
+
+    // Resolves all assigned lines of a membership to their WhatsApp account PhoneNumberIds.
+    // Falls back to the legacy single-line fields when AssignedLines is empty.
+    private static async Task<List<string>> ResolvePhoneNumberIdsAsync(
+        TenantMembership? membership,
+        Guid tenantId,
+        IWhatsAppAccountRepository accountRepository)
+    {
+        if (membership is null)
+            return [];
+
+        IReadOnlyList<LineAssignment> lines;
+        if (membership.AssignedLines.Count > 0)
+            lines = membership.AssignedLines;
+        else if (membership.AssignedConnectionType is not null && membership.AssignedLineNumber is not null)
+            lines = [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)];
+        else
+            lines = [];
+
+        var result = new List<string>(lines.Count);
+        foreach (var line in lines)
+        {
+            var account = await accountRepository.GetByTenantAndSlotAsync(tenantId, line.ConnectionType, line.LineNumber);
+            if (account?.PhoneNumberId is not null)
+                result.Add(account.PhoneNumberId);
+        }
+        return result;
     }
 }
 

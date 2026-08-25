@@ -9,7 +9,7 @@ namespace WhatsAppAI.Infrastructure.Conversations;
 internal sealed class ConversationQueries(AppDbContext context) : IConversationQueries
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
-        Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, string? phoneNumberId = null,
+        Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, List<string>? phoneNumberIds = null,
         CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
@@ -24,12 +24,12 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
         else if (!string.IsNullOrWhiteSpace(operatorUserId))
             query = query.Where(c => c.AssignedToUserId == operatorUserId);
 
-        if (!string.IsNullOrWhiteSpace(phoneNumberId))
+        if (phoneNumberIds is { Count: > 0 })
         {
-            var isQrLine = phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase);
-            query = isQrLine
-                ? query.Where(c => c.PhoneNumberId == phoneNumberId || c.PhoneNumberId == "manual")
-                : query.Where(c => c.PhoneNumberId == phoneNumberId);
+            var hasQr = phoneNumberIds.Exists(p => p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase));
+            query = hasQr
+                ? query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId) || c.PhoneNumberId == "manual")
+                : query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId));
         }
 
         if (!string.IsNullOrEmpty(request.Cursor))
