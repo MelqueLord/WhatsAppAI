@@ -161,17 +161,8 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
-    // Ensure migrations history table exists for databases created with EnsureCreated
-    await EnsureMigrationsHistoryTableAsync(context);
-    try
-    {
-        await context.Database.MigrateAsync();
-    }
-    catch
-    {
-        // Fallback for databases created with EnsureCreated - add missing columns
-        await AddMissingColumnsAsync(context);
-    }
+    // For databases created with EnsureCreated, add missing columns directly
+    await AddMissingColumnsAsync(context);
 
     // Optional bootstrap account.
     // Credentials must come from configuration/user-secrets.
@@ -390,33 +381,6 @@ app.MapHub<InboxHub>(
     "/hubs/inbox");
 
 await app.RunAsync();
-
-static async Task EnsureMigrationsHistoryTableAsync(AppDbContext context)
-{
-    var db = context.Database;
-    var isNpgsql = db.IsNpgsql();
-
-    // Check if __EFMigrationsHistory table exists
-    var tableExists = isNpgsql
-        ? await db.SqlQueryRaw<int>(@"SELECT 1 FROM information_schema.tables 
-            WHERE table_schema = 'whatsappai' AND table_name = '__EFMigrationsHistory'")
-            .AnyAsync()
-        : await db.SqlQueryRaw<int>(@"SELECT 1 FROM information_schema.tables 
-            WHERE table_name = '__EFMigrationsHistory'")
-            .AnyAsync();
-
-    if (tableExists) return;
-
-    // Create only the history table - MigrateAsync will apply the actual migrations
-    var schema = isNpgsql ? "whatsappai." : "";
-    var createSql = $@"
-        CREATE TABLE IF NOT EXISTS {schema}""__EFMigrationsHistory"" (
-            ""MigrationId"" character varying(150) NOT NULL,
-            ""ProductVersion"" character varying(32) NOT NULL,
-            CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
-        )";
-    await db.ExecuteSqlRawAsync(createSql);
-}
 
 static async Task AddMissingColumnsAsync(AppDbContext context)
 {
