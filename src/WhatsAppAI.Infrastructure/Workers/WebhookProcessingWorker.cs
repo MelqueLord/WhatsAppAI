@@ -152,6 +152,8 @@ public sealed class WebhookProcessingWorker(
         var encryptionService = serviceProvider.GetRequiredService<IEncryptionService>();
         var notifier = serviceProvider.GetRequiredService<IRealtimeNotifier>();
         var queueRepository = serviceProvider.GetRequiredService<IServiceLineRepository>();
+        var tagRepository = serviceProvider.GetRequiredService<IClientTagRepository>();
+        var contactTagRepository = serviceProvider.GetRequiredService<IContactTagRepository>();
 
         try
         {
@@ -186,6 +188,8 @@ public sealed class WebhookProcessingWorker(
                                 conversationRepository,
                                 messageRepository,
                                 queueRepository,
+                                tagRepository,
+                                contactTagRepository,
                                 notifier,
                                 cancellationToken);
                         }
@@ -223,6 +227,8 @@ public sealed class WebhookProcessingWorker(
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
         IServiceLineRepository queueRepository,
+        IClientTagRepository tagRepository,
+        IContactTagRepository contactTagRepository,
         IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
@@ -323,6 +329,18 @@ public sealed class WebhookProcessingWorker(
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
                 logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName} by keyword match",
                     conversation.Id, matchedQueue.Name);
+
+                // Apply tag with same name as the queue (mirrors AI routing behaviour)
+                var allTenantTags = await tagRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
+                var queueTag = allTenantTags.FirstOrDefault(t =>
+                    t.Name.Equals(matchedQueue.Name, StringComparison.OrdinalIgnoreCase));
+                if (queueTag is not null &&
+                    !await contactTagRepository.ExistsAsync(tenantId, contact.Id, queueTag.Id, cancellationToken))
+                {
+                    await contactTagRepository.AddAsync(
+                        ContactTag.Create(contact.Id, queueTag.Id, tenantId),
+                        cancellationToken);
+                }
             }
         }
 
