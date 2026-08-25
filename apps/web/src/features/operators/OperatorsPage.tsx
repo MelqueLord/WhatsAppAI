@@ -483,69 +483,128 @@ function LineMultiSelect({
   onAssign: (lines: LineAssignment[]) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const assignedLines = operator.assignedLines ?? []
+  // Local draft — only sent to server when user confirms
+  const [draft, setDraft] = useState<LineAssignment[] | null>(null)
+  const [btnRef, setBtnRef] = useState<HTMLButtonElement | null>(null)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const committed = operator.assignedLines ?? []
+  const current = draft ?? committed
 
   const isAssigned = (type: string, number: number) =>
-    assignedLines.some((l) => l.connectionType === type && l.lineNumber === number)
+    current.some((l) => l.connectionType === type && l.lineNumber === number)
 
   const toggleLine = (type: string, number: number) => {
-    const newLines = isAssigned(type, number)
-      ? assignedLines.filter((l) => !(l.connectionType === type && l.lineNumber === number))
-      : [...assignedLines, { connectionType: type, lineNumber: number }]
-    onAssign(newLines)
+    const next = isAssigned(type, number)
+      ? current.filter((l) => !(l.connectionType === type && l.lineNumber === number))
+      : [...current, { connectionType: type, lineNumber: number }]
+    setDraft(next)
   }
 
-  const displayText = assignedLines.length === 0
+  const openDropdown = () => {
+    if (btnRef) {
+      const rect = btnRef.getBoundingClientRect()
+      setDropPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 180),
+      })
+    }
+    setDraft(null) // reset draft to committed on open
+    setIsOpen(true)
+  }
+
+  const confirm = () => {
+    if (draft !== null) onAssign(draft)
+    setIsOpen(false)
+    setDraft(null)
+  }
+
+  const cancel = () => {
+    setIsOpen(false)
+    setDraft(null)
+  }
+
+  const displayText = committed.length === 0
     ? 'Sem atribuição'
-    : assignedLines.length === 1
-      ? lineOptions.find((l) => l.type === assignedLines[0].connectionType && l.number === assignedLines[0].lineNumber)?.label ?? '1 linha'
-      : `${assignedLines.length} linhas`
+    : committed.length === 1
+      ? lineOptions.find((l) => l.type === committed[0].connectionType && l.number === committed[0].lineNumber)?.label ?? '1 linha'
+      : `${committed.length} linhas`
+
+  const isDirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(committed)
 
   return (
-    <div className="relative">
+    <div>
       <button
+        ref={setBtnRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={openDropdown}
         disabled={isLoading}
-        className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50 flex items-center gap-1 min-w-[100px] justify-between"
+        className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg disabled:opacity-50 flex items-center gap-1 min-w-[110px] justify-between bg-white hover:bg-slate-50 transition-colors"
       >
         <span className="truncate">{displayText}</span>
-        {isLoading ? (
-          <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
-        ) : (
-          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        )}
+        {isLoading
+          ? <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+          : <svg className="w-3 h-3 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        }
       </button>
 
-      {isOpen && (
+      {isOpen && dropPos && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-20 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[180px] max-h-[200px] overflow-y-auto">
+          {/* backdrop */}
+          <div className="fixed inset-0 z-40" onClick={cancel} />
+
+          {/* dropdown rendered at fixed position to escape table overflow */}
+          <div
+            className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden"
+            style={{ top: dropPos.top, left: dropPos.left, minWidth: dropPos.width }}
+          >
             {lineOptions.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-slate-400">Nenhuma linha disponível</div>
+              <div className="px-3 py-3 text-xs text-slate-400">Nenhuma linha disponível</div>
             ) : (
-              lineOptions.map((line) => (
-                <button
-                  key={`${line.type}:${line.number}`}
-                  type="button"
-                  onClick={() => toggleLine(line.type, line.number)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
-                >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                    isAssigned(line.type, line.number)
-                      ? 'bg-emerald-500 border-emerald-500'
-                      : 'border-slate-300'
-                  }`}>
-                    {isAssigned(line.type, line.number) && (
-                      <Check className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                  <span className="text-slate-700">{line.label}</span>
-                </button>
-              ))
+              <div className="max-h-52 overflow-y-auto">
+                {lineOptions.map((line) => (
+                  <button
+                    key={`${line.type}:${line.number}`}
+                    type="button"
+                    onClick={() => toggleLine(line.type, line.number)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                      isAssigned(line.type, line.number)
+                        ? 'bg-emerald-500 border-emerald-500'
+                        : 'border-slate-300'
+                    }`}>
+                      {isAssigned(line.type, line.number) && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+                    <span className="text-slate-700">{line.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
+
+            {/* confirm / cancel bar */}
+            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-slate-100 bg-slate-50">
+              <button
+                type="button"
+                onClick={cancel}
+                className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirm}
+                disabled={!isDirty && draft === null}
+                className="px-3 py-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded font-medium transition-colors disabled:opacity-40"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </>
       )}

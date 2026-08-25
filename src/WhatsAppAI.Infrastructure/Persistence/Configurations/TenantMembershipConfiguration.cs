@@ -62,7 +62,10 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
         builder.Property(m => m.AssignedLineNumber)
             .HasColumnName("assigned_line_number");
 
-        builder.Ignore(m => m.AssignedLinesJson);
+        builder.Property(m => m.AssignedLinesJson)
+            .HasColumnName("assigned_lines")
+            .HasColumnType("json");
+
         builder.Ignore(m => m.AssignedLines);
 
         builder.HasOne(m => m.Tenant)
