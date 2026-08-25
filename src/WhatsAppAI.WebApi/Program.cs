@@ -163,7 +163,15 @@ using (var scope = app.Services.CreateScope())
 
     // Ensure migrations history table exists for databases created with EnsureCreated
     await EnsureMigrationsHistoryTableAsync(context);
-    await context.Database.MigrateAsync();
+    try
+    {
+        await context.Database.MigrateAsync();
+    }
+    catch
+    {
+        // Fallback for databases created with EnsureCreated
+        await context.Database.EnsureCreatedAsync();
+    }
 
     // Optional bootstrap account.
     // Credentials must come from configuration/user-secrets.
