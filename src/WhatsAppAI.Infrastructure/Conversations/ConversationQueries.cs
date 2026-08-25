@@ -26,8 +26,12 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 
         if (phoneNumberIds is { Count: > 0 })
         {
-            var hasQr = phoneNumberIds.Exists(p => p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase));
-            query = hasQr
+            // "manual" is a legacy phoneNumberId for QR line 1 — only include it when
+            // the filter contains the first QR slot (qr:...:1) to avoid leaking those
+            // conversations into other line tabs.
+            var includeManual = phoneNumberIds.Exists(p =>
+                p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) && p.EndsWith(":1"));
+            query = includeManual
                 ? query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId) || c.PhoneNumberId == "manual")
                 : query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId));
         }

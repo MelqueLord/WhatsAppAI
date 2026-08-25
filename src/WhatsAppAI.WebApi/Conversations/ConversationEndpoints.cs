@@ -271,8 +271,11 @@ public static class ConversationEndpoints
         var phoneNumberIds = await ResolvePhoneNumberIdsAsync(
             membership, currentTenant.TenantId.Value, accountRepository);
 
+        var includeManual = phoneNumberIds.Exists(p =>
+            p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) && p.EndsWith(":1"));
         return phoneNumberIds.Count > 0 &&
-            (phoneNumberIds.Contains(conversation.PhoneNumberId) || conversation.PhoneNumberId == "manual");
+            (phoneNumberIds.Contains(conversation.PhoneNumberId) ||
+             (conversation.PhoneNumberId == "manual" && includeManual));
     }
 
     // Resolves all assigned lines of a membership to their WhatsApp account PhoneNumberIds.
