@@ -2,24 +2,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, MessageCircle } from 'lucide-react'
-
-function AtenzLogo({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
-  const s = size === 'lg' ? 'w-12 h-12' : 'w-7 h-7'
-  return (
-    <svg viewBox="0 0 48 48" className={s} fill="none">
-      <path d="M24 6L44 42h-9l-4-8H17l-4 8H4L24 6z" fill="url(#ag)" />
-      <circle cx="6" cy="40" r="2" fill="#22c55e" />
-      <circle cx="11" cy="44" r="2" fill="#22c55e" />
-      <circle cx="11" cy="36" r="2" fill="#3b82f6" />
-      <defs>
-        <linearGradient id="ag" x1="0" y1="0" x2="48" y2="48">
-          <stop stopColor="#3b82f6" />
-          <stop offset="1" stopColor="#22c55e" />
-        </linearGradient>
-      </defs>
-    </svg>
-  )
-}
+import atenzLogo from '../../assets/atenz-logo-a.png'
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -82,7 +65,7 @@ export function LoginPage() {
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20 w-full">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-16">
-            <AtenzLogo />
+            <img src={atenzLogo} alt="ATENZ" className="w-12 h-12 object-contain" />
             <div>
               <div className="flex items-baseline">
                 <span className="text-4xl font-extrabold tracking-wide">ATEN</span>
@@ -123,7 +106,7 @@ export function LoginPage() {
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
             <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-              <AtenzLogo size="sm" />
+              <img src={atenzLogo} alt="ATENZ" className="w-10 h-10 object-contain" />
             </div>
             <h2 className="text-3xl font-bold mb-2">Bem-vindo de volta!</h2>
             <p className="text-slate-400">Acesse sua conta para continuar</p>

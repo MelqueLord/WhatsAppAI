@@ -19,6 +19,7 @@ import {
   ListOrdered,
   Radio,
 } from 'lucide-react'
+import atenzLogo from '../assets/atenz-logo-a.png'
 
 interface SidebarProps {
   collapsed: boolean
@@ -40,9 +41,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
         )}
       >
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/40">
-            <MessageSquare className="w-5 h-5 text-white" />
-          </div>
+          <img src={atenzLogo} alt="ATENZ" className="w-9 h-9 object-contain flex-shrink-0" />
           {!collapsed && (
             <div className="overflow-hidden">
               <h1 className="font-bold text-base tracking-tight">ATENZ</h1>
@@ -154,9 +153,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/40">
-          <MessageSquare className="w-5 h-5 text-white" />
-        </div>
+        <img src={atenzLogo} alt="ATENZ" className="w-9 h-9 object-contain flex-shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="font-bold text-base tracking-tight">ATENZ</h1>
