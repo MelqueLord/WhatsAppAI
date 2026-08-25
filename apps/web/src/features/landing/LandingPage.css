@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
-:root {
+.atenz-site {
   --bg: #020711;
   --bg-soft: #050d1b;
   --bg-card: rgba(7, 18, 34, 0.76);
@@ -19,19 +19,8 @@
   --gradient: linear-gradient(90deg, #086dff 0%, #00bfea 48%, #00df8c 100%);
 
   --container: 1180px;
-}
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
   scroll-behavior: smooth;
-}
-
-.atenz-site {
   min-height: 100vh;
   overflow: hidden;
   background:
