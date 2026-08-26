@@ -129,6 +129,7 @@ public static class BroadcastEndpoints
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
         IWhatsAppAccountRepository accountRepo,
+        ITenantMembershipRepository membershipRepo,
         AppDbContext dbContext,
         IHubContext<InboxHub> hub)
     {
@@ -152,6 +153,28 @@ public static class BroadcastEndpoints
 
         if (line is null)
             return Results.BadRequest(new { error = "QR Code line not found or not active." });
+
+        if (currentTenant.UserRole == "Operator")
+        {
+            if (currentTenant.UserId is null)
+                return Results.Forbid();
+
+            var membership = await membershipRepo.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value,
+                tenantId);
+            membership?.LoadAssignedLinesFromJson();
+
+            var hasAssignedLine = membership is not null &&
+                (membership.AssignedLines.Any(assigned =>
+                    assigned.ConnectionType == WhatsAppConnectionType.QrCode &&
+                    assigned.LineNumber == line.LineNumber) ||
+                 (membership.AssignedLines.Count == 0 &&
+                  membership.AssignedConnectionType == WhatsAppConnectionType.QrCode &&
+                  membership.AssignedLineNumber == line.LineNumber));
+
+            if (!hasAssignedLine)
+                return Results.Forbid();
+        }
 
         // BR-BC-005: only one active broadcast per tenant
         var active = await broadcastRepo.GetActiveSendingAsync(tenantId);
@@ -258,4 +281,3 @@ public sealed record DispatchBroadcastRequest
     public string LinePhoneNumberId { get; init; } = string.Empty;
     public Guid? QueueId { get; init; }
 }
-

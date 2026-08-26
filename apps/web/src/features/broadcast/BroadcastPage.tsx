@@ -70,10 +70,6 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     select: (data) => data.filter((q) => q.isActive),
   })
 
-  useEffect(() => {
-    setSelectedIds(new Set())
-  }, [selectedSourceQueueId])
-
   const createMutation = useMutation({
     mutationFn: () =>
       api.broadcasts.create({
@@ -96,7 +92,8 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const toggleContact = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
 
@@ -137,7 +134,10 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Fila de origem</label>
               <select
                 value={selectedSourceQueueId}
-                onChange={(e) => setSelectedSourceQueueId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedSourceQueueId(e.target.value)
+                  setSelectedIds(new Set())
+                }}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">Todos os contatos</option>
@@ -277,17 +277,27 @@ function DispatchDialog({
   const [selectedLine, setSelectedLine] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState('')
 
-  const operatorLine =
-    isOperator &&
+  const assignedQrLineNumbers = new Set(
+    user?.assignedLines
+      ?.filter((line) => line.connectionType === 'QrCode')
+      .map((line) => line.lineNumber) ?? []
+  )
+  if (
+    assignedQrLineNumbers.size === 0 &&
     user?.assignedConnectionType === 'QrCode' &&
-    (user?.assignedLineNumber ?? 0) > 0
-      ? user.assignedLineNumber!
-      : null
+    (user.assignedLineNumber ?? 0) > 0
+  ) {
+    assignedQrLineNumbers.add(user.assignedLineNumber!)
+  }
 
   const { data: lines, isLoading: loadingLines } = useQuery({
     queryKey: ['whatsapp-lines'],
     queryFn: () => api.whatsapp.getLines(),
-    select: (data) => data.filter((l) => l.connectionType === 'QrCode' && l.isActive),
+    select: (data) => data.filter((line) =>
+      line.connectionType === 'QrCode' &&
+      line.isActive &&
+      (!isOperator || assignedQrLineNumbers.has(line.lineNumber))
+    ),
   })
 
   const { data: queues } = useQuery({
@@ -296,11 +306,8 @@ function DispatchDialog({
     select: (data) => data.filter((q) => q.isActive),
   })
 
-  // Resolve the operator's assigned line phoneNumberId once lines are loaded
-  const operatorPhoneNumberId =
-    operatorLine != null
-      ? (lines?.find((l) => l.lineNumber === operatorLine)?.phoneNumberId ?? null)
-      : null
+  const operatorLine = isOperator && lines?.length === 1 ? lines[0] : null
+  const operatorPhoneNumberId = operatorLine?.phoneNumberId ?? null
 
   const dispatchMutation = useMutation({
     mutationFn: ({ linePhoneNumberId, queueId }: { linePhoneNumberId: string; queueId?: string }) =>
@@ -320,7 +327,7 @@ function DispatchDialog({
   }, [operatorPhoneNumberId])
 
   // Operator path: show a minimal loading/error state — no selector needed
-  if (operatorLine != null) {
+  if (operatorLine) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
@@ -357,7 +364,7 @@ function DispatchDialog({
               <div className="flex flex-col items-center gap-3 py-2">
                 <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
                 <p className="text-sm text-slate-600">
-                  Disparando via linha QR Code {operatorLine}…
+                  Disparando via linha QR Code {operatorLine.lineNumber}…
                 </p>
               </div>
             )}
@@ -412,7 +419,9 @@ function DispatchDialog({
             </div>
           ) : !lines || lines.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-4">
-              Nenhuma linha QR Code ativa encontrada.
+              {isOperator
+                ? 'Nenhuma linha QR Code ativa está atribuída ao seu usuário.'
+                : 'Nenhuma linha QR Code ativa encontrada.'}
             </p>
           ) : (
             <div className="space-y-2">

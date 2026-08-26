@@ -90,6 +90,18 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
             <ListOrdered className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Filas Inbox</span>}
           </NavLink>
+          <NavLink
+            to="/broadcast"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                isActive ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              )
+            }
+          >
+            <Radio className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span>Disparo em massa</span>}
+          </NavLink>
         </nav>
         <div className="border-t border-white/10 p-3">
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
