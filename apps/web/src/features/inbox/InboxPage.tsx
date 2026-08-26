@@ -5,7 +5,7 @@ import { ConversationList } from './ConversationList'
 import { MessagePanel } from './MessagePanel'
 import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
 import { useSignalR } from '../../lib/signalr'
-import { useQueryClient, useQuery } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../lib/auth'
 import { LockKeyhole } from 'lucide-react'
 import { api } from '../../lib/api'
@@ -18,21 +18,18 @@ export function InboxPage() {
   const [showMobileList, setShowMobileList] = useState(true)
   const queryClient = useQueryClient()
 
-  const { data: conversations } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: api.conversations.list,
-    enabled: !!openConversationId && !selectedConversation,
-  })
-
   useEffect(() => {
-    if (!openConversationId || selectedConversation) return
-    const found = conversations?.find((c) => c.id === openConversationId)
-    if (found) {
-      setSelectedConversation(found)
+    if (!openConversationId) return
+    window.history.replaceState({}, '')
+    queryClient.fetchQuery({
+      queryKey: ['conversation', openConversationId],
+      queryFn: () => api.conversations.get(openConversationId),
+    }).then((conv) => {
+      setSelectedConversation(conv)
       setShowMobileList(false)
-      window.history.replaceState({}, '')
-    }
-  }, [openConversationId, conversations, selectedConversation])
+    }).catch(() => {/* ignore, user stays on list */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openConversationId])
 
   const { isConnected, start: startSignalR } = useSignalR({
     hubUrl: '/hubs/inbox',
