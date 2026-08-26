@@ -31,6 +31,9 @@ public static class OperatorEndpoints
         group.MapPost("/{operatorId:guid}/reset-password", ResetPasswordAsync)
             .WithName("ResetOperatorPassword");
 
+        group.MapPut("/{operatorId:guid}", UpdateOperatorAsync)
+            .WithName("UpdateOperator");
+
         group.MapPut("/{operatorId:guid}/line", AssignOperatorLineAsync)
             .WithName("AssignOperatorLine");
 
@@ -165,6 +168,59 @@ public static class OperatorEndpoints
             DisplayName = request.DisplayName,
             TemporaryPassword = request.Password,
             Message = "Operator created. User must change password on first login."
+        });
+    }
+
+    private static async Task<IResult> UpdateOperatorAsync(
+        Guid operatorId,
+        [FromBody] UpdateOperatorRequest request,
+        ICurrentTenant currentTenant,
+        ITenantMembershipRepository membershipRepository,
+        IUserRepository userRepository,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var membership = await membershipRepository.GetByIdAsync(operatorId);
+        if (membership is null || membership.TenantId != currentTenant.TenantId || membership.Role != MembershipRole.Operator)
+            return Results.NotFound();
+
+        var user = await userRepository.GetByIdAsync(membership.UserId);
+        if (user is null)
+            return Results.NotFound();
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+            if (await dbContext.Users.AnyAsync(u => u.Id != user.Id && u.Email == email))
+                return Results.Conflict(new { error = "This email is already in use." });
+            user.UpdateEmail(email);
+        }
+
+        user.UpdateDisplayName(request.DisplayName);
+        await userRepository.UpdateAsync(user);
+
+        membership.LoadAssignedLinesFromJson();
+        return Results.Ok(new OperatorResponse
+        {
+            Id = membership.Id,
+            UserId = membership.UserId,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            Status = membership.Status.ToString(),
+            CreatedAt = membership.CreatedAt,
+            DeactivatedAt = membership.DeactivatedAt,
+            ReactivatedAt = membership.ReactivatedAt,
+            AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
+            AssignedLineNumber = membership.AssignedLineNumber,
+            AssignedLines = membership.AssignedLines.Select(l => new LineAssignmentResponse
+            {
+                ConnectionType = l.ConnectionType.ToString(),
+                LineNumber = l.LineNumber
+            }).ToList()
         });
     }
 
@@ -385,6 +441,12 @@ public static class OperatorEndpoints
             Message = "Password reset. Operator must change password on next login."
         });
     }
+}
+
+public sealed class UpdateOperatorRequest
+{
+    public string? Email { get; init; }
+    public string? DisplayName { get; init; }
 }
 
 public sealed class CreateOperatorRequest

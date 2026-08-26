@@ -376,6 +376,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ lines }),
       }),
+    update: (id: string, data: { email?: string; displayName?: string }) =>
+      fetchApi<Operator>(`/api/operators/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
   },
 
   contacts: {
