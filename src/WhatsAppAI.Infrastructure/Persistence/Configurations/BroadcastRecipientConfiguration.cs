@@ -21,8 +21,8 @@ public sealed class BroadcastRecipientConfiguration : IEntityTypeConfiguration<B
             .HasMaxLength(20)
             .IsRequired();
         builder.Property(r => r.ErrorMessage).HasColumnName("error_message").HasMaxLength(500);
-        builder.Property(r => r.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
-        builder.Property(r => r.SentAt).HasColumnName("sent_at").HasColumnType("datetime(6)");
+        builder.Property(r => r.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(r => r.SentAt).HasColumnName("sent_at").HasColumnType("timestamp with time zone");
 
         builder.HasOne(r => r.BroadcastList)
             .WithMany()

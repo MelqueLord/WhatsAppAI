@@ -24,7 +24,7 @@ public sealed class AiInteractionConfiguration : IEntityTypeConfiguration<AiInte
         builder.Property(i => i.OutputTokens).HasColumnName("output_tokens").IsRequired();
         builder.Property(i => i.LatencyMs).HasColumnName("latency_ms").IsRequired();
         builder.Property(i => i.ResponseId).HasColumnName("response_id").HasMaxLength(100);
-        builder.Property(i => i.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(i => i.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
 
         builder.HasIndex(i => new { i.TenantId, i.ConversationId, i.CreatedAt });
         builder.HasIndex(i => i.TenantId);

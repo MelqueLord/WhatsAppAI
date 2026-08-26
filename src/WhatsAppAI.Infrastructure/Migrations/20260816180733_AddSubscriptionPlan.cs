@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -27,7 +27,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     output_tokens = table.Column<int>(type: "INTEGER", nullable: false),
                     latency_ms = table.Column<int>(type: "INTEGER", nullable: false),
                     response_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -44,8 +44,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     model_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     api_key_ref = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
@@ -65,7 +65,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     entity_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
                     details = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     ip_address = table.Column<string>(type: "TEXT", maxLength: 45, nullable: true),
-                    occurred_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    occurred_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -84,8 +84,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     fallback_message = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
                     max_tokens_per_response = table.Column<int>(type: "INTEGER", nullable: false),
                     enabled = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
@@ -103,7 +103,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     color = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
                     description = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -118,7 +118,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     contact_id = table.Column<Guid>(type: "TEXT", nullable: false),
                     tag_id = table.Column<Guid>(type: "TEXT", nullable: false),
                     tenant_id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -134,9 +134,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     phone_number = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
                     profile_picture_url = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    last_message_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    last_message_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -154,7 +154,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     to_mode = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     operator_user_id = table.Column<Guid>(type: "TEXT", nullable: true),
                     reason = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
-                    occurred_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    occurred_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -172,10 +172,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     priority = table.Column<int>(type: "INTEGER", nullable: false),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
                     version = table.Column<uint>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    deactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    deactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -198,7 +198,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     is_approved = table.Column<bool>(type: "INTEGER", nullable: false),
                     rejection_reason = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     rollback_model_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -214,9 +214,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     message_id = table.Column<Guid>(type: "TEXT", nullable: false),
                     status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     retry_count = table.Column<int>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    processed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    next_retry_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    processed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    next_retry_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     last_error = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true)
                 },
                 constraints: table =>
@@ -232,8 +232,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     key = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     encrypted_value = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: false),
                     tenant_id = table.Column<Guid>(type: "TEXT", nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -244,7 +244,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 name: "subscription_plans",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     code = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     description = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
@@ -254,8 +254,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     max_operators = table.Column<int>(type: "INTEGER", nullable: true),
                     max_knowledge_items = table.Column<int>(type: "INTEGER", nullable: true),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -269,13 +269,13 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "TEXT", nullable: false),
                     name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     slug = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    plan_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    plan_id = table.Column<Guid>(type: "uuid", nullable: false),
                     status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    activated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    suspended_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    closed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    activated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    suspended_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    closed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     suspension_reason = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false, defaultValue: 0u)
                 },
@@ -297,7 +297,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     unit = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
                     cost_minor_units = table.Column<long>(type: "INTEGER", nullable: true),
                     currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: true),
-                    recorded_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    recorded_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -315,9 +315,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
                     is_platform_admin = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: false),
                     security_stamp = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    activated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    last_login_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    activated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    last_login_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -338,9 +338,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     signature = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
                     error_message = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     retry_count = table.Column<int>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    processed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    next_retry_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    processed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    next_retry_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -357,8 +357,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     phone_number_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     access_token_ref = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false, defaultValue: 0u)
                 },
                 constraints: table =>
@@ -378,10 +378,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     assigned_to_user_id = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false, defaultValue: 1u),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    last_message_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    window_expires_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    last_message_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    window_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -406,10 +406,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     purpose = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     created_by_user_id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    expires_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    consumed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    revoked_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    consumed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    revoked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     revoked_by_user_id = table.Column<Guid>(type: "TEXT", nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false, defaultValue: 0u)
                 },
@@ -439,9 +439,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     user_id = table.Column<Guid>(type: "TEXT", nullable: false),
                     role = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    deactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     version = table.Column<uint>(type: "INTEGER", nullable: false, defaultValue: 0u)
                 },
                 constraints: table =>
@@ -479,11 +479,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     caption = table.Column<string>(type: "TEXT", maxLength: 4000, nullable: true),
                     quoted_message_id = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
                     idempotency_key = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    sent_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    delivered_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    read_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    failed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    sent_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    delivered_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    read_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    failed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     failure_reason = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     processed_by_ai = table.Column<bool>(type: "INTEGER", nullable: false)
                 },

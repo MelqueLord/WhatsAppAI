@@ -11,7 +11,7 @@ public partial class AddTenantDueDate : Migration
         migrationBuilder.AddColumn<DateTime>(
             name: "due_date",
             table: "tenants",
-            type: "datetime(6)",
+            type: "timestamp with time zone",
             nullable: true);
 
         migrationBuilder.Sql(
@@ -20,10 +20,10 @@ public partial class AddTenantDueDate : Migration
         migrationBuilder.AlterColumn<DateTime>(
             name: "due_date",
             table: "tenants",
-            type: "datetime(6)",
+            type: "timestamp with time zone",
             nullable: false,
             oldClrType: typeof(DateTime),
-            oldType: "datetime(6)",
+            oldType: "timestamp with time zone",
             oldNullable: true);
     }
 

@@ -20,7 +20,7 @@
 
 ## Gate de publicação
 
-**Decisão:** somente promover uma tag imutável que passe CI com MySQL 8.4, zero lint/testes falhos, zero testes críticos ignorados, scanner de segredos e smoke test em staging.  
+**Decisão:** somente promover uma tag imutável que passe CI com PostgreSQL, zero lint/testes falhos, zero testes críticos ignorados, scanner de segredos e smoke test em staging.
 **Motivo:** materializa os gates da constituição.  
 **Alternativas rejeitadas:** publicar a árvore local ou aceitar exceções sem prazo/responsável.
 

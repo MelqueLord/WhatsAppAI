@@ -8,7 +8,7 @@ Uma release recebe `GO` somente quando todos os resultados abaixo forem verdadei
 | Backend | Build `Release`, testes unitários/arquitetura/integração aprovados e zero warning novo. |
 | Frontend | Lint, testes e build aprovados. |
 | Segurança | Antiforgery obrigatório, cookies seguros, scanner limpo e isolamento de tenant aprovado. |
-| Banco | MySQL 8.4 migrado do zero e da versão anterior; rollback/restauração aprovados. |
+| Banco | PostgreSQL migrado do zero e da versão anterior; rollback/restauração aprovados. |
 | Deploy | Compose validado, `nginx -t` aprovado, HTTPS, API, SignalR e health checks operantes. |
 | Integrações | Meta/WhatsApp/IA testados sem segredo ou PII em logs. |
 | Operação | Monitoramento, alertas, backup, restauração e rollback com responsáveis definidos. |

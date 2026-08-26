@@ -17,7 +17,7 @@
 ## Sequência
 
 1. Validar configuração do Compose e do Nginx.
-2. Construir imagens sem cache e iniciar MySQL 8.4.
+2. Construir imagens sem cache e iniciar PostgreSQL.
 3. Executar serviço `migrate` em banco vazio e em cópia da versão anterior.
 4. Executar build, lint e todos os testes backend/frontend.
 5. Subir API, frontend e proxy; validar liveness, readiness, HTTPS e SignalR.

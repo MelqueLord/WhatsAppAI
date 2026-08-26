@@ -13,7 +13,7 @@ public partial class AddUserIsPlatformAdmin : Migration
         migrationBuilder.AddColumn<bool>(
             name: "is_platform_admin",
             table: "users",
-            type: "tinyint(1)",
+            type: "boolean",
             nullable: false,
             defaultValue: false);
     }

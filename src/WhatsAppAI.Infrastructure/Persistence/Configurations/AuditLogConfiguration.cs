@@ -20,7 +20,7 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.EntityId).HasColumnName("entity_id").HasMaxLength(100);
         builder.Property(a => a.Details).HasColumnName("details").HasMaxLength(2000);
         builder.Property(a => a.IpAddress).HasColumnName("ip_address").HasMaxLength(45);
-        builder.Property(a => a.OccurredAt).HasColumnName("occurred_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(a => a.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamp with time zone").IsRequired();
 
         builder.HasIndex(a => new { a.TenantId, a.OccurredAt });
         builder.HasIndex(a => new { a.TenantId, a.EntityType, a.EntityId });

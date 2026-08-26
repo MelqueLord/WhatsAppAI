@@ -18,7 +18,7 @@ public sealed class ServiceLineConfiguration : IEntityTypeConfiguration<ServiceL
         builder.Property(q => q.Keywords).HasColumnName("keywords").HasMaxLength(500);
         builder.Property(q => q.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(q => q.IsActive).HasColumnName("is_active").IsRequired();
-        builder.Property(q => q.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(q => q.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.HasIndex(q => new { q.TenantId, q.Name }).IsUnique();
     }
 }

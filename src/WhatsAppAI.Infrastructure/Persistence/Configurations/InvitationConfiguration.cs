@@ -51,21 +51,21 @@ public sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitatio
 
         builder.Property(i => i.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(i => i.ExpiresAt)
             .HasColumnName("expires_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(i => i.ConsumedAt)
             .HasColumnName("consumed_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(i => i.RevokedAt)
             .HasColumnName("revoked_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(i => i.RevokedByUserId)
             .HasColumnName("revoked_by_user_id");

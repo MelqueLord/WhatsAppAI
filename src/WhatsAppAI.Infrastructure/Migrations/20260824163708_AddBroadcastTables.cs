@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -24,7 +24,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "whatsapp_accounts",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 defaultValue: 0u,
                 oldClrType: typeof(int),
@@ -34,7 +34,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "whatsapp_accounts",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -60,7 +60,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "whatsapp_accounts",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -88,7 +88,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "whatsapp_accounts",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -96,7 +96,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "webhook_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -165,7 +165,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "encrypted_payload",
                 table: "webhook_events",
-                type: "longtext",
+                type: "text",
                 maxLength: 100000,
                 nullable: false,
                 oldClrType: typeof(string),
@@ -175,7 +175,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "RawPayloadRef",
                 table: "webhook_events",
-                type: "longtext",
+                type: "text",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -183,7 +183,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "webhook_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -212,7 +212,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_platform_admin",
                 table: "users",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false,
                 oldClrType: typeof(int),
@@ -222,7 +222,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "users",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -251,7 +251,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "MustChangePassword",
                 table: "users",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -259,7 +259,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "users",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -278,7 +278,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "usage_ledger",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -344,7 +344,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "usage_ledger",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -352,7 +352,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "tenants",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 defaultValue: 0u,
                 oldClrType: typeof(int),
@@ -433,7 +433,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "tenants",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -441,7 +441,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "tenant_memberships",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 defaultValue: 0u,
                 oldClrType: typeof(int),
@@ -451,7 +451,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "user_id",
                 table: "tenant_memberships",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -459,7 +459,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "tenant_memberships",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -507,7 +507,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "tenant_memberships",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -515,7 +515,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "openai_required",
                 table: "subscription_plans",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -551,7 +551,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "subscription_plans",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -580,7 +580,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "ai_metrics",
                 table: "subscription_plans",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -588,7 +588,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "ai_enabled",
                 table: "subscription_plans",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -596,7 +596,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "service_queues",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -622,7 +622,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "service_queues",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -652,7 +652,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "service_queues",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -660,7 +660,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "secrets",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -689,7 +689,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "secrets",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -697,7 +697,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "outbox_messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -723,7 +723,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "message_id",
                 table: "outbox_messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -742,7 +742,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "outbox_messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -750,7 +750,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "model_evaluations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -758,7 +758,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<double>(
                 name: "safety_score",
                 table: "model_evaluations",
-                type: "double",
+                type: "double precision",
                 nullable: false,
                 oldClrType: typeof(double),
                 oldType: "REAL");
@@ -788,7 +788,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<double>(
                 name: "quality_score",
                 table: "model_evaluations",
-                type: "double",
+                type: "double precision",
                 nullable: false,
                 oldClrType: typeof(double),
                 oldType: "REAL");
@@ -814,7 +814,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_approved",
                 table: "model_evaluations",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -822,7 +822,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<double>(
                 name: "handoff_rate",
                 table: "model_evaluations",
-                type: "double",
+                type: "double precision",
                 nullable: false,
                 oldClrType: typeof(double),
                 oldType: "REAL");
@@ -830,7 +830,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "evaluator_user_id",
                 table: "model_evaluations",
-                type: "longtext",
+                type: "text",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -838,7 +838,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "model_evaluations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -856,7 +856,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -885,7 +885,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "processed_by_ai",
                 table: "messages",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -958,7 +958,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "conversation_id",
                 table: "messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -977,7 +977,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "contact_id",
                 table: "messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -996,7 +996,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "messages",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1004,7 +1004,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "knowledge_items",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1022,7 +1022,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "knowledge_items",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1038,7 +1038,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "knowledge_items",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1056,7 +1056,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "knowledge_items",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1064,7 +1064,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "invitations",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 defaultValue: 0u,
                 oldClrType: typeof(int),
@@ -1074,7 +1074,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "user_id",
                 table: "invitations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1093,7 +1093,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "invitations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1111,7 +1111,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "revoked_by_user_id",
                 table: "invitations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1140,7 +1140,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "created_by_user_id",
                 table: "invitations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1148,7 +1148,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "invitations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1166,7 +1166,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "handoff_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1184,7 +1184,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "operator_user_id",
                 table: "handoff_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1203,7 +1203,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "conversation_id",
                 table: "handoff_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1211,7 +1211,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "handoff_events",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1219,7 +1219,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "conversations",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 defaultValue: 1u,
                 oldClrType: typeof(int),
@@ -1229,7 +1229,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "conversations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1247,7 +1247,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "queue_id",
                 table: "conversations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1276,7 +1276,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "contact_id",
                 table: "conversations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1295,7 +1295,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "conversations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1303,7 +1303,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "contacts",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1343,7 +1343,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "contacts",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1351,7 +1351,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "contact_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1359,7 +1359,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tag_id",
                 table: "contact_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1367,7 +1367,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "contact_id",
                 table: "contact_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1375,7 +1375,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "contact_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1383,7 +1383,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "client_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1401,7 +1401,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "client_tags",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1431,7 +1431,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "client_tags",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1450,7 +1450,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "bot_configurations",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1458,7 +1458,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "bot_configurations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1506,7 +1506,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "flow_steps_json",
                 table: "bot_configurations",
-                type: "longtext",
+                type: "text",
                 maxLength: 20000,
                 nullable: true,
                 oldClrType: typeof(string),
@@ -1528,7 +1528,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "enabled",
                 table: "bot_configurations",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1536,7 +1536,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "MediaMessage",
                 table: "bot_configurations",
-                type: "longtext",
+                type: "text",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1545,7 +1545,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<string>(
                 name: "HandoffMessage",
                 table: "bot_configurations",
-                type: "longtext",
+                type: "text",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1554,7 +1554,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "bot_configurations",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1562,7 +1562,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "user_id",
                 table: "audit_logs",
-                type: "char(36)",
+                type: "uuid",
                 nullable: true,
                 oldClrType: typeof(string),
                 oldType: "TEXT",
@@ -1571,7 +1571,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "audit_logs",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1632,7 +1632,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "audit_logs",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1640,7 +1640,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<uint>(
                 name: "version",
                 table: "ai_provider_credentials",
-                type: "int unsigned",
+                type: "bigint",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1648,7 +1648,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "ai_provider_credentials",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1695,7 +1695,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "is_active",
                 table: "ai_provider_credentials",
-                type: "tinyint(1)",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
@@ -1713,7 +1713,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "ai_provider_credentials",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1721,7 +1721,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "tenant_id",
                 table: "ai_interactions",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1758,7 +1758,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "message_id",
                 table: "ai_interactions",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1803,7 +1803,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "conversation_id",
                 table: "ai_interactions",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1811,7 +1811,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<double>(
                 name: "confidence",
                 table: "ai_interactions",
-                type: "double",
+                type: "double precision",
                 nullable: false,
                 oldClrType: typeof(double),
                 oldType: "REAL");
@@ -1819,7 +1819,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
             migrationBuilder.AlterColumn<Guid>(
                 name: "id",
                 table: "ai_interactions",
-                type: "char(36)",
+                type: "uuid",
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "TEXT");
@@ -1828,8 +1828,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 name: "broadcast_lists",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                     message = table.Column<string>(type: "varchar(4096)", maxLength: 4096, nullable: false),
                     status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
@@ -1837,29 +1837,28 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     total_count = table.Column<int>(type: "int", nullable: false),
                     sent_count = table.Column<int>(type: "int", nullable: false),
                     failed_count = table.Column<int>(type: "int", nullable: false),
-                    created_by_user_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    started_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    finished_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    started_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    finished_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_broadcast_lists", x => x.id);
-                })
-                .Annotation("MySQL:Charset", "utf8mb4");
+                });
 
             migrationBuilder.CreateTable(
                 name: "broadcast_recipients",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    broadcast_list_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    contact_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    broadcast_list_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    contact_id = table.Column<Guid>(type: "uuid", nullable: false),
                     status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                     error_message = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    sent_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    sent_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1870,8 +1869,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         principalTable: "broadcast_lists",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
-                })
-                .Annotation("MySQL:Charset", "utf8mb4");
+                });
 
             migrationBuilder.CreateIndex(
                 name: "IX_broadcast_lists_tenant_id",
@@ -1926,7 +1924,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned",
+                oldType: "bigint",
                 oldDefaultValue: 0u);
 
             migrationBuilder.AlterColumn<string>(
@@ -1935,7 +1933,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "phone_number_id",
@@ -1961,7 +1959,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "connection_type",
@@ -1989,7 +1987,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -1997,7 +1995,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -2067,7 +2065,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 maxLength: 100000,
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "longtext",
+                oldType: "text",
                 oldMaxLength: 100000);
 
             migrationBuilder.AlterColumn<string>(
@@ -2076,7 +2074,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "longtext");
+                oldType: "text");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -2084,7 +2082,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "security_stamp",
@@ -2114,7 +2112,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)",
+                oldType: "boolean",
                 oldDefaultValue: false);
 
             migrationBuilder.AlterColumn<int>(
@@ -2123,7 +2121,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "email",
@@ -2152,7 +2150,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -2160,7 +2158,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "unit",
@@ -2179,7 +2177,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "source_id",
@@ -2245,7 +2243,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -2254,7 +2252,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned",
+                oldType: "bigint",
                 oldDefaultValue: 0u);
 
             migrationBuilder.AlterColumn<string>(
@@ -2334,7 +2332,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -2343,7 +2341,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned",
+                oldType: "bigint",
                 oldDefaultValue: 0u);
 
             migrationBuilder.AlterColumn<string>(
@@ -2352,7 +2350,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -2360,7 +2358,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "status",
@@ -2408,7 +2406,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "openai_required",
@@ -2416,7 +2414,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "name",
@@ -2452,7 +2450,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "description",
@@ -2481,7 +2479,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<int>(
                 name: "ai_enabled",
@@ -2489,7 +2487,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -2497,7 +2495,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "sort_order",
@@ -2523,7 +2521,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "description",
@@ -2553,7 +2551,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -2561,7 +2559,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -2590,7 +2588,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -2598,7 +2596,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "status",
@@ -2624,7 +2622,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "last_error",
@@ -2643,7 +2641,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -2651,7 +2649,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<double>(
                 name: "safety_score",
@@ -2659,7 +2657,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "REAL",
                 nullable: false,
                 oldClrType: typeof(double),
-                oldType: "double");
+                oldType: "double precision");
 
             migrationBuilder.AlterColumn<string>(
                 name: "rollback_model_id",
@@ -2689,7 +2687,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "REAL",
                 nullable: false,
                 oldClrType: typeof(double),
-                oldType: "double");
+                oldType: "double precision");
 
             migrationBuilder.AlterColumn<int>(
                 name: "p95_latency_ms",
@@ -2715,7 +2713,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<double>(
                 name: "handoff_rate",
@@ -2723,7 +2721,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "REAL",
                 nullable: false,
                 oldClrType: typeof(double),
-                oldType: "double");
+                oldType: "double precision");
 
             migrationBuilder.AlterColumn<string>(
                 name: "evaluator_user_id",
@@ -2731,7 +2729,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "longtext");
+                oldType: "text");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -2739,7 +2737,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "type",
@@ -2757,7 +2755,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "status",
@@ -2786,7 +2784,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "media_url",
@@ -2859,7 +2857,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "content",
@@ -2878,7 +2876,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "caption",
@@ -2897,7 +2895,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -2905,7 +2903,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned");
+                oldType: "bigint");
 
             migrationBuilder.AlterColumn<string>(
                 name: "title",
@@ -2923,7 +2921,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "priority",
@@ -2939,7 +2937,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "content",
@@ -2957,7 +2955,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -2966,7 +2964,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned",
+                oldType: "bigint",
                 oldDefaultValue: 0u);
 
             migrationBuilder.AlterColumn<string>(
@@ -2975,7 +2973,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -2994,7 +2992,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "status",
@@ -3012,7 +3010,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3041,7 +3039,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -3049,7 +3047,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "to_mode",
@@ -3067,7 +3065,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "reason",
@@ -3085,7 +3083,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3104,7 +3102,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -3112,7 +3110,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -3121,7 +3119,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 1,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned",
+                oldType: "bigint",
                 oldDefaultValue: 1u);
 
             migrationBuilder.AlterColumn<string>(
@@ -3130,7 +3128,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "status",
@@ -3148,7 +3146,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3177,7 +3175,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "assigned_to_user_id",
@@ -3196,7 +3194,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3204,7 +3202,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "profile_picture_url",
@@ -3244,7 +3242,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3252,7 +3250,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tag_id",
@@ -3260,7 +3258,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "contact_id",
@@ -3268,7 +3266,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -3276,7 +3274,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3284,7 +3282,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "name",
@@ -3302,7 +3300,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "description",
@@ -3332,7 +3330,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "welcome_message",
@@ -3351,7 +3349,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned");
+                oldType: "bigint");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3359,7 +3357,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "returning_message",
@@ -3408,7 +3406,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 maxLength: 20000,
                 nullable: true,
                 oldClrType: typeof(string),
-                oldType: "longtext",
+                oldType: "text",
                 oldMaxLength: 20000,
                 oldNullable: true);
 
@@ -3429,7 +3427,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "MediaMessage",
@@ -3437,7 +3435,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(string),
-                oldType: "longtext",
+                oldType: "text",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3446,7 +3444,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(string),
-                oldType: "longtext",
+                oldType: "text",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3455,7 +3453,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "user_id",
@@ -3463,7 +3461,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)",
+                oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
@@ -3472,7 +3470,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "ip_address",
@@ -3533,7 +3531,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "version",
@@ -3541,7 +3539,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(uint),
-                oldType: "int unsigned");
+                oldType: "bigint");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3549,7 +3547,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "system_prompt",
@@ -3596,7 +3594,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "INTEGER",
                 nullable: false,
                 oldClrType: typeof(bool),
-                oldType: "tinyint(1)");
+                oldType: "boolean");
 
             migrationBuilder.AlterColumn<string>(
                 name: "api_key_ref",
@@ -3614,7 +3612,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "tenant_id",
@@ -3622,7 +3620,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<string>(
                 name: "response_id",
@@ -3659,7 +3657,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<int>(
                 name: "latency_ms",
@@ -3704,7 +3702,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
 
             migrationBuilder.AlterColumn<double>(
                 name: "confidence",
@@ -3712,7 +3710,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "REAL",
                 nullable: false,
                 oldClrType: typeof(double),
-                oldType: "double");
+                oldType: "double precision");
 
             migrationBuilder.AlterColumn<string>(
                 name: "id",
@@ -3720,7 +3718,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 type: "TEXT",
                 nullable: false,
                 oldClrType: typeof(Guid),
-                oldType: "char(36)");
+                oldType: "uuid");
         }
     }
 }

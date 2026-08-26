@@ -23,7 +23,7 @@ public sealed class SecretConfiguration : IEntityTypeConfiguration<Secret>
 
         builder.Property(s => s.EncryptedValue)
             .HasColumnName("encrypted_value")
-            .HasColumnType("longtext")
+            .HasColumnType("text")
             .IsRequired();
 
         builder.Property(s => s.TenantId)
@@ -31,12 +31,12 @@ public sealed class SecretConfiguration : IEntityTypeConfiguration<Secret>
 
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(s => s.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.HasIndex(s => new { s.Key, s.TenantId })
             .IsUnique();

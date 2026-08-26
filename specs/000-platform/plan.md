@@ -5,7 +5,7 @@
 
 ## 1. Arquitetura escolhida
 
-Monólito modular com frontend separado e um único backend implantável. O backend expõe HTTP/SignalR, executa workers internos e acessa MySQL 8.4 LTS. Limites de módulos permitem extração futura, mas não criam custo distribuído antecipadamente.
+Monólito modular com frontend separado e um único backend implantável. O backend expõe HTTP/SignalR, executa workers internos e acessa PostgreSQL via Npgsql. Supabase hospeda o banco gerenciado e PostgreSQL em Docker atende a produção própria.
 
 ### Módulos
 
@@ -21,15 +21,15 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | Área | Escolha | Motivo |
 |---|---|---|
 | Backend | .NET 10 LTS / ASP.NET Core | LTS atual, bom suporte a API, workers e SignalR |
-| ORM | EF Core 10 + MySql.EntityFrameworkCore | migrations e integração com MySQL 8.4 |
+| ORM | EF Core 10 + Npgsql | migrations e integração PostgreSQL |
 | Frontend | React 19.2 + TypeScript + Vite | SPA simples, tipada e de ciclo rápido |
 | UI data | TanStack Query | cache e estados de servidor sem store global excessiva |
-| Banco | MySQL 8.4 LTS | dados transacionais, utf8mb4, compatível com Hostinger VPS |
+| Banco | PostgreSQL | Supabase gerenciado ou container Docker na Hostinger |
 | Tempo real | SignalR | integração nativa e grupos por tenant |
 | IA | OpenAI Responses API | interface atual com saída estruturada e uso auditável |
 | WhatsApp | Meta Graph/Cloud API | canal oficial e suportado |
 | Testes | xUnit, Testcontainers, Vitest, Playwright | pirâmide completa e ambiente realista |
-| Local | Docker Compose | MySQL e dependências reproduzíveis |
+| Local | Docker Compose | PostgreSQL e dependências reproduzíveis |
 
 Versões menores devem ser fixadas no bootstrap e atualizadas de forma deliberada.
 
@@ -139,7 +139,7 @@ Implementar fatias verticais em ordem de `tasks.md`. A primeira demo funcional t
 | Controle humano | estados de conversa, versão e revalidação |
 | Isolamento | tenant em dados, auth, SignalR, jobs e testes |
 | Observável | Inbox/Outbox, correlação, métricas e runbooks |
-| Proporcional | MySQL central; extração condicionada a métricas |
+| Proporcional | PostgreSQL central; extração condicionada a métricas |
 | Especificação executável | IDs rastreados em contrato, tarefas e testes |
 
 ## 11. Decisões arquiteturais vigentes

@@ -1,6 +1,6 @@
 # ADR-0006: Hosting, Database and Secret Management
 
-**Status:** Accepted — 2026-08-14
+**Status:** Superseded by ADR-0008 — 2026-08-26
 
 ## Context
 

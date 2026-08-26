@@ -26,9 +26,9 @@ public sealed class BroadcastListConfiguration : IEntityTypeConfiguration<Broadc
         builder.Property(b => b.SentCount).HasColumnName("sent_count").IsRequired();
         builder.Property(b => b.FailedCount).HasColumnName("failed_count").IsRequired();
         builder.Property(b => b.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
-        builder.Property(b => b.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
-        builder.Property(b => b.StartedAt).HasColumnName("started_at").HasColumnType("datetime(6)");
-        builder.Property(b => b.FinishedAt).HasColumnName("finished_at").HasColumnType("datetime(6)");
+        builder.Property(b => b.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(b => b.StartedAt).HasColumnName("started_at").HasColumnType("timestamp with time zone");
+        builder.Property(b => b.FinishedAt).HasColumnName("finished_at").HasColumnType("timestamp with time zone");
 
         builder.HasIndex(b => b.TenantId);
         builder.HasIndex(b => new { b.TenantId, b.Status });

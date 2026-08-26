@@ -14,7 +14,7 @@ public sealed class ContactTagConfiguration : IEntityTypeConfiguration<ContactTa
         builder.Property(ct => ct.ContactId).HasColumnName("contact_id").IsRequired();
         builder.Property(ct => ct.TagId).HasColumnName("tag_id").IsRequired();
         builder.Property(ct => ct.TenantId).HasColumnName("tenant_id").IsRequired();
-        builder.Property(ct => ct.CreatedAt).HasColumnName("created_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(ct => ct.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.HasIndex(ct => new { ct.ContactId, ct.TagId }).IsUnique();
     }
 }

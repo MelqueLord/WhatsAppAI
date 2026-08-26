@@ -14,17 +14,17 @@ public partial class InitialSchema : Migration
             name: "tenants",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
                 name = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
                 slug = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                activated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                suspended_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                closed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                activated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                suspended_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                closed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                 suspension_reason = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false, defaultValue: 0u)
+                version = table.Column<uint>(type: "bigint", nullable: false, defaultValue: 0u)
             },
             constraints: table =>
             {
@@ -35,15 +35,15 @@ public partial class InitialSchema : Migration
             name: "users",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
                 email = table.Column<string>(type: "varchar(300)", maxLength: 300, nullable: false),
                 password_hash = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
                 display_name = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true),
-                is_active = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                is_active = table.Column<bool>(type: "boolean", nullable: false),
                 security_stamp = table.Column<string>(type: "varchar(64)", maxLength: 64, nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                activated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                last_login_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                activated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                last_login_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -54,15 +54,15 @@ public partial class InitialSchema : Migration
             name: "tenant_memberships",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                user_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                user_id = table.Column<Guid>(type: "uuid", nullable: false),
                 role = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                deactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false, defaultValue: 0u)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                deactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                version = table.Column<uint>(type: "bigint", nullable: false, defaultValue: 0u)
             },
             constraints: table =>
             {
@@ -85,20 +85,20 @@ public partial class InitialSchema : Migration
             name: "invitations",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                user_id = table.Column<Guid>(type: "char(36)", nullable: true),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                user_id = table.Column<Guid>(type: "uuid", nullable: true),
                 email = table.Column<string>(type: "varchar(300)", maxLength: 300, nullable: false),
                 token_hash = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false),
                 purpose = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
-                created_by_user_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                expires_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                consumed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                revoked_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                revoked_by_user_id = table.Column<Guid>(type: "char(36)", nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false, defaultValue: 0u)
+                created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                consumed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                revoked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                revoked_by_user_id = table.Column<Guid>(type: "uuid", nullable: true),
+                version = table.Column<uint>(type: "bigint", nullable: false, defaultValue: 0u)
             },
             constraints: table =>
             {
@@ -121,12 +121,12 @@ public partial class InitialSchema : Migration
             name: "secrets",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
                 key = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
                 encrypted_value = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: true),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: true),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -137,15 +137,15 @@ public partial class InitialSchema : Migration
             name: "whatsapp_accounts",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 waba_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 phone_number_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 access_token_ref = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
-                is_active = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false, defaultValue: 0u)
+                is_active = table.Column<bool>(type: "boolean", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                version = table.Column<uint>(type: "bigint", nullable: false, defaultValue: 0u)
             },
             constraints: table =>
             {
@@ -156,18 +156,18 @@ public partial class InitialSchema : Migration
             name: "webhook_events",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
                 phone_number_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: true),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: true),
                 idempotency_key = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
-                encrypted_payload = table.Column<string>(type: "longtext", maxLength: 100000, nullable: false),
+                encrypted_payload = table.Column<string>(type: "text", maxLength: 100000, nullable: false),
                 signature = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true),
                 error_message = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true),
                 retry_count = table.Column<int>(type: "int", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                processed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                next_retry_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                processed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                next_retry_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -178,14 +178,14 @@ public partial class InitialSchema : Migration
             name: "contacts",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 phone_number = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 name = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true),
                 profile_picture_url = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                last_message_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                last_message_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -196,18 +196,18 @@ public partial class InitialSchema : Migration
             name: "conversations",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                contact_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                contact_id = table.Column<Guid>(type: "uuid", nullable: false),
                 phone_number_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 mode = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 assigned_to_user_id = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false, defaultValue: 1u),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                last_message_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                window_expires_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                version = table.Column<uint>(type: "bigint", nullable: false, defaultValue: 1u),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                last_message_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                window_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -224,10 +224,10 @@ public partial class InitialSchema : Migration
             name: "messages",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                conversation_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                contact_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                conversation_id = table.Column<Guid>(type: "uuid", nullable: false),
+                contact_id = table.Column<Guid>(type: "uuid", nullable: false),
                 external_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                 direction = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
@@ -238,13 +238,13 @@ public partial class InitialSchema : Migration
                 caption = table.Column<string>(type: "varchar(4000)", maxLength: 4000, nullable: true),
                 quoted_message_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                 idempotency_key = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                sent_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                delivered_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                read_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                failed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                sent_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                delivered_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                read_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                failed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                 failure_reason = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true),
-                processed_by_ai = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                processed_by_ai = table.Column<bool>(type: "boolean", nullable: false)
             },
             constraints: table =>
             {
@@ -267,14 +267,14 @@ public partial class InitialSchema : Migration
             name: "handoff_events",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                conversation_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                conversation_id = table.Column<Guid>(type: "uuid", nullable: false),
                 from_mode = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 to_mode = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
-                operator_user_id = table.Column<Guid>(type: "char(36)", nullable: true),
+                operator_user_id = table.Column<Guid>(type: "uuid", nullable: true),
                 reason = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false),
-                occurred_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                occurred_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -285,14 +285,14 @@ public partial class InitialSchema : Migration
             name: "outbox_messages",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                message_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                message_id = table.Column<Guid>(type: "uuid", nullable: false),
                 status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 retry_count = table.Column<int>(type: "int", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                processed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                next_retry_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                processed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                next_retry_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                 last_error = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
             },
             constraints: table =>
@@ -304,15 +304,15 @@ public partial class InitialSchema : Migration
             name: "ai_provider_credentials",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 provider = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
                 model_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 api_key_ref = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
-                is_active = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false)
+                is_active = table.Column<bool>(type: "boolean", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                version = table.Column<uint>(type: "bigint", nullable: false)
             },
             constraints: table =>
             {
@@ -323,19 +323,19 @@ public partial class InitialSchema : Migration
             name: "ai_interactions",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                conversation_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                message_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                conversation_id = table.Column<Guid>(type: "uuid", nullable: false),
+                message_id = table.Column<Guid>(type: "uuid", nullable: false),
                 model_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 decision = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false),
                 handoff_reason = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
-                confidence = table.Column<double>(type: "double", nullable: false),
+                confidence = table.Column<double>(type: "double precision", nullable: false),
                 input_tokens = table.Column<int>(type: "int", nullable: false),
                 output_tokens = table.Column<int>(type: "int", nullable: false),
                 latency_ms = table.Column<int>(type: "int", nullable: false),
                 response_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -346,8 +346,8 @@ public partial class InitialSchema : Migration
             name: "usage_ledger",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 provider = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
                 metric = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
                 source_id = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
@@ -355,7 +355,7 @@ public partial class InitialSchema : Migration
                 unit = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: true),
                 cost_minor_units = table.Column<long>(type: "bigint", nullable: true),
                 currency = table.Column<string>(type: "varchar(3)", maxLength: 3, nullable: true),
-                recorded_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                recorded_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -366,19 +366,19 @@ public partial class InitialSchema : Migration
             name: "model_evaluations",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 model_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
-                evaluator_user_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                quality_score = table.Column<double>(type: "double", nullable: false),
-                handoff_rate = table.Column<double>(type: "double", nullable: false),
-                safety_score = table.Column<double>(type: "double", nullable: false),
+                evaluator_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                quality_score = table.Column<double>(type: "double precision", nullable: false),
+                handoff_rate = table.Column<double>(type: "double precision", nullable: false),
+                safety_score = table.Column<double>(type: "double precision", nullable: false),
                 cost_per_1k_tokens = table.Column<decimal>(type: "decimal(10,4)", nullable: false),
                 p95_latency_ms = table.Column<int>(type: "int", nullable: false),
-                is_approved = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                is_approved = table.Column<bool>(type: "boolean", nullable: false),
                 rejection_reason = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
                 rollback_model_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -389,17 +389,17 @@ public partial class InitialSchema : Migration
             name: "knowledge_items",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 title = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: false),
                 content = table.Column<string>(type: "varchar(4000)", maxLength: 4000, nullable: false),
                 priority = table.Column<int>(type: "int", nullable: false),
-                is_active = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                version = table.Column<uint>(type: "int unsigned", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                deactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                reactivated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                is_active = table.Column<bool>(type: "boolean", nullable: false),
+                version = table.Column<uint>(type: "bigint", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                deactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                reactivated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
             },
             constraints: table =>
             {
@@ -410,13 +410,13 @@ public partial class InitialSchema : Migration
             name: "client_tags",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 name = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
                 color = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: true),
                 description = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true),
-                is_active = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                is_active = table.Column<bool>(type: "boolean", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -427,11 +427,11 @@ public partial class InitialSchema : Migration
             name: "contact_tags",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                contact_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tag_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                contact_id = table.Column<Guid>(type: "uuid", nullable: false),
+                tag_id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
@@ -442,17 +442,17 @@ public partial class InitialSchema : Migration
             name: "bot_configurations",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
                 mode = table.Column<string>(type: "varchar(30)", maxLength: 30, nullable: false),
                 welcome_message = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true),
                 offline_message = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true),
                 fallback_message = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true),
                 max_tokens_per_response = table.Column<int>(type: "int", nullable: false),
-                enabled = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                version = table.Column<uint>(type: "int unsigned", nullable: false)
+                enabled = table.Column<bool>(type: "boolean", nullable: false),
+                created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                version = table.Column<uint>(type: "bigint", nullable: false)
             },
             constraints: table =>
             {
@@ -463,15 +463,15 @@ public partial class InitialSchema : Migration
             name: "audit_logs",
             columns: table => new
             {
-                id = table.Column<Guid>(type: "char(36)", nullable: false),
-                tenant_id = table.Column<Guid>(type: "char(36)", nullable: false),
-                user_id = table.Column<Guid>(type: "char(36)", nullable: true),
+                id = table.Column<Guid>(type: "uuid", nullable: false),
+                tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                user_id = table.Column<Guid>(type: "uuid", nullable: true),
                 action = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
                 entity_type = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
                 entity_id = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                 details = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true),
                 ip_address = table.Column<string>(type: "varchar(45)", maxLength: 45, nullable: true),
-                occurred_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                occurred_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {

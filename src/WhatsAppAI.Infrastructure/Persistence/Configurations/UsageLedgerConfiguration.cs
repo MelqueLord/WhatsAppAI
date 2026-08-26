@@ -21,7 +21,7 @@ public sealed class UsageLedgerConfiguration : IEntityTypeConfiguration<UsageLed
         builder.Property(u => u.Unit).HasColumnName("unit").HasMaxLength(20);
         builder.Property(u => u.CostMinorUnits).HasColumnName("cost_minor_units");
         builder.Property(u => u.Currency).HasColumnName("currency").HasMaxLength(3);
-        builder.Property(u => u.RecordedAt).HasColumnName("recorded_at").HasColumnType("datetime(6)").IsRequired();
+        builder.Property(u => u.RecordedAt).HasColumnName("recorded_at").HasColumnType("timestamp with time zone").IsRequired();
 
         builder.HasIndex(u => new { u.TenantId, u.Provider, u.Metric, u.SourceId }).IsUnique();
         builder.HasIndex(u => new { u.TenantId, u.RecordedAt });

@@ -25,3 +25,4 @@ Thumbs.db
 *.db-shm
 *.db-wal
 cookies.txt
+src/WhatsAppAI.WebApi/appsettings.Supabase.json

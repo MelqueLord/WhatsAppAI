@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -39,7 +39,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     color = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
                     sort_order = table.Column<int>(type: "INTEGER", nullable: false),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table => table.PrimaryKey("PK_service_queues", item => item.id));
 

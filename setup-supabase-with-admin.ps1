@@ -32,7 +32,6 @@ $connectionString = "postgresql://postgres:$DbPassword@db.$projectRef.supabase.c
 Write-Host "`n2. Running EF Core migrations..." -ForegroundColor Yellow
 
 $env:ConnectionStrings__DefaultConnection = $connectionString
-$env:DatabaseProvider = "SUPABASE"
 
 Push-Location src/WhatsAppAI.WebApi
 dotnet ef database update -p ../WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj 2>&1 | Select-String -Pattern "Done|error|Error" | Select-Object -Last 3
@@ -63,29 +62,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "⚠ Admin seed may have skipped (user exists?)" -ForegroundColor Yellow
 }
 
-# Create final config
-Write-Host "`n4. Creating appsettings.Supabase.json..." -ForegroundColor Yellow
-$jwtSecret = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([guid]::NewGuid().ToString()))
-$config = @{
-    Logging = @{
-        LogLevel = @{
-            Default = "Information"
-            Microsoft = "Warning"
-        }
-    }
-    DatabaseProvider = "SUPABASE"
-    ConnectionStrings = @{
-        DefaultConnection = $connectionString
-    }
-    Authentication = @{
-        JwtSecret = $jwtSecret
-    }
-} | ConvertTo-Json -Depth 10
-
-Set-Content -Path "src/WhatsAppAI.WebApi/appsettings.Supabase.json" -Value $config
-Write-Host "✓ Config saved to appsettings.Supabase.json" -ForegroundColor Green
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" $connectionString --project src/WhatsAppAI.WebApi
 
 Write-Host "`n=== Supabase Ready ===" -ForegroundColor Green
-Write-Host "Environment: `$env:ASPNETCORE_ENVIRONMENT='Supabase'" -ForegroundColor Cyan
 Write-Host "Start: dotnet run --project src/WhatsAppAI.WebApi" -ForegroundColor Cyan
 Write-Host "Login: admin@platform.com / Admin@123" -ForegroundColor Cyan

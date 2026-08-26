@@ -199,4 +199,4 @@ erDiagram
 
 ## Prontidão de produção
 
-O plano de correção de produção não adiciona entidades. Ele exige validar no MySQL 8.4 todas as migrations e restrições deste modelo, incluindo `Up`, `Down`, isolamento por `tenant_id`, backup e restauração antes da publicação.
+O plano de correção de produção não adiciona entidades. Ele exige validar no PostgreSQL todas as migrations e restrições deste modelo, incluindo `Up`, `Down`, isolamento por `tenant_id`, backup e restauração antes da publicação.

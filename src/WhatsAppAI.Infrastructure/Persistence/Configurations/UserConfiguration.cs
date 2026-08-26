@@ -45,16 +45,16 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(u => u.ActivatedAt)
             .HasColumnName("activated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(u => u.LastLoginAt)
             .HasColumnName("last_login_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.HasIndex(u => u.Email)
             .IsUnique();

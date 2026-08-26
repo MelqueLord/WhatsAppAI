@@ -10,7 +10,7 @@ Implementado:
 
 - Backend .NET 10 com WebApi, workers, EF Core, autenticacao, tenant isolation, SignalR, Meta/OpenAI, Inbox/Outbox, auditoria e uso.
 - Frontend React 19.2 + TypeScript + Vite com telas de auth, admin, operadores, inbox, integracoes, conhecimento, uso, bot e planos.
-- Persistencia MySQL 8.4 LTS em producao/testes e SQLite em desenvolvimento local.
+- Persistencia PostgreSQL via Npgsql, com Supabase gerenciado ou Docker em producao propria.
 - Docker, Nginx, scripts de backup/restore, observabilidade, runbooks e testes unitarios/integracao/arquitetura.
 
 Atualizacao de readiness (2026-08-21):
@@ -27,7 +27,7 @@ Atualizacao de readiness (2026-08-21):
 - O MVP atende conversas iniciadas pelo consumidor; não inclui campanhas nem disparos de marketing.
 - O núcleo não depende de n8n.
 - A arquitetura inicial é um monólito modular, sem microsserviços, RabbitMQ ou Redis.
-- Stack de referência: .NET 10 LTS, React 19.2 + TypeScript, MySQL 8.4 LTS, SQLite local e SignalR.
+- Stack de referência: .NET 10 LTS, React 19.2 + TypeScript, PostgreSQL e SignalR.
 
 ## Mapa da documentação
 
@@ -59,7 +59,7 @@ Atualizacao de readiness (2026-08-21):
 - Node.js LTS, que inclui npm
 - Git
 
-Docker e permissao de administrador nao sao necessarios para o desenvolvimento local. O setup usa SQLite e instala dependencias apenas na conta do usuario atual.
+Docker e necessario para o PostgreSQL local. A conexão do Supabase deve ser fornecida somente por segredo de ambiente.
 
 ### Depois de baixar pelo GitHub
 
@@ -73,7 +73,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 O `Set-ExecutionPolicy` vale somente para o terminal atual e nao exige administrador. Se o PowerShell ja permitir scripts, essa linha pode ser omitida.
 
-O setup executa restore, instala dependencias, configura SQLite, compila backend/frontend e roda os testes do frontend. Para preparar mais rapidamente sem os testes:
+O setup executa restore, inicia PostgreSQL, compila backend/frontend e roda os testes do frontend. Para preparar mais rapidamente sem os testes:
 
 ```powershell
 .\setup.ps1 -SkipTests

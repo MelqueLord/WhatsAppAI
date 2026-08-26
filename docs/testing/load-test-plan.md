@@ -127,7 +127,7 @@
 
 ## Environment
 - API: [version]
-- Database: MySQL 8.4
+- Database: PostgreSQL
 - Workers: [count]
 
 ## Results

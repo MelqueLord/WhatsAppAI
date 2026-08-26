@@ -1,34 +1,22 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Infrastructure.Persistence;
+using Testcontainers.PostgreSql;
 
 namespace WhatsAppAI.IntegrationTests;
 
-public class TestWebApplicationFactory : WebApplicationFactory<Program>
+public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly string? _dbProvider;
-    private readonly SqliteConnection? _sqliteConnection;
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+        .WithDatabase("whatsappai_test")
+        .WithUsername("postgres")
+        .WithPassword("postgres")
+        .Build();
 
-    public TestWebApplicationFactory()
-    {
-        Environment.SetEnvironmentVariable("DatabaseProvider", "SQLite");
-
-        _dbProvider = Environment.GetEnvironmentVariable("DatabaseProvider") ?? "SQLite";
-
-        if (_dbProvider == "SQLite")
-        {
-            _sqliteConnection = new SqliteConnection("DataSource=:memory:");
-            _sqliteConnection.Open();
-        }
-    }
-
-    private static string MySqlConnectionString =>
-        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-        ?? "Server=127.0.0.1;Port=3306;Database=whatsappai_test;User=root;Password=root;CharSet=utf8mb4";
+    public Task InitializeAsync() => _postgres.StartAsync();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -38,8 +26,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DatabaseProvider"] = "SQLite",
-                ["DatabaseInitialization:EnsureCreated"] = "true",
+                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
@@ -59,10 +46,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<AppDbContext>(options =>
             {
-                if (_dbProvider == "MySQL")
-                    options.UseMySQL(MySqlConnectionString);
-                else
-                    options.UseSqlite(_sqliteConnection!);
+                options.UseNpgsql(_postgres.GetConnectionString());
             });
         });
     }
@@ -71,7 +55,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.MigrateAsync();
 
         if (!await context.SubscriptionPlans.AnyAsync())
         {
@@ -84,10 +68,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         return context;
     }
 
-    protected override void Dispose(bool disposing)
+    public new async Task DisposeAsync()
     {
-        base.Dispose(disposing);
-        Environment.SetEnvironmentVariable("DatabaseProvider", null);
-        if (disposing) _sqliteConnection?.Dispose();
+        await _postgres.DisposeAsync();
+        await base.DisposeAsync();
     }
 }

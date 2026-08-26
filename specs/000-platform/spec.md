@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.11.0
+**Versão:** 0.12.0
 **Data:** 2026-08-21
 
 ## 1. Problema
@@ -235,7 +235,7 @@ Estas decisões não bloqueiam o desenho, mas precisam ser fechadas antes das fa
 - Conta Meta Business aprovada, WABA, número e permissões do cliente.
 - Um Meta App compartilhado da plataforma, com `app_secret` e verify token em cofre global, configurado para WhatsApp Cloud API e webhook HTTPS público.
 - Projeto OpenAI com faturamento, chave e limites do cliente.
-- Domínio, TLS, banco MySQL 8.4 LTS, armazenamento de segredos e backup.
+- Domínio, TLS, PostgreSQL, armazenamento de segredos e backup.
 
 ## 11. Extensões registradas
 

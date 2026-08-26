@@ -54,16 +54,16 @@ public sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webhook
 
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(e => e.ProcessedAt)
             .HasColumnName("processed_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(e => e.NextRetryAt)
             .HasColumnName("next_retry_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique();

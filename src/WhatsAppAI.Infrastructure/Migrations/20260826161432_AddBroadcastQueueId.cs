@@ -9,9 +9,7 @@ public partial class AddBroadcastQueueId : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        if (ActiveProvider.Contains("Npgsql", StringComparison.Ordinal))
-        {
-            migrationBuilder.Sql("""
+        migrationBuilder.Sql("""
                 CREATE SCHEMA IF NOT EXISTS "whatsappai";
 
                 CREATE TABLE IF NOT EXISTS "whatsappai"."broadcast_lists" (
@@ -59,29 +57,14 @@ public partial class AddBroadcastQueueId : Migration
                     ON "whatsappai"."broadcast_recipients" ("broadcast_list_id", "status");
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_broadcast_recipients_tenant_id_broadcast_list_id_contact_id"
                     ON "whatsappai"."broadcast_recipients" ("tenant_id", "broadcast_list_id", "contact_id");
-                """);
-            return;
-        }
-
-        migrationBuilder.AddColumn<Guid>(
-            name: "queue_id",
-            table: "broadcast_lists",
-            nullable: true);
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        if (ActiveProvider.Contains("Npgsql", StringComparison.Ordinal))
-        {
-            migrationBuilder.Sql("""
-                ALTER TABLE IF EXISTS "whatsappai"."broadcast_lists"
-                    DROP COLUMN IF EXISTS "queue_id";
-                """);
-            return;
-        }
-
-        migrationBuilder.DropColumn(
-            name: "queue_id",
-            table: "broadcast_lists");
+        migrationBuilder.Sql("""
+            ALTER TABLE IF EXISTS "whatsappai"."broadcast_lists"
+                DROP COLUMN IF EXISTS "queue_id";
+            """);
     }
 }

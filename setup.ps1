@@ -2,8 +2,7 @@
 .SYNOPSIS
     Prepares WhatsApp AI Manager for local development without administrator rights.
 .DESCRIPTION
-    Uses SQLite, .NET SDK and Node.js already installed for the current user.
-    Docker/MySQL remain optional for integration or production-like runs.
+    Uses PostgreSQL in Docker, .NET SDK and Node.js.
 #>
 
 [CmdletBinding()]
@@ -26,12 +25,14 @@ Write-Host 'WhatsApp AI Manager - local setup (no administrator rights)' -Foregr
 Require-Command 'dotnet' 'https://dotnet.microsoft.com/download/dotnet/10.0'
 Require-Command 'node' 'https://nodejs.org/'
 Require-Command 'npm' 'https://nodejs.org/'
+Require-Command 'docker' 'https://docs.docker.com/get-docker/'
 
 Write-Host "Using .NET $(& dotnet --version) and Node $(& node --version)" -ForegroundColor Green
 
 & dotnet user-secrets init --project src/WhatsAppAI.WebApi 2>$null
-& dotnet user-secrets set 'DatabaseProvider' 'SQLite' --project src/WhatsAppAI.WebApi
-& dotnet user-secrets set 'ConnectionStrings:DefaultConnection' 'Data Source=whatsappai.db' --project src/WhatsAppAI.WebApi
+if (-not $env:POSTGRES_PASSWORD) { $env:POSTGRES_PASSWORD = 'postgres' }
+& docker compose up -d postgres
+& dotnet user-secrets set 'ConnectionStrings:DefaultConnection' "Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=$env:POSTGRES_PASSWORD" --project src/WhatsAppAI.WebApi
 & dotnet user-secrets set 'Encryption:Key' 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHiA=' --project src/WhatsAppAI.WebApi
 & dotnet user-secrets set 'Meta:VerifyToken' 'dev-verify-token' --project src/WhatsAppAI.WebApi
 & dotnet user-secrets set 'Meta:AppSecret' 'dev-app-secret' --project src/WhatsAppAI.WebApi
@@ -68,7 +69,7 @@ if (-not $SkipTests) {
     finally { Pop-Location }
 }
 
-Write-Host 'Setup completed. SQLite will be created by the API on first run.' -ForegroundColor Green
+Write-Host 'Setup completed. PostgreSQL is running in Docker.' -ForegroundColor Green
 Write-Host 'Run run.bat or use: dotnet run --project src/WhatsAppAI.WebApi --urls http://localhost:5000' -ForegroundColor Green
 
 if ($Run) {

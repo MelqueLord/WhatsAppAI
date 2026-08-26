@@ -51,12 +51,12 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
 
         builder.Property(a => a.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(a => a.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(a => a.Version)
             .HasColumnName("version")

@@ -2,7 +2,7 @@
 
 **Status:** Em andamento (P0 implementado em código; validações operacionais pendentes)  
 **Base da auditoria:** 2026-08-21  
-**Objetivo:** levar a plataforma a um deploy reproduzível e seguro em MySQL 8.4, sem alterar o escopo do MVP.
+**Objetivo:** levar a plataforma a um deploy reproduzível e seguro em PostgreSQL, sem alterar o escopo do MVP.
 
 ## Estado atual
 
@@ -34,11 +34,11 @@
 | PRD-002 | P0 | Remover `cookies.txt` do versionamento, invalidar sessões existentes e verificar o histórico por segredos. | Security/DevOps | Scanner não encontra cookie, token, senha ou chave no repositório; sessões antigas deixam de ser aceitas. |
 | PRD-003 | P0 | Unificar os nomes das variáveis entre `.env.production.example` e `compose.yaml`; proibir defaults inseguros em produção. | DevOps/Backend | `docker compose config` recebe todos os valores exigidos e falha cedo quando um segredo está ausente. |
 | PRD-004 | P0 | Corrigir Nginx: template de domínio, contexto de rate limit, dependência do frontend, TLS e proxy de API/SignalR/webhook. | DevOps | `nginx -t` passa e o stack abre frontend, API e SignalR somente pelo domínio HTTPS. |
-| PRD-005 | P0 | Substituir `EnsureCreated` em produção por migration bundle/job dedicado e reversível. | Backend/DBA | Banco MySQL vazio sobe até a última migration; rollback ensaiado; API runtime não depende do SDK .NET. |
-| PRD-006 | P1 | Consolidar e revisar as migrations não versionadas, incluindo filas, tags, linhas, operadores e IA. | Backend/DBA | Snapshot consistente; `Up`/`Down` testados em MySQL; isolamento por tenant aprovado. |
+| PRD-005 | P0 | Substituir `EnsureCreated` em produção por migration bundle/job dedicado e reversível. | Backend/DBA | Banco PostgreSQL vazio sobe até a última migration; rollback ensaiado; API runtime não depende do SDK .NET. |
+| PRD-006 | P1 | Consolidar e revisar as migrations não versionadas, incluindo filas, tags, linhas, operadores e IA. | Backend/DBA | Snapshot consistente; `Up`/`Down` testados em PostgreSQL; isolamento por tenant aprovado. |
 | PRD-007 | P1 | Corrigir 23 erros de lint e o teste frontend de configuração da IA. | Frontend | `npm run lint`, `npm test` e `npm run build` passam sem erro. |
 | PRD-008 | P1 | Habilitar os 8 testes de webhook com configuração controlada e adicionar cenários de assinatura, duplicidade e tenant. | Backend/QA | Nenhum teste crítico ignorado; webhook inválido é rejeitado e reentrega não duplica dados. |
-| PRD-009 | P1 | Executar CI limpa com MySQL 8.4 e artefatos `Release`, incluindo migrations, isolamento e scanner de segredos. | QA/DevOps | Pipeline completo verde a partir de checkout limpo. |
+| PRD-009 | P1 | Executar CI limpa com PostgreSQL e artefatos `Release`, incluindo migrations, isolamento e scanner de segredos. | QA/DevOps | Pipeline completo verde a partir de checkout limpo. |
 | PRD-010 | P1 | Criar release versionada: revisar diff, separar mudanças por requisito e registrar riscos/rollback. | Tech Lead | Worktree limpo, commits rastreáveis e tag candidata imutável. |
 | PRD-011 | P2 | Implantar staging equivalente à produção e executar smoke tests de PlatformAdmin, TenantOwner e Operator. | QA/Product | Login, convite, filas, tags, inbox, SignalR e permissões funcionam sem cruzamento de tenant. |
 | PRD-012 | P2 | Validar Meta, WhatsApp QR e provedores de IA com credenciais de teste e logs sanitizados. | QA/Integrations | Entrada, saída, status, handoff, fila e tag funcionam; nenhum segredo aparece nos logs. |

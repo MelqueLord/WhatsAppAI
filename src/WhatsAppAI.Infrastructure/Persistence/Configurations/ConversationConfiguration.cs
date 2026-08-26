@@ -55,20 +55,20 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
 
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(c => c.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(c => c.LastMessageAt)
             .HasColumnName("last_message_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(c => c.WindowExpiresAt)
             .HasColumnName("window_expires_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.HasOne(c => c.Contact)
             .WithMany(c => c.Conversations)

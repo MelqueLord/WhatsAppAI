@@ -1,6 +1,6 @@
 # ADR-0007: Supabase PostgreSQL opcional
 
-**Status:** Accepted — 2026-08-21
+**Status:** Superseded by ADR-0008 — 2026-08-26
 
 ## Contexto
 

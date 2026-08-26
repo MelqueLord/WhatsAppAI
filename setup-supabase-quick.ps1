@@ -11,9 +11,7 @@ $password = [System.Net.NetworkCredential]::new("", $DbPassword).Password
 $connectionString = "Host=$PoolerHost;Port=$Port;Database=postgres;Username=postgres.$ProjectRef;Password=$password;SSL Mode=Require"
 
 try {
-    $env:DatabaseProvider = "SUPABASE"
     $env:ConnectionStrings__DefaultConnection = $connectionString
-    $env:DatabaseInitialization__EnsureCreated = "true"
     $env:DatabaseInitialization__Only = "true"
     $env:ASPNETCORE_ENVIRONMENT = "Production"
     $env:Encryption__Key = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))

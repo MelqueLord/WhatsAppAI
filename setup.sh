@@ -7,8 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 DOTNET_VERSION="10.0"
-MYSQL_ROOT_PASSWORD="root"
-MYSQL_DATABASE="whatsappai_dev"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
+POSTGRES_DB="${POSTGRES_DB:-whatsappai}"
+POSTGRES_USER="${POSTGRES_USER:-whatsappai}"
 ENCRYPTION_KEY=$(openssl rand -base64 32)
 
 # Colors
@@ -82,23 +83,23 @@ install_node() {
     fi
 }
 
-start_mysql() {
-    step "Iniciando MySQL via Docker"
+start_postgres() {
+    step "Iniciando PostgreSQL via Docker"
 
-    echo -e "${YELLOW}🐬 Iniciando MySQL 8.4...${NC}"
-    docker compose up -d mysql
+    echo -e "${YELLOW}Iniciando PostgreSQL...${NC}"
+    POSTGRES_PASSWORD="$POSTGRES_PASSWORD" docker compose up -d postgres
 
-    echo -e "${YELLOW}⏳ Aguardando MySQL ficar pronto...${NC}"
+    echo -e "${YELLOW}Aguardando PostgreSQL ficar pronto...${NC}"
     for i in $(seq 1 30); do
-        if docker compose exec -T mysql mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" &>/dev/null; then
-            echo -e "${GREEN}✅ MySQL pronto!${NC}"
+        if docker compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" &>/dev/null; then
+            echo -e "${GREEN}PostgreSQL pronto!${NC}"
             return
         fi
         echo -n "."
         sleep 1
     done
 
-    echo -e "\n${RED}❌ MySQL não ficou pronto a tempo${NC}"
+    echo -e "\n${RED}PostgreSQL não ficou pronto a tempo${NC}"
     exit 1
 }
 
@@ -109,7 +110,7 @@ setup_user_secrets() {
 
     dotnet user-secrets init --project "$PROJECT_PATH" 2>/dev/null || true
 
-    CONN_STRING="Server=localhost;Port=3306;Database=$MYSQL_DATABASE;User=root;Password=$MYSQL_ROOT_PASSWORD;CharSet=utf8mb4"
+    CONN_STRING="Host=localhost;Port=5432;Database=$POSTGRES_DB;Username=$POSTGRES_USER;Password=$POSTGRES_PASSWORD"
     dotnet user-secrets set "ConnectionStrings:DefaultConnection" "$CONN_STRING" --project "$PROJECT_PATH"
     dotnet user-secrets set "Encryption:Key" "$ENCRYPTION_KEY" --project "$PROJECT_PATH"
     dotnet user-secrets set "Meta:VerifyToken" "dev-verify-token" --project "$PROJECT_PATH"
@@ -135,7 +136,7 @@ install_dependencies() {
 init_database() {
     step "Inicializando banco de dados"
 
-    echo -e "${YELLOW}🐬 Banco de dados MySQL criado pelo Docker Compose${NC}"
+    echo -e "${YELLOW}Banco PostgreSQL criado pelo Docker Compose${NC}"
 
     echo -e "${YELLOW}🔄 Executando migrations...${NC}"
     dotnet ef database update --project src/WhatsAppAI.Infrastructure --startup-project src/WhatsAppAI.WebApi || true
@@ -219,7 +220,7 @@ if ! $RUN_ONLY; then
     install_dotnet
     install_docker
     install_node
-    start_mysql
+    start_postgres
     setup_user_secrets
     install_dependencies
     init_database

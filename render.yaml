@@ -12,10 +12,6 @@ services:
         value: "false"
       - key: Cors__AllowedOrigins__0
         value: https://whats-app-ai-red.vercel.app
-      - key: DatabaseProvider
-        value: PostgreSQL
-      - key: DatabaseInitialization__EnsureCreated
-        value: "true"
       - key: ConnectionStrings__DefaultConnection
         sync: false
       - key: Encryption__Key

@@ -28,7 +28,7 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.PlanId)
             .HasColumnName("plan_id")
-            .HasColumnType("char(36)")
+            .HasColumnType("uuid")
             .IsRequired();
 
         builder.Property(t => t.OfficialApiLineCount)
@@ -54,33 +54,33 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(t => t.LastPaymentAt)
             .HasColumnName("last_payment_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(t => t.ActivatedAt)
             .HasColumnName("activated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(t => t.SuspendedAt)
             .HasColumnName("suspended_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(t => t.ReactivatedAt)
             .HasColumnName("reactivated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(t => t.ClosedAt)
             .HasColumnName("closed_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(t => t.SuspensionReason)
             .HasColumnName("suspension_reason")

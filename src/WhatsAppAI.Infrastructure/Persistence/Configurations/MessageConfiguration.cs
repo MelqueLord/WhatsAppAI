@@ -76,24 +76,24 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(m => m.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(m => m.SentAt)
             .HasColumnName("sent_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.DeliveredAt)
             .HasColumnName("delivered_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.ReadAt)
             .HasColumnName("read_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.FailedAt)
             .HasColumnName("failed_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.FailureReason)
             .HasColumnName("failure_reason")

@@ -1,5 +1,5 @@
 #!/bin/bash
-# WhatsApp AI Platform - MySQL Backup Script
+# WhatsApp AI Platform - PostgreSQL Backup Script
 # Run daily via cron: 0 2 * * * /path/to/backup.sh
 
 set -e
@@ -7,26 +7,23 @@ set -e
 # Configuration
 BACKUP_DIR="/var/backups/whatsappai"
 RETENTION_DAYS=7
-MYSQL_CONTAINER="whatsapp-ai-mysql-1"
-MYSQL_DATABASE="whatsappai_prod"
-MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}"
+POSTGRES_CONTAINER="whatsapp-ai-postgres-1"
+POSTGRES_DB="${POSTGRES_DB:-whatsappai}"
+POSTGRES_USER="${POSTGRES_USER:-whatsappai}"
 
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 
 # Generate timestamp
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/backup_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="$BACKUP_DIR/backup_${TIMESTAMP}.dump"
 
 # Create backup
 echo "[$(date)] Starting backup..."
-docker exec "$MYSQL_CONTAINER" mysqldump \
-    -u root \
-    -p"$MYSQL_ROOT_PASSWORD" \
-    --single-transaction \
-    --routines \
-    --triggers \
-    "$MYSQL_DATABASE" | gzip > "$BACKUP_FILE"
+docker exec "$POSTGRES_CONTAINER" pg_dump \
+    --username "$POSTGRES_USER" \
+    --dbname "$POSTGRES_DB" \
+    --format=custom > "$BACKUP_FILE"
 
 # Verify backup
 if [ -s "$BACKUP_FILE" ]; then
@@ -38,10 +35,10 @@ fi
 
 # Clean old backups
 echo "[$(date)] Cleaning backups older than $RETENTION_DAYS days..."
-find "$BACKUP_DIR" -name "backup_*.sql.gz" -mtime +$RETENTION_DAYS -delete
+find "$BACKUP_DIR" -name "backup_*.dump" -mtime +$RETENTION_DAYS -delete
 
 # List recent backups
 echo "[$(date)] Recent backups:"
-ls -lh "$BACKUP_DIR"/backup_*.sql.gz | tail -5
+ls -lh "$BACKUP_DIR"/backup_*.dump | tail -5
 
 echo "[$(date)] Backup completed successfully."

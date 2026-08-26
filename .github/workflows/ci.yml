@@ -14,15 +14,16 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.4-lts
+      postgres:
+        image: postgres:17-alpine
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: whatsappai_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: whatsappai_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-cmd="pg_isready -U postgres -d whatsappai_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -32,8 +33,7 @@ jobs:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-      DatabaseProvider: MySQL
-      ConnectionStrings__DefaultConnection: "Server=localhost;Port=3306;Database=whatsappai_test;User=root;Password=root;CharSet=utf8mb4"
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=whatsappai_test;Username=postgres;Password=postgres"
 
     steps:
       - name: Checkout

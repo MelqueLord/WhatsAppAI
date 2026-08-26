@@ -24,7 +24,7 @@
 
 - [ ] Copy `deploy/.env.production.example` to `.env`
 - [ ] Generate encryption key: `openssl rand -base64 32`
-- [ ] Set MySQL root password (strong, unique)
+- [ ] Set PostgreSQL password (strong, unique)
 - [ ] Set Meta Verify Token and App Secret
 - [ ] Set DOMAIN for Nginx template rendering
 
@@ -42,11 +42,11 @@
 # Build images
 docker compose build
 
-# Start MySQL
-docker compose up -d mysql
+# Start PostgreSQL
+docker compose up -d postgres
 
-# Wait for MySQL health check
-docker compose ps mysql
+# Wait for PostgreSQL health check
+docker compose ps postgres
 
 # Run migrations
 docker compose run --rm migrate
@@ -60,7 +60,7 @@ docker compose --profile production up -d
 
 ### 2. Verify Services
 
-- [ ] MySQL healthy: `docker compose ps mysql`
+- [ ] PostgreSQL healthy: `docker compose ps postgres`
 - [ ] API responding: `curl https://yourdomain.com/health/live`
 - [ ] Frontend accessible: `https://yourdomain.com`
 - [ ] Nginx proxying correctly

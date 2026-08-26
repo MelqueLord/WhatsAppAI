@@ -15,8 +15,7 @@ public static class PersistenceServiceCollectionExtensions
 {
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
-        string connectionString,
-        string provider = "MySQL")
+        string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
@@ -28,21 +27,7 @@ public static class PersistenceServiceCollectionExtensions
             options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
             options.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
 
-            switch (provider.ToUpperInvariant())
-            {
-                case "SQLITE":
-                    options.UseSqlite(connectionString);
-                    break;
-                case "MYSQL":
-                    options.UseMySQL(connectionString);
-                    break;
-                case "POSTGRESQL":
-                case "POSTGRES":
-                case "SUPABASE":
-                default:
-                    options.UseNpgsql(connectionString);
-                    break;
-            }
+            options.UseNpgsql(connectionString);
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();

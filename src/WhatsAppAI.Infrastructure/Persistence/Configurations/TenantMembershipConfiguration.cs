@@ -38,16 +38,16 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
 
         builder.Property(m => m.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("datetime(6)")
+            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(m => m.DeactivatedAt)
             .HasColumnName("deactivated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.ReactivatedAt)
             .HasColumnName("reactivated_at")
-            .HasColumnType("datetime(6)");
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(m => m.Version)
             .HasColumnName("version")
@@ -64,7 +64,7 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
 
         builder.Property(m => m.AssignedLinesJson)
             .HasColumnName("assigned_lines")
-            .HasColumnType("json");
+            .HasColumnType("jsonb");
 
         builder.Ignore(m => m.AssignedLines);
 

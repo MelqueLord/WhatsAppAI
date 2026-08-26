@@ -26,7 +26,7 @@ Se código e especificação divergirem, interrompa a implementação e proponha
 
 - Backend: .NET 10 LTS, ASP.NET Core, EF Core e SignalR.
 - Frontend: React 19.2, TypeScript e Vite.
-- Persistência: MySQL 8.4 LTS.
+- Persistência: PostgreSQL via Npgsql; Supabase gerenciado ou Docker em produção própria.
 - Organização: monólito modular com separação leve entre Domain, Application, Infrastructure e WebApi.
 - Integrações: WhatsApp Cloud API oficial e OpenAI Responses API atrás de interfaces próprias.
 - Assíncrono: padrões Inbox/Outbox e worker durável apoiado no MySQL.

@@ -49,17 +49,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 // PostgreSQL is the default provider; connection comes from ConnectionStrings:DefaultConnection.
-var dbProvider =
-    builder.Configuration["DatabaseProvider"]
-    ?? "PostgreSQL";
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    if (builder.Environment.IsProduction())
+        throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required in production.");
 
-var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Host=localhost;Port=5432;Database=whatsappai;Username=postgres;Password=postgres";
+    connectionString = "Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=postgres";
+}
 
-builder.Services.AddPersistence(
-    connectionString,
-    dbProvider);
+builder.Services.AddPersistence(connectionString);
 
 builder.Services.AddObservability(
     builder.Configuration);

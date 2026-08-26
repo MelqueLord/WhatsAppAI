@@ -39,7 +39,6 @@ if (-not $SkipMigration) {
     Write-Host "`n2. Running EF Core migrations..." -ForegroundColor Yellow
     
     $env:ConnectionStrings__DefaultConnection = $connectionString
-    $env:DatabaseProvider = "SUPABASE"
     
     Set-Location src/WhatsAppAI.WebApi
     dotnet ef database update -p ../WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj
@@ -53,17 +52,8 @@ if (-not $SkipMigration) {
     Set-Location ../../
 }
 
-# Save config to appsettings.Supabase.json
-Write-Host "`n3. Creating appsettings.Supabase.json..." -ForegroundColor Yellow
-$config = @{
-    DatabaseProvider = "SUPABASE"
-    ConnectionStrings = @{
-        DefaultConnection = $connectionString
-    }
-} | ConvertTo-Json -Depth 10
-
-Set-Content -Path "src/WhatsAppAI.WebApi/appsettings.Supabase.json" -Value $config
-Write-Host "✓ Config saved to appsettings.Supabase.json" -ForegroundColor Green
+# Keep the credential outside versioned files.
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" $connectionString --project src/WhatsAppAI.WebApi
 
 Write-Host "`n=== Ready for Supabase ===" -ForegroundColor Green
-Write-Host "Start with: `$env:ASPNETCORE_ENVIRONMENT='Supabase'; dotnet run" -ForegroundColor Cyan
+Write-Host "Start with: dotnet run --project src/WhatsAppAI.WebApi" -ForegroundColor Cyan

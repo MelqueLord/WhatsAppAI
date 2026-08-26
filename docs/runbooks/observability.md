@@ -78,7 +78,7 @@ The `SanitizingEnricher` strips:
 
 | Check | Description |
 |---|---|
-| `mysql` | Database connectivity |
+| `postgres` | Database connectivity |
 | `worker-webhook` | Webhook processing worker |
 | `worker-outbox` | Outbox processing worker |
 | `worker-ai` | AI orchestration worker |
@@ -116,7 +116,7 @@ The `SanitizingEnricher` strips:
 ### High Webhook Queue
 
 1. Check webhook worker logs
-2. Verify MySQL connectivity
+2. Verify PostgreSQL connectivity
 3. Check Meta API rate limits
 4. Look for signature verification failures
 

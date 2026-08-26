@@ -19,21 +19,21 @@ Para executar em uma maquina Windows sem permissao de administrador, instale o .
 .\run.bat
 ```
 
-Esse caminho usa SQLite em `src/WhatsAppAI.WebApi/whatsappai.db`, nao inicia Docker e sobe a API em `http://localhost:5000` e o frontend em `http://localhost:5173`. O servico opcional `services/whatsapp-web` pode ser instalado com `npm install` nessa pasta para habilitar o QR Code local.
+Esse caminho inicia PostgreSQL em Docker e sobe a API em `http://localhost:5000` e o frontend em `http://localhost:5173`.
 
-## Preparação com Docker/MySQL
+## Preparação com Docker/PostgreSQL
 
 Copie `.env.example` para um `.env` local ignorado, substitua a senha de exemplo e execute:
 
 ```bash
-docker compose up -d mysql
-docker compose ps mysql
-dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Server=localhost;Port=3306;Database=whatsapp_ai;User=whatsapp_ai;Password=<senha-local>"
+docker compose up -d postgres
+docker compose ps postgres
+dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=<senha-local>"
 dotnet restore
 dotnet run --project src/WhatsAppAI.WebApi
 ```
 
-**Nota:** O modo desenvolvimento usa SQLite por conveniência (configurado em `Program.cs`). O MySQL via Docker Compose é usado para testes de integração e produção.
+Supabase e PostgreSQL Docker usam o mesmo provider Npgsql e a mesma cadeia de migrations.
 
 Nenhuma migration existe no bootstrap. O primeiro `dotnet ef database update` somente será executado depois da migration de Tenant/User prevista na Fase 1.
 
