@@ -55,17 +55,24 @@ public static class ContactEndpoints
                 return Results.BadRequest(new { error = "Queue not found." });
         }
 
+        List<Guid>? queueContactIds = null;
+        if (queueId.HasValue)
+        {
+            queueContactIds = await dbContext.Conversations
+                .Where(conversation =>
+                    conversation.TenantId == currentTenant.TenantId.Value &&
+                    conversation.QueueId == queueId.Value &&
+                    conversation.Status == ConversationStatus.Open)
+                .Select(conversation => conversation.ContactId)
+                .Distinct()
+                .ToListAsync();
+        }
+
         var query = dbContext.Contacts
             .Where(c => c.TenantId == currentTenant.TenantId.Value);
 
-        if (queueId.HasValue)
-        {
-            query = query.Where(c => dbContext.Conversations.Any(conversation =>
-                conversation.TenantId == currentTenant.TenantId.Value &&
-                conversation.ContactId == c.Id &&
-                conversation.QueueId == queueId.Value &&
-                conversation.Status == ConversationStatus.Open));
-        }
+        if (queueContactIds is not null)
+            query = query.Where(c => queueContactIds.Contains(c.Id));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
