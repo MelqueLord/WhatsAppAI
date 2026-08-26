@@ -13,7 +13,7 @@ import {
   Search,
 } from 'lucide-react'
 import { api } from '../../lib/api'
-import type { BroadcastList, Contact } from '../../lib/api'
+import type { BroadcastList, Contact, ServiceQueue } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 
 // ──────────────────────────────── helpers ────────────────────────────────────
@@ -56,12 +56,23 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
+  const [selectedSourceQueueId, setSelectedSourceQueueId] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: contacts, isLoading: loadingContacts } = useQuery({
-    queryKey: ['contacts', 'broadcast'],
-    queryFn: () => api.contacts.list(undefined, 500),
+    queryKey: ['contacts', 'broadcast', selectedSourceQueueId],
+    queryFn: () => api.contacts.list(undefined, 500, selectedSourceQueueId || undefined),
   })
+
+  const { data: queues } = useQuery({
+    queryKey: ['service-queues'],
+    queryFn: api.serviceQueues.list,
+    select: (data) => data.filter((q) => q.isActive),
+  })
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [selectedSourceQueueId])
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -121,6 +132,20 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 {(createMutation.error as Error).message}
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Fila de origem</label>
+              <select
+                value={selectedSourceQueueId}
+                onChange={(e) => setSelectedSourceQueueId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="">Todos os contatos</option>
+                {(queues ?? []).map((queue: ServiceQueue) => (
+                  <option key={queue.id} value={queue.id}>{queue.name}</option>
+                ))}
+              </select>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome da lista *</label>

@@ -37,13 +37,35 @@ public static class ContactEndpoints
         ICurrentTenant currentTenant,
         AppDbContext dbContext,
         string? search = null,
+        Guid? queueId = null,
         int limit = 50)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
+        if (queueId.HasValue)
+        {
+            var queueExists = await dbContext.ServiceLines
+                .AnyAsync(q =>
+                    q.Id == queueId.Value &&
+                    q.TenantId == currentTenant.TenantId.Value &&
+                    q.IsActive);
+
+            if (!queueExists)
+                return Results.BadRequest(new { error = "Queue not found." });
+        }
+
         var query = dbContext.Contacts
             .Where(c => c.TenantId == currentTenant.TenantId.Value);
+
+        if (queueId.HasValue)
+        {
+            query = query.Where(c => dbContext.Conversations.Any(conversation =>
+                conversation.TenantId == currentTenant.TenantId.Value &&
+                conversation.ContactId == c.Id &&
+                conversation.QueueId == queueId.Value &&
+                conversation.Status == ConversationStatus.Open));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
