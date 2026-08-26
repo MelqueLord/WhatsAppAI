@@ -87,6 +87,11 @@ public sealed class User
         SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
+    public void UpdateDisplayName(string? displayName)
+    {
+        DisplayName = displayName?.Trim();
+    }
+
     public void GrantPlatformAdmin()
     {
         IsPlatformAdmin = true;

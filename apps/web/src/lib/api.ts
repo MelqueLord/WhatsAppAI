@@ -514,6 +514,7 @@ export const api = {
         data: {
           name: string
           ownerEmail: string
+          ownerDisplayName?: string
           planCode: string
           officialApiLineCount: number
           qrCodeLineCount: number

@@ -97,7 +97,7 @@ export function AdminTenantsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number } }) =>
+    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number } }) =>
       api.admin.tenants.update(tenant.id, data, tenant.version),
     onSuccess: () => {
       setEditTarget(null)
@@ -151,6 +151,7 @@ export function AdminTenantsPage() {
       data: {
         name: String(formData.get('name') ?? '').trim(),
         ownerEmail: String(formData.get('ownerEmail') ?? '').trim(),
+        ownerDisplayName: String(formData.get('ownerDisplayName') ?? '').trim() || undefined,
         planCode: String(formData.get('planCode') ?? ''),
         officialApiLineCount: Number(formData.get('officialApiLineCount') ?? 0),
         qrCodeLineCount: Number(formData.get('qrCodeLineCount') ?? 0),
@@ -668,6 +669,16 @@ export function AdminTenantsPage() {
                   required
                   defaultValue={editTarget.ownerEmail ?? ''}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome do responsável</label>
+                <input
+                  name="ownerDisplayName"
+                  type="text"
+                  defaultValue={editTarget.ownerDisplayName ?? ''}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  placeholder="Nome do responsável (opcional)"
                 />
               </div>
               <div>

@@ -300,6 +300,7 @@ public static class AdminTenantEndpoints
             request.QrCodeLineCount,
             request.OperatorLimit);
         owner.UpdateEmail(ownerEmail);
+        owner.UpdateDisplayName(request.OwnerDisplayName);
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
@@ -533,6 +534,7 @@ public sealed class UpdateTenantRequest
 {
     public string Name { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
+    public string? OwnerDisplayName { get; init; }
     public string PlanCode { get; init; } = string.Empty;
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
