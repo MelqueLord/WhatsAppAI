@@ -179,11 +179,16 @@ public sealed class WebhookProcessingWorker(
                     {
                         foreach (var whatsappMessage in change.Value.Messages)
                         {
+                            var matchedContact = change.Value.Contacts?.Find(c =>
+                                c.WaId is not null &&
+                                whatsappMessage.From is not null &&
+                                whatsappMessage.From.TrimStart('+').EndsWith(c.WaId.TrimStart('+')))
+                                ?? change.Value.Contacts?.Find(_ => true);
                             await ProcessInboundMessageAsync(
                                 tenantId,
                                 whatsappMessage,
                                 change.Value.Metadata?.PhoneNumberId ?? webhookEvent.PhoneNumberId,
-                                change.Value.Contacts?.FirstOrDefault(),
+                                matchedContact,
                                 contactRepository,
                                 conversationRepository,
                                 messageRepository,
