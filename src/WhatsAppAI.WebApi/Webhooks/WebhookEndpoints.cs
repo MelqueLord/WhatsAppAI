@@ -37,7 +37,89 @@ public static class WebhookEndpoints
             .AllowAnonymous()
             .DisableAntiforgery();
 
+        app.MapGet("/api/webhooks/whatsapp-web/session/{sessionId}", GetWhatsAppWebSessionAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous();
+
+        app.MapPut("/api/webhooks/whatsapp-web/session/{sessionId}", SaveWhatsAppWebSessionAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous()
+            .DisableAntiforgery();
+
+        app.MapDelete("/api/webhooks/whatsapp-web/session/{sessionId}", DeleteWhatsAppWebSessionAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous()
+            .DisableAntiforgery();
+
         return app;
+    }
+
+    private static async Task<IResult> GetWhatsAppWebSessionAsync(
+        string sessionId,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        ISecretStore secretStore)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!IsValidSessionId(sessionId))
+            return Results.BadRequest();
+
+        var payload = await secretStore.GetAsync($"whatsapp-web:auth:{sessionId}");
+        return payload is null ? Results.NotFound() : Results.Ok(new { payload });
+    }
+
+    private static async Task<IResult> SaveWhatsAppWebSessionAsync(
+        string sessionId,
+        [FromBody] WhatsAppWebSessionRequest request,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        ISecretStore secretStore)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!IsValidSessionId(sessionId) || string.IsNullOrWhiteSpace(request.Payload) || request.Payload.Length > 1_000_000)
+            return Results.BadRequest();
+
+        await secretStore.SetAsync($"whatsapp-web:auth:{sessionId}", request.Payload);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DeleteWhatsAppWebSessionAsync(
+        string sessionId,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        ISecretStore secretStore)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!IsValidSessionId(sessionId))
+            return Results.BadRequest();
+
+        await secretStore.DeleteAsync($"whatsapp-web:auth:{sessionId}");
+        return Results.NoContent();
+    }
+
+    private static bool IsAuthorizedWhatsAppWebRequest(HttpContext httpContext, IConfiguration configuration)
+    {
+        var expected = configuration["WhatsAppWeb:WebhookSecret"];
+        var received = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(received))
+            return false;
+
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        var receivedBytes = Encoding.UTF8.GetBytes(received);
+        return expectedBytes.Length == receivedBytes.Length &&
+            CryptographicOperations.FixedTimeEquals(expectedBytes, receivedBytes);
+    }
+
+    private static bool IsValidSessionId(string sessionId)
+    {
+        var separatorIndex = sessionId.LastIndexOf("-qr-", StringComparison.OrdinalIgnoreCase);
+        return separatorIndex > 0 &&
+            Guid.TryParse(sessionId[..separatorIndex], out _) &&
+            int.TryParse(sessionId[(separatorIndex + 4)..], out var lineNumber) &&
+            lineNumber is > 0 and <= 100;
     }
 
     private static async Task<IResult> ReceiveWhatsAppWebEventAsync(
@@ -403,4 +485,9 @@ public sealed class WebhookError
     public string? Title { get; set; }
     public string? Message { get; set; }
     public string? ErrorData { get; set; }
+}
+
+public sealed record WhatsAppWebSessionRequest
+{
+    public string Payload { get; init; } = string.Empty;
 }

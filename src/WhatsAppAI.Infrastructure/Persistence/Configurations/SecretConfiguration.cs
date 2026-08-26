@@ -23,7 +23,7 @@ public sealed class SecretConfiguration : IEntityTypeConfiguration<Secret>
 
         builder.Property(s => s.EncryptedValue)
             .HasColumnName("encrypted_value")
-            .HasMaxLength(2000)
+            .HasColumnType("longtext")
             .IsRequired();
 
         builder.Property(s => s.TenantId)

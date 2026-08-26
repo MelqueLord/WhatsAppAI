@@ -1,5 +1,7 @@
 import express from 'express'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { promisify } from 'node:util'
+import { gzip, gunzip } from 'node:zlib'
 import QRCode from 'qrcode'
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys'
 
@@ -10,6 +12,12 @@ const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development
 const sessions = new Map()
 const botConfigs = new Map()
 const reconnectTimers = new Map()
+const authBackupTimers = new Map()
+const authBackupPromises = new Map()
+const lastAuthPayloads = new Map()
+const gzipAsync = promisify(gzip)
+const gunzipAsync = promisify(gunzip)
+const sessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-qr-(?:[1-9]\d?|100)$/i
 
 const defaultBotConfig = {
   configured: true,
@@ -30,7 +38,12 @@ const defaultBotConfig = {
   version: 1,
 }
 
-app.use(express.json())
+app.use(express.json({ limit: '2mb' }))
+
+app.param('tenantId', (req, res, next, tenantId) => {
+  if (!sessionIdPattern.test(tenantId)) return res.status(400).json({ error: 'Invalid session id.' })
+  next()
+})
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -63,7 +76,13 @@ async function getSession(tenantId) {
   if (session.sock) return session
 
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(`sessions/${tenantId}`)
+    await restoreAuthState(tenantId)
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory(tenantId))
+    const setKeys = state.keys.set.bind(state.keys)
+    state.keys.set = async (data) => {
+      await setKeys(data)
+      scheduleAuthBackup(tenantId)
+    }
     const sock = makeWASocket({
       auth: state,
       browser: ['Mac OS', 'Chrome', '14.4.1'],
@@ -75,7 +94,10 @@ async function getSession(tenantId) {
     session.sock = sock
     session.status = 'connecting'
 
-    sock.ev.on('creds.update', saveCreds)
+    sock.ev.on('creds.update', async () => {
+      await saveCreds()
+      scheduleAuthBackup(tenantId)
+    })
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         session.qr = qr
@@ -87,6 +109,7 @@ async function getSession(tenantId) {
         session.qr = null
         session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
         reconnectTimers.delete(tenantId)
+        scheduleAuthBackup(tenantId)
         console.log(`WhatsApp session connected for ${tenantId} (${session.phoneNumber ?? 'unknown phone'})`)
       }
       if (connection === 'close') {
@@ -99,7 +122,8 @@ async function getSession(tenantId) {
 
         if (code === DisconnectReason.loggedOut) {
           sessions.delete(tenantId)
-          await rm(`sessions/${tenantId}`, { recursive: true, force: true })
+          await rm(sessionDirectory(tenantId), { recursive: true, force: true })
+          await deleteRemoteAuthState(tenantId)
           return
         }
 
@@ -191,7 +215,8 @@ app.post('/sessions/:tenantId/logout', async (req, res) => {
     // The local auth folder still must be cleared so the next request emits a fresh QR.
   }
   sessions.delete(req.params.tenantId)
-  await rm(`sessions/${req.params.tenantId}`, { recursive: true, force: true })
+  await rm(sessionDirectory(req.params.tenantId), { recursive: true, force: true })
+  await deleteRemoteAuthState(req.params.tenantId)
   res.json({ ok: true })
 })
 
@@ -412,7 +437,7 @@ function buildBotReply(session, jid, text, config) {
 
 async function loadSnapshot(tenantId, session) {
   try {
-    const raw = await readFile(`sessions/${tenantId}/inbox.json`, 'utf8')
+    const raw = await readFile(`${sessionDirectory(tenantId)}/inbox.json`, 'utf8')
     const data = JSON.parse(raw)
     session.conversations = new Map(data.conversations ?? [])
     session.messages = new Map(data.messages ?? [])
@@ -421,8 +446,8 @@ async function loadSnapshot(tenantId, session) {
 
 async function saveSnapshot(session) {
   const tenantId = session.tenantId
-  await mkdir(`sessions/${tenantId}`, { recursive: true })
-  await writeFile(`sessions/${tenantId}/inbox.json`, JSON.stringify({
+  await mkdir(sessionDirectory(tenantId), { recursive: true })
+  await writeFile(`${sessionDirectory(tenantId)}/inbox.json`, JSON.stringify({
     conversations: Array.from(session.conversations.entries()),
     messages: Array.from(session.messages.entries()),
   }))
@@ -431,7 +456,7 @@ async function saveSnapshot(session) {
 async function getBotConfig(tenantId) {
   if (botConfigs.has(tenantId)) return botConfigs.get(tenantId)
   try {
-    const raw = await readFile(`sessions/${tenantId}/bot-config.json`, 'utf8')
+    const raw = await readFile(`${sessionDirectory(tenantId)}/bot-config.json`, 'utf8')
     const config = { ...defaultBotConfig, ...JSON.parse(raw) }
     botConfigs.set(tenantId, config)
     return config
@@ -442,6 +467,102 @@ async function getBotConfig(tenantId) {
 }
 
 async function saveBotConfig(tenantId, config) {
-  await mkdir(`sessions/${tenantId}`, { recursive: true })
-  await writeFile(`sessions/${tenantId}/bot-config.json`, JSON.stringify(config))
+  await mkdir(sessionDirectory(tenantId), { recursive: true })
+  await writeFile(`${sessionDirectory(tenantId)}/bot-config.json`, JSON.stringify(config))
+}
+
+function sessionDirectory(tenantId) {
+  return `sessions/${tenantId}`
+}
+
+function sessionStateUrl(tenantId) {
+  return `${apiWebhookUrl}/session/${encodeURIComponent(tenantId)}`
+}
+
+function scheduleAuthBackup(tenantId) {
+  const existing = authBackupTimers.get(tenantId)
+  if (existing) clearTimeout(existing)
+
+  const timer = setTimeout(() => {
+    authBackupTimers.delete(tenantId)
+    const previous = authBackupPromises.get(tenantId) ?? Promise.resolve()
+    const current = previous.then(() => backupAuthState(tenantId))
+    authBackupPromises.set(tenantId, current)
+    void current.finally(() => {
+      if (authBackupPromises.get(tenantId) === current) authBackupPromises.delete(tenantId)
+    })
+  }, 1500)
+  authBackupTimers.set(tenantId, timer)
+}
+
+async function backupAuthState(tenantId) {
+  try {
+    const directory = sessionDirectory(tenantId)
+    const entries = await readdir(directory, { withFileTypes: true })
+    const files = {}
+    for (const entry of entries) {
+      if (!entry.isFile() || entry.name === 'inbox.json' || entry.name === 'bot-config.json') continue
+      files[entry.name] = (await readFile(`${directory}/${entry.name}`)).toString('base64')
+    }
+    if (!files['creds.json']) return
+
+    const compressed = await gzipAsync(Buffer.from(JSON.stringify(files)))
+    const payload = compressed.toString('base64')
+    if (lastAuthPayloads.get(tenantId) === payload) return
+
+    const response = await fetch(sessionStateUrl(tenantId), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WhatsApp-Web-Secret': apiWebhookSecret,
+      },
+      body: JSON.stringify({ payload }),
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    lastAuthPayloads.set(tenantId, payload)
+  } catch (error) {
+    console.error(`Failed to persist WhatsApp auth state for ${tenantId}:`, error)
+  }
+}
+
+async function restoreAuthState(tenantId) {
+  try {
+    await readFile(`${sessionDirectory(tenantId)}/creds.json`)
+    return
+  } catch {}
+
+  try {
+    const response = await fetch(sessionStateUrl(tenantId), {
+      headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
+    })
+    if (response.status === 404) return
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    const { payload } = await response.json()
+    if (typeof payload !== 'string' || !payload) throw new Error('Invalid auth payload')
+    const raw = await gunzipAsync(Buffer.from(payload, 'base64'))
+    const files = JSON.parse(raw.toString('utf8'))
+    await mkdir(sessionDirectory(tenantId), { recursive: true })
+    for (const [name, content] of Object.entries(files)) {
+      if (name.includes('/') || name.includes('\\') || name === '.' || name === '..') continue
+      await writeFile(`${sessionDirectory(tenantId)}/${name}`, Buffer.from(content, 'base64'))
+    }
+    lastAuthPayloads.set(tenantId, payload)
+    console.log(`WhatsApp auth state restored for ${tenantId}`)
+  } catch (error) {
+    console.error(`Failed to restore WhatsApp auth state for ${tenantId}:`, error)
+  }
+}
+
+async function deleteRemoteAuthState(tenantId) {
+  lastAuthPayloads.delete(tenantId)
+  try {
+    const response = await fetch(sessionStateUrl(tenantId), {
+      method: 'DELETE',
+      headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
+    })
+    if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`)
+  } catch (error) {
+    console.error(`Failed to delete WhatsApp auth state for ${tenantId}:`, error)
+  }
 }

@@ -64,7 +64,7 @@ public sealed class AppDbContext : DbContext
 
             foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetProperties()))
             {
-                if (property.GetColumnType() is "datetime(6)" or "char(36)")
+                if (property.GetColumnType() is "datetime(6)" or "char(36)" or "longtext")
                     property.SetColumnType(null);
             }
         }

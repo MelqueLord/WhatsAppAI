@@ -881,8 +881,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.Property<string>("EncryptedValue")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("longtext")
                         .HasColumnName("encrypted_value");
 
                     b.Property<string>("Key")
