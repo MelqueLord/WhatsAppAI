@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Plus, Search, X, Loader2, MessageSquare } from 'lucide-react'
+import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 
@@ -30,6 +30,7 @@ export function ContactsPage() {
   const [search, setSearch] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [editTarget, setEditTarget] = useState<Contact | null>(null)
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts'],
@@ -50,6 +51,17 @@ export function ContactsPage() {
       if (data?.conversationId) {
         navigate('/inbox')
       }
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string } }) =>
+      api.contacts.update(id, data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Contact[]>(['contacts'], (current = []) =>
+        current.map((c) => (c.id === updated.id ? updated : c))
+      )
+      setEditTarget(null)
     },
   })
 
@@ -147,13 +159,23 @@ export function ContactsPage() {
                           {contact.lastMessageAt ? new Date(contact.lastMessageAt).toLocaleDateString('pt-BR') : '—'}
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-right">
-                          <button
-                            onClick={() => startConversationMutation.mutate(contact.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            <span className="hidden sm:inline">Conversar</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setEditTarget(contact)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                              title="Editar contato"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              <span className="hidden sm:inline">Editar</span>
+                            </button>
+                            <button
+                              onClick={() => startConversationMutation.mutate(contact.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span className="hidden sm:inline">Conversar</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -164,6 +186,66 @@ export function ContactsPage() {
           </div>
         )}
       </div>
+
+      {/* Edit contact modal */}
+      {editTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-slate-800">Editar Contato</h2>
+              <button onClick={() => setEditTarget(null)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {updateMutation.isError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                {(updateMutation.error as Error).message}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const fd = new FormData(e.currentTarget)
+                updateMutation.mutate({
+                  id: editTarget.id,
+                  data: { name: (fd.get('name') as string) || undefined },
+                })
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Telefone</label>
+                <input
+                  type="text"
+                  value={editTarget.phoneNumber}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome</label>
+                <input
+                  name="name"
+                  type="text"
+                  defaultValue={editTarget.name ?? ''}
+                  placeholder="Nome do contato"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setEditTarget(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={updateMutation.isPending} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50">
+                  {updateMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create contact modal */}
       {showCreateForm && (
