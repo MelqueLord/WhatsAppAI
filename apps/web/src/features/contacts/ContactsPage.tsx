@@ -49,7 +49,7 @@ export function ContactsPage() {
       setShowCreateForm(false)
       setPhoneNumber('')
       if (data?.conversationId) {
-        navigate('/inbox')
+        navigate('/inbox', { state: { conversationId: data.conversationId } })
       }
     },
   })
@@ -69,7 +69,7 @@ export function ContactsPage() {
     mutationFn: (contactId: string) => api.contacts.startConversation(contactId),
     onSuccess: (data) => {
       if (data?.conversationId) {
-        navigate('/inbox')
+        navigate('/inbox', { state: { conversationId: data.conversationId } })
       }
     },
   })

@@ -1,19 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { type Conversation } from '../../lib/api'
 import { ConversationList } from './ConversationList'
 import { MessagePanel } from './MessagePanel'
 import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
 import { useSignalR } from '../../lib/signalr'
-import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../lib/auth'
 import { LockKeyhole } from 'lucide-react'
+import { api } from '../../lib/api'
 
 export function InboxPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const openConversationId: string | undefined = (location.state as { conversationId?: string } | null)?.conversationId
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [showMobileList, setShowMobileList] = useState(true)
   const queryClient = useQueryClient()
+
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: api.conversations.list,
+    enabled: !!openConversationId && !selectedConversation,
+  })
+
+  useEffect(() => {
+    if (!openConversationId || selectedConversation) return
+    const found = conversations?.find((c) => c.id === openConversationId)
+    if (found) {
+      setSelectedConversation(found)
+      setShowMobileList(false)
+      window.history.replaceState({}, '')
+    }
+  }, [openConversationId, conversations, selectedConversation])
 
   const { isConnected, start: startSignalR } = useSignalR({
     hubUrl: '/hubs/inbox',
