@@ -161,7 +161,7 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
-    await context.Database.EnsureCreatedAsync();
+    await context.Database.MigrateAsync();
 
     // Optional bootstrap account.
     // Credentials must come from configuration/user-secrets.

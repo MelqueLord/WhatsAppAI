@@ -11,7 +11,7 @@ using WhatsAppAI.Infrastructure.Persistence;
 namespace WhatsAppAI.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260826155715_AddBroadcastQueueId")]
+    [Migration("20260826161432_AddBroadcastQueueId")]
     partial class AddBroadcastQueueId
     {
         /// <inheritdoc />
