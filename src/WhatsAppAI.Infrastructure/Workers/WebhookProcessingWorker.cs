@@ -184,6 +184,11 @@ public sealed class WebhookProcessingWorker(
                                 whatsappMessage.From is not null &&
                                 whatsappMessage.From.TrimStart('+').EndsWith(c.WaId.TrimStart('+')))
                                 ?? change.Value.Contacts?.Find(_ => true);
+                            // Use push_name from the message as fallback when contacts array has no profile name
+                            if (matchedContact is not null && matchedContact.Profile?.Name is null && whatsappMessage.PushName is not null)
+                                matchedContact = new WebhookContact { WaId = matchedContact.WaId, Profile = new WebhookProfile { Name = whatsappMessage.PushName } };
+                            else if (matchedContact is null && whatsappMessage.PushName is not null)
+                                matchedContact = new WebhookContact { WaId = whatsappMessage.From, Profile = new WebhookProfile { Name = whatsappMessage.PushName } };
                             await ProcessInboundMessageAsync(
                                 tenantId,
                                 whatsappMessage,

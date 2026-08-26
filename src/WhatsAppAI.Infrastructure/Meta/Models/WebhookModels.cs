@@ -88,6 +88,9 @@ public sealed class WebhookMessage
     [JsonPropertyName("type")]
     public string? Type { get; set; }
 
+    [JsonPropertyName("name")]
+    public string? PushName { get; set; }
+
     [JsonPropertyName("text")]
     public WebhookText? Text { get; set; }
 
