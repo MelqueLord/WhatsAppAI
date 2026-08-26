@@ -224,6 +224,7 @@ export interface BroadcastList {
   message: string
   status: string
   linePhoneNumberId?: string
+  queueId?: string
   totalCount: number
   sentCount: number
   failedCount: number
@@ -470,10 +471,10 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    dispatch: (id: string, linePhoneNumberId: string) =>
+    dispatch: (id: string, linePhoneNumberId: string, queueId?: string) =>
       fetchApi<BroadcastList>(`/api/broadcasts/${id}/dispatch`, {
         method: 'POST',
-        body: JSON.stringify({ linePhoneNumberId }),
+        body: JSON.stringify({ linePhoneNumberId, queueId: queueId || undefined }),
       }),
 
     cancel: (id: string) =>

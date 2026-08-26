@@ -175,6 +175,8 @@ public sealed class BroadcastDispatchWorker(
             message.MarkSent(result.MessageId ?? string.Empty);
             await messageRepo.AddAsync(message, ct);
 
+            if (broadcast.QueueId.HasValue && conversation.QueueId is null)
+                conversation.AssignQueue(broadcast.QueueId.Value);
             conversation.RecordMessage();
             await conversationRepo.UpdateAsync(conversation, ct);
 

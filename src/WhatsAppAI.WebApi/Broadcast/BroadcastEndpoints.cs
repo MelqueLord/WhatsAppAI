@@ -129,6 +129,7 @@ public static class BroadcastEndpoints
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
         IWhatsAppAccountRepository accountRepo,
+        AppDbContext dbContext,
         IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -164,7 +165,17 @@ public static class BroadcastEndpoints
         if (totalCount == 0)
             return Results.BadRequest(new { error = "No recipients found for this broadcast." });
 
-        broadcast.StartDispatch(request.LinePhoneNumberId, totalCount);
+        Guid? queueId = null;
+        if (request.QueueId.HasValue)
+        {
+            var queueExists = await dbContext.ServiceLines
+                .AnyAsync(q => q.Id == request.QueueId.Value && q.TenantId == tenantId && q.IsActive);
+            if (!queueExists)
+                return Results.BadRequest(new { error = "Queue not found or does not belong to this tenant." });
+            queueId = request.QueueId.Value;
+        }
+
+        broadcast.StartDispatch(request.LinePhoneNumberId, totalCount, queueId);
         await broadcastRepo.UpdateAsync(broadcast);
 
         // Notify via SignalR
@@ -225,6 +236,7 @@ public static class BroadcastEndpoints
         message = b.Message,
         status = b.Status.ToString(),
         linePhoneNumberId = b.LinePhoneNumberId,
+        queueId = b.QueueId,
         totalCount = b.TotalCount,
         sentCount = b.SentCount,
         failedCount = b.FailedCount,
@@ -244,5 +256,6 @@ public sealed record CreateBroadcastRequest
 public sealed record DispatchBroadcastRequest
 {
     public string LinePhoneNumberId { get; init; } = string.Empty;
+    public Guid? QueueId { get; init; }
 }
 

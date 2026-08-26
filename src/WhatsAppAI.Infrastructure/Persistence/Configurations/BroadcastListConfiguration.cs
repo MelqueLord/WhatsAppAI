@@ -21,6 +21,7 @@ public sealed class BroadcastListConfiguration : IEntityTypeConfiguration<Broadc
             .HasMaxLength(20)
             .IsRequired();
         builder.Property(b => b.LinePhoneNumberId).HasColumnName("line_phone_number_id").HasMaxLength(100).IsRequired();
+        builder.Property(b => b.QueueId).HasColumnName("queue_id");
         builder.Property(b => b.TotalCount).HasColumnName("total_count").IsRequired();
         builder.Property(b => b.SentCount).HasColumnName("sent_count").IsRequired();
         builder.Property(b => b.FailedCount).HasColumnName("failed_count").IsRequired();

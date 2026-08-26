@@ -8,6 +8,7 @@ public sealed class BroadcastList
     public string Message { get; private set; } = string.Empty;
     public BroadcastStatus Status { get; private set; }
     public string LinePhoneNumberId { get; private set; } = string.Empty;
+    public Guid? QueueId { get; private set; }
     public int TotalCount { get; private set; }
     public int SentCount { get; private set; }
     public int FailedCount { get; private set; }
@@ -43,7 +44,7 @@ public sealed class BroadcastList
         };
     }
 
-    public void StartDispatch(string linePhoneNumberId, int totalCount)
+    public void StartDispatch(string linePhoneNumberId, int totalCount, Guid? queueId = null)
     {
         if (Status != BroadcastStatus.Draft)
             throw new InvalidOperationException("Only draft broadcasts can be dispatched.");
@@ -53,6 +54,7 @@ public sealed class BroadcastList
             throw new ArgumentException("At least one recipient required.", nameof(totalCount));
 
         LinePhoneNumberId = linePhoneNumberId;
+        QueueId = queueId;
         TotalCount = totalCount;
         Status = BroadcastStatus.Sending;
         StartedAt = DateTime.UtcNow;

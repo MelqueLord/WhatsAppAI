@@ -250,6 +250,7 @@ function DispatchDialog({
   const { user, isOperator } = useAuth()
   const queryClient = useQueryClient()
   const [selectedLine, setSelectedLine] = useState('')
+  const [selectedQueueId, setSelectedQueueId] = useState('')
 
   const operatorLine =
     isOperator &&
@@ -264,6 +265,12 @@ function DispatchDialog({
     select: (data) => data.filter((l) => l.connectionType === 'QrCode' && l.isActive),
   })
 
+  const { data: queues } = useQuery({
+    queryKey: ['service-queues'],
+    queryFn: api.serviceQueues.list,
+    select: (data) => data.filter((q) => q.isActive),
+  })
+
   // Resolve the operator's assigned line phoneNumberId once lines are loaded
   const operatorPhoneNumberId =
     operatorLine != null
@@ -271,8 +278,8 @@ function DispatchDialog({
       : null
 
   const dispatchMutation = useMutation({
-    mutationFn: (linePhoneNumberId: string) =>
-      api.broadcasts.dispatch(broadcast.id, linePhoneNumberId),
+    mutationFn: ({ linePhoneNumberId, queueId }: { linePhoneNumberId: string; queueId?: string }) =>
+      api.broadcasts.dispatch(broadcast.id, linePhoneNumberId, queueId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] })
       onClose()
@@ -282,7 +289,7 @@ function DispatchDialog({
   // Auto-dispatch as soon as the operator's line is resolved
   useEffect(() => {
     if (operatorPhoneNumberId && !dispatchMutation.isPending && !dispatchMutation.isError) {
-      dispatchMutation.mutate(operatorPhoneNumberId)
+      dispatchMutation.mutate({ linePhoneNumberId: operatorPhoneNumberId })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operatorPhoneNumberId])
@@ -313,7 +320,7 @@ function DispatchDialog({
                     Fechar
                   </button>
                   <button
-                    onClick={() => operatorPhoneNumberId && dispatchMutation.mutate(operatorPhoneNumberId)}
+                    onClick={() => operatorPhoneNumberId && dispatchMutation.mutate({ linePhoneNumberId: operatorPhoneNumberId })}
                     disabled={!operatorPhoneNumberId || dispatchMutation.isPending}
                     className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
                   >
@@ -358,6 +365,22 @@ function DispatchDialog({
             </div>
           )}
 
+          {queues && queues.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Fila de atendimento <span className="font-normal text-slate-400">(opcional)</span></label>
+              <select
+                value={selectedQueueId}
+                onChange={(e) => setSelectedQueueId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="">Nenhuma (sem fila)</option>
+                {queues.map((q) => (
+                  <option key={q.id} value={q.id}>{q.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {loadingLines ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
@@ -393,7 +416,7 @@ function DispatchDialog({
             Cancelar
           </button>
           <button
-            onClick={() => dispatchMutation.mutate(selectedLine)}
+            onClick={() => dispatchMutation.mutate({ linePhoneNumberId: selectedLine, queueId: selectedQueueId || undefined })}
             disabled={!selectedLine || dispatchMutation.isPending}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
           >
