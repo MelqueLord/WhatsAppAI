@@ -18,7 +18,8 @@ public static class MetaServiceCollectionExtensions
 
         if (useBridge)
         {
-            var bridgeSecret = configuration["WhatsAppWeb:WebhookSecret"]
+            var bridgeSecret = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
+                ?? configuration["WhatsAppWeb:WebhookSecret"]
                 ?? throw new InvalidOperationException("WhatsAppWeb:WebhookSecret is required when the WhatsApp Web bridge is enabled.");
             services.AddHttpClient<IWhatsAppClient, WhatsAppWebClient>(client =>
                 client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Secret", bridgeSecret));

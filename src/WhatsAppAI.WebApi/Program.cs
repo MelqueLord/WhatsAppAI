@@ -37,54 +37,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-var bridgeWebhookSecret = builder.Configuration["WHATSAPP_WEB_WEBHOOK_SECRET"];
-if (!string.IsNullOrWhiteSpace(bridgeWebhookSecret))
-{
-    builder.Configuration.AddInMemoryCollection(
-        new Dictionary<string, string?>
-        {
-            ["WhatsAppWeb:WebhookSecret"] = bridgeWebhookSecret
-        });
-}
-
-var useWhatsAppWebBridge = builder.Configuration.GetValue<bool>("WhatsAppWeb:Enabled");
-if (builder.Environment.IsProduction())
-{
-    var configurationErrors = new List<string>();
-    var productionConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    var encryptionKey = builder.Configuration["Encryption:Key"];
-    var jwtSecret = builder.Configuration["Jwt:Secret"];
-    var metaVerifyToken = builder.Configuration["Meta:VerifyToken"];
-    var metaAppSecret = builder.Configuration["Meta:AppSecret"];
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
-    if (string.IsNullOrWhiteSpace(productionConnectionString))
-        configurationErrors.Add("ConnectionStrings:DefaultConnection");
-    if (!IsValidEncryptionKey(encryptionKey))
-        configurationErrors.Add("Encryption:Key (Base64 de 32 bytes)");
-    if (string.IsNullOrWhiteSpace(jwtSecret))
-        configurationErrors.Add("Jwt:Secret");
-    if (string.IsNullOrWhiteSpace(metaVerifyToken))
-        configurationErrors.Add("Meta:VerifyToken");
-    if (string.IsNullOrWhiteSpace(metaAppSecret))
-        configurationErrors.Add("Meta:AppSecret");
-    if (allowedOrigins.Length == 0 || allowedOrigins.Any(string.IsNullOrWhiteSpace))
-        configurationErrors.Add("Cors:AllowedOrigins");
-
-    if (useWhatsAppWebBridge)
-    {
-        var configuredBridgeSecret = builder.Configuration["WhatsAppWeb:WebhookSecret"];
-        if (string.IsNullOrWhiteSpace(configuredBridgeSecret) || configuredBridgeSecret.Length < 32)
-            configurationErrors.Add("WHATSAPP_WEB_WEBHOOK_SECRET (mínimo de 32 caracteres)");
-        if (!Uri.TryCreate(builder.Configuration["WhatsAppWeb:BaseUrl"], UriKind.Absolute, out _))
-            configurationErrors.Add("WhatsAppWeb:BaseUrl (URL absoluta)");
-    }
-
-    if (configurationErrors.Count > 0)
-        throw new InvalidOperationException(
-            $"Invalid production configuration: {string.Join(", ", configurationErrors)}.");
-}
-
 var forwardedHeadersConfiguration = builder.Configuration.GetSection("ForwardedHeaders");
 var forwardedHeadersEnabled = forwardedHeadersConfiguration.GetValue<bool>("Enabled");
 var trustAllForwardedHeaders = forwardedHeadersConfiguration.GetValue<bool>("TrustAll");
@@ -474,18 +426,3 @@ app.MapHub<InboxHub>(
     "/hubs/inbox");
 
 await app.RunAsync();
-
-static bool IsValidEncryptionKey(string? encryptionKey)
-{
-    if (string.IsNullOrWhiteSpace(encryptionKey))
-        return false;
-
-    try
-    {
-        return Convert.FromBase64String(encryptionKey).Length == 32;
-    }
-    catch (FormatException)
-    {
-        return false;
-    }
-}
