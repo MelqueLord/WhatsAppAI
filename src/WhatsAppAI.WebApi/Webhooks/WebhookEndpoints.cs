@@ -102,7 +102,8 @@ public static class WebhookEndpoints
 
     private static bool IsAuthorizedWhatsAppWebRequest(HttpContext httpContext, IConfiguration configuration)
     {
-        var expected = configuration["WhatsAppWeb:WebhookSecret"];
+        var expected = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
+            ?? configuration["WhatsAppWeb:WebhookSecret"];
         var received = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(received))
             return false;
@@ -130,7 +131,8 @@ public static class WebhookEndpoints
         AppDbContext dbContext,
         ILogger<Program> logger)
     {
-        var expectedSecret = configuration["WhatsAppWeb:WebhookSecret"];
+        var expectedSecret = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
+            ?? configuration["WhatsAppWeb:WebhookSecret"];
         var receivedSecret = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(expectedSecret) || receivedSecret != expectedSecret)
             return Results.Unauthorized();
