@@ -28,6 +28,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
             {
                 ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
                 ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
+                ["Jwt:Secret"] = "integration-test-jwt-secret-at-least-32-bytes",
+                ["Jwt:Issuer"] = "whatsappai-tests",
+                ["Jwt:Audience"] = "whatsappai-tests",
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
                 ["BootstrapAdmin:Email"] = "admin@test.com",

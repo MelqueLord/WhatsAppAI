@@ -113,6 +113,18 @@ public sealed class Message
     {
         ProcessedByAi = true;
     }
+
+    public void RedactPersonalData()
+    {
+        ExternalId = null;
+        Content = null;
+        MediaId = null;
+        MediaUrl = null;
+        Caption = null;
+        QuotedMessageId = null;
+        IdempotencyKey = null;
+        FailureReason = null;
+    }
 }
 
 public enum MessageDirection

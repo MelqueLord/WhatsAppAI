@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -19,12 +20,10 @@ internal sealed class WhatsAppClient(
     {
         try
         {
-            httpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/{phoneNumberId}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            var response = await httpClient.GetAsync(
-                $"{BaseUrl}/{phoneNumberId}",
-                cancellationToken);
+            var response = await httpClient.SendAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -69,10 +68,7 @@ internal sealed class WhatsAppClient(
     {
         try
         {
-            httpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-            var request = new SendMessageRequest
+            var payload = new SendMessageRequest
             {
                 MessagingProduct = "whatsapp",
                 To = recipientPhone,
@@ -80,10 +76,15 @@ internal sealed class WhatsAppClient(
                 Text = new TextBody { Body = text }
             };
 
-            var response = await httpClient.PostAsJsonAsync(
-                $"{BaseUrl}/{phoneNumberId}/messages",
-                request,
-                cancellationToken);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{BaseUrl}/{phoneNumberId}/messages")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await httpClient.SendAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

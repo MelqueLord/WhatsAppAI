@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using WhatsAppAI.Application.Abstractions;
@@ -17,13 +18,10 @@ internal sealed class MediaGateway(
     {
         try
         {
-            httpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
             // Get media URL from Meta
-            var metaResponse = await httpClient.GetAsync(
-                $"{BaseUrl}/{mediaId}",
-                cancellationToken);
+            using var metaRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/{mediaId}");
+            metaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            var metaResponse = await httpClient.SendAsync(metaRequest, cancellationToken);
 
             if (!metaResponse.IsSuccessStatusCode)
             {
@@ -48,9 +46,9 @@ internal sealed class MediaGateway(
             }
 
             // Download the actual media
-            var mediaResponse = await httpClient.GetAsync(
-                mediaInfo.Url,
-                cancellationToken);
+            using var mediaRequest = new HttpRequestMessage(HttpMethod.Get, mediaInfo.Url);
+            mediaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            var mediaResponse = await httpClient.SendAsync(mediaRequest, cancellationToken);
 
             if (!mediaResponse.IsSuccessStatusCode)
             {

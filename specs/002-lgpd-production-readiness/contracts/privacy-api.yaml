@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info:
+  title: Privacy Operations
+  version: 1.0.0
+paths:
+  /api/privacy/notice:
+    get:
+      security: []
+      responses:
+        '200': { description: Public privacy identity and rights channel }
+  /api/privacy/purposes:
+    get:
+      responses:
+        '200': { description: Tenant processing purposes }
+    post:
+      responses:
+        '201': { description: Purpose created }
+        '400': { description: Invalid purpose }
+  /api/privacy/consents:
+    post:
+      responses:
+        '201': { description: Consent evidence recorded }
+        '400': { description: Purpose does not use consent }
+  /api/privacy/consents/{id}/revoke:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Consent revoked idempotently }
+        '404': { description: Evidence not found in tenant }
+  /api/privacy/requests:
+    get:
+      responses:
+        '200': { description: Tenant requests }
+    post:
+      responses:
+        '201': { description: Request opened }
+  /api/privacy/requests/{id}/export:
+    get:
+      responses:
+        '200': { description: Structured contact export }
+        '404': { description: Request not found in tenant }
+  /api/privacy/requests/{id}/erase:
+    post:
+      responses:
+        '200': { description: Data anonymized and request completed }
+        '409': { description: Request type or state does not permit erasure }
+  /api/privacy/requests/{id}/deny:
+    post:
+      responses:
+        '200': { description: Request denied with reason and review date }

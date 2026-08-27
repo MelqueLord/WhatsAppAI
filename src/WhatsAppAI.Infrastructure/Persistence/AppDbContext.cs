@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Audit;
@@ -8,6 +7,7 @@ using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Domain.Usage;
 
 namespace WhatsAppAI.Infrastructure.Persistence;
@@ -20,12 +20,6 @@ public sealed class AppDbContext : DbContext
         : base(options)
     {
         _currentTenant = currentTenant;
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.ConfigureWarnings(warnings =>
-            warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
@@ -53,6 +47,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<BroadcastList> BroadcastLists => Set<BroadcastList>();
     public DbSet<BroadcastRecipient> BroadcastRecipients => Set<BroadcastRecipient>();
+    public DbSet<ProcessingPurpose> ProcessingPurposes => Set<ProcessingPurpose>();
+    public DbSet<ConsentEvidence> ConsentEvidence => Set<ConsentEvidence>();
+    public DbSet<DataSubjectRequest> DataSubjectRequests => Set<DataSubjectRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,6 +99,12 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Invitation>()
             .HasQueryFilter(e => e.TenantId == tenantId);
         modelBuilder.Entity<TenantMembership>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ProcessingPurpose>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<ConsentEvidence>()
+            .HasQueryFilter(e => e.TenantId == tenantId);
+        modelBuilder.Entity<DataSubjectRequest>()
             .HasQueryFilter(e => e.TenantId == tenantId);
 
         base.OnModelCreating(modelBuilder);

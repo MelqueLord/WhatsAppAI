@@ -47,4 +47,12 @@ public sealed class Contact
     {
         LastMessageAt = DateTime.UtcNow;
     }
+
+    public void Anonymize()
+    {
+        PhoneNumber = $"anon-{Id:N}";
+        Name = null;
+        ProfilePictureUrl = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

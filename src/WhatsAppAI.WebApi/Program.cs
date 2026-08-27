@@ -24,6 +24,7 @@ using WhatsAppAI.WebApi.Integrations;
 using WhatsAppAI.WebApi.Knowledge;
 using WhatsAppAI.WebApi.Media;
 using WhatsAppAI.WebApi.Operators;
+using WhatsAppAI.WebApi.Privacy;
 using WhatsAppAI.WebApi.Queues;
 using WhatsAppAI.WebApi.Tags;
 using WhatsAppAI.WebApi.Usage;
@@ -374,6 +375,7 @@ app.MapBotConfigurationEndpoints();
 app.MapServiceLineEndpoints();
 app.MapDashboardEndpoints();
 app.MapBroadcastEndpoints();
+app.MapPrivacyEndpoints();
 
 app.MapHub<InboxHub>(
     "/hubs/inbox");
