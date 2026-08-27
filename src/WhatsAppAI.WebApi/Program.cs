@@ -37,6 +37,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
+var bridgeWebhookSecret = builder.Configuration["WHATSAPP_WEB_WEBHOOK_SECRET"];
+if (!string.IsNullOrWhiteSpace(bridgeWebhookSecret))
+    builder.Configuration["WhatsAppWeb:WebhookSecret"] = bridgeWebhookSecret;
+
 var forwardedHeadersConfiguration = builder.Configuration.GetSection("ForwardedHeaders");
 var forwardedHeadersEnabled = forwardedHeadersConfiguration.GetValue<bool>("Enabled");
 var trustAllForwardedHeaders = forwardedHeadersConfiguration.GetValue<bool>("TrustAll");
