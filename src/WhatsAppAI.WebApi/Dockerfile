@@ -49,8 +49,6 @@ WORKDIR /app
 
 COPY --from=publish /app/publish .
 
-RUN addgroup --system app && adduser --system --ingroup app app
-
 USER app
 
 ENTRYPOINT ["dotnet", "WhatsAppAI.WebApi.dll"]
