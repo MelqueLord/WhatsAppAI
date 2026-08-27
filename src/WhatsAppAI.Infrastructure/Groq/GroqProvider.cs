@@ -34,7 +34,7 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError("Groq API error {StatusCode}: {Body}", response.StatusCode, body);
+            logger.LogError("Groq API error {StatusCode}", (int)response.StatusCode);
             throw new InvalidOperationException($"Groq API error ({(int)response.StatusCode} {response.StatusCode})");
         }
 

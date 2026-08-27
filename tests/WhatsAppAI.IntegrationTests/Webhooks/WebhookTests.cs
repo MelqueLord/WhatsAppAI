@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
 using Xunit;
@@ -29,10 +28,6 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
     {
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-
-        await secretStore.SetAsync("meta:verify_token", _verifyToken);
-        await secretStore.SetAsync("meta:app_secret", _appSecret);
         context.WebhookEvents.RemoveRange(context.WebhookEvents);
         await context.SaveChangesAsync();
     }

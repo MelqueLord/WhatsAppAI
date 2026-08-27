@@ -119,4 +119,21 @@ public class MessageTests
 
         Assert.True(message.ProcessedByAi);
     }
+
+    [Fact]
+    public void RegisterAiFailure_SchedulesExponentialRetriesUntilLimit()
+    {
+        var message = Message.CreateInbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "ext123", MessageType.Text, "Hello");
+
+        Assert.True(message.RegisterAiFailure(3, TimeSpan.FromSeconds(10)));
+        Assert.Equal(1, message.AiRetryCount);
+        Assert.NotNull(message.NextAiRetryAt);
+
+        Assert.True(message.RegisterAiFailure(3, TimeSpan.FromSeconds(20)));
+        Assert.False(message.RegisterAiFailure(3, TimeSpan.FromSeconds(40)));
+        Assert.Equal(3, message.AiRetryCount);
+        Assert.Null(message.NextAiRetryAt);
+    }
 }

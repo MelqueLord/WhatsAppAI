@@ -9,7 +9,6 @@ public sealed class ContextAssembler(
 {
     private const int MaxMessages = 6;
     private const int MaxMessageCharacters = 360;
-    private const int MaxSummaryCharacters = 1200;
     private const int MaxKnowledgeItems = 6;
     private const int MaxContextCharacters = 9000;
 
@@ -31,23 +30,17 @@ public sealed class ContextAssembler(
             .Select(m => new AiMessage
             {
                 Role = m.Direction == "Inbound" ? "user" : "assistant",
-                Content = Limit(m.Content, MaxMessageCharacters)
+                Content = AiContextSanitizer.RedactPersonalData(Limit(m.Content, MaxMessageCharacters))
             })
             .ToList();
-
-        var customerSummary = string.Join(" | ", messagesResponse.Items
-            .Where(m => m.Direction == "Inbound")
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(4)
-            .Select(m => Limit(m.Content, 280)));
 
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
         var knowledgeTexts = knowledge
             .Take(MaxKnowledgeItems)
-            .Select(k => k.Content)
+            .Select(k => AiContextSanitizer.RedactPersonalData(k.Content))
             .ToList();
 
-        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags, customerSummary);
+        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
 
         return new ConversationContext
         {
@@ -60,8 +53,7 @@ public sealed class ContextAssembler(
         string? basePrompt,
         List<string> knowledgeItems,
         IReadOnlyList<RoutingQueueContext>? routingQueues,
-        IReadOnlyList<RoutingTagContext>? routingTags,
-        string customerSummary)
+        IReadOnlyList<RoutingTagContext>? routingTags)
     {
         var parts = new List<string>();
 
@@ -69,9 +61,6 @@ public sealed class ContextAssembler(
             parts.Add(basePrompt);
 
         parts.Add("As diretrizes configuradas pela empresa acima são regras prioritárias. Atenda somente a solicitação atual dentro dessas diretrizes e do conhecimento autorizado. Recuse ou encaminhe assuntos fora do escopo, sem tentar conversar sobre temas gerais. Não invente informações, políticas, preços, prazos ou disponibilidade. Responda em no máximo 2 frases curtas, com até 300 caracteres, no idioma do cliente.");
-
-        if (!string.IsNullOrWhiteSpace(customerSummary))
-            parts.Add($"Resumo do que o cliente enviou (use somente para manter contexto): {customerSummary}");
 
         if (knowledgeItems.Count > 0)
         {

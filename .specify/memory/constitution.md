@@ -1,15 +1,15 @@
 # Constituição do WhatsApp AI Manager
 
-**Versão:** 1.1.0
-**Ratificada:** 2026-08-03
+**Versão:** 1.2.0
+**Ratificada:** 2026-08-27
 
 ## I. Simplicidade orientada ao atendimento
 
 O produto existe para gerenciar conversas do WhatsApp e automatizar atendimento com IA. Funcionalidades que não reduzem esforço de atendimento, melhoram controle humano ou tornam a operação mais segura ficam fora do núcleo. O MVP não é CRM, ferramenta de campanhas ou construtor genérico de bots.
 
-## II. Integrações oficiais e responsabilidade clara
+## II. Integrações WhatsApp e responsabilidade clara
 
-Somente APIs oficiais da Meta e da OpenAI podem participar do caminho crítico. Cada tenant mantém titularidade, aceite de termos e faturamento direto de suas contas. A plataforma configura e opera as conexões, mas não revende consumo dos provedores.
+A API oficial Cloud da Meta e a ponte WhatsApp Web via Baileys podem participar do caminho crítico; a OpenAI usa sua API oficial. Cada tenant mantém titularidade, aceite de termos, responsabilidade pelos riscos do canal QR e faturamento direto de suas contas. A plataforma configura e opera as conexões, mas não revende consumo dos provedores.
 
 ## III. Automação sob controle humano
 

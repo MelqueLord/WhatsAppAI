@@ -38,6 +38,10 @@ services:
         value: "10000"
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
+      - key: ForwardedHeaders__Enabled
+        value: "true"
+      - key: ForwardedHeaders__TrustAll
+        value: "true"
 
   - type: web
     name: whatsappai-whatsapp-web

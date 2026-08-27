@@ -103,6 +103,14 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("processed_by_ai")
             .IsRequired();
 
+        builder.Property(m => m.AiRetryCount)
+            .HasColumnName("ai_retry_count")
+            .IsRequired();
+
+        builder.Property(m => m.NextAiRetryAt)
+            .HasColumnName("next_ai_retry_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.HasOne(m => m.Conversation)
             .WithMany(c => c.Messages)
             .HasForeignKey(m => m.ConversationId)
@@ -118,6 +126,8 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         builder.HasIndex(m => m.IdempotencyKey);
 
         builder.HasIndex(m => new { m.TenantId, m.ConversationId, m.CreatedAt });
+
+        builder.HasIndex(m => new { m.ProcessedByAi, m.NextAiRetryAt });
 
         builder.HasIndex(m => m.TenantId);
     }

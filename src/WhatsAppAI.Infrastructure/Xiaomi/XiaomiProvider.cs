@@ -45,7 +45,7 @@ public sealed class XiaomiProvider(HttpClient httpClient, ILogger<XiaomiProvider
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.LogError("Xiaomi API error {StatusCode}: {Body}", httpResponse.StatusCode, body);
+            logger.LogError("Xiaomi API error {StatusCode}", (int)httpResponse.StatusCode);
             throw new InvalidOperationException($"Xiaomi API error: {httpResponse.StatusCode}");
         }
 

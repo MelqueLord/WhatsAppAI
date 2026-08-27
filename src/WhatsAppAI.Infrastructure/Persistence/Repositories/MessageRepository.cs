@@ -29,8 +29,9 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
     {
         return await context.Set<Message>()
             .IgnoreQueryFilters()
-            .Where(m => m.Direction == MessageDirection.Inbound && !m.ProcessedByAi)
-            .OrderByDescending(m => m.CreatedAt)
+            .Where(m => m.Direction == MessageDirection.Inbound && !m.ProcessedByAi &&
+                (m.NextAiRetryAt == null || m.NextAiRetryAt <= DateTime.UtcNow))
+            .OrderBy(m => m.NextAiRetryAt ?? m.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
     }

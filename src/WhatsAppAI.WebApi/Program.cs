@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using System.Threading.RateLimiting;
 using Serilog;
+using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Meta;
@@ -35,18 +37,50 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-// Permite que o ASP.NET reconheça corretamente HTTPS
-// quando está atrás do proxy reverso do Render.
+var forwardedHeadersConfiguration = builder.Configuration.GetSection("ForwardedHeaders");
+var forwardedHeadersEnabled = forwardedHeadersConfiguration.GetValue<bool>("Enabled");
+var trustAllForwardedHeaders = forwardedHeadersConfiguration.GetValue<bool>("TrustAll");
+var trustedProxyAddresses = forwardedHeadersConfiguration.GetSection("KnownProxies").Get<string[]>() ?? [];
+var trustedProxyNetworks = forwardedHeadersConfiguration.GetSection("KnownNetworks").Get<string[]>() ?? [];
+
+if (forwardedHeadersEnabled && !trustAllForwardedHeaders &&
+    trustedProxyAddresses.Length == 0 && trustedProxyNetworks.Length == 0 &&
+    builder.Environment.IsProduction())
+{
+    throw new InvalidOperationException(
+        "ForwardedHeaders requires KnownProxies, KnownNetworks, or TrustAll in production.");
+}
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
+    if (!forwardedHeadersEnabled)
+        return;
+
     options.ForwardedHeaders =
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto;
 
-    // Render usa proxies dinâmicos.
-    // No .NET 10, use KnownIPNetworks em vez de KnownNetworks.
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+
+    if (trustAllForwardedHeaders)
+        return;
+
+    foreach (var proxyAddress in trustedProxyAddresses)
+    {
+        if (!IPAddress.TryParse(proxyAddress, out var proxy))
+            throw new InvalidOperationException("ForwardedHeaders:KnownProxies contains an invalid IP address.");
+
+        options.KnownProxies.Add(proxy);
+    }
+
+    foreach (var proxyNetwork in trustedProxyNetworks)
+    {
+        if (!IPNetwork.TryParse(proxyNetwork, out var network))
+            throw new InvalidOperationException("ForwardedHeaders:KnownNetworks contains an invalid CIDR range.");
+
+        options.KnownIPNetworks.Add(network);
+    }
 });
 
 // PostgreSQL is the default provider; connection comes from ConnectionStrings:DefaultConnection.
@@ -152,7 +186,8 @@ var app = builder.Build();
 // IMPORTANTE:
 // deve executar antes de qualquer middleware que dependa
 // de Request.IsHttps, cookies Secure ou antiforgery.
-app.UseForwardedHeaders();
+if (forwardedHeadersEnabled)
+    app.UseForwardedHeaders();
 
 // Apply database schema and seed
 using (var scope = app.Services.CreateScope())
@@ -162,6 +197,21 @@ using (var scope = app.Services.CreateScope())
             .GetRequiredService<AppDbContext>();
 
     await context.Database.MigrateAsync();
+
+    var metaVerifyToken = builder.Configuration["Meta:VerifyToken"];
+    var metaAppSecret = builder.Configuration["Meta:AppSecret"];
+    if (builder.Environment.IsProduction() &&
+        (string.IsNullOrWhiteSpace(metaVerifyToken) || string.IsNullOrWhiteSpace(metaAppSecret)))
+    {
+        throw new InvalidOperationException("Meta:VerifyToken and Meta:AppSecret are required in production.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(metaVerifyToken) && !string.IsNullOrWhiteSpace(metaAppSecret))
+    {
+        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
+        await secretStore.SetAsync("meta:verify_token", metaVerifyToken);
+        await secretStore.SetAsync("meta:app_secret", metaAppSecret);
+    }
 
     // Optional bootstrap account.
     // Credentials must come from configuration/user-secrets.

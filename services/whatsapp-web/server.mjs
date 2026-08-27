@@ -1,4 +1,5 @@
 import express from 'express'
+import { timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
@@ -9,15 +10,23 @@ const app = express()
 const port = Number(process.env.PORT ?? 3020)
 const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
 const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
+const isProduction = process.env.NODE_ENV === 'production'
 const sessions = new Map()
 const botConfigs = new Map()
 const reconnectTimers = new Map()
 const authBackupTimers = new Map()
 const authBackupPromises = new Map()
 const lastAuthPayloads = new Map()
+const reconnectAttempts = new Map()
 const gzipAsync = promisify(gzip)
 const gunzipAsync = promisify(gunzip)
 const sessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-qr-(?:[1-9]\d?|100)$/i
+const bridgeSecretHeader = 'x-whatsapp-web-secret'
+let isShuttingDown = false
+
+if (isProduction && (apiWebhookSecret === 'development-whatsapp-web-secret' || apiWebhookSecret.length < 32)) {
+  throw new Error('WHATSAPP_WEB_WEBHOOK_SECRET must be a production secret with at least 32 characters.')
+}
 
 const defaultBotConfig = {
   configured: true,
@@ -38,18 +47,19 @@ const defaultBotConfig = {
   version: 1,
 }
 
+app.disable('x-powered-by')
 app.use(express.json({ limit: '2mb' }))
 
-app.param('tenantId', (req, res, next, tenantId) => {
-  if (!sessionIdPattern.test(tenantId)) return res.status(400).json({ error: 'Invalid session id.' })
+app.get('/health', (_req, res) => res.json({ ok: true, status: isShuttingDown ? 'shutting_down' : 'ready' }))
+
+app.use('/sessions', (req, res, next) => {
+  const received = req.get(bridgeSecretHeader)
+  if (!isAuthorizedBridgeRequest(received)) return res.status(401).json({ error: 'Unauthorized.' })
   next()
 })
 
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.sendStatus(204)
+app.param('tenantId', (req, res, next, tenantId) => {
+  if (!sessionIdPattern.test(tenantId)) return res.status(400).json({ error: 'Invalid session id.' })
   next()
 })
 
@@ -66,6 +76,7 @@ async function getSession(tenantId) {
     conversations: new Map(),
     messages: new Map(),
     seenMessageIds: new Set(),
+    connecting: null,
   }
 
   if (!existing) {
@@ -75,6 +86,19 @@ async function getSession(tenantId) {
 
   if (session.sock) return session
 
+  if (session.connecting) return session.connecting
+
+  session.connecting = initializeSession(tenantId, session)
+  try {
+    await session.connecting
+  } finally {
+    session.connecting = null
+  }
+
+  return session
+}
+
+async function initializeSession(tenantId, session) {
   try {
     await restoreAuthState(tenantId)
     const { state, saveCreds } = await useMultiFileAuthState(sessionDirectory(tenantId))
@@ -94,47 +118,14 @@ async function getSession(tenantId) {
     session.sock = sock
     session.status = 'connecting'
 
-    sock.ev.on('creds.update', async () => {
-      await saveCreds()
-      scheduleAuthBackup(tenantId)
+    sock.ev.on('creds.update', () => {
+      void saveCreds()
+        .then(() => scheduleAuthBackup(tenantId))
+        .catch((error) => logError('Failed to save WhatsApp credentials', tenantId, error))
     })
-    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-      if (qr) {
-        session.qr = qr
-        session.status = 'qr_pending'
-        console.log(`QR code generated for session ${tenantId}`)
-      }
-      if (connection === 'open') {
-        session.status = 'connected'
-        session.qr = null
-        session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
-        reconnectTimers.delete(tenantId)
-        scheduleAuthBackup(tenantId)
-        console.log(`WhatsApp session connected for ${tenantId} (${session.phoneNumber ?? 'unknown phone'})`)
-      }
-      if (connection === 'close') {
-        const code = lastDisconnect?.error?.output?.statusCode
-        const errorMessage = lastDisconnect?.error?.message ?? 'unknown connection error'
-        const shouldReconnect = code !== DisconnectReason.loggedOut
-        session.status = shouldReconnect ? 'reconnecting' : 'disconnected'
-        session.sock = null
-        console.error(`WhatsApp session closed for ${tenantId}: code=${code ?? 'unknown'} error=${errorMessage} reconnect=${shouldReconnect}`)
-
-        if (code === DisconnectReason.loggedOut) {
-          sessions.delete(tenantId)
-          await rm(sessionDirectory(tenantId), { recursive: true, force: true })
-          await deleteRemoteAuthState(tenantId)
-          return
-        }
-
-        if (shouldReconnect && !reconnectTimers.has(tenantId)) {
-          const timer = setTimeout(() => {
-            reconnectTimers.delete(tenantId)
-            void getSession(tenantId)
-          }, 3000)
-          reconnectTimers.set(tenantId, timer)
-        }
-      }
+    sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+      void handleConnectionUpdate(tenantId, session, sock, connection, lastDisconnect, qr)
+        .catch((error) => logError('Failed to process WhatsApp connection update', tenantId, error))
     })
 
     sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
@@ -144,26 +135,53 @@ async function getSession(tenantId) {
     })
 
     sock.ev.on('messages.upsert', ({ messages, type }) => {
-      console.log(`WhatsApp messages.upsert: type=${type} count=${messages?.length ?? 0}`)
+      console.log(`WhatsApp messages received: session=${tenantId} type=${type} count=${messages?.length ?? 0}`)
       for (const message of messages ?? []) addMessage(session, message, type === 'notify')
     })
   } catch (error) {
     session.status = 'disconnected'
     session.sock = null
-    console.error(`Failed to initialize WhatsApp session ${tenantId}:`, error)
-    if (!reconnectTimers.has(tenantId)) {
-      const timer = setTimeout(() => {
-        reconnectTimers.delete(tenantId)
-        void getSession(tenantId)
-      }, 5000)
-      reconnectTimers.set(tenantId, timer)
-    }
+    logError('Failed to initialize WhatsApp session', tenantId, error)
+    scheduleReconnect(tenantId)
   }
 
   return session
 }
 
-app.get('/health', (_req, res) => res.json({ ok: true }))
+async function handleConnectionUpdate(tenantId, session, sock, connection, lastDisconnect, qr) {
+  if (session.sock !== sock) return
+
+      if (qr) {
+        session.qr = qr
+        session.status = 'qr_pending'
+        console.log(`WhatsApp QR generated: session=${tenantId}`)
+      }
+      if (connection === 'open') {
+        session.status = 'connected'
+        session.qr = null
+        session.phoneNumber = sock.user?.id?.split(':')[0] ?? null
+        clearReconnect(tenantId)
+        scheduleAuthBackup(tenantId)
+        console.log(`WhatsApp session connected: session=${tenantId}`)
+      }
+      if (connection === 'close') {
+        const code = lastDisconnect?.error?.output?.statusCode
+        const shouldReconnect = code !== DisconnectReason.loggedOut
+        session.status = shouldReconnect ? 'reconnecting' : 'disconnected'
+        session.sock = null
+        console.error(`WhatsApp session closed: session=${tenantId} code=${code ?? 'unknown'} reconnect=${shouldReconnect}`)
+
+        if (code === DisconnectReason.loggedOut) {
+          clearReconnect(tenantId)
+          sessions.delete(tenantId)
+          await rm(sessionDirectory(tenantId), { recursive: true, force: true })
+          await deleteRemoteAuthState(tenantId)
+          return
+        }
+
+        if (shouldReconnect) scheduleReconnect(tenantId)
+      }
+}
 
 app.get('/sessions/:tenantId/qr', async (req, res) => {
   const session = await getSession(req.params.tenantId)
@@ -209,6 +227,7 @@ app.get('/sessions/:tenantId/conversations/:id/messages', async (req, res) => {
 
 app.post('/sessions/:tenantId/logout', async (req, res) => {
   const session = sessions.get(req.params.tenantId)
+  clearReconnect(req.params.tenantId)
   try {
     await session?.sock?.logout?.()
   } catch {
@@ -223,7 +242,7 @@ app.post('/sessions/:tenantId/logout', async (req, res) => {
 app.post('/sessions/:tenantId/send-message', async (req, res) => {
   const session = sessions.get(req.params.tenantId)
   const { recipientPhone, text } = req.body ?? {}
-  if (!session?.sock || !recipientPhone || !text) {
+  if (!session?.sock || !isValidRecipient(recipientPhone) || !isValidMessageText(text)) {
     return res.status(400).json({ success: false, error: 'Session, recipientPhone and text are required.' })
   }
 
@@ -255,7 +274,7 @@ app.post('/sessions/:tenantId/bot-config', async (req, res) => {
   res.json(next)
 })
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`WhatsApp Web service listening on http://localhost:${port}`)
 })
 
@@ -282,7 +301,7 @@ function addMessage(session, msg, isLiveInbound = false) {
   const messageId = msg.key?.id
   if (messageId) {
     if (!msg.key?.fromMe && session.seenMessageIds.has(messageId)) {
-      console.log(`Duplicate inbound message ignored for ${session.tenantId}: ${messageId}`)
+      console.log(`Duplicate inbound message ignored: session=${session.tenantId}`)
       return
     }
     if (!msg.key?.fromMe) {
@@ -359,7 +378,7 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
-      const response = await fetch(apiWebhookUrl, {
+      const response = await fetchWithTimeout(apiWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -371,11 +390,10 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
         console.log(`Inbound message forwarded for ${session.tenantId}: HTTP ${response.status}`)
         return
       }
-      const responseBody = await response.text()
-      throw new Error(`Webhook returned HTTP ${response.status}: ${responseBody.slice(0, 200)}`)
+      throw new Error(`Webhook returned HTTP ${response.status}`)
     } catch (error) {
       if (attempt === 5) {
-        console.error('Failed to forward WhatsApp Web message', error)
+        logError('Failed to forward WhatsApp Web message', session.tenantId, error)
         return
       }
       await new Promise((resolve) => setTimeout(resolve, attempt * 2000))
@@ -510,7 +528,7 @@ async function backupAuthState(tenantId) {
     const payload = compressed.toString('base64')
     if (lastAuthPayloads.get(tenantId) === payload) return
 
-    const response = await fetch(sessionStateUrl(tenantId), {
+    const response = await fetchWithTimeout(sessionStateUrl(tenantId), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -521,7 +539,7 @@ async function backupAuthState(tenantId) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     lastAuthPayloads.set(tenantId, payload)
   } catch (error) {
-    console.error(`Failed to persist WhatsApp auth state for ${tenantId}:`, error)
+    logError('Failed to persist WhatsApp auth state', tenantId, error)
   }
 }
 
@@ -532,7 +550,7 @@ async function restoreAuthState(tenantId) {
   } catch {}
 
   try {
-    const response = await fetch(sessionStateUrl(tenantId), {
+    const response = await fetchWithTimeout(sessionStateUrl(tenantId), {
       headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
     })
     if (response.status === 404) return
@@ -548,21 +566,93 @@ async function restoreAuthState(tenantId) {
       await writeFile(`${sessionDirectory(tenantId)}/${name}`, Buffer.from(content, 'base64'))
     }
     lastAuthPayloads.set(tenantId, payload)
-    console.log(`WhatsApp auth state restored for ${tenantId}`)
+    console.log(`WhatsApp auth state restored: session=${tenantId}`)
   } catch (error) {
-    console.error(`Failed to restore WhatsApp auth state for ${tenantId}:`, error)
+    logError('Failed to restore WhatsApp auth state', tenantId, error)
   }
 }
 
 async function deleteRemoteAuthState(tenantId) {
   lastAuthPayloads.delete(tenantId)
   try {
-    const response = await fetch(sessionStateUrl(tenantId), {
+    const response = await fetchWithTimeout(sessionStateUrl(tenantId), {
       method: 'DELETE',
       headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
     })
     if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`)
   } catch (error) {
-    console.error(`Failed to delete WhatsApp auth state for ${tenantId}:`, error)
+    logError('Failed to delete WhatsApp auth state', tenantId, error)
   }
 }
+
+function isAuthorizedBridgeRequest(received) {
+  if (!received) return false
+  const expectedBytes = Buffer.from(apiWebhookSecret)
+  const receivedBytes = Buffer.from(received)
+  return expectedBytes.length === receivedBytes.length && timingSafeEqual(expectedBytes, receivedBytes)
+}
+
+function isValidRecipient(recipientPhone) {
+  return typeof recipientPhone === 'string' && /^\d{7,20}$/.test(recipientPhone)
+}
+
+function isValidMessageText(text) {
+  return typeof text === 'string' && text.trim().length > 0 && text.length <= 4096
+}
+
+function fetchWithTimeout(url, options = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(15_000) })
+}
+
+function clearReconnect(tenantId) {
+  const timer = reconnectTimers.get(tenantId)
+  if (timer) clearTimeout(timer)
+  reconnectTimers.delete(tenantId)
+  reconnectAttempts.delete(tenantId)
+}
+
+function scheduleReconnect(tenantId) {
+  if (isShuttingDown || reconnectTimers.has(tenantId)) return
+  const attempts = (reconnectAttempts.get(tenantId) ?? 0) + 1
+  reconnectAttempts.set(tenantId, attempts)
+  const delay = Math.min(30_000, 1_000 * 2 ** Math.min(attempts - 1, 5)) + Math.floor(Math.random() * 500)
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(tenantId)
+    void getSession(tenantId).catch((error) => logError('Scheduled WhatsApp reconnect failed', tenantId, error))
+  }, delay)
+  reconnectTimers.set(tenantId, timer)
+}
+
+function logError(event, tenantId, error) {
+  const errorType = error instanceof Error ? error.name : 'UnknownError'
+  console.error(`${event}: session=${tenantId} error=${errorType}`)
+}
+
+async function flushAuthBackups() {
+  for (const timer of authBackupTimers.values()) clearTimeout(timer)
+  authBackupTimers.clear()
+  await Promise.all([...authBackupPromises.values()])
+  await Promise.all([...sessions.keys()].map((tenantId) => backupAuthState(tenantId)))
+}
+
+async function shutdown(signal, exitCode = 0) {
+  if (isShuttingDown) return
+  isShuttingDown = true
+  console.log(`WhatsApp Web service shutting down: signal=${signal}`)
+  for (const tenantId of [...reconnectTimers.keys()]) clearReconnect(tenantId)
+  await flushAuthBackups()
+  for (const session of sessions.values()) session.sock?.end?.(new Error('Service shutdown'))
+  await new Promise((resolve) => server.close(resolve))
+  process.exitCode = exitCode
+}
+
+process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+process.once('SIGINT', () => { void shutdown('SIGINT') })
+process.once('uncaughtException', (error) => {
+  logError('Uncaught bridge exception', 'system', error)
+  void shutdown('uncaughtException', 1)
+})
+process.once('unhandledRejection', (error) => {
+  logError('Unhandled bridge rejection', 'system', error)
+  void shutdown('unhandledRejection', 1)
+})

@@ -44,7 +44,7 @@ public sealed class AnthropicProvider(HttpClient httpClient, ILogger<AnthropicPr
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.LogError("Anthropic API error {StatusCode}: {Body}", httpResponse.StatusCode, body);
+            logger.LogError("Anthropic API error {StatusCode}", (int)httpResponse.StatusCode);
             throw new InvalidOperationException($"Anthropic API error: {httpResponse.StatusCode}");
         }
 

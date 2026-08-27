@@ -23,7 +23,7 @@ Atualizacao de readiness (2026-08-21):
 ## Premissas fechadas
 
 - Cada cliente é dono da conta Meta, do número, do método de pagamento e do projeto/chave da OpenAI.
-- O produto usa somente a API oficial WhatsApp Cloud API.
+- O produto usa a WhatsApp Cloud API e, para linhas QR, a ponte WhatsApp Web via Baileys em produção.
 - O MVP atende conversas iniciadas pelo consumidor; não inclui campanhas nem disparos de marketing.
 - O núcleo não depende de n8n.
 - A arquitetura inicial é um monólito modular, sem microsserviços, RabbitMQ ou Redis.

@@ -45,7 +45,7 @@ public sealed class OpenAiProvider(HttpClient httpClient, ILogger<OpenAiProvider
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.LogError("OpenAI API error {StatusCode}: {Body}", httpResponse.StatusCode, body);
+            logger.LogError("OpenAI API error {StatusCode}", (int)httpResponse.StatusCode);
             throw new InvalidOperationException($"OpenAI API error: {httpResponse.StatusCode}");
         }
 

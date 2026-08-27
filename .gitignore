@@ -21,6 +21,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
 *.db
 *.db-shm
 *.db-wal

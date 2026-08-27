@@ -5,7 +5,9 @@
 ```mermaid
 flowchart TB
   Customer[Cliente final] --> Meta[WhatsApp Cloud API]
+  Customer --> QR[WhatsApp Web via Baileys/QR]
   Meta --> App[WhatsApp AI Manager]
+  QR --> App
   Operator[Operador] --> App
   App --> OpenAI[OpenAI Responses API]
   App --> PostgreSQL[(PostgreSQL)]
@@ -20,9 +22,11 @@ flowchart TB
   Web[React SPA] -->|HTTPS + cookie| API[ASP.NET Core API]
   Web <-->|SignalR| API
   Meta[Meta webhook] --> API
+  QR[Baileys bridge/QR] --> API
   API --> DB[(PostgreSQL)]
   Worker[Workers internos] --> DB
   Worker --> MetaAPI[Meta Graph API]
+  Worker --> Baileys[Baileys/WhatsApp Web]
   Worker --> AIAPI[OpenAI API]
 ```
 
@@ -38,13 +42,13 @@ flowchart LR
   WebApi --> Infrastructure
 ```
 
-`Domain` não referencia SDKs ou infraestrutura. `Application` define portas e casos de uso. `Infrastructure` adapta EF Core, Meta, OpenAI e cofre. `WebApi` compõe dependências e traduz HTTP/SignalR.
+`Domain` não referencia SDKs ou infraestrutura. `Application` define portas e casos de uso. `Infrastructure` adapta EF Core, Meta, Baileys, OpenAI e cofre. `WebApi` compõe dependências e traduz HTTP/SignalR.
 
 ## Sequência de mensagem automática
 
 ```mermaid
 sequenceDiagram
-  participant M as Meta
+  participant M as Meta ou Baileys
   participant A as API
   participant D as PostgreSQL
   participant W as Worker
@@ -56,7 +60,7 @@ sequenceDiagram
   W->>O: decisão estruturada
   O-->>W: reply ou handoff
   W->>D: revalida versão e grava Outbox
-  W->>M: envia resposta permitida
+  W->>M: envia resposta pelo canal da linha
 ```
 
 ## Fronteiras de segurança

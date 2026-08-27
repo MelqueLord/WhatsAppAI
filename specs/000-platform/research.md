@@ -44,12 +44,13 @@ O MVP responde somente a mensagens iniciadas pelo consumidor e bloqueia texto li
 
 ## R-010 — Meta App compartilhado e contas dos tenants
 
-A plataforma utiliza um único Meta App. Seu `app_secret` e verify token são segredos globais da plataforma no `ISecretStore`; o primeiro valida `X-Hub-Signature-256` antes de qualquer resolução de tenant e o segundo valida o challenge GET. Após a autenticidade do POST ser comprovada, `phone_number_id` resolve a `WhatsAppAccount`. WABA, `phone_number_id`, token de acesso e faturamento continuam pertencendo a cada tenant. A decisão especializa ADR-0002 e ADR-0003 sem substituí-los.
+A plataforma utiliza um único Meta App para linhas Cloud. Seu `app_secret` e verify token são segredos globais da plataforma no `ISecretStore`; o primeiro valida `X-Hub-Signature-256` antes de qualquer resolução de tenant e o segundo valida o challenge GET. Após a autenticidade do POST ser comprovada, `phone_number_id` resolve a `WhatsAppAccount`. Linhas QR usam sessões Baileys isoladas por tenant/linha e segredo próprio para a ponte. WABA, `phone_number_id`, token de acesso e faturamento Cloud continuam pertencendo a cada tenant. A decisão especializa ADR-0002, ADR-0003 e ADR-0009.
 
 ## ADRs aceitos reutilizados
 
 - `docs/architecture/adr/0001-modular-monolith.md` — monólito modular.
-- `docs/architecture/adr/0002-official-whatsapp-cloud-api.md` — API oficial da Meta.
+- `docs/architecture/adr/0002-official-whatsapp-cloud-api.md` — canal Cloud oficial da Meta.
+- `docs/architecture/adr/0009-baileys-production-qr.md` — ponte Baileys para conexões QR em produção.
 - `docs/architecture/adr/0003-customer-owned-provider-billing.md` — contas e faturamento dos tenants.
 - `docs/architecture/adr/0004-no-n8n-core.md` — n8n fora do núcleo.
 - `docs/architecture/adr/0005-postgres-inbox-outbox.md` — filas duráveis (conceito; implementação usa MySQL conforme ADR-0006).

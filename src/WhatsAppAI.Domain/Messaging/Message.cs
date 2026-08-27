@@ -23,6 +23,8 @@ public sealed class Message
     public DateTime? FailedAt { get; private set; }
     public string? FailureReason { get; private set; }
     public bool ProcessedByAi { get; private set; }
+    public int AiRetryCount { get; private set; }
+    public DateTime? NextAiRetryAt { get; private set; }
 
     public Conversation Conversation { get; private set; } = null!;
     public Contact Contact { get; private set; } = null!;
@@ -112,6 +114,22 @@ public sealed class Message
     public void MarkProcessedByAi()
     {
         ProcessedByAi = true;
+        NextAiRetryAt = null;
+    }
+
+    public bool RegisterAiFailure(int maxAttempts, TimeSpan retryDelay)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxAttempts, 1);
+
+        AiRetryCount++;
+        if (AiRetryCount >= maxAttempts)
+        {
+            NextAiRetryAt = null;
+            return false;
+        }
+
+        NextAiRetryAt = DateTime.UtcNow.Add(retryDelay);
+        return true;
     }
 
     public void RedactPersonalData()

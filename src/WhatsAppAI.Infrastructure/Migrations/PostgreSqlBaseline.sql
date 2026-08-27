@@ -416,6 +416,8 @@ CREATE TABLE IF NOT EXISTS whatsappai.messages (
     failed_at timestamp with time zone,
     failure_reason character varying(2000),
     processed_by_ai boolean NOT NULL,
+    ai_retry_count integer NOT NULL DEFAULT 0,
+    next_ai_retry_at timestamp with time zone,
     CONSTRAINT "PK_messages" PRIMARY KEY (id),
     CONSTRAINT "FK_messages_contacts_contact_id" FOREIGN KEY (contact_id) REFERENCES whatsappai.contacts (id) ON DELETE RESTRICT,
     CONSTRAINT "FK_messages_conversations_conversation_id" FOREIGN KEY (conversation_id) REFERENCES whatsappai.conversations (id) ON DELETE RESTRICT
@@ -516,6 +518,9 @@ CREATE INDEX IF NOT EXISTS "IX_messages_tenant_id" ON whatsappai.messages (tenan
 
 
 CREATE INDEX IF NOT EXISTS "IX_messages_tenant_id_conversation_id_created_at" ON whatsappai.messages (tenant_id, conversation_id, created_at);
+
+
+CREATE INDEX IF NOT EXISTS "IX_messages_processed_by_ai_next_ai_retry_at" ON whatsappai.messages (processed_by_ai, next_ai_retry_at);
 
 
 CREATE INDEX IF NOT EXISTS "IX_model_evaluations_tenant_id_is_approved_created_at" ON whatsappai.model_evaluations (tenant_id, is_approved, created_at);

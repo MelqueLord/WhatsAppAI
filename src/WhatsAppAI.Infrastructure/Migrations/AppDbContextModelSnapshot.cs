@@ -1298,6 +1298,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("caption");
 
+                    b.Property<int>("AiRetryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("ai_retry_count");
+
                     b.Property<Guid>("ContactId")
                         .HasColumnType("uuid")
                         .HasColumnName("contact_id");
@@ -1354,6 +1358,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("media_url");
 
+                    b.Property<DateTime?>("NextAiRetryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_ai_retry_at");
+
                     b.Property<bool>("ProcessedByAi")
                         .HasColumnType("boolean")
                         .HasColumnName("processed_by_ai");
@@ -1396,6 +1404,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("ExternalId");
 
                     b.HasIndex("IdempotencyKey");
+
+                    b.HasIndex("ProcessedByAi", "NextAiRetryAt");
 
                     b.HasIndex("TenantId");
 

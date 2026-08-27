@@ -1,14 +1,14 @@
-# ADR-0002: WhatsApp Cloud API oficial
+# ADR-0002: WhatsApp Cloud API como canal oficial
 
-**Status:** Aceito — 2026-08-03
+**Status:** Aceito, complementado por ADR-0009 — 2026-08-27
 
 ## Contexto
 
-Conexões não oficiais podem quebrar, causar banimento e dificultar conformidade.
+A Cloud API é o canal oficial e suportado da Meta. O produto também opera conexões QR via Baileys conforme ADR-0009, com riscos operacionais aceitos pelo tenant.
 
 ## Decisão
 
-Integrar diretamente com a WhatsApp Cloud API da Meta. Não usar automação de WhatsApp Web nem gateways não oficiais.
+Integrar diretamente com a WhatsApp Cloud API da Meta para linhas Cloud. Esta decisão não exclui a ponte WhatsApp Web/Baileys aprovada no ADR-0009 para linhas QR.
 
 ## Consequências
 

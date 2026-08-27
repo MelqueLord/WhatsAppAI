@@ -8,6 +8,7 @@
 | Asset | Sensitivity | Location |
 |-------|-------------|----------|
 | WhatsApp access tokens | Critical | `ISecretStore` (encrypted) |
+| WhatsApp Web/QR session | Critical | `ISecretStore` (encrypted) |
 | OpenAI API keys | Critical | `ISecretStore` (encrypted) |
 | User credentials | High | `users.password_hash` |
 | Conversation content | High | `messages.content` |
@@ -46,8 +47,14 @@
 - **Mitigation:** Rate limiting (100 req/min default, 500 for webhooks, 20 for auth); request size limits.
 - **Verification:** Load tests (T083).
 
+### T7: Instabilidade ou bloqueio de sessão QR
+- **Risk:** High
+- **Mitigation:** sessões Baileys isoladas por tenant e linha, segredos da ponte, reconexão controlada, observabilidade e aceite explícito do tenant.
+- **Verification:** testes de integração do canal QR e runbook operacional.
+
 ## Residual Risks
 
-- **Meta API outage:** No fallback; platform degrades gracefully.
+- **Meta Cloud API outage:** linhas Cloud degradam graciosamente; linhas QR já conectadas continuam no canal Baileys independente.
+- **Baileys/WhatsApp Web outage or account action:** linhas QR degradam graciosamente e podem exigir nova autenticação por QR.
 - **OpenAI API outage:** Circuit breaker prevents cascading failures; handoff to human.
 - **Database compromise:** Encrypted secrets require separate key; conversation content is plaintext in DB (acceptable for MVP).

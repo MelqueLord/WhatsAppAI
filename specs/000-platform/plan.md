@@ -10,7 +10,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 ### Módulos
 
 - **Identity & Tenancy:** autenticação, papéis, tenant corrente e administração.
-- **Integrations:** configuração Meta/OpenAI, teste de conexão e segredos.
+- **Integrations:** configuração Meta Cloud, WhatsApp Web/Baileys, OpenAI, teste de conexão e segredos.
 - **Messaging:** webhook, contatos, conversas, mensagens, Inbox/Outbox e status.
 - **Automation:** política, contexto, interação de IA e handoff.
 - **Knowledge:** conteúdo ativo que fundamenta respostas.
@@ -27,7 +27,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | Banco | PostgreSQL | Supabase gerenciado ou container Docker na Hostinger |
 | Tempo real | SignalR | integração nativa e grupos por tenant |
 | IA | OpenAI Responses API | interface atual com saída estruturada e uso auditável |
-| WhatsApp | Meta Graph/Cloud API | canal oficial e suportado |
+| WhatsApp | Meta Graph/Cloud API e Baileys/WhatsApp Web por QR | Cloud é o canal oficial; QR atende linhas conectadas por sessão Baileys |
 | Testes | xUnit, Testcontainers, Vitest, Playwright | pirâmide completa e ambiente realista |
 | Local | Docker Compose | PostgreSQL e dependências reproduzíveis |
 
@@ -80,7 +80,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 1. Caso de uso valida autorização, modo, janela e conteúdo.
 2. Cria `Message` em `Queued` e `OutboxMessage` na mesma transação.
-3. Worker chama Meta com correlação e idempotência local.
+3. Worker chama o canal da linha (Meta Cloud ou ponte Baileys) com correlação e idempotência local.
 4. Atualiza provider ID/status; webhooks posteriores avançam o status.
 
 ### Handoff
@@ -91,8 +91,8 @@ O comando de assumir conversa incrementa `Version`, muda para `Human` e registra
 
 1. A mensagem persiste apenas identificador e metadados seguros da mídia.
 2. A SPA solicita a mídia a endpoint autenticado da WebApi com conversa e mensagem no tenant corrente.
-3. A WebApi autoriza o acesso, usa internamente o token do tenant para obter o conteúdo e transmite o arquivo com limites de tipo/tamanho.
-4. Token e URL privada da Meta nunca são enviados ao navegador (**FR-023**).
+3. A WebApi autoriza o acesso, usa internamente a credencial do canal do tenant para obter o conteúdo e transmite o arquivo com limites de tipo/tamanho.
+4. Credencial e URL privada do provedor nunca são enviados ao navegador (**FR-023**).
 
 ## 6. Dados e transações
 
@@ -107,7 +107,7 @@ O comando de assumir conversa incrementa `Version`, muda para `Human` e registra
 
 - Frontend e backend usam o mesmo site. ASP.NET Core Identity usa cookie `HttpOnly`, `Secure` e `SameSite=Lax` em produção.
 - Um endpoint de bootstrap emite token antiforgery; toda mutação autenticada deve enviá-lo em `X-CSRF-TOKEN`. Login é público (`security: []`), mas também exige o token antiforgery.
-- O webhook tem autenticação própria com `app_secret` e verify token globais no cofre, rate limit e limite de payload; assinatura é validada antes da resolução pelo `phone_number_id`.
+- O webhook Cloud tem autenticação própria com `app_secret` e verify token globais no cofre; a ponte Baileys usa segredo próprio. Ambos têm rate limit e limite de payload antes da resolução pelo `phone_number_id`.
 - Produção usa cofre gerenciado via `ISecretStore`; desenvolvimento usa user-secrets/variáveis, nunca `appsettings.json` versionado.
 - Telefones são mascarados em logs; conteúdo de mensagens não entra em log padrão.
 - CORS é allowlist; headers de segurança e TLS são obrigatórios.
@@ -135,7 +135,7 @@ Implementar fatias verticais em ordem de `tasks.md`. A primeira demo funcional t
 | Princípio | Como o plano atende |
 |---|---|
 | Simplicidade | monólito, escopo inbound/service, sem orquestrador externo |
-| Integrações oficiais | adaptadores diretos Meta/OpenAI |
+| Integrações | adaptadores diretos Meta/OpenAI e ponte QR Baileys |
 | Controle humano | estados de conversa, versão e revalidação |
 | Isolamento | tenant em dados, auth, SignalR, jobs e testes |
 | Observável | Inbox/Outbox, correlação, métricas e runbooks |
@@ -151,7 +151,8 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 - `docs/architecture/adr/0003-customer-owned-provider-billing.md`;
 - `docs/architecture/adr/0004-no-n8n-core.md`;
 - `docs/architecture/adr/0005-postgres-inbox-outbox.md`;
-- `docs/architecture/adr/0006-hosting-and-secrets.md`.
+- `docs/architecture/adr/0006-hosting-and-secrets.md`;
+- `docs/architecture/adr/0009-baileys-production-qr.md`.
 
 A topologia de um Meta App compartilhado especializa ADR-0002/0003 e está registrada em **R-010**. A política normativa de IA é `docs/ai/behavior-policy.md`.
 

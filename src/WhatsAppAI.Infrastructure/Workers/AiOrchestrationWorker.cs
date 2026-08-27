@@ -22,6 +22,8 @@ public sealed class AiOrchestrationWorker(
     IServiceProvider serviceProvider,
     ILogger<AiOrchestrationWorker> logger) : BackgroundService
 {
+    private const int MaxAiAttempts = 3;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("AI Orchestration Worker started");
@@ -188,6 +190,32 @@ public sealed class AiOrchestrationWorker(
             if (string.IsNullOrEmpty(apiKey))
             {
                 logger.LogWarning("API key not available for tenant {TenantId}", message.TenantId);
+                return;
+            }
+
+            var purposes = await dbContext.ProcessingPurposes
+                .IgnoreQueryFilters()
+                .Where(purpose => purpose.TenantId == message.TenantId && purpose.IsActive)
+                .ToListAsync(cancellationToken);
+            var consentPurposeIds = purposes
+                .Where(purpose => purpose.LegalBasis == WhatsAppAI.Domain.Privacy.LegalBasis.Consent)
+                .Select(purpose => purpose.Id)
+                .ToList();
+            List<WhatsAppAI.Domain.Privacy.ConsentEvidence> consents = consentPurposeIds.Count == 0
+                ? []
+                : await dbContext.ConsentEvidence
+                    .IgnoreQueryFilters()
+                    .Where(consent => consent.TenantId == message.TenantId &&
+                        consent.ContactId == message.ContactId &&
+                        consentPurposeIds.Contains(consent.ProcessingPurposeId))
+                    .ToListAsync(cancellationToken);
+            if (!AiDataProcessingPolicy.IsAuthorized(message.TenantId, message.ContactId, purposes, consents))
+            {
+                conversation.SwitchMode(ConversationMode.Human, conversation.Version, null);
+                await conversationRepository.UpdateAsync(conversation, cancellationToken);
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                logger.LogInformation("AI data processing is not authorized for tenant {TenantId}", message.TenantId);
                 return;
             }
 
@@ -405,7 +433,34 @@ public sealed class AiOrchestrationWorker(
                 message.MarkProcessedByAi();
                 await messageRepository.UpdateAsync(message, cancellationToken);
                 logger.LogWarning("AI quota exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
+                return;
             }
+
+            var retryDelay = TimeSpan.FromSeconds(Math.Pow(2, message.AiRetryCount) * 10);
+            if (message.RegisterAiFailure(MaxAiAttempts, retryDelay))
+            {
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                logger.LogWarning("AI attempt {Attempt} scheduled for message {MessageId}", message.AiRetryCount, message.Id);
+                return;
+            }
+
+            var failedConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
+            if (failedConversation is not null && failedConversation.Mode == ConversationMode.Automatic)
+            {
+                failedConversation.SwitchMode(ConversationMode.Human, failedConversation.Version, null);
+                await conversationRepository.UpdateAsync(failedConversation, cancellationToken);
+
+                var handoffMsg = Message.CreateOutbound(
+                    message.TenantId, message.ConversationId, message.ContactId,
+                    MessageType.Text, "Vou encaminhar voce para um atendente.",
+                    $"ai-retry-exhausted:{message.Id}");
+                await messageRepository.AddAsync(handoffMsg, cancellationToken);
+                await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, handoffMsg.Id));
+            }
+
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            logger.LogWarning("AI retries exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
         }
     }
 

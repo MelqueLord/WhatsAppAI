@@ -1,12 +1,12 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.12.0
-**Data:** 2026-08-21
+**Versão:** 0.13.0
+**Data:** 2026-08-27
 
 ## 1. Problema
 
-Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implantar CRM ou automações complexas. O proprietário da plataforma configura a conta oficial da Meta e a conta da OpenAI do cliente e entrega uma caixa de entrada pronta, na qual a IA responde dúvidas rotineiras e uma pessoa assume exceções.
+Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implantar CRM ou automações complexas. O proprietário da plataforma configura uma conexão Cloud da Meta ou uma sessão WhatsApp Web via QR/Baileys, além da conta de IA do cliente, e entrega uma caixa de entrada pronta, na qual a IA responde dúvidas rotineiras e uma pessoa assume exceções.
 
 ## 2. Atores
 
@@ -23,7 +23,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - SaaS multi-tenant com um número de WhatsApp por tenant.
 - Autenticação de TenantOwner/Operator, ambos presentes no primeiro piloto, e administração mínima da plataforma.
 - Frontend e backend publicados no mesmo site, com sessão baseada em cookie e proteção antiforgery.
-- Conexão guiada à WhatsApp Cloud API e à OpenAI com credenciais do cliente.
+- Conexão guiada à WhatsApp Cloud API ou WhatsApp Web via QR/Baileys, e à OpenAI com credenciais do cliente.
 - Webhook de mensagens e status com processamento idempotente.
 - Inbox em tempo real, histórico, texto e mídia básica.
 - Resposta humana e resposta automática textual por IA.
@@ -162,7 +162,7 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **FR-018:** disponibilizar estimativas de unidades e custos por período, representando valores monetários em unidade menor inteira e moeda ISO 4217.
 - **FR-019:** registrar auditoria imutável para ações sensíveis, com proteção de persistência contra `UPDATE` e `DELETE` pela identidade da aplicação.
 - **FR-020:** permitir política de retenção e exclusão operacional por tenant.
-- **FR-021:** testar as conexões Meta/OpenAI sem expor credenciais ao navegador.
+- **FR-021:** testar as conexões Meta, WhatsApp Web/QR e OpenAI sem expor credenciais ao navegador.
 - **FR-022:** classificar eventos não reconhecidos, preservar um envelope operacional sanitizado separado do payload original cifrado e de acesso restrito, e permitir consulta e reprocessamento auditados.
 - **FR-023:** expor mídia básica por endpoint autenticado e limitado ao tenant corrente, atuando como download/proxy sem revelar token ou URL privada da Meta.
 - **FR-024:** paginar por cursor a lista de conversas e o histórico de mensagens, com limite máximo definido no contrato.
@@ -192,7 +192,7 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **BR-008:** credenciais pertencem ao tenant; o PlatformAdmin pode substituí-las, nunca recuperá-las em claro.
 - **BR-009:** após limite controlado de tentativas, o job vai para estado morto e gera alerta.
 - **BR-010:** resposta da IA é descartada se a versão da conversa mudou desde o início da geração.
-- **BR-011:** a plataforma opera um único Meta App e guarda seu `app_secret` e verify token no cofre global; cada tenant mantém titularidade de WABA, `phone_number_id`, token de acesso e faturamento.
+- **BR-011:** para conexões Cloud, a plataforma opera um único Meta App e guarda seu `app_secret` e verify token no cofre global; cada tenant mantém titularidade de WABA, `phone_number_id`, token de acesso e faturamento. Para conexões QR, a sessão Baileys é isolada por tenant e linha, com aceite explícito do tenant para os riscos operacionais do canal.
 - **BR-012:** no MVP, cada usuário pertence a no máximo um tenant; PlatformAdmin é uma permissão de plataforma sem membership de tenant.
 - **BR-013:** um convite expira exatamente 24 horas após `created_at`, é consumido uma única vez e o reenvio revoga qualquer convite anterior ainda utilizável para a mesma membership/purpose.
 - **BR-014:** o MVP não possui serviço de e-mail; links de ativação são entregues manualmente e nunca registrados em logs ou auditoria.
@@ -233,7 +233,7 @@ Estas decisões não bloqueiam o desenho, mas precisam ser fechadas antes das fa
 ## 10. Dependências externas
 
 - Conta Meta Business aprovada, WABA, número e permissões do cliente.
-- Um Meta App compartilhado da plataforma, com `app_secret` e verify token em cofre global, configurado para WhatsApp Cloud API e webhook HTTPS público.
+- Um Meta App compartilhado da plataforma, com `app_secret` e verify token em cofre global, para conexões WhatsApp Cloud API; ou uma ponte WhatsApp Web/Baileys com QR e segredo de webhook para conexões QR.
 - Projeto OpenAI com faturamento, chave e limites do cliente.
 - Domínio, TLS, PostgreSQL, armazenamento de segredos e backup.
 
