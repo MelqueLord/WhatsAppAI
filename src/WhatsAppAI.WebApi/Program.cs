@@ -76,7 +76,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
     foreach (var proxyNetwork in trustedProxyNetworks)
     {
-        if (!Microsoft.AspNetCore.HttpOverrides.IPNetwork.TryParse(proxyNetwork, out var network))
+        if (!System.Net.IPNetwork.TryParse(proxyNetwork, out var network))
             throw new InvalidOperationException("ForwardedHeaders:KnownNetworks contains an invalid CIDR range.");
 
         options.KnownIPNetworks.Add(network);
