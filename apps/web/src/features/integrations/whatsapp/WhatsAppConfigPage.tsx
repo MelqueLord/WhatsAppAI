@@ -49,7 +49,7 @@ export function WhatsAppConfigPage() {
       if (!res.ok) return null
       return res.json()
     },
-    enabled: !isSuspended && connectionMode === 'qrcode' && qrLineCount > 0,
+    enabled: !isSuspended && connectionMode === 'qrcode',
     refetchInterval: 5000,
   })
 
