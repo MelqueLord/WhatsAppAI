@@ -1,9 +1,15 @@
 namespace WhatsAppAI.Domain.Identity;
 
+using System.Globalization;
+using System.Text.RegularExpressions;
 using WhatsAppAI.Domain.Integrations;
 
 public sealed class TenantMembership
 {
+    private static readonly Regex LineAssignmentPattern = new(
+        "\\\"ConnectionType\\\"\\s*:\\s*\\\"(?<connectionType>[^\\\"]+)\\\"\\s*,\\s*\\\"LineNumber\\\"\\s*:\\s*(?<lineNumber>-?\\d+)",
+        RegexOptions.CultureInvariant);
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid UserId { get; private set; }
@@ -127,15 +133,12 @@ public sealed class TenantMembership
             _assignedLines.Clear();
             return;
         }
-        var parsed = System.Text.Json.JsonSerializer.Deserialize<List<LineAssignmentDto>>(AssignedLinesJson);
         _assignedLines.Clear();
-        if (parsed is not null)
+        foreach (Match match in LineAssignmentPattern.Matches(AssignedLinesJson))
         {
-            foreach (var item in parsed)
-            {
-                if (Enum.TryParse<WhatsAppConnectionType>(item.ConnectionType, true, out var ct))
-                    _assignedLines.Add(new LineAssignment(ct, item.LineNumber));
-            }
+            if (Enum.TryParse<WhatsAppConnectionType>(match.Groups["connectionType"].Value, true, out var connectionType) &&
+                int.TryParse(match.Groups["lineNumber"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lineNumber))
+                _assignedLines.Add(new LineAssignment(connectionType, lineNumber));
         }
     }
 
@@ -146,18 +149,8 @@ public sealed class TenantMembership
             AssignedLinesJson = null;
             return;
         }
-        var dtos = _assignedLines.Select(l => new LineAssignmentDto
-        {
-            ConnectionType = l.ConnectionType.ToString(),
-            LineNumber = l.LineNumber
-        }).ToList();
-        AssignedLinesJson = System.Text.Json.JsonSerializer.Serialize(dtos);
-    }
-
-    private sealed class LineAssignmentDto
-    {
-        public string ConnectionType { get; init; } = string.Empty;
-        public int LineNumber { get; init; }
+        AssignedLinesJson = "[" + string.Join(",", _assignedLines.Select(line =>
+            $"{{\"ConnectionType\":\"{line.ConnectionType}\",\"LineNumber\":{line.LineNumber.ToString(CultureInfo.InvariantCulture)}}}")) + "]";
     }
 }
 
