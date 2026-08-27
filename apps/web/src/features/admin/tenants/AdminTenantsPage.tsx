@@ -490,7 +490,7 @@ export function AdminTenantsPage() {
 
       {showCreateForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white text-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-slate-800">Nova Empresa</h2>
               <button
@@ -635,7 +635,7 @@ export function AdminTenantsPage() {
 
       {editTarget && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white text-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-slate-800">Editar Empresa</h2>
               <button onClick={() => setEditTarget(null)} className="p-2 hover:bg-slate-100 rounded-lg" title="Fechar">
