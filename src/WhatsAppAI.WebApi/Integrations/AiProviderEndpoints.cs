@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -150,19 +151,8 @@ public static class AiProviderEndpoints
         if (!SupportedProviders.Contains(provider))
             return Results.BadRequest(new { error = $"Unsupported provider. Use: {string.Join(", ", SupportedProviders)}" });
 
-        if (provider.Equals("gemini", StringComparison.OrdinalIgnoreCase))
-        {
-            var modelId = request.ModelId.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
-                ? request.ModelId["models/".Length..]
-                : request.ModelId;
-            var allowedGeminiModels = ProviderModels["gemini"]
-                .Select(model => ((dynamic)model).id as string)
-                .Where(id => id is not null)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            if (!allowedGeminiModels.Contains(modelId))
-                return Results.BadRequest(new { error = "Modelo Gemini inválido. Selecione um modelo disponível no catálogo." });
-        }
+        if (!AiModelPolicy.IsAllowed(provider, request.ModelId))
+            return Results.BadRequest(new { error = "Modelo inválido. Selecione um modelo disponível no catálogo." });
 
         var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var selectedCredential = await credentialRepository.GetByTenantAndProviderAsync(currentTenant.TenantId.Value, provider);
@@ -285,6 +275,8 @@ public static class AiProviderEndpoints
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null || !credential.IsActive)
             return Results.BadRequest(new { error = "AI provider not configured.", step = "config" });
+        if (!AiModelPolicy.IsAllowed(credential.Provider, credential.ModelId))
+            return Results.BadRequest(new { error = "Configured model is not allowed.", step = "config" });
 
         var apiKey = await secretStore.GetAsync(credential.ApiKeyRef);
         if (string.IsNullOrEmpty(apiKey))
