@@ -5,45 +5,87 @@ namespace WhatsAppAI.Infrastructure.Ai;
 
 public static class AiDecisionJsonParser
 {
+    private const string InvalidResponseReason = "invalid_response";
+
     public static AiDecision Parse(string output)
     {
         try
         {
             using var document = JsonDocument.Parse(output);
             var root = document.RootElement;
-            var action = root.TryGetProperty("action", out var actionValue)
-                ? actionValue.GetString()?.ToLowerInvariant() switch
-                {
-                    "reply" => AiAction.Reply,
-                    "handoff" => AiAction.Handoff,
-                    _ => AiAction.NoAction
-                }
-                : AiAction.Reply;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("action", out var actionValue) ||
+                actionValue.ValueKind != JsonValueKind.String ||
+                !root.TryGetProperty("confidence", out var confidenceValue) ||
+                confidenceValue.ValueKind != JsonValueKind.Number ||
+                !confidenceValue.TryGetDouble(out var confidence) ||
+                confidence is < 0 or > 1)
+                return InvalidDecision();
 
-            var tags = root.TryGetProperty("tags", out var tagValues) &&
-                tagValues.ValueKind == JsonValueKind.Array
-                ? tagValues.EnumerateArray()
-                    .Where(item => item.ValueKind == JsonValueKind.String)
+            var action = actionValue.GetString()?.ToLowerInvariant() switch
+            {
+                "reply" => AiAction.Reply,
+                "handoff" => AiAction.Handoff,
+                "no_action" or "no_reply" => AiAction.NoAction,
+                _ => (AiAction?)null
+            };
+            if (action is null)
+                return InvalidDecision();
+
+            var text = ReadOptionalString(root, "text", out var validText);
+            var handoffReason = ReadOptionalString(root, "handoff_reason", out var validReason);
+            var queueName = ReadOptionalString(root, "queue", out var validQueue);
+            if (!validText || !validReason || !validQueue ||
+                action == AiAction.Reply && string.IsNullOrWhiteSpace(text))
+                return InvalidDecision();
+
+            var tags = new List<string>();
+            if (root.TryGetProperty("tags", out var tagValues))
+            {
+                if (tagValues.ValueKind != JsonValueKind.Array ||
+                    tagValues.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+                    return InvalidDecision();
+
+                tags = tagValues.EnumerateArray()
                     .Select(item => item.GetString()?.Trim())
                     .Where(item => !string.IsNullOrWhiteSpace(item))
                     .Cast<string>()
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList()
-                : [];
+                    .ToList();
+            }
 
             return new AiDecision
             {
-                Action = action,
-                Text = root.TryGetProperty("text", out var text) ? text.GetString() : output,
-                HandoffReason = root.TryGetProperty("handoff_reason", out var reason) ? reason.GetString() : null,
-                Confidence = root.TryGetProperty("confidence", out var confidence) ? confidence.GetDouble() : 0.8,
-                QueueName = root.TryGetProperty("queue", out var queue) ? queue.GetString() : null,
+                Action = action.Value,
+                Text = text,
+                HandoffReason = handoffReason,
+                Confidence = confidence,
+                QueueName = queueName,
                 TagNames = tags
             };
         }
         catch (JsonException)
         {
-            return new AiDecision { Action = AiAction.Reply, Text = output, Confidence = 0.5 };
+            return InvalidDecision();
         }
     }
+
+    private static string? ReadOptionalString(JsonElement root, string propertyName, out bool isValid)
+    {
+        if (!root.TryGetProperty(propertyName, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            isValid = true;
+            return null;
+        }
+
+        isValid = value.ValueKind == JsonValueKind.String;
+        return isValid ? value.GetString() : null;
+    }
+
+    private static AiDecision InvalidDecision() => new()
+    {
+        Action = AiAction.Handoff,
+        HandoffReason = InvalidResponseReason,
+        Confidence = 0
+    };
 }

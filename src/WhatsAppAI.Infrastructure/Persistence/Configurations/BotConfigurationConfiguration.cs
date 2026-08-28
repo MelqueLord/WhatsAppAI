@@ -22,6 +22,7 @@ public sealed class BotConfigurationConfiguration : IEntityTypeConfiguration<Bot
         builder.Property(b => b.QueueTransferMessage).HasColumnName("queue_transfer_message").HasMaxLength(1000);
         builder.Property(b => b.MediaMessage).HasColumnName("media_message").HasMaxLength(1000);
         builder.Property(b => b.MaxTokensPerResponse).HasColumnName("max_tokens_per_response").IsRequired();
+        builder.Property(b => b.ConfidenceThreshold).HasColumnName("confidence_threshold").HasDefaultValue(0.5).IsRequired();
         builder.Property(b => b.Enabled).HasColumnName("enabled").IsRequired();
         builder.Property(b => b.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(b => b.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");

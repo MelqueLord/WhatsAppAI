@@ -72,7 +72,7 @@ public sealed class AnthropicProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResponseAsync_HandlesPlainTextResponse()
+    public async Task GetResponseAsync_RejectsPlainTextResponse()
     {
         var response = """
         {
@@ -86,9 +86,9 @@ public sealed class AnthropicProviderTests : IDisposable
 
         var result = await _provider.GetResponseAsync(CreateRequest());
 
-        Assert.Equal(AiAction.Reply, result.Decision.Action);
-        Assert.Equal("Just plain text", result.Decision.Text);
-        Assert.Equal(0.5, result.Decision.Confidence);
+        Assert.Equal(AiAction.Handoff, result.Decision.Action);
+        Assert.Equal("invalid_response", result.Decision.HandoffReason);
+        Assert.Null(result.Content);
     }
 
     [Fact]

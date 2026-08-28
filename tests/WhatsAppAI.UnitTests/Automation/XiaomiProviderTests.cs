@@ -54,7 +54,7 @@ public sealed class XiaomiProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResponseAsync_HandlesPlainTextResponse()
+    public async Task GetResponseAsync_RejectsPlainTextResponse()
     {
         _handler.Response = CreateResponse("""
         { "id": "cmpl-3", "choices": [{ "message": { "role": "assistant", "content": "Plain answer" }, "finish_reason": "stop" }],
@@ -63,9 +63,9 @@ public sealed class XiaomiProviderTests : IDisposable
 
         var result = await _provider.GetResponseAsync(CreateRequest());
 
-        Assert.Equal(AiAction.Reply, result.Decision.Action);
-        Assert.Equal("Plain answer", result.Decision.Text);
-        Assert.Equal(0.5, result.Decision.Confidence);
+        Assert.Equal(AiAction.Handoff, result.Decision.Action);
+        Assert.Equal("invalid_response", result.Decision.HandoffReason);
+        Assert.Null(result.Content);
     }
 
     [Fact]

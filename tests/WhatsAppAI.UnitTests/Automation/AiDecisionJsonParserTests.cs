@@ -14,4 +14,18 @@ public sealed class AiDecisionJsonParserTests
         Assert.Equal(AiAction.Reply, decision.Action);
         Assert.Equal(new[] { "VIP", "Novo" }, decision.TagNames);
     }
+
+    [Theory]
+    [InlineData("Resposta livre fora do JSON")]
+    [InlineData("{\"action\":\"reply\",\"text\":\"Conteúdo sem confiança\"}")]
+    [InlineData("{\"action\":\"reply\",\"text\":\"\",\"confidence\":0.9}")]
+    [InlineData("{\"action\":\"unknown\",\"text\":\"Conteúdo\",\"confidence\":0.9}")]
+    public void Parse_InvalidResponse_ReturnsSafeHandoff(string output)
+    {
+        var decision = AiDecisionJsonParser.Parse(output);
+
+        Assert.Equal(AiAction.Handoff, decision.Action);
+        Assert.Equal("invalid_response", decision.HandoffReason);
+        Assert.Null(decision.Text);
+    }
 }

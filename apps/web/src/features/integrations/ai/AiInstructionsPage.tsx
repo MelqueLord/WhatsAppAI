@@ -8,6 +8,7 @@ export function AiInstructionsPage() {
   const [systemPrompt, setSystemPrompt] = useState('')
   const [businessType, setBusinessType] = useState('')
   const [maxTokens, setMaxTokens] = useState(180)
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.5)
   const [routingQueueIds, setRoutingQueueIds] = useState<string[]>([])
   const [routingTagIds, setRoutingTagIds] = useState<string[]>([])
   const [loadedVersion, setLoadedVersion] = useState<number | null>(null)
@@ -42,6 +43,7 @@ export function AiInstructionsPage() {
     setBusinessType(businessLine?.[1] || '')
     setSystemPrompt(businessLine ? storedPrompt.slice(businessLine[0].length) : storedPrompt)
     setMaxTokens(config.maxTokensPerResponse || 180)
+    setConfidenceThreshold(config.confidenceThreshold ?? 0.5)
     setRoutingQueueIds(config.routingQueueIds || [])
     setRoutingTagIds(config.routingTagIds || [])
   }
@@ -50,9 +52,9 @@ export function AiInstructionsPage() {
     mutationFn: async () => {
       const response = await fetchWithCsrf('/api/integrations/ai/instructions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': String(loadedVersion) },
         credentials: 'include',
-        body: JSON.stringify({ systemPrompt: `Tipo de negócio: ${businessType || 'Não informado'}\n\n${systemPrompt}`.slice(0, 4000), maxTokensPerResponse: maxTokens, routingQueueIds, routingTagIds }),
+        body: JSON.stringify({ systemPrompt: `Tipo de negócio: ${businessType || 'Não informado'}\n\n${systemPrompt}`.slice(0, 4000), maxTokensPerResponse: maxTokens, confidenceThreshold, routingQueueIds, routingTagIds }),
       })
       if (!response.ok) {
         const body = await response.text()
@@ -84,7 +86,8 @@ export function AiInstructionsPage() {
           <p className="text-xs text-slate-500 mt-2">A IA adicionará somente as tags selecionadas que correspondam ao conteúdo da conversa.</p>
         </div>
         <div><label className="block text-sm font-medium text-slate-700 mb-1">Máximo de tokens por resposta</label><input type="number" value={maxTokens} onChange={(event) => setMaxTokens(Math.min(300, Math.max(80, Number(event.target.value))))} min={80} max={300} className="w-36 px-4 py-2.5 border border-slate-300 rounded-lg" /><p className="text-xs text-slate-500 mt-1">A IA usa respostas curtas, resume o contexto do cliente e pode usar de 80 a 300 tokens.</p></div>
-        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !config?.configured || !businessType} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50">{saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Salvar diretrizes</button>
+        <div><label className="block text-sm font-medium text-slate-700 mb-1">Limiar de confiança</label><input type="number" value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(Math.min(1, Math.max(0, Number(event.target.value))))} min={0} max={1} step={0.05} className="w-36 px-4 py-2.5 border border-slate-300 rounded-lg" /><p className="text-xs text-slate-500 mt-1">Respostas abaixo deste valor são encaminhadas para atendimento humano.</p></div>
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || loadedVersion === null || !config?.configured || !businessType} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium disabled:opacity-50">{saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Salvar diretrizes</button>
         {saveMutation.isError && <p className="text-sm text-red-600">{(saveMutation.error as Error).message}</p>}{saveMutation.isSuccess && <p className="text-sm text-emerald-600">Diretrizes salvas.</p>}
       </div>
     </div></div>

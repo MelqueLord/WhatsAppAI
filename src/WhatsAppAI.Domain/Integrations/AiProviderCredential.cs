@@ -47,9 +47,14 @@ public sealed class AiProviderCredential
     public void UpdateInstructions(
         string? systemPrompt,
         int maxTokensPerResponse,
+        uint expectedVersion,
         IEnumerable<Guid>? routingQueueIds = null,
         IEnumerable<Guid>? routingTagIds = null)
     {
+        if (Version != expectedVersion)
+            throw new ConcurrencyException(
+                $"Version conflict: expected {expectedVersion}, actual {Version}.");
+
         SystemPrompt = systemPrompt?.Trim();
         MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 300);
         RoutingQueueIdsJson = SerializeGuidList(routingQueueIds);

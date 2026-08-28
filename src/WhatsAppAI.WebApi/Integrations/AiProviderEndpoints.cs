@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Automation.Policy;
+using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -125,6 +127,7 @@ public static class AiProviderEndpoints
             routingQueueIds = credential?.GetRoutingQueueIds() ?? [],
             routingTagIds = credential?.GetRoutingTagIds() ?? [],
             maxTokensPerResponse = credential?.MaxTokensPerResponse ?? 500,
+            confidenceThreshold = botConfig?.ConfidenceThreshold ?? 0.5,
             isActive = credential?.IsActive,
             version = credential?.Version,
             aiActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered
@@ -193,8 +196,10 @@ public static class AiProviderEndpoints
         [FromBody] UpdateAiInstructionsRequest request,
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
         IServiceLineRepository queueRepository,
-        IClientTagRepository tagRepository)
+        IClientTagRepository tagRepository,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -202,6 +207,14 @@ public static class AiProviderEndpoints
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null)
             return Results.BadRequest(new { error = "Configure um provedor de IA antes das diretrizes." });
+
+        var ifMatch = httpContext.Request.Headers["If-Match"].FirstOrDefault();
+        if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
+
+        if (request.ConfidenceThreshold is double confidenceThreshold &&
+            (double.IsNaN(confidenceThreshold) || confidenceThreshold is < 0 or > 1))
+            return Results.BadRequest(new { error = "O limiar de confiança deve estar entre 0 e 1." });
 
         var requestedQueueIds = (request.RoutingQueueIds ?? []).Distinct().ToArray();
         var activeQueues = await queueRepository.GetActiveByTenantAsync(currentTenant.TenantId.Value);
@@ -215,13 +228,45 @@ public static class AiProviderEndpoints
         if (Array.Exists(requestedTagIds, id => !activeTagIds.Contains(id)))
             return Results.BadRequest(new { error = "Selecione somente tags ativas desta empresa." });
 
-        credential.UpdateInstructions(
-            request.SystemPrompt,
-            request.MaxTokensPerResponse,
-            requestedQueueIds,
-            requestedTagIds);
-        await credentialRepository.UpdateAsync(credential);
-        return Results.Ok(new { saved = true, maxTokensPerResponse = credential.MaxTokensPerResponse });
+        try
+        {
+            credential.UpdateInstructions(
+                request.SystemPrompt,
+                request.MaxTokensPerResponse,
+                expectedVersion,
+                requestedQueueIds,
+                requestedTagIds);
+            await credentialRepository.UpdateAsync(credential);
+        }
+        catch (ConcurrencyException)
+        {
+            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
+        }
+
+        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (botConfig is null)
+        {
+            botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
+            botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
+            await botConfigRepository.AddAsync(botConfig);
+        }
+        else
+        {
+            botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
+            await botConfigRepository.UpdateAsync(botConfig);
+        }
+
+        return Results.Ok(new
+        {
+            saved = true,
+            version = credential.Version,
+            maxTokensPerResponse = credential.MaxTokensPerResponse,
+            confidenceThreshold = botConfig.ConfidenceThreshold
+        });
     }
 
     private static async Task<IResult> ToggleAsync(
@@ -333,4 +378,5 @@ public sealed record UpdateAiInstructionsRequest(
     string? SystemPrompt,
     int MaxTokensPerResponse,
     IReadOnlyList<Guid>? RoutingQueueIds,
-    IReadOnlyList<Guid>? RoutingTagIds);
+    IReadOnlyList<Guid>? RoutingTagIds,
+    double? ConfidenceThreshold);

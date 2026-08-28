@@ -133,5 +133,50 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         Assert.False(root.GetProperty("aiActive").GetBoolean());
     }
 
+    [Fact]
+    public async Task UpdateInstructions_RequiresIfMatchAndRejectsStaleVersion()
+    {
+        var (client, _) = await CreateTenantWithAiPlanAsync();
+        await client.PostAsJsonAsync("/api/integrations/ai", new
+        {
+            provider = "openai", modelId = "gpt-4o-mini", apiKey = "sk-test-openai"
+        });
+
+        var payload = new
+        {
+            systemPrompt = "Versão atual",
+            maxTokensPerResponse = 180,
+            confidenceThreshold = 0.5,
+            routingQueueIds = Array.Empty<Guid>(),
+            routingTagIds = Array.Empty<Guid>()
+        };
+
+        var missingHeader = await client.PutAsJsonAsync(
+            "/api/integrations/ai/instructions", payload);
+        Assert.Equal(HttpStatusCode.BadRequest, missingHeader.StatusCode);
+
+        using var firstRequest = new HttpRequestMessage(
+            HttpMethod.Put, "/api/integrations/ai/instructions")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        firstRequest.Headers.TryAddWithoutValidation("If-Match", "0");
+        var firstUpdate = await client.SendAsync(firstRequest);
+        Assert.Equal(HttpStatusCode.OK, firstUpdate.StatusCode);
+
+        using var staleRequest = new HttpRequestMessage(
+            HttpMethod.Put, "/api/integrations/ai/instructions")
+        {
+            Content = JsonContent.Create(payload with { systemPrompt = "Versão obsoleta" })
+        };
+        staleRequest.Headers.TryAddWithoutValidation("If-Match", "0");
+        var staleUpdate = await client.SendAsync(staleRequest);
+        Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
+
+        var config = await client.GetFromJsonAsync<JsonElement>("/api/integrations/ai");
+        Assert.Equal("Versão atual", config.GetProperty("systemPrompt").GetString());
+        Assert.Equal(1U, config.GetProperty("version").GetUInt32());
+    }
+
     private sealed record ProviderDto(string Id, string Name, object[] Models);
 }
