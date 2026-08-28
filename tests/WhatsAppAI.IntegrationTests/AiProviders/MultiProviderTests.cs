@@ -176,6 +176,8 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         var config = await client.GetFromJsonAsync<JsonElement>("/api/integrations/ai");
         Assert.Equal("Versão atual", config.GetProperty("systemPrompt").GetString());
         Assert.Equal(1U, config.GetProperty("version").GetUInt32());
+        Assert.True(config.GetProperty("guidelines").GetProperty("security").GetArrayLength() > 0);
+        Assert.True(config.GetProperty("guidelines").GetProperty("handoff").GetArrayLength() > 0);
     }
 
     private sealed record ProviderDto(string Id, string Name, object[] Models);

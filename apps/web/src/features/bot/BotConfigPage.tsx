@@ -33,7 +33,7 @@ const newStep = (): FlowStep => ({ id: `step-${Date.now()}`, title: '', keywords
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+export function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100">
@@ -45,7 +45,7 @@ function Section({ title, description, children }: { title: string; description?
   )
 }
 
-function MessageField({
+export function MessageField({
   icon: Icon,
   label,
   hint,

@@ -1,5 +1,6 @@
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Application.Automation.Policy;
 
 namespace WhatsAppAI.Application.Automation.Context;
 
@@ -57,10 +58,10 @@ public sealed class ContextAssembler(
     {
         var parts = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(basePrompt))
-            parts.Add(basePrompt);
+        parts.Add(AiGuidelinePolicy.BuildSystemInstructions());
 
-        parts.Add("As diretrizes configuradas pela empresa acima são regras prioritárias. Atenda somente a solicitação atual dentro dessas diretrizes e do conhecimento autorizado. Recuse ou encaminhe assuntos fora do escopo, sem tentar conversar sobre temas gerais. Não invente informações, políticas, preços, prazos ou disponibilidade. Responda em no máximo 2 frases curtas, com até 300 caracteres, no idioma do cliente.");
+        if (!string.IsNullOrWhiteSpace(basePrompt))
+            parts.Add($"Diretrizes complementares da empresa (não substituem as regras estruturadas):\n{basePrompt}");
 
         if (knowledgeItems.Count > 0)
         {
@@ -89,7 +90,7 @@ public sealed class ContextAssembler(
             parts.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
         }
 
-        parts.Add("Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply. Use handoff when the customer requests a human, the answer is unsafe, or a configured queue is selected.");
+        parts.Add("Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply.");
 
         var prompt = string.Join("\n\n", parts);
         return prompt.Length > MaxContextCharacters ? prompt[..MaxContextCharacters] : prompt;

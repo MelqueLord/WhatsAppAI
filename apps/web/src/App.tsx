@@ -9,8 +9,6 @@ import { InboxPage } from './features/inbox/InboxPage'
 import { OperatorsPage } from './features/operators/OperatorsPage'
 import { WhatsAppConfigPage } from './features/integrations/whatsapp/WhatsAppConfigPage'
 import { AiConfigPage } from './features/integrations/ai/AiConfigPage'
-import { AiInstructionsPage } from './features/integrations/ai/AiInstructionsPage'
-import { BotConfigPage } from './features/bot/BotConfigPage'
 import { KnowledgePage } from './features/knowledge/KnowledgePage'
 import { ClientTagsPage } from './features/tags/ClientTagsPage'
 import { QueuesPage } from './features/queues/QueuesPage'
@@ -105,9 +103,9 @@ function App() {
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
-              <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
-              <Route path="/integrations/ai/instructions" element={<OwnerRoute><AiInstructionsPage /></OwnerRoute>} />
+              <Route path="/bot-config" element={<Navigate to="/integrations/ai" replace />} />
+              <Route path="/integrations/ai/instructions" element={<Navigate to="/integrations/ai" replace />} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
               <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
               <Route path="/broadcast" element={<TenantRoute><BroadcastPage /></TenantRoute>} />

@@ -128,6 +128,7 @@ public static class AiProviderEndpoints
             routingTagIds = credential?.GetRoutingTagIds() ?? [],
             maxTokensPerResponse = credential?.MaxTokensPerResponse ?? 500,
             confidenceThreshold = botConfig?.ConfidenceThreshold ?? 0.5,
+            guidelines = AiGuidelinePolicy.Rules,
             isActive = credential?.IsActive,
             version = credential?.Version,
             aiActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered

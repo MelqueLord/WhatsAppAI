@@ -2,23 +2,20 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class BehaviorPolicy
 {
+    public static readonly IReadOnlySet<string> RequiredHandoffReasons = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "sensitive_topic",
+        "out_of_scope",
+        "customer_request",
+        "escalation_needed",
+        "complaint",
+        "refund_request",
+        "legal_issue"
+    };
+
     private static bool ShouldBlock(string? handoffReason)
     {
-        var blockedReasons = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "sensitive_topic",
-            "out_of_scope",
-            "customer_request",
-            "escalation_needed",
-            "complaint",
-            "refund_request",
-            "legal_issue"
-        };
-
-        if (handoffReason is not null && blockedReasons.Contains(handoffReason))
-            return true;
-
-        return false;
+        return handoffReason is not null && RequiredHandoffReasons.Contains(handoffReason);
     }
 
     public static AiDecision SanitizeDecision(AiDecision decision, double confidenceThreshold)

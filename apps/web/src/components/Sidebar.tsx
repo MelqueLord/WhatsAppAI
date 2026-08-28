@@ -15,7 +15,6 @@ import {
   LayoutDashboard,
   LogOut,
   Tags,
-  Settings,
   ListOrdered,
   Radio,
 } from 'lucide-react'
@@ -134,9 +133,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
-          { to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' },
-          ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Atendimento IA' }] : []),
-          ...(aiEnabled ? [{ to: '/integrations/ai/instructions', icon: Bot, label: 'Diretrizes IA' }] : []),
+          ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/queues', icon: ListOrdered, label: 'Filas' },
           { to: '/tags', icon: Tags, label: 'Tags' },

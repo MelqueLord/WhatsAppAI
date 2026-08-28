@@ -27,12 +27,25 @@ describe('AiConfigPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn((url: string) => {
       const isProviders = typeof url === 'string' && url.includes('/providers')
+      const isBotConfig = typeof url === 'string' && url.includes('/api/bot-config')
+      const isQueues = typeof url === 'string' && url.includes('/api/service-queues')
+      const isTags = typeof url === 'string' && url.includes('/api/client-tags')
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve(
           isProviders
             ? [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o' }] }]
-            : { configured: false, botConfig: { mode: 'Manual', maxTokensPerResponse: 500 } }
+            : isQueues || isTags
+              ? []
+            : isBotConfig
+              ? { configured: true, mode: 'AiPowered', version: 1 }
+              : {
+                configured: true,
+                provider: 'openai',
+                modelId: 'gpt-4o',
+                version: 1,
+                guidelines: { behavior: [], security: [], handoff: [] },
+              }
         ),
       })
     }))
@@ -50,6 +63,12 @@ describe('AiConfigPage', () => {
     expect(screen.getByText('API Key')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeInTheDocument()
+    expect(screen.getByText('Modo de operação')).toBeInTheDocument()
+    expect(screen.getByText('Regras estruturadas')).toBeInTheDocument()
+    expect(screen.getByText('Mensagens automáticas')).toBeInTheDocument()
+    expect(screen.getByText('Resposta padrão (fallback)')).toBeInTheDocument()
+    expect(screen.getByText('Transferência para atendente')).toBeInTheDocument()
+    expect(screen.getByText('Limiar de confiança')).toBeInTheDocument()
   })
 
   it('calls fetch for providers and config', async () => {
@@ -57,6 +76,7 @@ describe('AiConfigPage', () => {
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/integrations/ai/providers', expect.anything())
       expect(fetch).toHaveBeenCalledWith('/api/integrations/ai', expect.anything())
+      expect(fetch).toHaveBeenCalledWith('/api/bot-config', expect.anything())
     })
   })
 })
