@@ -78,6 +78,9 @@ public static class AiProviderEndpoints
         group.MapPost("/test-connection", TestConnectionAsync)
             .WithName("TestAiConnection");
 
+        group.MapPost("/simulate", SimulateAsync)
+            .WithName("SimulateAiDecision");
+
         return app;
     }
 
@@ -365,6 +368,49 @@ public static class AiProviderEndpoints
         }
     }
 
+    private static async Task<IResult> SimulateAsync(
+        [FromBody] SimulateAiRequest request,
+        ICurrentTenant currentTenant,
+        IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
+        ISecretStore secretStore,
+        IAiProviderResolver aiProviderResolver,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
+        if (string.IsNullOrWhiteSpace(request.Message))
+            return Results.BadRequest(new { error = "A mensagem de simulação é obrigatória." });
+
+        var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (credential is null || !credential.IsActive)
+            return Results.BadRequest(new { error = "Configure um provedor de IA antes da simulação." });
+        var apiKey = await secretStore.GetAsync(credential.ApiKeyRef);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return Results.BadRequest(new { error = "Credencial do provedor não disponível." });
+
+        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var response = await aiProviderResolver.Resolve(credential.Provider).GetResponseAsync(new AiRequest
+        {
+            ModelId = credential.ModelId,
+            ApiKey = apiKey,
+            SystemPrompt = credential.SystemPrompt,
+            MaxTokens = credential.MaxTokensPerResponse,
+            Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
+        });
+        var decision = BehaviorPolicy.SanitizeDecision(response.Decision, botConfig?.ConfidenceThreshold ?? 0.5);
+
+        return Results.Ok(new
+        {
+            decision = decision.Action.ToString(),
+            text = decision.Text,
+            confidence = decision.Confidence,
+            handoffReason = decision.Action == AiAction.Handoff ? decision.HandoffReason : null,
+            fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null
+        });
+    }
+
 }
 
 public sealed record SaveAiConfigRequest
@@ -375,6 +421,7 @@ public sealed record SaveAiConfigRequest
 }
 
 public sealed record ToggleAiRequest(bool Enabled);
+public sealed record SimulateAiRequest(string Message);
 public sealed record UpdateAiInstructionsRequest(
     string? SystemPrompt,
     int MaxTokensPerResponse,

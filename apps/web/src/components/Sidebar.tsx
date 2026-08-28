@@ -17,6 +17,7 @@ import {
   Tags,
   ListOrdered,
   Radio,
+  Settings,
 } from 'lucide-react'
 import atenzLogo from '../assets/atenz-logo-a.png'
 
@@ -133,6 +134,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
+          { to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' },
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           { to: '/queues', icon: ListOrdered, label: 'Filas' },

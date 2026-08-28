@@ -27,19 +27,19 @@ describe('AiConfigPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn((url: string) => {
       const isProviders = typeof url === 'string' && url.includes('/providers')
-      const isBotConfig = typeof url === 'string' && url.includes('/api/bot-config')
       const isQueues = typeof url === 'string' && url.includes('/api/service-queues')
       const isTags = typeof url === 'string' && url.includes('/api/client-tags')
+      const isSimulation = typeof url === 'string' && url.includes('/api/integrations/ai/simulate')
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve(
           isProviders
             ? [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o' }] }]
+            : isSimulation
+              ? { decision: 'Handoff', confidence: 0.2, handoffReason: 'low_confidence', fallbackReason: 'A confiança ficou abaixo do limiar configurado.' }
             : isQueues || isTags
               ? []
-            : isBotConfig
-              ? { configured: true, mode: 'AiPowered', version: 1 }
-              : {
+            : {
                 configured: true,
                 provider: 'openai',
                 modelId: 'gpt-4o',
@@ -63,12 +63,9 @@ describe('AiConfigPage', () => {
     expect(screen.getByText('API Key')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeInTheDocument()
-    expect(screen.getByText('Modo de operação')).toBeInTheDocument()
     expect(screen.getByText('Regras estruturadas')).toBeInTheDocument()
-    expect(screen.getByText('Mensagens automáticas')).toBeInTheDocument()
-    expect(screen.getByText('Resposta padrão (fallback)')).toBeInTheDocument()
-    expect(screen.getByText('Transferência para atendente')).toBeInTheDocument()
     expect(screen.getByText('Limiar de confiança')).toBeInTheDocument()
+    expect(screen.queryByText('Mensagens automáticas')).not.toBeInTheDocument()
   })
 
   it('calls fetch for providers and config', async () => {
@@ -76,7 +73,21 @@ describe('AiConfigPage', () => {
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/integrations/ai/providers', expect.anything())
       expect(fetch).toHaveBeenCalledWith('/api/integrations/ai', expect.anything())
-      expect(fetch).toHaveBeenCalledWith('/api/bot-config', expect.anything())
+      expect(fetch).not.toHaveBeenCalledWith('/api/bot-config', expect.anything())
     })
+  })
+
+  it('simulates a decision without calling bot endpoints', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Simular antes de ativar')).toBeInTheDocument())
+    const input = screen.getByPlaceholderText('Digite uma mensagem de exemplo')
+    await import('@testing-library/user-event').then(async ({ default: userEvent }) => {
+      const user = userEvent.setup()
+      await user.type(input, 'Preciso de ajuda')
+      await user.click(screen.getByRole('button', { name: 'Simular decisão' }))
+    })
+    await waitFor(() => expect(screen.getByText('Motivo do handoff:')).toBeInTheDocument())
+    expect(fetch).toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).not.toHaveBeenCalledWith('/api/bot-config', expect.anything())
   })
 })

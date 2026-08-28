@@ -250,12 +250,14 @@ Permite ao PlatformAdmin cadastrar empresas com dois tipos de plano:
 
 Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa IA mas mantém todos os outros recursos.
 
-### Multi-provedor de IA e tela unificada de configuração
+### Multi-provedor de IA e configuração separada por plano
 
 **Spec:** `spec-ai-multi-provider.md`
 **Status:** Implementado (Fase 10 - T150-T165)
 
-A tela de configuração de IA deve suportar múltiplos provedores e consolidar todas as configurações relacionadas ao atendimento automatizado por IA em um único lugar.
+> **Correção de decisão (2026-08-27):** a configuração de BOT é separada da configuração de IA porque existem planos BOT e BOT + IA. O BOT deve funcionar sem provedor de IA; somente o plano BOT + IA expõe a configuração de IA.
+
+A tela de configuração de IA deve suportar múltiplos provedores e reunir apenas as configurações de IA. Modo, mensagens e fluxo do BOT permanecem na tela e nos endpoints próprios do BOT.
 
 **Provedores suportados:**
 - **OpenAI** (GPT-4o, GPT-4o-mini, etc.)
@@ -263,19 +265,19 @@ A tela de configuração de IA deve suportar múltiplos provedores e consolidar 
 - **Anthropic** (Claude Sonnet 4, Claude Haiku 3.5, etc.)
 - **Xiaomi MiMo** (mimo-v2.5-pro, mimo-v2.5, etc.)
 
-**Consolidação na tela de IA (substitui a tela separada de "Fluxo do bot"):**
+**Configuração na tela de IA (somente BOT + IA):**
 1. Seleção de provedor (dropdown com OpenAI, Gemini, Anthropic, Xiaomi)
 2. Modelo e credencial (API key) do provedor selecionado
 3. Teste de conexão específico por provedor
-4. Modo de operação (Manual, SimpleAutoReply, AiPowered)
-5. Mensagens automáticas (boas-vindas, fallback, handoff, mídia)
-6. Limites de tokens por resposta
-7. Status e indicadores do provedor ativo
+4. Diretrizes estruturadas, limiar de confiança e handoff
+5. Status e indicadores do provedor ativo
+
+**Configuração na tela de BOT (BOT e BOT + IA):** modo de operação, mensagens automáticas, fluxo e fallback do BOT.
 
 **Requisitos:**
 - FR-AI-001: suportar múltiplos provedores de IA com adapter específico por provider
 - FR-AI-002: credenciais são por provedor; tenant pode ter mais de um provedor configurado mas apenas um ativo por vez
-- FR-AI-003: a tela unificada substitui as duas telas atuais (AiConfigPage + BotConfigPage)
+- FR-AI-003: `AiConfigPage` e `BotConfigPage` são telas distintas e condicionadas ao pacote; IA exige `aiEnabled`, BOT está disponível nos dois planos
 - FR-AI-004: testes de contrato para cada provedor devem validar a interface comum
 - BR-AI-001: provedor não suportado ou credencial inválida não impede operação em modo Manual
 - BR-AI-002: trocar de provedor preserva histórico de interações do provedor anterior

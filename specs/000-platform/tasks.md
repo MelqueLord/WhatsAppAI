@@ -215,7 +215,7 @@ Permitir que PlatformAdmin cadastre empresas com dois tipos de plano:
 
 ### Nota: T090-T095 já implementados (Fase 9 - Sistema de Planos)
 
-## Feature: Multi-provedor de IA e tela unificada
+## Feature: Multi-provedor de IA e configurações separadas por plano
 
 **Spec:** `specs/000-platform/spec-ai-multi-provider.md`
 **Status:** Implementado (Fase 10 - T150-T165)
@@ -230,15 +230,15 @@ Permitir que PlatformAdmin cadastre empresas com dois tipos de plano:
 - [X] **T154** Registrar todos os provedores no DI e criar extensão `AddAiProviderServices`. **Refs:** FR-AI-002.
 - [X] **T155** Atualizar `AiOrchestrationWorker` para usar `IAiProviderResolver` e registrar provedor no `UsageLedger`. **Refs:** FR-AI-001, BR-AI-001.
 - [X] **T156** Atualizar endpoints de IA para aceitar `provider` e listar modelos por provedor. **Refs:** FR-AI-001, FR-AI-006, FR-AI-007.
-- [X] **T157** Mesclar endpoints de `BotConfiguration` nos endpoints de IA. **Refs:** FR-AI-003, FR-AI-005, US-AI-002.
+- [X] **T157** Manter endpoints de `BotConfiguration` separados dos endpoints de IA e aplicar as permissões por pacote. **Refs:** FR-AI-003, FR-AI-005, US-AI-002.
 - [X] **T158** [P] Testes unitários para `GeminiProvider` (6 testes). **Refs:** FR-AI-002, G6.
 - [X] **T159** [P] Testes unitários para `AnthropicProvider` (6 testes). **Refs:** FR-AI-002, G6.
 - [X] **T160** [P] Testes unitários para `XiaomiProvider` (6 testes). **Refs:** FR-AI-002, G6.
 - [X] **T161** Testes unitários para `IAiProviderResolver` (5 testes). **Refs:** FR-AI-002, G6.
 - [X] **T162** Testes de integração para multi-provedor (4 testes). **Refs:** FR-AI-002, BR-AI-001, BR-AI-002.
-- [X] **T163** Reescrever `AiConfigPage` com seletor de provedor e seções unificadas. **Refs:** FR-AI-003, FR-AI-006, FR-AI-007, US-AI-002.
-- [X] **T164** Remover `BotConfigPage`, atualizar rotas e sidebar. **Refs:** FR-AI-003.
-- [X] **T165** Testes frontend para tela unificada (2 testes). **Refs:** FR-AI-003, G6.
+- [X] **T163** Reescrever `AiConfigPage` com seletor de provedor e seções próprias de IA. **Refs:** FR-AI-003, FR-AI-006, FR-AI-007, US-AI-002.
+- [X] **T164** Manter `BotConfigPage` e as rotas distintas, com visibilidade condicionada ao pacote. **Refs:** FR-AI-003.
+- [X] **T165** Testes frontend para telas separadas e permissões por pacote. **Refs:** FR-AI-003, G6.
 
 ### Incremento de capacidade de linhas por tenant
 
