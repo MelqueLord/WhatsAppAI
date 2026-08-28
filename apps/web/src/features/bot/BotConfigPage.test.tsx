@@ -26,9 +26,11 @@ describe('BotConfigPage', () => {
     await waitFor(() => expect(screen.getByText('Fluxo do Bot')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Salvar configuração' }))
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/bot-config', expect.objectContaining({ method: 'POST' })))
-    const [, options] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url, opts]) => url === '/api/bot-config' && opts?.method === 'POST')
-    expect(options.headers['If-Match']).toBe('3')
-    expect(JSON.parse(options.body).mode).toBe('AiPowered')
+    const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url, opts]) => url === '/api/bot-config' && opts?.method === 'POST')
+    expect(call).toBeDefined()
+    const options = call?.[1] as RequestInit
+    expect((options.headers as Record<string, string>)['If-Match']).toBe('3')
+    expect(JSON.parse(options.body as string).mode).toBe('AiPowered')
   })
 
   it('previews a flow locally without calling an external endpoint', async () => {
