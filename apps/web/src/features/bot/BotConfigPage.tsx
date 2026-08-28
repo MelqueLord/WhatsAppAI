@@ -1,6 +1,7 @@
 import { fetchWithCsrf } from '../../lib/api'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../../lib/auth'
 import {
   Bot, CheckCircle2, Loader2, Plus, Save, Trash2,
   MessageSquare, UserCheck, WifiOff, HelpCircle,
@@ -26,6 +27,7 @@ interface BotConfig {
   handoffMessage?: string | null
   queueTransferMessage?: string | null
   enabled: boolean
+  version?: number
   flowSteps?: FlowStep[]
 }
 
@@ -87,6 +89,7 @@ export function MessageField({
 
 export function BotConfigPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [welcomeMessage, setWelcomeMessage] = useState<string | undefined>(undefined)
   const [returningMessage, setReturningMessage] = useState<string | undefined>(undefined)
   const [offlineMessage, setOfflineMessage] = useState<string | undefined>(undefined)
@@ -97,24 +100,33 @@ export function BotConfigPage() {
   const [flowSteps, setFlowSteps] = useState<FlowStep[] | undefined>(undefined)
   const [success, setSuccess] = useState(false)
   const [expandedStep, setExpandedStep] = useState<string | null>(null)
-
-  const { data: config, isLoading } = useQuery({
+  const [previewInput, setPreviewInput] = useState('')
+  const { data: config, isLoading, isError, error } = useQuery({
     queryKey: ['bot-config'],
     queryFn: async () => {
       const res = await fetchWithCsrf('/api/bot-config')
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(body?.error || 'Não foi possível carregar a configuração do BOT.')
+      }
       return res.json() as Promise<BotConfig>
     },
   })
+
+  const version = config?.version ?? 0
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const res = await fetchWithCsrf('/api/bot-config/toggle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',
         body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
       })
-      if (!res.ok) throw new Error('Erro ao alterar status')
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(body?.error || (res.status === 409 ? 'A configuração foi alterada por outro usuário.' : 'Erro ao alterar status'))
+      }
       return res.json()
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot-config'] }),
@@ -127,10 +139,10 @@ export function BotConfigPage() {
       )
       const res = await fetchWithCsrf('/api/bot-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',
         body: JSON.stringify({
-          mode: 'SimpleAutoReply',
+          mode: config?.mode ?? 'SimpleAutoReply',
           welcomeMessage: welcomeMessage ?? config?.welcomeMessage ?? '',
           returningMessage: returningMessage ?? config?.returningMessage ?? '',
           offlineMessage: offlineMessage ?? config?.offlineMessage ?? '',
@@ -141,7 +153,10 @@ export function BotConfigPage() {
           flowSteps: steps,
         }),
       })
-      if (!res.ok) throw new Error('Erro ao salvar')
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(body?.error || (res.status === 409 ? 'A configuração foi alterada por outro usuário. Recarregue a tela.' : 'Erro ao salvar'))
+      }
       return res.json()
     },
     onSuccess: () => {
@@ -170,12 +185,18 @@ export function BotConfigPage() {
       </div>
     )
 
+  if (isError)
+    return <div className="h-full flex items-center justify-center text-sm text-red-600">{(error as Error).message}</div>
+
   const effectiveSteps = config?.flowSteps?.length ? config.flowSteps : []
   const steps = flowSteps ?? effectiveSteps
   const isBotActive = config?.enabled === true && config.mode === 'SimpleAutoReply'
 
   const val = (local: string | undefined, remote: string | null | undefined) =>
     local ?? remote ?? ''
+  const previewStep = previewInput.trim() && steps.find((step) =>
+    step.keywords.split(',').some((keyword) => keyword.trim() && previewInput.toLowerCase().includes(keyword.trim().toLowerCase()))
+  )
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -221,6 +242,12 @@ export function BotConfigPage() {
             O bot está <strong>inativo</strong>. As mensagens automáticas não serão enviadas.
           </div>
         )}
+        {user?.aiEnabled && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-lg text-sm text-violet-800">
+            <Info className="w-4 h-4 flex-shrink-0" />
+            O BOT e a IA são mutuamente exclusivos: ativar o BOT desativa a IA, e ativar a IA desativa o BOT.
+          </div>
+        )}
 
         {/* ── 1. Saudações ── */}
         <Section
@@ -245,6 +272,13 @@ export function BotConfigPage() {
               placeholder="Olá! Que bom ter você de volta. No que posso ajudar?"
             />
           </div>
+        </Section>
+
+        <Section title="Pré-visualização segura" description="Teste localmente uma palavra-chave sem enviar mensagem nem alterar a conversa.">
+          <div className="flex gap-3">
+            <input value={previewInput} onChange={(e) => setPreviewInput(e.target.value)} placeholder="Digite uma mensagem de exemplo" className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm" />
+          </div>
+          {previewInput.trim() && <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm">{previewStep ? <><span className="font-medium text-slate-700">Resposta prevista:</span> {previewStep.response}</> : <span className="text-slate-500">Nenhuma opção corresponde; o fallback configurado será usado.</span>}</div>}
         </Section>
 
         {/* ── 2. Situações especiais ── */}
