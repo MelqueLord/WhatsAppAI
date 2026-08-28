@@ -118,6 +118,15 @@ public sealed class AiOrchestrationWorker(
 
             var expectedConversationVersion = conversation.Version;
 
+            // Do not process automated replies outside the WhatsApp 24-hour window.
+            if (!AiReplyDeliveryGuard.CanSend(conversation, expectedConversationVersion, DateTime.UtcNow))
+            {
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+                logger.LogInformation("Automated reply blocked for closed or changed conversation {ConversationId}", message.ConversationId);
+                return;
+            }
+
             var tenant = await dbContext.Tenants.FindAsync([message.TenantId], cancellationToken);
             if (tenant?.Status != TenantStatus.Active)
             {
@@ -168,6 +177,17 @@ public sealed class AiOrchestrationWorker(
                         ?? botConfig.FallbackMessage;
                     if (string.IsNullOrWhiteSpace(replyContent))
                         replyContent = "Obrigado pela sua mensagem. Em breve retornaremos o contato.";
+
+                    // The flow lookup is asynchronous; revalidate human takeover, version and window.
+                    await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                    if (!AiReplyDeliveryGuard.CanSend(
+                            conversation, expectedConversationVersion, DateTime.UtcNow))
+                    {
+                        message.MarkProcessedByAi();
+                        await messageRepository.UpdateAsync(message, cancellationToken);
+                        logger.LogInformation("SimpleAutoReply discarded after conversation {ConversationId} changed", message.ConversationId);
+                        return;
+                    }
 
                     message.MarkProcessedByAi();
                     await messageRepository.UpdateAsync(message, cancellationToken);
@@ -426,8 +446,37 @@ public sealed class AiOrchestrationWorker(
                     cancellationToken);
             }
 
-            if (response.Decision.Action == AiAction.Reply && !string.IsNullOrWhiteSpace(response.Content))
+            if (response.Decision.Action == AiAction.Reply)
             {
+                // Final check immediately before creating any customer-facing message/outbox.
+                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                if (!AiReplyDeliveryGuard.CanSend(
+                        conversation, expectedConversationVersion, DateTime.UtcNow))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation("AI reply discarded after conversation {ConversationId} changed", message.ConversationId);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(response.Content))
+                {
+                    await RegisterAutomaticHandoffAsync(
+                        message.TenantId, conversation, "empty_ai_reply",
+                        conversationRepository, handoffEventRepository, cancellationToken);
+
+                    var fallbackMessage = Message.CreateOutbound(
+                        message.TenantId, conversation.Id, message.ContactId,
+                        MessageType.Text, ResolveHandoffMessage(botConfig),
+                        $"ai-empty-reply:{message.Id}");
+                    await messageRepository.AddAsync(fallbackMessage, cancellationToken);
+                    await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogWarning("AI returned an empty reply; conversation {ConversationId} transferred to human", message.ConversationId);
+                    return;
+                }
+
                 var replyMessage = Message.CreateOutbound(
                     message.TenantId,
                     message.ConversationId,

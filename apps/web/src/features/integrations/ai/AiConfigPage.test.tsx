@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -81,11 +81,8 @@ describe('AiConfigPage', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Simular antes de ativar')).toBeInTheDocument())
     const input = screen.getByPlaceholderText('Digite uma mensagem de exemplo')
-    await import('@testing-library/user-event').then(async ({ default: userEvent }) => {
-      const user = userEvent.setup()
-      await user.type(input, 'Preciso de ajuda')
-      await user.click(screen.getByRole('button', { name: 'Simular decisão' }))
-    })
+    fireEvent.change(input, { target: { value: 'Preciso de ajuda' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Simular decisão' }))
     await waitFor(() => expect(screen.getByText('Motivo do handoff:')).toBeInTheDocument())
     expect(fetch).toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.objectContaining({ method: 'POST' }))
     expect(fetch).not.toHaveBeenCalledWith('/api/bot-config', expect.anything())
