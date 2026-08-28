@@ -14,7 +14,7 @@ public static class AiDataProcessingPolicy
             .Where(purpose => purpose.TenantId == tenantId && purpose.IsActive)
             .ToList();
 
-        if (applicablePurposes.Any(purpose => purpose.LegalBasis != LegalBasis.Consent))
+        if (applicablePurposes.Exists(purpose => purpose.LegalBasis != LegalBasis.Consent))
             return true;
 
         var consentPurposeIds = applicablePurposes

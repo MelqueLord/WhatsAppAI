@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Audit;
@@ -18,6 +19,7 @@ public static class PersistenceServiceCollectionExtensions
         string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        var pooledConnectionString = LimitConnectionPool(connectionString);
 
         services.AddSingleton<TenantSaveChangesInterceptor>();
         services.AddSingleton<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
@@ -27,7 +29,7 @@ public static class PersistenceServiceCollectionExtensions
             options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
             options.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
 
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(pooledConnectionString);
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
@@ -60,5 +62,14 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ContextAssembler>();
 
         return services;
+    }
+
+    internal static string LimitConnectionPool(string connectionString)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        builder.Pooling = true;
+        builder.MaxPoolSize = Math.Min(builder.MaxPoolSize, 10);
+
+        return builder.ConnectionString;
     }
 }

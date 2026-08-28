@@ -2,7 +2,7 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class AiModelPolicy
 {
-    private static readonly IReadOnlyDictionary<string, HashSet<string>> AllowedModels =
+    private static readonly Dictionary<string, HashSet<string>> AllowedModels =
         new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["openai"] = new(StringComparer.OrdinalIgnoreCase) { "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini" },
