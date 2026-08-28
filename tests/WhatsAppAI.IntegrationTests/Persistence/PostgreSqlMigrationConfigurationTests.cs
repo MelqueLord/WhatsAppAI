@@ -23,6 +23,7 @@ public sealed class PostgreSqlMigrationConfigurationTests
         Assert.Equal(
             [
                 "20260827000000_PostgreSqlBaseline",
+                "20260827120000_RemoveBotTokenLimit",
                 "20260827133343_AddPrivacyControls",
                 "20260827160000_AddAiMessageRetry",
                 "20260827210000_AddBotConfidenceThreshold"

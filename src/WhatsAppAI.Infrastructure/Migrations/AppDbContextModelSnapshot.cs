@@ -823,10 +823,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("handoff_message");
 
-                    b.Property<int>("MaxTokensPerResponse")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_tokens_per_response");
-
                     b.Property<string>("MediaMessage")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
