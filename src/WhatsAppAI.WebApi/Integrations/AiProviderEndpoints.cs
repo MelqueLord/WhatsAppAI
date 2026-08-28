@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -134,6 +136,7 @@ public static class AiProviderEndpoints
             guidelines = AiGuidelinePolicy.Rules,
             isActive = credential?.IsActive,
             version = credential?.Version,
+            botVersion = botConfig?.Version,
             aiActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered
         });
     }
@@ -143,13 +146,18 @@ public static class AiProviderEndpoints
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
         ISecretStore secretStore,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
+
+        var ifMatch = httpContext.Request.Headers["If-Match"].FirstOrDefault();
+        if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
 
         if (string.IsNullOrWhiteSpace(request.ModelId))
             return Results.BadRequest(new { error = "Model ID is required." });
@@ -162,6 +170,9 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "Modelo inválido. Selecione um modelo disponível no catálogo." });
 
         var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (existing is not null && existing.Version != expectedVersion)
+            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+
         var selectedCredential = await credentialRepository.GetByTenantAndProviderAsync(currentTenant.TenantId.Value, provider);
         if (string.IsNullOrWhiteSpace(request.ApiKey) &&
             selectedCredential is null)
@@ -252,6 +263,14 @@ public static class AiProviderEndpoints
         }
 
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (request.ConfidenceThreshold is not null && botConfig is not null)
+        {
+            var botIfMatch = httpContext.Request.Headers["If-Match-Bot"].FirstOrDefault();
+            if (botIfMatch is null || !uint.TryParse(botIfMatch, out var expectedBotVersion))
+                return Results.BadRequest(new { error = "If-Match-Bot com a versão do BOT é obrigatório ao salvar o limiar." });
+            if (botConfig.Version != expectedBotVersion)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+        }
         if (botConfig is null)
         {
             botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
@@ -375,11 +394,14 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         ISecretStore secretStore,
         IAiProviderResolver aiProviderResolver,
-        AppDbContext dbContext)
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
+
         if (string.IsNullOrWhiteSpace(request.Message))
             return Results.BadRequest(new { error = "A mensagem de simulação é obrigatória." });
 
@@ -400,6 +422,18 @@ public static class AiProviderEndpoints
             Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
         });
         var decision = BehaviorPolicy.SanitizeDecision(response.Decision, botConfig?.ConfidenceThreshold ?? 0.5);
+
+        var userId = Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
+            ? parsedUserId
+            : (Guid?)null;
+        await auditLogRepository.AddAsync(AuditLog.Create(
+            currentTenant.TenantId.Value,
+            userId,
+            "AI.Simulation",
+            "AiProviderCredential",
+            credential.Id.ToString(),
+            $"provider={credential.Provider};model={credential.ModelId};decision={decision.Action};confidence={decision.Confidence.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            httpContext.Connection.RemoteIpAddress?.ToString()));
 
         return Results.Ok(new
         {

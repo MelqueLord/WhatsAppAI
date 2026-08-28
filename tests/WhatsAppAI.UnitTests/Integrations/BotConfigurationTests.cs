@@ -12,7 +12,6 @@ public class BotConfigurationTests
 
         Assert.Equal(BotMode.Manual, config.Mode);
         Assert.True(config.Enabled);
-        Assert.Equal(500, config.MaxTokensPerResponse);
     }
 
     [Fact]
@@ -68,24 +67,6 @@ public class BotConfigurationTests
         Assert.Null(config.HandoffMessage);
         Assert.Null(config.QueueTransferMessage);
         Assert.Null(config.MediaMessage);
-    }
-
-    [Fact]
-    public void UpdateTokenLimit_ClampsValue()
-    {
-        var config = BotConfiguration.Create(Guid.NewGuid());
-        config.UpdateTokenLimit(10);
-
-        Assert.Equal(50, config.MaxTokensPerResponse);
-    }
-
-    [Fact]
-    public void UpdateTokenLimit_ClampsMax()
-    {
-        var config = BotConfiguration.Create(Guid.NewGuid());
-        config.UpdateTokenLimit(5000);
-
-        Assert.Equal(2000, config.MaxTokensPerResponse);
     }
 
     [Fact]

@@ -13,7 +13,6 @@ public sealed class BotConfiguration
     public string? QueueTransferMessage { get; private set; }
     public string? MediaMessage { get; private set; }
     public string? FlowStepsJson { get; private set; }
-    public int MaxTokensPerResponse { get; private set; }
     public double ConfidenceThreshold { get; private set; } = 0.5;
     public bool Enabled { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -29,7 +28,6 @@ public sealed class BotConfiguration
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             Mode = mode,
-            MaxTokensPerResponse = 500,
             ConfidenceThreshold = 0.5,
             Enabled = true,
             CreatedAt = DateTime.UtcNow
@@ -59,13 +57,6 @@ public sealed class BotConfiguration
     public void UpdateMessages(string? welcome, string? offline, string? fallback, string? handoff, string? queueTransfer, string? media)
     {
         UpdateMessages(welcome, ReturningMessage, offline, fallback, handoff, queueTransfer, media);
-    }
-
-    public void UpdateTokenLimit(int maxTokens)
-    {
-        MaxTokensPerResponse = Math.Clamp(maxTokens, 50, 2000);
-        UpdatedAt = DateTime.UtcNow;
-        Version++;
     }
 
     public void UpdateConfidenceThreshold(double confidenceThreshold)

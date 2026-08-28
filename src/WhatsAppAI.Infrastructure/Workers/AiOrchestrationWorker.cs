@@ -401,6 +401,8 @@ public sealed class AiOrchestrationWorker(
             {
                 conversation.AssignQueue(routingQueueId);
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
+                // Queue routing is an internal change; use its new version for the final delivery guard.
+                expectedConversationVersion = conversation.Version;
                 logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName}",
                     conversation.Id, response.Decision.QueueName);
 
@@ -498,6 +500,16 @@ public sealed class AiOrchestrationWorker(
             }
             else if (response.Decision.Action == AiAction.Handoff)
             {
+                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                if (!AiReplyDeliveryGuard.CanSend(
+                        conversation, expectedConversationVersion, DateTime.UtcNow))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation("AI handoff message discarded after conversation {ConversationId} changed or window closed", message.ConversationId);
+                    return;
+                }
+
                 await RegisterAutomaticHandoffAsync(
                     message.TenantId, conversation, response.Decision.HandoffReason ?? "handoff",
                     conversationRepository, handoffEventRepository, cancellationToken);
@@ -529,7 +541,7 @@ public sealed class AiOrchestrationWorker(
             {
                 var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
                 var currentConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
-                if (currentConversation is not null && currentConversation.Mode == ConversationMode.Automatic)
+                if (currentConversation is not null && currentConversation.Mode == ConversationMode.Automatic && currentConversation.IsWindowOpen(DateTime.UtcNow))
                 {
                     await RegisterAutomaticHandoffAsync(
                         message.TenantId, currentConversation, "ai_quota_exhausted",
@@ -557,7 +569,7 @@ public sealed class AiOrchestrationWorker(
             }
 
             var failedConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
-            if (failedConversation is not null && failedConversation.Mode == ConversationMode.Automatic)
+            if (failedConversation is not null && failedConversation.Mode == ConversationMode.Automatic && failedConversation.IsWindowOpen(DateTime.UtcNow))
             {
                 var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
                 await RegisterAutomaticHandoffAsync(
@@ -588,6 +600,13 @@ public sealed class AiOrchestrationWorker(
         IHandoffEventRepository handoffEventRepository,
         CancellationToken cancellationToken)
     {
+        if (!conversation.IsWindowOpen(DateTime.UtcNow))
+        {
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            return;
+        }
+
         var fallbackMessage = ApplyUnavailableAiFallback(message, botConfig);
         await messageRepository.UpdateAsync(message, cancellationToken);
         await RegisterAutomaticHandoffAsync(

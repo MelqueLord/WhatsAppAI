@@ -20,7 +20,6 @@ public static class BotConfigurationEndpoints
         group.MapPost("/", SaveAsync);
         group.MapPut("/mode", UpdateModeAsync);
         group.MapPut("/messages", UpdateMessagesAsync);
-        group.MapPut("/tokens", UpdateTokenLimitAsync);
         group.MapPost("/toggle", ToggleAsync);
 
         return app;
@@ -47,7 +46,6 @@ public static class BotConfigurationEndpoints
             handoffMessage = config.HandoffMessage,
             queueTransferMessage = config.QueueTransferMessage,
             mediaMessage = config.MediaMessage,
-            maxTokensPerResponse = config.MaxTokensPerResponse,
             enabled = config.Enabled,
             version = config.Version
         });
@@ -66,7 +64,6 @@ public static class BotConfigurationEndpoints
         {
             config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
             config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
-            config.UpdateTokenLimit(request.MaxTokensPerResponse ?? 500);
             config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
             await repo.AddAsync(config);
         }
@@ -74,7 +71,6 @@ public static class BotConfigurationEndpoints
         {
             config.UpdateMode(mode);
             config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
-            config.UpdateTokenLimit(request.MaxTokensPerResponse ?? config.MaxTokensPerResponse);
             config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
             if (!config.Enabled)
                 config.Toggle(true);
@@ -119,19 +115,6 @@ public static class BotConfigurationEndpoints
         return Results.Ok(new { saved = true });
     }
 
-    private static async Task<IResult> UpdateTokenLimitAsync(
-        [FromBody] UpdateTokenLimitRequest request,
-        ICurrentTenant currentTenant, IBotConfigurationRepository repo)
-    {
-        if (currentTenant.TenantId is null) return Results.Unauthorized();
-
-        var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
-
-        config.UpdateTokenLimit(request.MaxTokens);
-        await repo.UpdateAsync(config);
-        return Results.Ok(new { maxTokensPerResponse = config.MaxTokensPerResponse });
-    }
 
     private static async Task<IResult> ToggleAsync(
         [FromBody] ToggleBotRequest request,
@@ -181,10 +164,8 @@ public sealed record SaveBotConfigRequest(
     string? HandoffMessage,
     string? QueueTransferMessage,
     string? MediaMessage,
-    int? MaxTokensPerResponse,
     JsonElement? FlowSteps);
 
 public sealed record UpdateModeRequest(string Mode);
 public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? ReturningMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? QueueTransferMessage, string? MediaMessage);
-public sealed record UpdateTokenLimitRequest(int MaxTokens);
 public sealed record ToggleBotRequest(bool Enabled, string? Mode = null);
