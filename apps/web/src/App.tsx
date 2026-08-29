@@ -120,9 +120,9 @@ function App() {
               <Route path="/bot-config" element={<OwnerRoute><PlanFeatureRoute feature="botEnabled"><BotConfigPage /></PlanFeatureRoute></OwnerRoute>} />
               <Route path="/integrations/ai/instructions" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
-              <Route path="/tags" element={<OwnerRoute><PlanFeatureRoute feature="tagsEnabled"><ClientTagsPage /></PlanFeatureRoute></OwnerRoute>} />
+              <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
               <Route path="/broadcast" element={<TenantRoute><BroadcastPage /></TenantRoute>} />
-              <Route path="/queues" element={<OwnerRoute><PlanFeatureRoute feature="automaticDistributionEnabled"><QueuesPage /></PlanFeatureRoute></OwnerRoute>} />
+              <Route path="/queues" element={<OwnerRoute><QueuesPage /></OwnerRoute>} />
               <Route path="/queue-inbox" element={<TenantRoute><PlanFeatureRoute feature="automaticDistributionEnabled"><QueueInboxPage /></PlanFeatureRoute></TenantRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />

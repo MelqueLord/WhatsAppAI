@@ -32,7 +32,6 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
 
   const aiEnabled = user?.aiEnabled === true
   const botEnabled = user?.botEnabled === true
-  const tagsEnabled = user?.tagsEnabled === true
   const automaticDistributionEnabled = user?.automaticDistributionEnabled === true
 
   if (isOperator) {
@@ -142,8 +141,10 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
           ...(botEnabled ? [{ to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' }] : []),
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
-          ...(automaticDistributionEnabled ? [{ to: '/queues', icon: ListOrdered, label: 'Filas' }] : []),
-          ...(tagsEnabled ? [{ to: '/tags', icon: Tags, label: 'Tags' }] : []),
+          // Queue and tag management remains available to the tenant owner.
+          // Plan flags only gate their operational use (routing/assignment).
+          { to: '/queues', icon: ListOrdered, label: 'Filas' },
+          { to: '/tags', icon: Tags, label: 'Tags' },
           { to: '/broadcast', icon: Radio, label: 'Disparo em massa' },
         ]
       : []),

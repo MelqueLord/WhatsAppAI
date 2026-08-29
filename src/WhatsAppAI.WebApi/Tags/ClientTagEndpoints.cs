@@ -13,8 +13,7 @@ public static class ClientTagEndpoints
     {
         var group = app.MapGroup("/api/client-tags")
             .WithTags("Client Tags")
-            .RequireAuthorization("RequireTenantContext")
-            .RequirePlanFeature(PlanFeature.Tags);
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);
@@ -22,10 +21,11 @@ public static class ClientTagEndpoints
         group.MapPost("/{id:guid}/deactivate", DeactivateAsync);
         group.MapPost("/{id:guid}/reactivate", ReactivateAsync);
 
-        // Contact-Tag association
-        group.MapPost("/contacts/{contactId:guid}/tags/{tagId:guid}", AssignTagAsync);
-        group.MapDelete("/contacts/{contactId:guid}/tags/{tagId:guid}", RemoveTagAsync);
-        group.MapGet("/contacts/{contactId:guid}/tags", GetContactTagsAsync);
+        // Contact-tag association is an operational feature and remains plan-gated.
+        var operationalGroup = group.MapGroup("").RequirePlanFeature(PlanFeature.Tags);
+        operationalGroup.MapPost("/contacts/{contactId:guid}/tags/{tagId:guid}", AssignTagAsync);
+        operationalGroup.MapDelete("/contacts/{contactId:guid}/tags/{tagId:guid}", RemoveTagAsync);
+        operationalGroup.MapGet("/contacts/{contactId:guid}/tags", GetContactTagsAsync);
 
         return app;
     }

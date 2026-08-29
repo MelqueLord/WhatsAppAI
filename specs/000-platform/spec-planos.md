@@ -52,9 +52,9 @@ Como TenantOwner, quero ativar minha empresa e configurar o ambiente conforme o 
 **Aceite:**
 
 1. Ativação define senha e ativa TenantOwner
-2. Interface mostra apenas funcionalidades do plano contratado
+2. Interface mostra apenas funcionalidades operacionais do plano contratado; o TenantOwner mantém acesso ao cadastro de filas e tags para preparar a operação
 3. Configurações obrigatórias são guiadas conforme as permissões efetivas retornadas no login
-4. Recursos não contratados não aparecem na navegação e são bloqueados no backend
+4. Recursos operacionais não contratados não aparecem na navegação e são bloqueados no backend
 
 ### US-P003 — Gerenciar operadores (P1)
 
@@ -93,8 +93,8 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 
 - **FR-P001:** PlatformAdmin pode criar tenant selecionando STAR, FLOW ou SCALA
 - **FR-P002:** Plano é persistido em `Tenant` e controla acesso a funcionalidades
-- **FR-P003:** STAR habilita IA e desabilita BOT, tags e filas/distribuição
-- **FR-P004:** FLOW e SCALA habilitam IA, BOT, tags e filas/distribuição implementadas
+- **FR-P003:** STAR habilita IA e desabilita BOT e o uso operacional de tags e filas/distribuição; o cadastro permanece disponível ao TenantOwner
+- **FR-P004:** FLOW e SCALA habilitam IA, BOT e o uso operacional de tags e filas/distribuição implementadas
 - **FR-P005:** Plano pode ser alterado por PlatformAdmin (upgrade/downgrade com validação)
 
 ### Cadastro de Empresa
@@ -185,8 +185,9 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 
 ### Menu Lateral
 
-**STAR:** Dashboard, Inbox, Operadores, WhatsApp, IA, Conhecimento e Uso.
-**FLOW/SCALA:** recursos do STAR mais BOT, Tags e Filas.
+**Todos os planos:** o TenantOwner pode cadastrar Tags e Filas.
+**STAR:** Dashboard, Inbox, Operadores, WhatsApp, IA, Conhecimento e Uso; uso operacional de tags/filas indisponível.
+**FLOW/SCALA:** recursos do STAR mais BOT e uso operacional de Tags e Filas.
 
 ## 9. Dependências
 

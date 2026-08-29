@@ -12,16 +12,17 @@ public static class ServiceLineEndpoints
     {
         var group = app.MapGroup("/api/service-queues")
             .WithTags("Service Queues")
-            .RequireAuthorization("RequireTenantContext")
-            .RequirePlanFeature(PlanFeature.AutomaticDistribution);
+            .RequireAuthorization("RequireTenantContext");
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);
         group.MapPut("/{id:guid}", UpdateAsync);
         group.MapPost("/{id:guid}/deactivate", DeactivateAsync);
         group.MapPost("/{id:guid}/reactivate", ReactivateAsync);
-        group.MapPost("/conversations/{conversationId:guid}/assign", AssignQueueAsync);
-        group.MapPost("/conversations/{conversationId:guid}/unassign", UnassignQueueAsync);
+        // Queue assignment is an operational feature and remains plan-gated.
+        var operationalGroup = group.MapGroup("").RequirePlanFeature(PlanFeature.AutomaticDistribution);
+        operationalGroup.MapPost("/conversations/{conversationId:guid}/assign", AssignQueueAsync);
+        operationalGroup.MapPost("/conversations/{conversationId:guid}/unassign", UnassignQueueAsync);
 
         return app;
     }
