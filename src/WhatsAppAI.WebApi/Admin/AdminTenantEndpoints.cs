@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Administration;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -21,6 +22,9 @@ public static class AdminTenantEndpoints
 
         group.MapGet("/", GetAllTenantsAsync)
             .WithName("GetAllTenants");
+
+        group.MapGet("/capacity", GetInfrastructureCapacityAsync)
+            .WithName("GetInfrastructureCapacity");
 
         group.MapGet("/{tenantId:guid}", GetTenantByIdAsync)
             .WithName("GetTenantById");
@@ -44,6 +48,50 @@ public static class AdminTenantEndpoints
             .WithName("ResetTenantOwnerPassword");
 
         return app;
+    }
+
+    private static async Task<IResult> GetInfrastructureCapacityAsync(
+        IInfrastructureCapacityReader capacityReader,
+        IConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        var counts = await capacityReader.GetCountsAsync(cancellationToken);
+        var customers = InfrastructureCapacityPolicy.Evaluate(
+            counts.Customers,
+            GetCapacityLimit(configuration, "CustomerLimit", 25));
+        var lines = InfrastructureCapacityPolicy.Evaluate(
+            counts.Lines,
+            GetCapacityLimit(configuration, "LineLimit", 40));
+        var operators = InfrastructureCapacityPolicy.Evaluate(
+            counts.Operators,
+            GetCapacityLimit(configuration, "OperatorLimit", 90));
+
+        return Results.Ok(new InfrastructureCapacityResponse
+        {
+            Customers = ToResponse(customers),
+            Lines = ToResponse(lines),
+            Operators = ToResponse(operators),
+            MigrationRequired = customers.Status == InfrastructureCapacityStatus.MigrationRequired ||
+                lines.Status == InfrastructureCapacityStatus.MigrationRequired ||
+                operators.Status == InfrastructureCapacityStatus.MigrationRequired
+        });
+    }
+
+    private static CapacityIndicatorResponse ToResponse(InfrastructureCapacityIndicator indicator) => new()
+    {
+        Current = indicator.Current,
+        Limit = indicator.Limit,
+        UtilizationPercentage = indicator.UtilizationPercentage,
+        Status = indicator.Status.ToString()
+    };
+
+    private static int GetCapacityLimit(
+        IConfiguration configuration,
+        string name,
+        int defaultValue)
+    {
+        var configured = configuration.GetValue<int?>($"InfrastructureCapacity:{name}");
+        return configured is > 0 ? configured.Value : defaultValue;
     }
 
     private static async Task<IResult> CreateTenantAsync(
@@ -560,6 +608,22 @@ public sealed class TenantResponse
     public DateTime? SuspendedAt { get; init; }
     public DateTime? ReactivatedAt { get; init; }
     public string? SuspensionReason { get; init; }
+}
+
+public sealed class InfrastructureCapacityResponse
+{
+    public CapacityIndicatorResponse Customers { get; init; } = new();
+    public CapacityIndicatorResponse Lines { get; init; } = new();
+    public CapacityIndicatorResponse Operators { get; init; } = new();
+    public bool MigrationRequired { get; init; }
+}
+
+public sealed class CapacityIndicatorResponse
+{
+    public int Current { get; init; }
+    public int Limit { get; init; }
+    public int UtilizationPercentage { get; init; }
+    public string Status { get; init; } = string.Empty;
 }
 
 internal static class TenantSlugHelper

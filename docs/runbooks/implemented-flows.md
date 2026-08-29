@@ -180,6 +180,9 @@ Serviço: `src/WhatsAppAI.Application/Contacts/ContactImportService.cs`
 - Login/logout por cookie seguro, antiforgery, `GET /auth/me` e invalidação por estado/security stamp.
 - Platform Admin cria, suspende e reativa tenants; TenantOwner recebe convite de uso único com expiração.
 - TenantOwner convida, reenvia, desativa e reativa operadores sem cruzar tenants.
+- A tela administrativa de empresas mostra a capacidade global deste KVM: tenants não encerrados, conexões WhatsApp ativas e Operators ativos.
+- O painel avisa a partir de 80% e exige visualmente a migração quando atingir qualquer limite. Os padrões são 25 clientes, 40 linhas e 90 operadores e podem ser alterados por `InfrastructureCapacity__CustomerLimit`, `InfrastructureCapacity__LineLimit` e `InfrastructureCapacity__OperatorLimit`.
+- Tenants suspensos continuam contando; tenants encerrados e seus recursos não entram nos indicadores. Os totais são somente leitura e acessíveis apenas ao PlatformAdmin.
 - Nome, plano, quotas e limites administrativos usam versionamento otimista.
 
 ### WhatsApp e entrada de mensagens

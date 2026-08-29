@@ -30,6 +30,16 @@ public class SecurityTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task CapacityEndpoint_WithoutAuth_ReturnsUnauthorized()
+    {
+        var response = await _client.GetAsync("/api/admin/tenants/capacity");
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Found,
+            $"Expected Unauthorized or Found, got {response.StatusCode}");
+    }
+
+    [Fact]
     public async Task AdminEndpoints_WithNonAdmin_ReturnsForbidden()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions

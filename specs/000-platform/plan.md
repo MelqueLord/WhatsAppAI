@@ -125,6 +125,8 @@ O comando de assumir conversa incrementa `Version`, muda para `Human` e registra
 - O SLI mensal de **NFR-004** divide respostas elegíveis concluídas sem 5xx/timeout da plataforma pelo total de requisições válidas recebidas; falhas Meta/OpenAI recebem dimensão separada sem sair do total e manutenção não é excluída.
 - O ensaio de recuperação restaura backup com ponto de no máximo 24 horas e mede até 4 horas da declaração do incidente ao smoke test aprovado (**NFR-005**).
 - A validação de IA usa no mínimo 100 requisições elegíveis e separa fila, aplicação e provedor para comprovar **NFR-003**.
+- O PlatformAdmin consulta um resumo agregado e somente leitura da capacidade da instalação. A Application define o contrato e a política de limiar, a Infrastructure executa as contagens globais ignorando filtros de tenant de forma explícita, e a WebApi protege o endpoint com a política `PlatformAdmin` (**FR-040/FR-041**).
+- Os limites de clientes, linhas e operadores são configuração da instalação (`InfrastructureCapacity`) com padrões 25/40/90; não são persistidos por tenant e não exigem migration.
 
 ## 9. Estratégia de entrega
 

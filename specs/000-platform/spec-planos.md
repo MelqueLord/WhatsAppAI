@@ -1,7 +1,7 @@
 # Especificação: Sistema de Planos e Gestão de Empresas
 
 **Status:** Implementado  
-**Versão:** 1.0.0
+**Versão:** 1.1.0
 **Data:** 2026-08-16
 **Spec relacionada:** `spec.md` (plataforma base)
 **Implementado em:** Fase 9 (T090-T112)
@@ -211,3 +211,7 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 - Planos customizados
 - Limites de uso por plano (mensagens, tokens)
 - Marketplace de planos
+
+## 11. Capacidade da instalação
+
+Os limites comerciais de cada tenant continuam separados da capacidade técnica do servidor. O PlatformAdmin acompanha globalmente clientes não encerrados, linhas WhatsApp ativas e Operators ativos conforme **US-011/FR-040/FR-041** da especificação principal. Os limites padrão da instalação são 25 clientes, 40 linhas e 90 operadores e não alteram o plano contratado.

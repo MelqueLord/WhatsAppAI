@@ -13,6 +13,10 @@ import {
   KeyRound,
   Pencil,
   DollarSign,
+  RadioTower,
+  Server,
+  TriangleAlert,
+  Users,
 } from 'lucide-react'
 import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 
@@ -35,6 +39,12 @@ export function AdminTenantsPage() {
     queryFn: () => api.admin.tenants.list(),
   })
 
+  const { data: capacity, isLoading: isCapacityLoading, error: capacityError } = useQuery({
+    queryKey: ['admin', 'capacity'],
+    queryFn: () => api.admin.tenants.capacity(),
+    refetchInterval: 60_000,
+  })
+
   const { data: plans } = useQuery({
     queryKey: ['plans'],
     queryFn: () => api.plans.list(),
@@ -47,6 +57,7 @@ export function AdminTenantsPage() {
       setCreateResult(data)
       setShowCreateForm(false)
       queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'capacity'] })
     },
   })
 
@@ -216,6 +227,63 @@ export function AdminTenantsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
+        {capacity?.migrationRequired && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-400/40 bg-red-500/10 p-4 text-red-100" role="alert">
+            <TriangleAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+            <div>
+              <p className="font-semibold">Capacidade atingida: migre para outro KVM</p>
+              <p className="mt-1 text-sm text-red-200">Um ou mais limites operacionais da instalação foram alcançados.</p>
+            </div>
+          </div>
+        )}
+
+        <section className="mb-6" aria-label="Capacidade da infraestrutura">
+          <div className="mb-3 flex items-center gap-2">
+            <Server className="h-4 w-4 text-blue-400" />
+            <h2 className="text-sm font-semibold text-slate-200">Capacidade deste KVM</h2>
+          </div>
+          {capacityError ? (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+              Não foi possível carregar os indicadores de capacidade.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3">
+              {([
+                { label: 'Clientes', detail: 'Não encerrados', icon: Building2, indicator: capacity?.customers },
+                { label: 'Linhas', detail: 'WhatsApp ativas', icon: RadioTower, indicator: capacity?.lines },
+                { label: 'Operadores', detail: 'Vínculos ativos', icon: Users, indicator: capacity?.operators },
+              ]).map(({ label, detail, icon: Icon, indicator }) => {
+                const migrationRequired = indicator?.status === 'MigrationRequired'
+                const warning = indicator?.status === 'Warning'
+                const barColor = migrationRequired ? 'bg-red-500' : warning ? 'bg-amber-400' : 'bg-emerald-500'
+                return (
+                  <article key={label} className={`rounded-xl border p-4 ${migrationRequired ? 'border-red-400/40 bg-red-500/10' : warning ? 'border-amber-400/30 bg-amber-500/10' : 'border-white/10 bg-[#0b1222]'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
+                        <Icon className="h-4 w-4 text-slate-400" /> {label}
+                      </div>
+                      {migrationRequired && <span className="text-xs font-semibold text-red-300">Migrar KVM</span>}
+                      {warning && <span className="text-xs font-semibold text-amber-300">Atenção</span>}
+                    </div>
+                    <div className="mt-3 flex items-end justify-between">
+                      <p className="text-2xl font-bold text-white">
+                        {isCapacityLoading || !indicator ? '—' : `${indicator.current} / ${indicator.limit}`}
+                      </p>
+                      <p className="text-xs text-slate-400">{detail}</p>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className={`h-full rounded-full transition-all ${barColor}`}
+                        style={{ width: `${indicator?.utilizationPercentage ?? 0}%` }}
+                      />
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
         {createResult && (
           <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
             <div className="flex items-start gap-3">

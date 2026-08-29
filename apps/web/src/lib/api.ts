@@ -206,6 +206,20 @@ export interface CreateTenantResponse {
   message: string
 }
 
+export interface CapacityIndicator {
+  current: number
+  limit: number
+  utilizationPercentage: number
+  status: 'Normal' | 'Warning' | 'MigrationRequired'
+}
+
+export interface InfrastructureCapacity {
+  customers: CapacityIndicator
+  lines: CapacityIndicator
+  operators: CapacityIndicator
+  migrationRequired: boolean
+}
+
 export interface DashboardStats {
   operatorCount: number
   messagesToday: number
@@ -525,6 +539,9 @@ export const api = {
     tenants: {
       list: () =>
         fetchApi<Tenant[]>('/api/admin/tenants'),
+
+      capacity: () =>
+        fetchApi<InfrastructureCapacity>('/api/admin/tenants/capacity'),
 
       get: (id: string) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}`),

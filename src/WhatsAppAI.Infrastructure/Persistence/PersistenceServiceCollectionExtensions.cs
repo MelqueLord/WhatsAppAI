@@ -3,12 +3,14 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Administration;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Audit;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Infrastructure.Contacts;
+using WhatsAppAI.Infrastructure.Administration;
 using WhatsAppAI.Infrastructure.Conversations;
 using WhatsAppAI.Infrastructure.Persistence.Repositories;
 
@@ -35,6 +37,7 @@ public static class PersistenceServiceCollectionExtensions
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IInfrastructureCapacityReader, InfrastructureCapacityReader>();
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();

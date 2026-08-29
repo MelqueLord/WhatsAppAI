@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.15.0
+**Versão:** 0.16.0
 **Data:** 2026-08-28
 
 ## 1. Problema
@@ -153,6 +153,17 @@ Como TenantOwner, quero importar contatos de uma planilha para cadastrar minha b
 4. Linhas inválidas não impedem as demais e o resultado informa quantidades importadas, ignoradas e inválidas, com motivo por linha sem repetir o número na resposta.
 5. Somente TenantOwner pode importar; arquivos maiores que 2 MB ou com mais de 5.000 linhas são rejeitados.
 
+### US-011 — Acompanhar capacidade da infraestrutura (P1)
+
+Como PlatformAdmin, quero acompanhar clientes, linhas e operadores hospedados para migrar a instalação antes de exceder a capacidade do KVM.
+
+**Aceite:**
+
+1. A administração mostra clientes não encerrados, conexões WhatsApp ativas e Operators ativos.
+2. Os limites são configuráveis por ambiente e usam, por padrão, 25 clientes, 40 linhas e 90 operadores.
+3. Ao atingir qualquer limite, a interface mostra de forma destacada que a migração do KVM é necessária.
+4. Tenants suspensos continuam na contagem; tenants encerrados e seus recursos não contam.
+
 ## 5. Requisitos funcionais
 
 - **FR-001:** autenticar usuários com frontend e backend no mesmo site; em produção o cookie de sessão é `HttpOnly`, `Secure` e `SameSite=Lax`, e toda mutação autenticada exige token antiforgery enviado em `X-CSRF-TOKEN`.
@@ -194,6 +205,8 @@ Como TenantOwner, quero importar contatos de uma planilha para cadastrar minha b
 - **FR-037:** permitir ao TenantOwner selecionar tags ativas do próprio tenant para categorização pela IA; após cada decisão válida, o backend deve adicionar ao contato somente as tags autorizadas reconhecidas pela IA, sem remover tags existentes.
 - **FR-038:** permitir ao TenantOwner atribuir ou remover uma fila ativa do próprio tenant em cada Operator; sem fila atribuída o atendimento permanece geral, e com fila atribuída o backend deve limitar o Operator às conversas dessa fila.
 - **FR-039:** permitir ao TenantOwner importar até 5.000 contatos por arquivo `.csv` ou `.xlsx` de até 2 MB, usando as colunas obrigatórias `nome` e `contato`, com resultado parcial e isolamento pelo tenant corrente.
+- **FR-040:** disponibilizar somente ao PlatformAdmin um resumo global de capacidade com quantidade atual, limite configurado e percentual de uso para clientes não encerrados, conexões WhatsApp ativas e memberships `Operator` ativas.
+- **FR-041:** sinalizar necessidade de migração da infraestrutura quando qualquer indicador atingir ou ultrapassar seu limite; os padrões são 25 clientes, 40 linhas e 90 operadores e podem ser substituídos por configuração de ambiente.
 
 ## 6. Regras de negócio
 
@@ -216,6 +229,7 @@ Como TenantOwner, quero importar contatos de uma planilha para cadastrar minha b
 - **BR-017:** a IA somente pode categorizar com tags ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; atribuições são idempotentes e nunca removem tags automaticamente.
 - **BR-018:** `assigned_queue_id` nulo representa atendimento geral; quando preenchido, uma conversa só pode ser listada, aberta ou respondida pelo Operator se possuir exatamente essa fila, sem aceitar fila inativa, inexistente ou de outro tenant na configuração.
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
+- **BR-020:** capacidade de clientes inclui tenants `Pending`, `Active` e `Suspended`; linhas incluem `WhatsAppAccount` ativo desses tenants; operadores incluem membership `Operator` ativa desses tenants. Tenant `Closed` e seus recursos ficam fora dos três indicadores.
 
 ## 7. Requisitos não funcionais
 
