@@ -166,7 +166,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, null, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("Bot configuration not available for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -250,7 +250,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("AI not enabled for tenant {TenantId} plan", message.TenantId);
                 return;
             }
@@ -275,7 +275,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("No active AI credential for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -287,7 +287,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("API key not available for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -295,7 +295,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("AI model is not allowed for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -304,7 +304,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning("AI model has no approved evaluation for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -327,11 +327,10 @@ public sealed class AiOrchestrationWorker(
                     .ToListAsync(cancellationToken);
             if (!AiDataProcessingPolicy.IsAuthorized(message.TenantId, message.ContactId, purposes, consents))
             {
-                await RegisterAutomaticHandoffAsync(
-                    message.TenantId, conversation, "data_processing_not_authorized",
-                    conversationRepository, handoffEventRepository, cancellationToken);
-                message.MarkProcessedByAi();
-                await messageRepository.UpdateAsync(message, cancellationToken);
+                await PersistAutomaticHandoffAsync(
+                    message.TenantId, message, conversation, "data_processing_not_authorized", null, "ai-data-policy",
+                    dbContext, messageRepository, conversationRepository, outboxRepository,
+                    handoffEventRepository, cancellationToken);
                 logger.LogInformation("AI data processing is not authorized for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -346,7 +345,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning(ex, "AI provider '{Provider}' not available for tenant {TenantId}", credential.Provider, message.TenantId);
                 return;
             }
@@ -397,7 +396,7 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken);
+                    outboxRepository, handoffEventRepository, dbContext, cancellationToken);
                 logger.LogWarning(
                     "AI provider circuit is open for tenant {TenantId} and provider {Provider}",
                     message.TenantId, credential.Provider);
@@ -543,24 +542,10 @@ public sealed class AiOrchestrationWorker(
 
                 if (string.IsNullOrWhiteSpace(response.Content))
                 {
-                    if (!await RegisterAutomaticHandoffAsync(
-                            message.TenantId, conversation, "empty_ai_reply",
-                            conversationRepository, handoffEventRepository, cancellationToken))
-                    {
-                        message.MarkProcessedByAi();
-                        await messageRepository.UpdateAsync(message, cancellationToken);
-                        return;
-                    }
-
-                    var fallbackMessage = Message.CreateOutbound(
-                        message.TenantId, conversation.Id, message.ContactId,
-                        MessageType.Text, ResolveHandoffMessage(botConfig),
-                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                            "ai-empty-reply", message.Id, conversation.Version));
-                    await messageRepository.AddAsync(fallbackMessage, cancellationToken);
-                    await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    await PersistAutomaticHandoffAsync(
+                        message.TenantId, message, conversation, "empty_ai_reply", ResolveHandoffMessage(botConfig),
+                        "ai-empty-reply", dbContext, messageRepository, conversationRepository,
+                        outboxRepository, handoffEventRepository, cancellationToken);
                     logger.LogWarning("AI returned an empty reply; conversation {ConversationId} transferred to human", message.ConversationId);
                     return;
                 }
@@ -660,31 +645,16 @@ public sealed class AiOrchestrationWorker(
                     return;
                 }
 
-                if (!await RegisterAutomaticHandoffAsync(
-                        message.TenantId, conversation, response.Decision.HandoffReason ?? "handoff",
-                        conversationRepository, handoffEventRepository, cancellationToken))
-                {
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
-                    return;
-                }
-
-                // Send handoff message to client
-                var handoffText = ResolveHandoffMessage(botConfig);
-
-                var handoffMsg = Message.CreateOutbound(
-                    message.TenantId, conversation.Id, message.ContactId,
-                    MessageType.Text,
-                    handoffText,
-                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                        "ai-handoff", message.Id, conversation.Version));
-                await messageRepository.AddAsync(handoffMsg, cancellationToken);
-
-                var handoffOutbox = OutboxMessage.Create(message.TenantId, handoffMsg.Id);
-                await outboxRepository.AddAsync(handoffOutbox);
+                await PersistAutomaticHandoffAsync(
+                    message.TenantId, message, conversation,
+                    response.Decision.HandoffReason ?? "handoff",
+                    ResolveHandoffMessage(botConfig), "ai-handoff", dbContext,
+                    messageRepository, conversationRepository, outboxRepository,
+                    handoffEventRepository, cancellationToken);
 
                 logger.LogInformation("AI handoff for conversation {ConversationId}: {Reason}",
                     conversation.Id, response.Decision.HandoffReason);
+                return;
             }
 
             message.MarkProcessedByAi();
@@ -702,25 +672,16 @@ public sealed class AiOrchestrationWorker(
                 var currentConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
                 if (currentConversation is not null && currentConversation.Mode == ConversationMode.Automatic && currentConversation.IsWindowOpen(DateTime.UtcNow))
                 {
-                    if (!await RegisterAutomaticHandoffAsync(
-                            message.TenantId, currentConversation, "ai_quota_exhausted",
-                            conversationRepository, handoffEventRepository, cancellationToken))
-                    {
-                        message.MarkProcessedByAi();
-                        await messageRepository.UpdateAsync(message, cancellationToken);
-                        return;
-                    }
-
-                    var unavailableMessage = Message.CreateOutbound(
-                        message.TenantId, message.ConversationId, message.ContactId,
-                        MessageType.Text, ResolveHandoffMessage(botConfig),
-                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                            "ai-quota", message.Id, currentConversation.Version));
-                    await messageRepository.AddAsync(unavailableMessage, cancellationToken);
-                    await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, unavailableMessage.Id));
+                    await PersistAutomaticHandoffAsync(
+                        message.TenantId, message, currentConversation, "ai_quota_exhausted",
+                        ResolveHandoffMessage(botConfig), "ai-quota", dbContext, messageRepository,
+                        conversationRepository, outboxRepository, handoffEventRepository, cancellationToken);
                 }
-                message.MarkProcessedByAi();
-                await messageRepository.UpdateAsync(message, cancellationToken);
+                else
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                }
                 logger.LogWarning("AI quota exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
                 return;
             }
@@ -737,26 +698,16 @@ public sealed class AiOrchestrationWorker(
             if (failedConversation is not null && failedConversation.Mode == ConversationMode.Automatic && failedConversation.IsWindowOpen(DateTime.UtcNow))
             {
                 var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
-                if (!await RegisterAutomaticHandoffAsync(
-                        message.TenantId, failedConversation, "ai_retry_exhausted",
-                        conversationRepository, handoffEventRepository, cancellationToken))
-                {
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
-                    return;
-                }
-
-                    var handoffMsg = Message.CreateOutbound(
-                        message.TenantId, message.ConversationId, message.ContactId,
-                        MessageType.Text, ResolveHandoffMessage(botConfig),
-                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                            "ai-retry-exhausted", message.Id, failedConversation.Version));
-                await messageRepository.AddAsync(handoffMsg, cancellationToken);
-                await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, handoffMsg.Id));
+                await PersistAutomaticHandoffAsync(
+                    message.TenantId, message, failedConversation, "ai_retry_exhausted",
+                    ResolveHandoffMessage(botConfig), "ai-retry-exhausted", dbContext, messageRepository,
+                    conversationRepository, outboxRepository, handoffEventRepository, cancellationToken);
             }
-
-            message.MarkProcessedByAi();
-            await messageRepository.UpdateAsync(message, cancellationToken);
+            else
+            {
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+            }
             logger.LogWarning("AI retries exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
         }
     }
@@ -769,6 +720,7 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
+        AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
         if (!conversation.IsWindowOpen(DateTime.UtcNow))
@@ -778,18 +730,10 @@ public sealed class AiOrchestrationWorker(
             return;
         }
 
-        if (!await RegisterAutomaticHandoffAsync(
-                message.TenantId, conversation, "ai_unavailable",
-                conversationRepository, handoffEventRepository, cancellationToken))
-        {
-            message.MarkProcessedByAi();
-            await messageRepository.UpdateAsync(message, cancellationToken);
-            return;
-        }
-        var fallbackMessage = ApplyUnavailableAiFallback(message, botConfig, conversation.Version);
-        await messageRepository.UpdateAsync(message, cancellationToken);
-        await messageRepository.AddAsync(fallbackMessage, cancellationToken);
-        await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
+        await PersistAutomaticHandoffAsync(
+            message.TenantId, message, conversation, "ai_unavailable",
+            ResolveHandoffMessage(botConfig), "ai-unavailable", dbContext, messageRepository,
+            conversationRepository, outboxRepository, handoffEventRepository, cancellationToken);
     }
 
     private static async Task<long> GetMonthlyAiResponsesUsedAsync(
@@ -831,42 +775,29 @@ public sealed class AiOrchestrationWorker(
             return;
         }
 
-        await RegisterAiQuotaAuditAsync(
-            dbContext,
-            auditLogRepository,
-            message.TenantId,
-            monthlyLimit,
-            monthlyResponsesUsed,
-            transactionAlreadyHeld: false,
-            cancellationToken);
-
-        if (!await RegisterAutomaticHandoffAsync(
-                message.TenantId,
-                conversation,
-                "ai_quota_exhausted",
-                conversationRepository,
-                handoffEventRepository,
-                cancellationToken))
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            message.MarkProcessedByAi();
-            await messageRepository.UpdateAsync(message, cancellationToken);
-            return;
+            await RegisterAiQuotaAuditAsync(
+                dbContext,
+                auditLogRepository,
+                message.TenantId,
+                monthlyLimit,
+                monthlyResponsesUsed,
+                transactionAlreadyHeld: true,
+                cancellationToken);
+
+            await PersistAutomaticHandoffInTransactionAsync(
+                message.TenantId, message, conversation, "ai_quota_exhausted",
+                ResolveHandoffMessage(botConfig), "ai-quota", messageRepository,
+                conversationRepository, outboxRepository, handoffEventRepository, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-
-        var fallbackMessage = Message.CreateOutbound(
-            message.TenantId,
-            message.ConversationId,
-            message.ContactId,
-            MessageType.Text,
-            ResolveHandoffMessage(botConfig),
-            AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                "ai-quota", message.Id, conversation.Version));
-        await messageRepository.AddAsync(fallbackMessage, cancellationToken);
-        await outboxRepository.AddAsync(
-            OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
-
-        message.MarkProcessedByAi();
-        await messageRepository.UpdateAsync(message, cancellationToken);
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private static async Task RegisterAiQuotaAuditAsync(
@@ -978,6 +909,72 @@ public sealed class AiOrchestrationWorker(
         await handoffEventRepository.AddAsync(HandoffEvent.Create(
             tenantId, conversation.Id, previousMode, ConversationMode.Human, null, reason));
         return true;
+    }
+
+    internal static async Task<bool> PersistAutomaticHandoffAsync(
+        Guid tenantId,
+        Message inboundMessage,
+        Conversation conversation,
+        string reason,
+        string? handoffText,
+        string idempotencyPrefix,
+        AppDbContext dbContext,
+        IMessageRepository messageRepository,
+        IConversationRepository conversationRepository,
+        IOutboxMessageRepository outboxRepository,
+        IHandoffEventRepository handoffEventRepository,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var registered = await PersistAutomaticHandoffInTransactionAsync(
+                tenantId, inboundMessage, conversation, reason, handoffText, idempotencyPrefix,
+                messageRepository, conversationRepository, outboxRepository, handoffEventRepository,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return registered;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task<bool> PersistAutomaticHandoffInTransactionAsync(
+        Guid tenantId,
+        Message inboundMessage,
+        Conversation conversation,
+        string reason,
+        string? handoffText,
+        string idempotencyPrefix,
+        IMessageRepository messageRepository,
+        IConversationRepository conversationRepository,
+        IOutboxMessageRepository outboxRepository,
+        IHandoffEventRepository handoffEventRepository,
+        CancellationToken cancellationToken)
+    {
+        var registered = await RegisterAutomaticHandoffAsync(
+            tenantId, conversation, reason, conversationRepository, handoffEventRepository, cancellationToken);
+
+        if (registered && !string.IsNullOrWhiteSpace(handoffText))
+        {
+            var handoffMessage = Message.CreateOutbound(
+                tenantId,
+                conversation.Id,
+                inboundMessage.ContactId,
+                MessageType.Text,
+                handoffText,
+                AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                    idempotencyPrefix, inboundMessage.Id, conversation.Version));
+            await messageRepository.AddAsync(handoffMessage, cancellationToken);
+            await outboxRepository.AddAsync(OutboxMessage.Create(tenantId, handoffMessage.Id));
+        }
+
+        inboundMessage.MarkProcessedByAi();
+        await messageRepository.UpdateAsync(inboundMessage, cancellationToken);
+        return registered;
     }
 
     private static string? FindFlowReply(string? flowStepsJson, string? content)

@@ -1,6 +1,11 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.Infrastructure.Persistence.Repositories;
 using WhatsAppAI.Infrastructure.Workers;
 
 namespace WhatsAppAI.UnitTests.Automation;
@@ -97,6 +102,44 @@ public sealed class AiOrchestrationWorkerTests
         Assert.Empty(handoffRepository.Events);
     }
 
+    [Fact]
+    public async Task PersistAutomaticHandoffAsync_PersistsHandoffMessageAndOutboxTogether()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var tenantId = Guid.NewGuid();
+        var currentTenant = new TestCurrentTenant(tenantId);
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new AppDbContext(options, currentTenant);
+        await db.Database.EnsureCreatedAsync();
+
+        var contact = WhatsAppAI.Domain.Messaging.Contact.Create(tenantId, "+5511999999999");
+        var conversation = Conversation.Create(tenantId, contact.Id, "manual");
+        var inbound = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "inbound-1", MessageType.Text, "Olá");
+        db.Contacts.Add(contact);
+        db.Conversations.Add(conversation);
+        db.Messages.Add(inbound);
+        await db.SaveChangesAsync();
+
+        var messageRepository = new MessageRepository(db);
+        var conversationRepository = new ConversationRepository(db);
+        var outboxRepository = new OutboxMessageRepository(db);
+        var handoffRepository = new HandoffEventRepository(db);
+
+        var registered = await AiOrchestrationWorker.PersistAutomaticHandoffAsync(
+            tenantId, inbound, conversation, "low_confidence", "Vou encaminhar para um atendente.",
+            "ai-handoff", db, messageRepository, conversationRepository, outboxRepository,
+            handoffRepository, CancellationToken.None);
+
+        Assert.True(registered);
+        Assert.True(inbound.ProcessedByAi);
+        Assert.Single(await db.HandoffEvents.IgnoreQueryFilters().ToListAsync());
+        Assert.Single(await db.Messages.IgnoreQueryFilters().Where(message => message.Direction == MessageDirection.Outbound).ToListAsync());
+        Assert.Single(await db.OutboxMessages.IgnoreQueryFilters().ToListAsync());
+    }
+
     private sealed class FakeConversationRepository : IConversationRepository
     {
         public List<Conversation> Updated { get; } = [];
@@ -129,5 +172,19 @@ public sealed class AiOrchestrationWorkerTests
 
         public Task<IReadOnlyList<HandoffEvent>> GetByConversationAsync(Guid tenantId, Guid conversationId) =>
             Task.FromResult<IReadOnlyList<HandoffEvent>>([]);
+    }
+
+    private sealed class TestCurrentTenant(Guid tenantId) : ICurrentTenant
+    {
+        public Guid? TenantId => tenantId;
+        public Guid? UserId => null;
+        public string? UserRole => "TenantOwner";
+        public bool IsPlatformAdmin => false;
+        public bool IsAuthenticated => true;
+        public SupportSessionInfo? SupportSession => null;
+        public void SetContext(Guid? tenantId, Guid userId, string role, bool isPlatformAdmin) { }
+        public void EnterSupportSession(Guid tenantId, string reason) { }
+        public void ExitSupportSession() { }
+        public void Clear() { }
     }
 }
