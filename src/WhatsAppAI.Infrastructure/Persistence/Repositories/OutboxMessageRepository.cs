@@ -34,6 +34,17 @@ public sealed class OutboxMessageRepository(AppDbContext context) : IOutboxMessa
             .ToListAsync();
     }
 
+    public async Task<bool> TryClaimAsync(Guid id, DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var affected = await context.Set<OutboxMessage>()
+            .IgnoreQueryFilters()
+            .Where(o => o.Id == id && o.Status == OutboxStatus.Pending &&
+                (o.NextRetryAt == null || o.NextRetryAt <= utcNow))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(o => o.Status, OutboxStatus.Processing), cancellationToken);
+        return affected == 1;
+    }
+
     public async Task UpdateAsync(OutboxMessage outboxMessage)
     {
         context.Set<OutboxMessage>().Update(outboxMessage);

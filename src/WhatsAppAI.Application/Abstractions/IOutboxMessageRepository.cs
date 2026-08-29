@@ -8,6 +8,7 @@ public interface IOutboxMessageRepository
     Task AddRangeAsync(IEnumerable<OutboxMessage> outboxMessages);
     Task<OutboxMessage?> GetByIdAsync(Guid id);
     Task<IReadOnlyList<OutboxMessage>> GetPendingAsync(int batchSize = 50);
+    Task<bool> TryClaimAsync(Guid id, DateTime utcNow, CancellationToken cancellationToken = default);
     Task UpdateAsync(OutboxMessage outboxMessage);
     Task<int> DeleteCompletedBeforeAsync(DateTime cutoff, int batchSize, CancellationToken cancellationToken = default);
 }

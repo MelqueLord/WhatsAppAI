@@ -67,6 +67,8 @@ public sealed class OutboxProcessingWorker(
 
         foreach (var outboxMessage in pending)
         {
+            if (!await outboxRepository.TryClaimAsync(outboxMessage.Id, DateTime.UtcNow, cancellationToken))
+                continue;
             await ProcessSingleAsync(
                 outboxMessage,
                 outboxRepository,
