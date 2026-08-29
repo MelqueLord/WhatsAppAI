@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Administration;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Usage;
@@ -561,12 +562,18 @@ public static class AdminTenantEndpoints
         if (tenant.PlanId == plan.Id)
             return Results.Ok(new { message = "Tenant already on this plan." });
 
+        var currentPlan = await dbContext.SubscriptionPlans.FindAsync(tenant.PlanId);
+        var monthlyAiResponseLimit = PlanQuotaPolicy.ResolveMonthlyAiResponseLimit(
+            tenant.MonthlyAiResponseLimit,
+            currentPlan?.DefaultMonthlyAiResponseLimit,
+            plan.DefaultMonthlyAiResponseLimit);
+
         tenant.ChangePlan(
             plan.Id,
             plan.DefaultOfficialApiLineCount,
             0,
             plan.DefaultOperatorLimit,
-            plan.DefaultMonthlyAiResponseLimit);
+            monthlyAiResponseLimit);
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
