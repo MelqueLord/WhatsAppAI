@@ -64,6 +64,33 @@ public sealed class AiReplyDeliveryGuardTests
             $"ai-unavailable:{Guid.NewGuid()}"));
     }
 
+    [Theory]
+    [InlineData("simple-auto-reply")]
+    [InlineData("ai-unavailable")]
+    [InlineData("ai-handoff")]
+    [InlineData("ai-quota")]
+    public void AutomatedNotice_RequiresVersionedKey(string kind)
+    {
+        var id = Guid.NewGuid();
+        var key = AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(kind, id, 7);
+
+        Assert.True(AiReplyDeliveryGuard.IsAutomated(key));
+        Assert.True(AiReplyDeliveryGuard.TryGetExpectedVersion(key, out var version));
+        Assert.Equal(7U, version);
+        Assert.True(AiReplyDeliveryGuard.IsAutomated($"{kind}:{id}"));
+        Assert.False(AiReplyDeliveryGuard.TryGetExpectedVersion($"{kind}:{id}", out _));
+    }
+
+    [Fact]
+    public void CanSendAutomatedNotice_AllowsIntentionalHumanHandoffWithinWindow()
+    {
+        var conversation = CreateConversationWithOpenWindow();
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version);
+
+        Assert.True(AiReplyDeliveryGuard.CanSendAutomatedNotice(
+            conversation, conversation.Version, DateTime.UtcNow));
+    }
+
     private static Conversation CreateConversationWithOpenWindow()
     {
         var conversation = Conversation.Create(

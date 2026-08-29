@@ -175,22 +175,23 @@ public sealed class OutboxProcessingWorker(
                 return;
             }
 
-            if (AiReplyDeliveryGuard.IsAiReply(message.IdempotencyKey))
+            if (AiReplyDeliveryGuard.IsAutomated(message.IdempotencyKey))
             {
                 if (conversation is not null)
                     await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
 
                 if (!AiReplyDeliveryGuard.TryGetExpectedVersion(
                         message.IdempotencyKey, out var expectedVersion) ||
-                    !AiReplyDeliveryGuard.CanSend(
-                        conversation, expectedVersion, DateTime.UtcNow))
+                    (AiReplyDeliveryGuard.IsAiReply(message.IdempotencyKey)
+                        ? !AiReplyDeliveryGuard.CanSend(conversation, expectedVersion, DateTime.UtcNow)
+                        : !AiReplyDeliveryGuard.CanSendAutomatedNotice(conversation, expectedVersion, DateTime.UtcNow)))
                 {
-                    message.MarkFailed("AI reply invalidated by conversation state");
+                    message.MarkFailed("Automated reply invalidated by conversation state");
                     await messageRepository.UpdateAsync(message, cancellationToken);
-                    outboxMessage.MarkDead("AI reply invalidated by conversation state");
+                    outboxMessage.MarkDead("Automated reply invalidated by conversation state");
                     await outboxRepository.UpdateAsync(outboxMessage);
                     logger.LogInformation(
-                        "AI reply {MessageId} discarded because conversation state changed",
+                        "Automated reply {MessageId} discarded because conversation state changed",
                         message.Id);
                     return;
                 }

@@ -211,7 +211,10 @@ public sealed class AiOrchestrationWorker(
 
                     var outboundMsg = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
-                        MessageType.Text, replyContent, $"simple-auto-reply:{message.Id}");
+                        MessageType.Text,
+                        replyContent,
+                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                            "simple-auto-reply", message.Id, expectedConversationVersion));
                     await messageRepository.AddAsync(outboundMsg, cancellationToken);
 
                     var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
@@ -473,7 +476,10 @@ public sealed class AiOrchestrationWorker(
 
                 var queueTransferMsg = Message.CreateOutbound(
                     message.TenantId, conversation.Id, message.ContactId,
-                    MessageType.Text, queueTransferText, Guid.NewGuid().ToString());
+                    MessageType.Text,
+                    queueTransferText,
+                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                        "ai-queue-transfer", message.Id, expectedConversationVersion));
                 await messageRepository.AddAsync(queueTransferMsg, cancellationToken);
 
                 var queueTransferOutbox = OutboxMessage.Create(message.TenantId, queueTransferMsg.Id);
@@ -530,7 +536,8 @@ public sealed class AiOrchestrationWorker(
                     var fallbackMessage = Message.CreateOutbound(
                         message.TenantId, conversation.Id, message.ContactId,
                         MessageType.Text, ResolveHandoffMessage(botConfig),
-                        $"ai-empty-reply:{message.Id}");
+                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                            "ai-empty-reply", message.Id, conversation.Version));
                     await messageRepository.AddAsync(fallbackMessage, cancellationToken);
                     await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
                     message.MarkProcessedByAi();
@@ -643,7 +650,10 @@ public sealed class AiOrchestrationWorker(
 
                 var handoffMsg = Message.CreateOutbound(
                     message.TenantId, conversation.Id, message.ContactId,
-                    MessageType.Text, handoffText, Guid.NewGuid().ToString());
+                    MessageType.Text,
+                    handoffText,
+                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                        "ai-handoff", message.Id, conversation.Version));
                 await messageRepository.AddAsync(handoffMsg, cancellationToken);
 
                 var handoffOutbox = OutboxMessage.Create(message.TenantId, handoffMsg.Id);
@@ -675,7 +685,8 @@ public sealed class AiOrchestrationWorker(
                     var unavailableMessage = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
                         MessageType.Text, ResolveHandoffMessage(botConfig),
-                        $"ai-quota:{message.Id}");
+                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                            "ai-quota", message.Id, currentConversation.Version));
                     await messageRepository.AddAsync(unavailableMessage, cancellationToken);
                     await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, unavailableMessage.Id));
                 }
@@ -701,10 +712,11 @@ public sealed class AiOrchestrationWorker(
                     message.TenantId, failedConversation, "ai_retry_exhausted",
                     conversationRepository, handoffEventRepository, cancellationToken);
 
-                var handoffMsg = Message.CreateOutbound(
-                    message.TenantId, message.ConversationId, message.ContactId,
-                    MessageType.Text, ResolveHandoffMessage(botConfig),
-                    $"ai-retry-exhausted:{message.Id}");
+                    var handoffMsg = Message.CreateOutbound(
+                        message.TenantId, message.ConversationId, message.ContactId,
+                        MessageType.Text, ResolveHandoffMessage(botConfig),
+                        AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                            "ai-retry-exhausted", message.Id, failedConversation.Version));
                 await messageRepository.AddAsync(handoffMsg, cancellationToken);
                 await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, handoffMsg.Id));
             }
@@ -732,11 +744,11 @@ public sealed class AiOrchestrationWorker(
             return;
         }
 
-        var fallbackMessage = ApplyUnavailableAiFallback(message, botConfig);
-        await messageRepository.UpdateAsync(message, cancellationToken);
         await RegisterAutomaticHandoffAsync(
             message.TenantId, conversation, "ai_unavailable",
             conversationRepository, handoffEventRepository, cancellationToken);
+        var fallbackMessage = ApplyUnavailableAiFallback(message, botConfig, conversation.Version);
+        await messageRepository.UpdateAsync(message, cancellationToken);
         await messageRepository.AddAsync(fallbackMessage, cancellationToken);
         await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
     }
@@ -803,7 +815,8 @@ public sealed class AiOrchestrationWorker(
             message.ContactId,
             MessageType.Text,
             ResolveHandoffMessage(botConfig),
-            $"ai-quota:{message.Id}");
+            AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                "ai-quota", message.Id, conversation.Version));
         await messageRepository.AddAsync(fallbackMessage, cancellationToken);
         await outboxRepository.AddAsync(
             OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
@@ -876,7 +889,8 @@ public sealed class AiOrchestrationWorker(
 
     internal static Message ApplyUnavailableAiFallback(
         Message message,
-        BotConfiguration? botConfig)
+        BotConfiguration? botConfig,
+        uint? expectedConversationVersion = null)
     {
         message.MarkProcessedByAi();
 
@@ -886,7 +900,9 @@ public sealed class AiOrchestrationWorker(
             message.ContactId,
             MessageType.Text,
             ResolveHandoffMessage(botConfig),
-            $"ai-unavailable:{message.Id}");
+            expectedConversationVersion is uint version
+                ? AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey("ai-unavailable", message.Id, version)
+                : $"ai-unavailable:{message.Id}");
     }
 
     internal static string ResolveHandoffMessage(BotConfiguration? botConfig)
