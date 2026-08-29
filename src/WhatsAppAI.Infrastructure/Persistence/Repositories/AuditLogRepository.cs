@@ -21,4 +21,16 @@ public sealed class AuditLogRepository(AppDbContext context) : IAuditLogReposito
             .Take(limit)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<bool> ExistsAsync(
+        Guid tenantId,
+        string action,
+        string entityId,
+        CancellationToken cancellationToken = default) =>
+        context.Set<AuditLog>()
+            .IgnoreQueryFilters()
+            .AnyAsync(entry => entry.TenantId == tenantId &&
+                entry.Action == action &&
+                entry.EntityId == entityId,
+                cancellationToken);
 }

@@ -9,6 +9,7 @@ using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Automation;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Knowledge;
@@ -65,6 +66,7 @@ public sealed class AiOrchestrationWorker(
         var handoffEventRepository = scope.ServiceProvider.GetRequiredService<IHandoffEventRepository>();
         var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
         var usageRepository = scope.ServiceProvider.GetRequiredService<IUsageLedgerRepository>();
+        var auditLogRepository = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var botConfigRepository = scope.ServiceProvider.GetRequiredService<IBotConfigurationRepository>();
@@ -80,7 +82,7 @@ public sealed class AiOrchestrationWorker(
                 messageRepository, conversationRepository,
                 credentialRepository, secretStore, aiProviderResolver,
                 contextAssembler, outboxRepository, interactionRepository,
-                usageRepository, handoffEventRepository, cancellationToken);
+                usageRepository, auditLogRepository, handoffEventRepository, cancellationToken);
         }
     }
 
@@ -100,6 +102,7 @@ public sealed class AiOrchestrationWorker(
         IOutboxMessageRepository outboxRepository,
         IAiInteractionRepository interactionRepository,
         IUsageLedgerRepository usageRepository,
+        IAuditLogRepository auditLogRepository,
         IHandoffEventRepository handoffEventRepository,
         CancellationToken cancellationToken)
     {
@@ -237,8 +240,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeAiResponseQuotaExceededAsync(
                     message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
-                    conversationRepository, outboxRepository, handoffEventRepository,
-                    cancellationToken);
+                    conversationRepository, outboxRepository, auditLogRepository, handoffEventRepository,
+                    tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
                 logger.LogWarning(
                     "Monthly AI response quota exhausted for tenant {TenantId}",
                     message.TenantId);
@@ -531,8 +534,8 @@ public sealed class AiOrchestrationWorker(
                     await quotaTransaction.DisposeAsync();
                     await FinalizeAiResponseQuotaExceededAsync(
                         message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
-                        conversationRepository, outboxRepository, handoffEventRepository,
-                        cancellationToken);
+                        conversationRepository, outboxRepository, auditLogRepository, handoffEventRepository,
+                        tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
                     logger.LogWarning(
                         "AI reply discarded because tenant {TenantId} reached its monthly quota",
                         message.TenantId);
@@ -575,6 +578,14 @@ public sealed class AiOrchestrationWorker(
                     1,
                     "responses");
                 await usageRepository.AddAsync(responseUsage, cancellationToken);
+                await RegisterAiQuotaAuditAsync(
+                    dbContext,
+                    auditLogRepository,
+                    message.TenantId,
+                    tenant.MonthlyAiResponseLimit,
+                    monthlyAiResponsesUsed + 1,
+                    transactionAlreadyHeld: true,
+                    cancellationToken);
 
                 conversation.RecordMessage();
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
@@ -730,7 +741,10 @@ public sealed class AiOrchestrationWorker(
         IMessageRepository messageRepository,
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
+        IAuditLogRepository auditLogRepository,
         IHandoffEventRepository handoffEventRepository,
+        int? monthlyLimit,
+        long monthlyResponsesUsed,
         CancellationToken cancellationToken)
     {
         await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
@@ -741,6 +755,15 @@ public sealed class AiOrchestrationWorker(
             await messageRepository.UpdateAsync(message, cancellationToken);
             return;
         }
+
+        await RegisterAiQuotaAuditAsync(
+            dbContext,
+            auditLogRepository,
+            message.TenantId,
+            monthlyLimit,
+            monthlyResponsesUsed,
+            transactionAlreadyHeld: false,
+            cancellationToken);
 
         await RegisterAutomaticHandoffAsync(
             message.TenantId,
@@ -763,6 +786,68 @@ public sealed class AiOrchestrationWorker(
 
         message.MarkProcessedByAi();
         await messageRepository.UpdateAsync(message, cancellationToken);
+    }
+
+    private static async Task RegisterAiQuotaAuditAsync(
+        AppDbContext dbContext,
+        IAuditLogRepository auditLogRepository,
+        Guid tenantId,
+        int? monthlyLimit,
+        long monthlyResponsesUsed,
+        bool transactionAlreadyHeld,
+        CancellationToken cancellationToken)
+    {
+        var level = AiQuotaAlertPolicy.GetLevel(monthlyLimit, monthlyResponsesUsed);
+        if (level is null)
+            return;
+
+        var period = $"{DateTime.UtcNow:yyyy-MM}";
+        var action = AiQuotaAlertPolicy.GetAuditAction(level.Value);
+        var entityId = $"{period}:{level.Value}";
+
+        if (!transactionAlreadyHeld)
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            if (dbContext.Database.IsNpgsql())
+            {
+                await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtext({tenantId.ToString()}))",
+                    cancellationToken);
+            }
+
+            await AddAiQuotaAuditIfMissingAsync(
+                auditLogRepository, tenantId, action, entityId, period,
+                monthlyLimit, monthlyResponsesUsed, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        await AddAiQuotaAuditIfMissingAsync(
+            auditLogRepository, tenantId, action, entityId, period,
+            monthlyLimit, monthlyResponsesUsed, cancellationToken);
+    }
+
+    private static async Task AddAiQuotaAuditIfMissingAsync(
+        IAuditLogRepository auditLogRepository,
+        Guid tenantId,
+        string action,
+        string entityId,
+        string period,
+        int? monthlyLimit,
+        long monthlyResponsesUsed,
+        CancellationToken cancellationToken)
+    {
+        if (await auditLogRepository.ExistsAsync(tenantId, action, entityId, cancellationToken))
+            return;
+
+        await auditLogRepository.AddAsync(AuditLog.Create(
+            tenantId,
+            null,
+            action,
+            "AiResponseQuota",
+            entityId,
+            $"period={period};used={monthlyResponsesUsed};limit={monthlyLimit?.ToString() ?? "unlimited"}"),
+            cancellationToken);
     }
 
     internal static Message ApplyUnavailableAiFallback(
