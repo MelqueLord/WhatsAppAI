@@ -6,6 +6,7 @@ using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.WebApi.Integrations;
 
 namespace WhatsAppAI.WebApi.Bot;
 
@@ -62,27 +63,32 @@ public static class BotConfigurationEndpoints
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
-        var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
-        if (config is null && expectedVersion != 0)
-            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply or AiPowered" });
-        if (mode == BotMode.SimpleAutoReply &&
-            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
-            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
-        if (mode == BotMode.AiPowered && await modelEvaluationRepository.GetApprovedForModelAsync(
-                currentTenant.TenantId.Value,
-                (await dbContext.AiProviderCredentials.FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive))?.ModelId ?? string.Empty,
-                httpContext.RequestAborted) is null)
-            return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
         if (!TryValidateFlowSteps(request.FlowSteps, out var flowError))
             return Results.BadRequest(new { error = flowError });
 
+        BotConfiguration? config = null;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         try
         {
+            await AiConfigurationLock.AcquireAsync(dbContext, currentTenant.TenantId.Value, httpContext.RequestAborted);
+            config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
+            if (config is null && expectedVersion != 0)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+            if (mode == BotMode.SimpleAutoReply &&
+                !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+            if (mode == BotMode.AiPowered)
+            {
+                var credential = await dbContext.AiProviderCredentials
+                    .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
+                if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
+                        currentTenant.TenantId.Value, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
+                    return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+            }
             if (config is null)
             {
                 config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
@@ -129,33 +135,34 @@ public static class BotConfigurationEndpoints
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
-        var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
-        if (config.Version != expectedVersion)
-            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
 
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply, AiPowered" });
 
-        if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
-            return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
-        if (mode == BotMode.SimpleAutoReply &&
-            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
-            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
-        if (mode == BotMode.AiPowered)
-        {
-            var credential = await dbContext.AiProviderCredentials
-                .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
-            if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
-                    currentTenant.TenantId.Value, credential.ModelId, httpContext.RequestAborted) is null)
-                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
-        }
-
+        BotConfiguration? config = null;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         try
         {
+            await AiConfigurationLock.AcquireAsync(dbContext, currentTenant.TenantId.Value, httpContext.RequestAborted);
+            config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
+            if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
+            if (config.Version != expectedVersion)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+            if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
+            if (mode == BotMode.SimpleAutoReply &&
+                !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+            if (mode == BotMode.AiPowered)
+            {
+                var credential = await dbContext.AiProviderCredentials
+                    .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
+                if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
+                        currentTenant.TenantId.Value, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
+                    return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+            }
             config.UpdateMode(mode);
             await repo.UpdateAsync(config, httpContext.RequestAborted);
             await auditLogRepository.AddAsync(AuditLog.Create(
@@ -224,42 +231,42 @@ public static class BotConfigurationEndpoints
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
-        var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
-        if (config.Version != expectedVersion)
-            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
 
-        if (request.Enabled && !string.IsNullOrWhiteSpace(request.Mode))
-        {
-            if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
-                return Results.BadRequest(new { error = "Invalid mode. Use: SimpleAutoReply or AiPowered." });
-
-            if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
-                return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
-            if (mode == BotMode.SimpleAutoReply &&
-                !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
-                return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
-
-            config.UpdateMode(mode);
-        }
-
-        if (request.Enabled && config.Mode == BotMode.SimpleAutoReply &&
-            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
-            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
-        if (request.Enabled && config.Mode == BotMode.AiPowered)
-        {
-            var credential = await dbContext.AiProviderCredentials
-                .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
-            if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
-                    currentTenant.TenantId.Value, credential.ModelId, httpContext.RequestAborted) is null)
-                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
-        }
-
+        BotConfiguration? config = null;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         try
         {
+            await AiConfigurationLock.AcquireAsync(dbContext, currentTenant.TenantId.Value, httpContext.RequestAborted);
+            config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
+            if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
+            if (config.Version != expectedVersion)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+
+            if (request.Enabled && !string.IsNullOrWhiteSpace(request.Mode))
+            {
+                if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
+                    return Results.BadRequest(new { error = "Invalid mode. Use: SimpleAutoReply or AiPowered." });
+                if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+                    return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
+                if (mode == BotMode.SimpleAutoReply &&
+                    !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+                    return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+                config.UpdateMode(mode);
+            }
+
+            if (request.Enabled && config.Mode == BotMode.SimpleAutoReply &&
+                !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+            if (request.Enabled && config.Mode == BotMode.AiPowered)
+            {
+                var credential = await dbContext.AiProviderCredentials
+                    .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
+                if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
+                        currentTenant.TenantId.Value, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
+                    return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+            }
             config.Toggle(request.Enabled);
             await repo.UpdateAsync(config, httpContext.RequestAborted);
             await auditLogRepository.AddAsync(AuditLog.Create(

@@ -133,28 +133,29 @@ public static class AiProviderEndpoints
         if (!AiModelPolicy.IsAllowed(provider, modelId))
             return Results.BadRequest(new { error = "Modelo inválido. Selecione um modelo disponível no catálogo." });
 
-        var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (existing is null && expectedVersion != 0)
-            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
-        if (existing is not null && existing.Version != expectedVersion)
-            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
-
-        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-        var aiIsActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered;
-        if (aiIsActive && await evaluationRepository.GetApprovedForModelAsync(
-                currentTenant.TenantId.Value, modelId, httpContext.RequestAborted) is null)
-            return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
-
-        var selectedCredential = await credentialRepository.GetByTenantAndProviderAsync(currentTenant.TenantId.Value, provider);
-        if (string.IsNullOrWhiteSpace(request.ApiKey) &&
-            selectedCredential is null)
-            return Results.BadRequest(new { error = "API key is required for a new provider configuration." });
-
-        var secretKey = selectedCredential?.ApiKeyRef ?? $"ai:{currentTenant.TenantId}:{provider}:apikey";
-        var configuredCredentialId = selectedCredential?.Id;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         try
         {
+            await AiConfigurationLock.AcquireAsync(dbContext, currentTenant.TenantId.Value, httpContext.RequestAborted);
+
+            var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+            if (existing is null && expectedVersion != 0)
+                return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+            if (existing is not null && existing.Version != expectedVersion)
+                return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+
+            var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+            var aiIsActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered;
+            if (aiIsActive && await evaluationRepository.GetApprovedForModelAsync(
+                    currentTenant.TenantId.Value, provider, modelId, httpContext.RequestAborted) is null)
+                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+
+            var selectedCredential = await credentialRepository.GetByTenantAndProviderAsync(currentTenant.TenantId.Value, provider);
+            if (string.IsNullOrWhiteSpace(request.ApiKey) && selectedCredential is null)
+                return Results.BadRequest(new { error = "API key is required for a new provider configuration." });
+
+            var secretKey = selectedCredential?.ApiKeyRef ?? $"ai:{currentTenant.TenantId}:{provider}:apikey";
+            var configuredCredentialId = selectedCredential?.Id;
             if (!string.IsNullOrWhiteSpace(request.ApiKey))
             {
                 secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
@@ -336,74 +337,61 @@ public static class AiProviderEndpoints
         if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match-Bot com a versão do BOT é obrigatório." });
 
-        if (request.Enabled && await credentialRepository.GetByTenantAsync(tenantId) is null)
-            return Results.BadRequest(new { error = "Configure um provedor de IA antes de ativar." });
-
-        if (request.Enabled)
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
         {
-            var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
-            if (credential is not null && await evaluationRepository.GetApprovedForModelAsync(
-                    tenantId, credential.ModelId, httpContext.RequestAborted) is null)
-                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
-        }
-
-        var botConfig = await botConfigRepository.GetByTenantAsync(tenantId);
-        if (botConfig is null)
-        {
-            if (expectedVersion != 0)
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
-
-            if (!request.Enabled)
-                return Results.Ok(new { aiActive = false, botVersion = 0U });
-
-            await using var createTransaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
-            try
+            await AiConfigurationLock.AcquireAsync(dbContext, tenantId, httpContext.RequestAborted);
+            var botConfig = await botConfigRepository.GetByTenantAsync(tenantId);
+            if (botConfig is null)
             {
+                if (expectedVersion != 0)
+                    return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+                if (!request.Enabled)
+                    return Results.Ok(new { aiActive = false, botVersion = 0U });
+
+                var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
+                if (credential is null)
+                    return Results.BadRequest(new { error = "Configure um provedor de IA antes de ativar." });
+                if (await evaluationRepository.GetApprovedForModelAsync(
+                        tenantId, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
+                    return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+
                 botConfig = BotConfiguration.Create(tenantId, BotMode.AiPowered);
                 await botConfigRepository.AddAsync(botConfig, httpContext.RequestAborted);
                 await auditLogRepository.AddAsync(AuditLog.Create(
-                    tenantId,
-                    currentTenant.UserId,
-                    "AI.ModeChanged",
-                    "BotConfiguration",
-                    botConfig.Id.ToString(),
-                    "mode=AiPowered;enabled=true"),
-                    httpContext.RequestAborted);
-                await createTransaction.CommitAsync(httpContext.RequestAborted);
+                    tenantId, currentTenant.UserId, "AI.ModeChanged", "BotConfiguration", botConfig.Id.ToString(),
+                    "mode=AiPowered;enabled=true"), httpContext.RequestAborted);
             }
-            catch (DbUpdateConcurrencyException)
+            else
             {
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
-            }
-        }
-        else
-        {
-            if (botConfig.Version != expectedVersion)
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+                if (botConfig.Version != expectedVersion)
+                    return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
 
-            botConfig.UpdateMode(request.Enabled ? BotMode.AiPowered : BotMode.Manual);
-            botConfig.Toggle(request.Enabled);
-            await using var updateTransaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
-            try
-            {
+                if (request.Enabled)
+                {
+                    var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
+                    if (credential is null)
+                        return Results.BadRequest(new { error = "Configure um provedor de IA antes de ativar." });
+                    if (await evaluationRepository.GetApprovedForModelAsync(
+                            tenantId, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
+                        return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+                }
+
+                botConfig.UpdateMode(request.Enabled ? BotMode.AiPowered : BotMode.Manual);
+                botConfig.Toggle(request.Enabled);
                 await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
                 await auditLogRepository.AddAsync(AuditLog.Create(
-                    tenantId,
-                    currentTenant.UserId,
-                    "AI.ModeChanged",
-                    "BotConfiguration",
-                    botConfig.Id.ToString(),
-                    $"mode={botConfig.Mode};enabled={botConfig.Enabled}"),
-                    httpContext.RequestAborted);
-                await updateTransaction.CommitAsync(httpContext.RequestAborted);
+                    tenantId, currentTenant.UserId, "AI.ModeChanged", "BotConfiguration", botConfig.Id.ToString(),
+                    $"mode={botConfig.Mode};enabled={botConfig.Enabled}"), httpContext.RequestAborted);
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
-            }
-        }
 
-        return Results.Ok(new { aiActive = request.Enabled, botVersion = botConfig!.Version });
+            await transaction.CommitAsync(httpContext.RequestAborted);
+            return Results.Ok(new { aiActive = request.Enabled, botVersion = botConfig.Version });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+        }
     }
 
     private static async Task<IResult> TestConnectionAsync(
@@ -559,7 +547,7 @@ public static class AiProviderEndpoints
 
         if (!AiModelPolicy.IsAllowed(credential.Provider, evaluation.RollbackModelId) ||
             await evaluationRepository.GetApprovedForModelAsync(
-                tenantId, evaluation.RollbackModelId, httpContext.RequestAborted) is null)
+                tenantId, credential.Provider, evaluation.RollbackModelId, httpContext.RequestAborted) is null)
             return Results.BadRequest(new { error = "O modelo de rollback não possui avaliação aprovada." });
 
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))

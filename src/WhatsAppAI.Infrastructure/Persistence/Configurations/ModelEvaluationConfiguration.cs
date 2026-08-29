@@ -14,6 +14,7 @@ public sealed class ModelEvaluationConfiguration : IEntityTypeConfiguration<Mode
 
         builder.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(e => e.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(e => e.Provider).HasColumnName("provider").HasMaxLength(50).IsRequired();
         builder.Property(e => e.ModelId).HasColumnName("model_id").HasMaxLength(100).IsRequired();
         builder.Property(e => e.EvaluatorUserId).HasColumnName("evaluator_user_id").IsRequired();
         builder.Property(e => e.QualityScore).HasColumnName("quality_score").IsRequired();

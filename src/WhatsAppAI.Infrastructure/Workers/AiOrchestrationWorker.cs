@@ -300,7 +300,7 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
             if (await modelEvaluationRepository.GetApprovedForModelAsync(
-                    message.TenantId, credential.ModelId, cancellationToken) is null)
+                    message.TenantId, credential.Provider, credential.ModelId, cancellationToken) is null)
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,

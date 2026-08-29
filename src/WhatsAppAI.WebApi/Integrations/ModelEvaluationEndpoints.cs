@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Infrastructure.Identity;
@@ -45,6 +46,7 @@ public static class ModelEvaluationEndpoints
         return Results.Ok(evaluations.Select(e => new
         {
             id = e.Id,
+            provider = e.Provider,
             modelId = e.ModelId,
             qualityScore = e.QualityScore,
             handoffRate = e.HandoffRate,
@@ -71,15 +73,21 @@ public static class ModelEvaluationEndpoints
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "Model evaluations require IA+BOT plan." });
 
+        var provider = AiProviderCatalog.NormalizeProvider(request.Provider);
+        var modelId = AiProviderCatalog.NormalizeModelId(request.ModelId);
+        if (!AiProviderCatalog.IsSupported(provider) || !AiModelPolicy.IsAllowed(provider, modelId))
+            return Results.BadRequest(new { error = "Selecione um provedor e modelo disponíveis no catálogo." });
+
         var evaluation = ModelEvaluation.Create(
             currentTenant.TenantId.Value,
-            request.ModelId,
+            modelId,
             currentTenant.UserId.ToString()!,
             request.QualityScore,
             request.HandoffRate,
             request.SafetyScore,
             request.CostPer1kTokens,
-            request.P95LatencyMs);
+            request.P95LatencyMs,
+            provider);
 
         await evaluationRepository.AddAsync(evaluation);
 
@@ -157,6 +165,7 @@ public static class ModelEvaluationEndpoints
 
 public sealed record CreateEvaluationRequest
 {
+    public string Provider { get; init; } = "openai";
     public string ModelId { get; init; } = string.Empty;
     public double QualityScore { get; init; }
     public double HandoffRate { get; init; }

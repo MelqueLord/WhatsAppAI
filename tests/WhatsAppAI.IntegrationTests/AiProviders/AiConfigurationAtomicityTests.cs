@@ -101,6 +101,38 @@ public sealed class AiConfigurationAtomicityTests(TestWebApplicationFactory fact
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(enabledRequest)).StatusCode);
     }
 
+    [Fact]
+    public async Task AiActivationRequiresEvaluationForConfiguredProvider()
+    {
+        var (client, tenantId) = await CreateTenantAsync();
+
+        using var providerRequest = new HttpRequestMessage(HttpMethod.Post, "/api/integrations/ai")
+        {
+            Content = JsonContent.Create(new { provider = "openai", modelId = "gpt-4o-mini", apiKey = "key" })
+        };
+        providerRequest.Headers.TryAddWithoutValidation("If-Match", "0");
+        (await client.SendAsync(providerRequest)).EnsureSuccessStatusCode();
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            var evaluation = ModelEvaluation.Create(
+                tenantId, "gpt-4o-mini", "owner", 0.9, 0.1, 0.95, 0.2m, 500, provider: "gemini");
+            evaluation.Approve();
+            db.ModelEvaluations.Add(evaluation);
+            await db.SaveChangesAsync();
+        }
+
+        using var toggleRequest = new HttpRequestMessage(HttpMethod.Post, "/api/integrations/ai/toggle")
+        {
+            Content = JsonContent.Create(new { enabled = true })
+        };
+        toggleRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
+        var blocked = await client.SendAsync(toggleRequest);
+
+        Assert.Equal(HttpStatusCode.BadRequest, blocked.StatusCode);
+        Assert.Contains("model_evaluation_required", await blocked.Content.ReadAsStringAsync());
+    }
+
     private async Task<(HttpClient Client, Guid TenantId)> CreateTenantAsync()
     {
         var db = await factory.GetDbContextAsync();

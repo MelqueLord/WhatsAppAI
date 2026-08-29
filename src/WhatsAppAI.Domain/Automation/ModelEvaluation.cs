@@ -4,6 +4,7 @@ public sealed class ModelEvaluation
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public string Provider { get; private set; } = "openai";
     public string ModelId { get; private set; } = string.Empty;
     public string EvaluatorUserId { get; private set; } = string.Empty;
     public double QualityScore { get; private set; }
@@ -26,12 +27,14 @@ public sealed class ModelEvaluation
         double handoffRate,
         double safetyScore,
         decimal costPer1kTokens,
-        int p95LatencyMs)
+        int p95LatencyMs,
+        string provider = "openai")
     {
         return new ModelEvaluation
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            Provider = provider.Trim().ToLowerInvariant(),
             ModelId = modelId,
             EvaluatorUserId = evaluatorUserId,
             QualityScore = qualityScore,

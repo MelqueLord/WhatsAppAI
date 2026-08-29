@@ -27,13 +27,15 @@ public sealed class ModelEvaluationRepository(AppDbContext context) : IModelEval
     }
 
     public async Task<ModelEvaluation?> GetApprovedForModelAsync(
-        Guid tenantId, string modelId, CancellationToken cancellationToken = default)
+        Guid tenantId, string provider, string modelId, CancellationToken cancellationToken = default)
     {
+        var normalizedProvider = provider.Trim().ToLowerInvariant();
         var normalizedModelId = modelId.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
             ? modelId["models/".Length..]
             : modelId;
         return await context.Set<ModelEvaluation>()
             .Where(e => e.TenantId == tenantId && e.IsApproved &&
+                e.Provider == normalizedProvider &&
                 (e.ModelId == modelId || e.ModelId == normalizedModelId))
             .OrderByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
