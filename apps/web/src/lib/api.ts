@@ -171,6 +171,13 @@ export interface Tenant {
   suspensionReason?: string
 }
 
+export interface AiQuotaAlert {
+  action: string
+  entityId?: string
+  details?: string
+  occurredAt: string
+}
+
 export interface Plan {
   id: string
   name: string
@@ -595,6 +602,9 @@ export const api = {
 
       get: (id: string) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}`),
+
+      quotaAlerts: (id: string) =>
+        fetchApi<AiQuotaAlert[]>(`/api/admin/tenants/${id}/quota-alerts`),
 
       create: (data: {
         name: string

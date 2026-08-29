@@ -38,6 +38,7 @@ export function AdminTenantsPage() {
   const [editPlanCode, setEditPlanCode] = useState('')
   const [editAiLimit, setEditAiLimit] = useState(0)
   const [quotaFilter, setQuotaFilter] = useState<'all' | 'normal' | 'warning' | 'exhausted' | 'unlimited'>('all')
+  const [quotaAlertsTarget, setQuotaAlertsTarget] = useState<Tenant | null>(null)
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -53,6 +54,12 @@ export function AdminTenantsPage() {
   const { data: plans } = useQuery({
     queryKey: ['plans'],
     queryFn: () => api.plans.list(),
+  })
+
+  const { data: quotaAlerts, isLoading: isQuotaAlertsLoading } = useQuery({
+    queryKey: ['admin', 'tenant-quota-alerts', quotaAlertsTarget?.id],
+    queryFn: () => api.admin.tenants.quotaAlerts(quotaAlertsTarget!.id),
+    enabled: quotaAlertsTarget !== null,
   })
 
   const createMutation = useMutation({
@@ -589,6 +596,14 @@ export function AdminTenantsPage() {
                             <KeyRound className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            onClick={() => setQuotaAlertsTarget(tenant)}
+                            className="inline-flex shrink-0 items-center text-xs text-blue-700 hover:text-blue-800 font-medium"
+                            aria-label={`Ver alertas de franquia de ${tenant.name}`}
+                            title="Ver alertas de franquia"
+                          >
+                            <TriangleAlert className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => {
                               setPaymentTarget(tenant)
                               setPaymentDate(new Date().toISOString().slice(0, 10))
@@ -644,6 +659,45 @@ export function AdminTenantsPage() {
             <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} max={new Date().toISOString().slice(0, 10)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
             <p className="mt-2 text-xs text-slate-500">O próximo vencimento será 30 dias após esta data.</p>
             <div className="mt-6 flex justify-end gap-3"><button onClick={() => setPaymentTarget(null)} className="text-sm text-slate-600">Cancelar</button><button onClick={() => paymentMutation.mutate({ tenant: paymentTarget, paidAt: `${paymentDate}T12:00:00Z` })} disabled={paymentMutation.isPending || !paymentDate} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{paymentMutation.isPending ? 'Registrando...' : 'Confirmar pagamento'}</button></div>
+          </div>
+        </div>
+      )}
+
+      {quotaAlertsTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Alertas de franquia</h2>
+                <p className="mt-1 text-sm text-slate-500">{quotaAlertsTarget.name} · últimos 3 meses</p>
+              </div>
+              <button onClick={() => setQuotaAlertsTarget(null)} className="p-2 hover:bg-slate-100 rounded-lg" title="Fechar">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="mt-5 max-h-72 overflow-y-auto">
+              {isQuotaAlertsLoading ? (
+                <div className="flex items-center justify-center py-8 text-sm text-slate-500">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando alertas...
+                </div>
+              ) : quotaAlerts && quotaAlerts.length > 0 ? (
+                <div className="space-y-2">
+                  {quotaAlerts.map((alert) => (
+                    <div key={`${alert.action}-${alert.entityId ?? alert.occurredAt}`} className="rounded-lg border border-slate-200 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`text-sm font-medium ${alert.action.endsWith('Exhausted') ? 'text-red-700' : 'text-amber-700'}`}>
+                          {alert.action.endsWith('Exhausted') ? 'Franquia esgotada' : 'Alerta de 80%'}
+                        </span>
+                        <time className="text-xs text-slate-400">{new Date(alert.occurredAt).toLocaleString('pt-BR')}</time>
+                      </div>
+                      {alert.details && <p className="mt-1 text-xs text-slate-500">{alert.details}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-500">Nenhum alerta registrado no período.</p>
+              )}
+            </div>
           </div>
         </div>
       )}

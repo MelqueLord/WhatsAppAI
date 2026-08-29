@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Administration;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
@@ -29,6 +30,9 @@ public static class AdminTenantEndpoints
 
         group.MapGet("/{tenantId:guid}", GetTenantByIdAsync)
             .WithName("GetTenantById");
+
+        group.MapGet("/{tenantId:guid}/quota-alerts", GetQuotaAlertsAsync)
+            .WithName("GetTenantQuotaAlerts");
 
         group.MapPut("/{tenantId:guid}", UpdateTenantAsync)
             .WithName("UpdateTenant");
@@ -310,6 +314,30 @@ public static class AdminTenantEndpoints
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
+    }
+
+    private static async Task<IResult> GetQuotaAlertsAsync(
+        Guid tenantId,
+        ITenantRepository tenantRepository,
+        IAuditLogRepository auditLogRepository)
+    {
+        if (await tenantRepository.GetByIdAsync(tenantId) is null)
+            return Results.NotFound();
+
+        var end = DateTime.UtcNow;
+        var alerts = await auditLogRepository.GetByTenantAsync(
+            tenantId, end.AddMonths(-3), end, 100);
+
+        return Results.Ok(alerts
+            .Where(alert => alert.EntityType == "AiResponseQuota")
+            .Select(alert => new
+            {
+                action = alert.Action,
+                entityId = alert.EntityId,
+                details = alert.Details,
+                occurredAt = alert.OccurredAt
+            })
+            .ToList());
     }
 
     private static async Task<IResult> UpdateTenantAsync(

@@ -17,6 +17,7 @@ vi.mock('../../../lib/api', () => ({
         reactivate: vi.fn(),
         registerPayment: vi.fn(),
         updatePlan: vi.fn(),
+        quotaAlerts: vi.fn(),
         resetOwnerPassword: vi.fn(),
       },
     },
@@ -36,6 +37,7 @@ describe('AdminTenantsPage capacity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.admin.tenants.list).mockResolvedValue([])
+    vi.mocked(api.admin.tenants.quotaAlerts).mockResolvedValue([])
     vi.mocked(api.plans.list).mockResolvedValue([])
     vi.mocked(api.admin.tenants.capacity).mockResolvedValue({
       customers: { current: 0, limit: 25, utilizationPercentage: 0, status: 'Normal' },
@@ -118,5 +120,27 @@ describe('AdminTenantsPage capacity', () => {
     expect(screen.getByText('Esgotadas (1)')).toBeInTheDocument()
     expect(screen.getByText('4.500')).toBeInTheDocument()
     expect(screen.getByText('11.800')).toBeInTheDocument()
+  })
+
+  it('opens the tenant quota alert history', async () => {
+    const tenant: Tenant = {
+      id: 'tenant-alerts', name: 'Empresa alertas', slug: 'empresa-alertas', planId: '', status: 'Active', version: 0,
+      createdAt: new Date().toISOString(), dueDate: new Date().toISOString(), officialApiLineCount: 1,
+      qrCodeLineCount: 0, operatorLimit: 2, monthlyAiResponseLimit: 1500,
+      monthlyAiResponsesUsed: 1200,
+    }
+    vi.mocked(api.admin.tenants.list).mockResolvedValue([tenant])
+    vi.mocked(api.admin.tenants.quotaAlerts).mockResolvedValue([{
+      action: 'AiQuota.WarningReached', entityId: '2026-08:Warning',
+      details: 'period=2026-08;used=1200;limit=1500', occurredAt: new Date().toISOString(),
+    }])
+
+    renderPage()
+    const alertButton = await screen.findByRole('button', { name: 'Ver alertas de franquia de Empresa alertas' })
+    fireEvent.click(alertButton)
+
+    expect(await screen.findByText('Alertas de franquia')).toBeInTheDocument()
+    expect(await screen.findByText('Alerta de 80%')).toBeInTheDocument()
+    expect(screen.getByText('period=2026-08;used=1200;limit=1500')).toBeInTheDocument()
   })
 })
