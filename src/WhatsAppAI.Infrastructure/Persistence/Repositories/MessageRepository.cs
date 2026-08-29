@@ -36,6 +36,26 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> TryClaimInboundForAiAsync(
+        Guid tenantId,
+        Guid messageId,
+        DateTime leaseUntil,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var updated = await context.Set<Message>()
+            .IgnoreQueryFilters()
+            .Where(message => message.TenantId == tenantId &&
+                message.Id == messageId &&
+                message.Direction == MessageDirection.Inbound &&
+                !message.ProcessedByAi &&
+                (message.NextAiRetryAt == null || message.NextAiRetryAt <= now))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(message => message.NextAiRetryAt, leaseUntil), cancellationToken);
+
+        return updated == 1;
+    }
+
     public async Task<IReadOnlyList<Message>> GetByConversationAsync(
         Guid conversationId,
         int limit = 50,

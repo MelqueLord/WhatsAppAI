@@ -26,6 +26,7 @@ public sealed class AiOrchestrationWorker(
     ILogger<AiOrchestrationWorker> logger) : BackgroundService
 {
     private const int MaxAiAttempts = 3;
+    private static readonly TimeSpan AiClaimLease = TimeSpan.FromMinutes(5);
     private readonly ConcurrentDictionary<string, CircuitBreaker> _providerBreakers = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,6 +80,15 @@ public sealed class AiOrchestrationWorker(
 
         foreach (var message in pendingInbound)
         {
+            if (!await messageRepository.TryClaimInboundForAiAsync(
+                    message.TenantId,
+                    message.Id,
+                    DateTime.UtcNow.Add(AiClaimLease),
+                    cancellationToken))
+            {
+                continue;
+            }
+
             await ProcessSingleInboundAsync(
                 message, dbContext, botConfigRepository, queueRepository, tagRepository, contactTagRepository,
                 messageRepository, conversationRepository,
