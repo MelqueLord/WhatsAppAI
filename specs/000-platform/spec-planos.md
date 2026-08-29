@@ -1,8 +1,8 @@
 # Especificação: Sistema de Planos e Gestão de Empresas
 
 **Status:** Implementado  
-**Versão:** 2.0.0
-**Data:** 2026-08-16
+**Versão:** 2.1.0
+**Data:** 2026-08-29
 **Spec relacionada:** `spec.md` (plataforma base)
 **Implementado em:** Fase 9 (T090-T112)
 
@@ -22,13 +22,15 @@ Atualmente, a plataforma provisiona tenants manualmente pelo PlatformAdmin. É n
 
 ## 3. Tipos de Plano
 
-| Plano | Linhas oficiais | Operators | IA/mês padrão | Recursos implementados |
+| Plano | Total de linhas | Operators | IA/mês padrão | Recursos implementados |
 |---|---:|---:|---:|---|
 | STAR | 1 | 2 | 1.500 | Inbox, dashboard, histórico, atendimento compartilhado, IA e conhecimento |
 | FLOW | 2 | 4 | 5.000 | Tudo do STAR, BOT, tags e filas/distribuição |
 | SCALA | 3 | 8 | 12.000 | Todos os recursos implementados do FLOW e maior capacidade operacional |
 
 Os valores de IA são sugestões iniciais e podem ser personalizados pelo PlatformAdmin em cada tenant. Pipeline, relatório avançado e respostas rápidas anunciados comercialmente ainda não possuem módulos implementados e não devem aparecer como permissão ativa até entrega própria especificada.
+
+Cada linha contratada pode ser distribuída como API Oficial ou QR Code pelo PlatformAdmin no cadastro ou na edição da empresa. A soma dos dois tipos deve corresponder exatamente ao total do plano, inclusive no STAR, que permite escolher uma única linha de qualquer um dos dois tipos.
 
 `BOT` e `IA_BOT` permanecem somente para compatibilidade de tenants existentes e não aparecem como opção para novos cadastros.
 
@@ -120,6 +122,7 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **FR-P018:** PlatformAdmin pode liberar ou renovar a franquia de respostas por tenant; o TenantOwner consulta o saldo no dashboard e recebe alerta a partir de 80%
 - **FR-P019:** PlatformAdmin consulta tokens reais de entrada/saída por tenant, provedor e modelo para estimar o custo da plataforma; tokens não substituem a franquia de respostas
 - **FR-P020:** preços de entrada e saída são versionados por provedor/modelo e aplicados ao uso registrado sem criar uma segunda quota para o tenant
+- **FR-P021:** a quantidade de linhas do plano é um total distribuível entre API Oficial e QR Code no cadastro e na edição da empresa
 
 ## 6. Regras de Negócio
 
@@ -133,6 +136,7 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **BR-P008:** apenas respostas válidas da IA enfileiradas consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem
 - **BR-P009:** franquia esgotada bloqueia o provedor e aplica handoff/fallback seguro
 - **BR-P010:** recarga e renovação são ações administrativas; a empresa não altera seu próprio limite comercial
+- **BR-P011:** em planos comerciais, a soma de linhas API Oficial e QR Code deve ser exatamente igual ao total contratado
 
 ## 7. Modelo de Dados
 
@@ -176,7 +180,7 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 1. Nome da empresa
 2. Nome do TenantOwner
 3. E-mail do TenantOwner
-4. Seleção de STAR, FLOW ou SCALA; linhas e Operators são preenchidos automaticamente
+4. Seleção de STAR, FLOW ou SCALA; o total de linhas e Operators é preenchido automaticamente, e o PlatformAdmin escolhe a distribuição das linhas entre API Oficial e QR Code
 5. Franquia mensal de respostas da IA preenchida pelo plano e editável
 6. Botão "Criar Empresa"
 7. Senha temporária exibida uma única vez

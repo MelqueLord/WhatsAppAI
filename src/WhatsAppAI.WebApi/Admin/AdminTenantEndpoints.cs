@@ -153,6 +153,12 @@ public static class AdminTenantEndpoints
                 .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
             if (plan is null || !plan.IsSelectable)
                 return Results.BadRequest(new { error = "Invalid or unavailable commercial plan code." });
+            if (!HasValidLineDistribution(
+                    plan.DefaultLineCount, request.OfficialApiLineCount, request.QrCodeLineCount))
+                return Results.BadRequest(new
+                {
+                    error = $"Official API and QR Code line counts must add up to the plan total ({plan.DefaultLineCount})."
+                });
 
             var monthlyAiResponseLimit = request.MonthlyAiResponseLimit ??
                 plan.DefaultMonthlyAiResponseLimit;
@@ -161,8 +167,8 @@ public static class AdminTenantEndpoints
                 request.Name,
                 slug,
                 plan.Id,
-                plan.DefaultOfficialApiLineCount,
-                0,
+                request.OfficialApiLineCount,
+                request.QrCodeLineCount,
                 plan.DefaultOperatorLimit,
                 monthlyAiResponseLimit);
             tenant.Activate();
@@ -650,6 +656,12 @@ public static class AdminTenantEndpoints
             .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
         if (plan is null || (!plan.IsSelectable && plan.Id != tenant.PlanId))
             return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+        if (plan.IsSelectable && !HasValidLineDistribution(
+                plan.DefaultLineCount, request.OfficialApiLineCount, request.QrCodeLineCount))
+            return Results.BadRequest(new
+            {
+                error = $"Official API and QR Code line counts must add up to the plan total ({plan.DefaultLineCount})."
+            });
 
         var owner = await dbContext.TenantMemberships
             .IgnoreQueryFilters()
@@ -663,10 +675,8 @@ public static class AdminTenantEndpoints
         if (await dbContext.Users.AnyAsync(u => u.Id != owner.Id && u.Email == ownerEmail))
             return Results.Conflict(new { error = "This email is already in use." });
 
-        var officialApiLineCount = plan.IsSelectable
-            ? plan.DefaultOfficialApiLineCount
-            : request.OfficialApiLineCount;
-        var qrCodeLineCount = plan.IsSelectable ? 0 : request.QrCodeLineCount;
+        var officialApiLineCount = request.OfficialApiLineCount;
+        var qrCodeLineCount = request.QrCodeLineCount;
         var operatorLimit = plan.IsSelectable
             ? plan.DefaultOperatorLimit
             : request.OperatorLimit;
@@ -846,10 +856,22 @@ public static class AdminTenantEndpoints
             currentPlan?.DefaultMonthlyAiResponseLimit,
             plan.DefaultMonthlyAiResponseLimit);
 
+        var officialApiLineCount = request.OfficialApiLineCount ??
+            (request.QrCodeLineCount is int requestedQrCodeLineCount
+                ? plan.DefaultLineCount - requestedQrCodeLineCount
+                : Math.Min(tenant.OfficialApiLineCount, plan.DefaultLineCount));
+        var qrCodeLineCount = request.QrCodeLineCount ??
+            (plan.DefaultLineCount - officialApiLineCount);
+        if (!HasValidLineDistribution(plan.DefaultLineCount, officialApiLineCount, qrCodeLineCount))
+            return Results.BadRequest(new
+            {
+                error = $"Official API and QR Code line counts must add up to the plan total ({plan.DefaultLineCount})."
+            });
+
         tenant.ChangePlan(
             plan.Id,
-            plan.DefaultOfficialApiLineCount,
-            0,
+            officialApiLineCount,
+            qrCodeLineCount,
             plan.DefaultOperatorLimit,
             monthlyAiResponseLimit);
         await tenantRepository.UpdateAsync(tenant);
@@ -908,6 +930,14 @@ public static class AdminTenantEndpoints
 
         return uint.TryParse(ifMatch.Trim('"'), out version);
     }
+
+    private static bool HasValidLineDistribution(
+        int totalLineCount,
+        int officialApiLineCount,
+        int qrCodeLineCount) =>
+        officialApiLineCount >= 0 &&
+        qrCodeLineCount >= 0 &&
+        (long)officialApiLineCount + qrCodeLineCount == totalLineCount;
 }
 
 public sealed class CreateTenantRequest
@@ -952,6 +982,8 @@ public sealed class RegisterPaymentRequest
 public sealed class UpdatePlanRequest
 {
     public string PlanCode { get; init; } = string.Empty;
+    public int? OfficialApiLineCount { get; init; }
+    public int? QrCodeLineCount { get; init; }
 }
 
 public sealed class UpdateTenantRequest

@@ -13,7 +13,7 @@ public sealed class SubscriptionPlan
     public bool TagsEnabled { get; private set; }
     public bool AutomaticDistributionEnabled { get; private set; }
     public bool IsSelectable { get; private set; }
-    public int DefaultOfficialApiLineCount { get; private set; }
+    public int DefaultLineCount { get; private set; }
     public int DefaultOperatorLimit { get; private set; }
     public int? DefaultMonthlyAiResponseLimit { get; private set; }
     public int? MaxOperators { get; private set; }
@@ -29,7 +29,7 @@ public sealed class SubscriptionPlan
         return Create(
             name, code, description, aiEnabled,
             botEnabled: true, tagsEnabled: true, automaticDistributionEnabled: true,
-            isSelectable: false, defaultOfficialApiLineCount: 0,
+            isSelectable: false, defaultLineCount: 0,
             defaultOperatorLimit: 0, defaultMonthlyAiResponseLimit: null);
     }
 
@@ -42,7 +42,7 @@ public sealed class SubscriptionPlan
         bool tagsEnabled,
         bool automaticDistributionEnabled,
         bool isSelectable,
-        int defaultOfficialApiLineCount,
+        int defaultLineCount,
         int defaultOperatorLimit,
         int? defaultMonthlyAiResponseLimit)
     {
@@ -59,7 +59,7 @@ public sealed class SubscriptionPlan
             TagsEnabled = tagsEnabled,
             AutomaticDistributionEnabled = automaticDistributionEnabled,
             IsSelectable = isSelectable,
-            DefaultOfficialApiLineCount = defaultOfficialApiLineCount,
+            DefaultLineCount = defaultLineCount,
             DefaultOperatorLimit = defaultOperatorLimit,
             DefaultMonthlyAiResponseLimit = defaultMonthlyAiResponseLimit,
             MaxOperators = defaultOperatorLimit > 0 ? defaultOperatorLimit : null,
@@ -83,7 +83,7 @@ public sealed class SubscriptionPlan
         return Create(
             "STAR", "STAR", "O essencial para começar com profissionalismo", true,
             botEnabled: false, tagsEnabled: false, automaticDistributionEnabled: false,
-            isSelectable: true, defaultOfficialApiLineCount: 1,
+            isSelectable: true, defaultLineCount: 1,
             defaultOperatorLimit: 2, defaultMonthlyAiResponseLimit: 1_500);
     }
 
@@ -92,7 +92,7 @@ public sealed class SubscriptionPlan
         return Create(
             "FLOW", "FLOW", "Para ganhar agilidade no atendimento", true,
             botEnabled: true, tagsEnabled: true, automaticDistributionEnabled: true,
-            isSelectable: true, defaultOfficialApiLineCount: 2,
+            isSelectable: true, defaultLineCount: 2,
             defaultOperatorLimit: 4, defaultMonthlyAiResponseLimit: 5_000);
     }
 
@@ -101,7 +101,7 @@ public sealed class SubscriptionPlan
         return Create(
             "SCALA", "SCALA", "Leve sua operação para o próximo nível", true,
             botEnabled: true, tagsEnabled: true, automaticDistributionEnabled: true,
-            isSelectable: true, defaultOfficialApiLineCount: 3,
+            isSelectable: true, defaultLineCount: 3,
             defaultOperatorLimit: 8, defaultMonthlyAiResponseLimit: 12_000);
     }
 

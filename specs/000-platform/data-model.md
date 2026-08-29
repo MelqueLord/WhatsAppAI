@@ -114,9 +114,9 @@ Somente append; metadata sanitizada. A identidade de banco usada pela aplicaçã
 
 ### SubscriptionPlan
 
-`id`, `name`, `code`, `description`, `ai_enabled`, `openai_required`, `ai_metrics`, `bot_enabled`, `tags_enabled`, `automatic_distribution_enabled`, `is_selectable`, `default_official_api_line_count`, `default_operator_limit`, `default_monthly_ai_response_limit`, `max_operators`, `max_knowledge_items`, `is_active`, `created_at`, `updated_at`.
+`id`, `name`, `code`, `description`, `ai_enabled`, `openai_required`, `ai_metrics`, `bot_enabled`, `tags_enabled`, `automatic_distribution_enabled`, `is_selectable`, `default_line_count`, `default_operator_limit`, `default_monthly_ai_response_limit`, `max_operators`, `max_knowledge_items`, `is_active`, `created_at`, `updated_at`.
 
-Planos comerciais selecionáveis: `STAR` (1 linha, 2 operadores, IA), `FLOW` (2 linhas, 4 operadores, IA, BOT, tags e distribuição) e `SCALA` (3 linhas, 8 operadores, os mesmos módulos atualmente implementados do FLOW). `BOT` e `IA_BOT` permanecem legados e não selecionáveis. A franquia de respostas parte do padrão do plano e pode ser personalizada por tenant. Único `code`; seed e migration garantem os planos (**FR-042** a **FR-045**, **BR-021**, **BR-022**).
+Planos comerciais selecionáveis: `STAR` (1 linha, 2 operadores, IA), `FLOW` (2 linhas, 4 operadores, IA, BOT, tags e distribuição) e `SCALA` (3 linhas, 8 operadores, os mesmos módulos atualmente implementados do FLOW). `default_line_count` representa o total distribuível entre `Tenant.official_api_line_count` e `Tenant.qr_code_line_count`. `BOT` e `IA_BOT` permanecem legados e não selecionáveis. A franquia de respostas parte do padrão do plano e pode ser personalizada por tenant. Único `code`; seed e migration garantem os planos (**FR-042** a **FR-045**, **FR-053**, **BR-021** a **BR-023**).
 
 ### BotConfiguration
 

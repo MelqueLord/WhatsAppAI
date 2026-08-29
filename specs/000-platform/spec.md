@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.18.0
+**Versão:** 0.19.0
 **Data:** 2026-08-29
 
 ## 1. Problema
@@ -181,7 +181,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 
 **Aceite:**
 
-1. STAR provisiona 1 linha oficial e 2 Operators; FLOW, 2 linhas e 4 Operators; SCALA, 3 linhas e 8 Operators.
+1. STAR provisiona 1 vaga de linha e 2 Operators; FLOW, 2 vagas e 4 Operators; SCALA, 3 vagas e 8 Operators. Em cada vaga, o PlatformAdmin escolhe API Oficial ou QR Code.
 2. Todos incluem IA; BOT, tags e filas automáticas são liberados apenas nos planos que os oferecem.
 3. A franquia começa com o padrão do plano, mas pode ser personalizada por empresa com concorrência otimista.
 4. Somente respostas válidas da IA enfileiradas para envio consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem.
@@ -241,6 +241,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
 - **FR-051:** persistir alterações de configuração, modo, handoff e auditoria na mesma transação, validando todas as versões `If-Match` antes de qualquer escrita para impedir estado parcial.
 - **FR-052:** exigir avaliação aprovada para ativar o modelo de IA, registrar a decisão de promoção e permitir retorno transacional ao modelo de rollback aprovado.
+- **FR-053:** tratar a quantidade de linhas do plano como limite total e exigir que o PlatformAdmin distribua todas as vagas entre API Oficial e QR Code no cadastro e na edição do tenant, inclusive em planos com uma única linha.
 
 ## 6. Regras de negócio
 
@@ -264,8 +265,9 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-018:** `assigned_queue_id` nulo representa atendimento geral; quando preenchido, uma conversa só pode ser listada, aberta ou respondida pelo Operator se possuir exatamente essa fila, sem aceitar fila inativa, inexistente ou de outro tenant na configuração.
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
 - **BR-020:** capacidade de clientes inclui tenants `Pending`, `Active` e `Suspended`; linhas incluem `WhatsAppAccount` ativo desses tenants; operadores incluem membership `Operator` ativa desses tenants. Tenant `Closed` e seus recursos ficam fora dos três indicadores.
-- **BR-021:** STAR libera IA e base de conhecimento, com 1 linha oficial e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 linhas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 linhas e 8 Operators.
+- **BR-021:** STAR libera IA e base de conhecimento, com 1 vaga de linha e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 vagas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 vagas e 8 Operators. Cada vaga pode ser provisionada como API Oficial ou QR Code, sem ultrapassar nem deixar vaga não distribuída.
 - **BR-022:** a franquia efetiva é o limite mensal persistido no tenant somado às recargas de 500 registradas no mês civil UTC; `null` preserva tenants legados sem limite, `0` sem recarga bloqueia respostas da IA e valores positivos limitam o mês. A suspensão por esgotamento afeta somente respostas da IA, preservando BOT, WhatsApp e atendimento humano. O alerta começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
+- **BR-023:** em planos comerciais, `official_api_line_count + qr_code_line_count` deve ser exatamente igual ao total de linhas do plano; valores negativos, excesso ou soma incompleta são rejeitados pelo backend.
 
 ## 7. Requisitos não funcionais
 

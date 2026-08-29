@@ -33,7 +33,7 @@ public static class SubscriptionPlanEndpoints
                 TagsEnabled = p.TagsEnabled,
                 AutomaticDistributionEnabled = p.AutomaticDistributionEnabled,
                 IsSelectable = p.IsSelectable,
-                DefaultOfficialApiLineCount = p.DefaultOfficialApiLineCount,
+                DefaultLineCount = p.DefaultLineCount,
                 DefaultOperatorLimit = p.DefaultOperatorLimit,
                 DefaultMonthlyAiResponseLimit = p.DefaultMonthlyAiResponseLimit,
                 MaxOperators = p.MaxOperators
@@ -55,7 +55,7 @@ public sealed class PlanResponse
     public bool TagsEnabled { get; init; }
     public bool AutomaticDistributionEnabled { get; init; }
     public bool IsSelectable { get; init; }
-    public int DefaultOfficialApiLineCount { get; init; }
+    public int DefaultLineCount { get; init; }
     public int DefaultOperatorLimit { get; init; }
     public int? DefaultMonthlyAiResponseLimit { get; init; }
     public int? MaxOperators { get; init; }

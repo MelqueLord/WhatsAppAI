@@ -36,8 +36,10 @@ export function AdminTenantsPage() {
   const [paymentDate, setPaymentDate] = useState('')
   const [createPlanCode, setCreatePlanCode] = useState('STAR')
   const [createAiLimit, setCreateAiLimit] = useState(1500)
+  const [createOfficialLineCount, setCreateOfficialLineCount] = useState(1)
   const [editPlanCode, setEditPlanCode] = useState('')
   const [editAiLimit, setEditAiLimit] = useState(0)
+  const [editOfficialLineCount, setEditOfficialLineCount] = useState(0)
   const [quotaFilter, setQuotaFilter] = useState<'all' | 'normal' | 'warning' | 'exhausted' | 'unlimited'>('all')
   const [quotaAlertsTarget, setQuotaAlertsTarget] = useState<Tenant | null>(null)
   const [aiUsageTarget, setAiUsageTarget] = useState<Tenant | null>(null)
@@ -107,14 +109,6 @@ export function AdminTenantsPage() {
     },
   })
 
-  const updatePlanMutation = useMutation({
-    mutationFn: ({ tenant, planCode }: { tenant: Tenant; planCode: string }) =>
-      api.admin.tenants.updatePlan(tenant.id, planCode, tenant.version),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
-    },
-  })
-
   const resetOwnerPasswordMutation = useMutation({
     mutationFn: (tenantId: string) => api.admin.tenants.resetOwnerPassword(tenantId),
     onSuccess: (data, tenantId) => {
@@ -164,13 +158,14 @@ export function AdminTenantsPage() {
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
+    const totalLineCount = plans?.find((plan) => plan.code === createPlanCode)?.defaultLineCount ?? 0
     createMutation.mutate({
       name: formData.get('name') as string,
       ownerEmail: formData.get('ownerEmail') as string,
       ownerDisplayName: (formData.get('ownerDisplayName') as string) || undefined,
       planCode: createPlanCode,
-      officialApiLineCount: plans?.find((plan) => plan.code === createPlanCode)?.defaultOfficialApiLineCount ?? 0,
-      qrCodeLineCount: 0,
+      officialApiLineCount: createOfficialLineCount,
+      qrCodeLineCount: totalLineCount - createOfficialLineCount,
       operatorLimit: plans?.find((plan) => plan.code === createPlanCode)?.defaultOperatorLimit ?? 0,
       monthlyAiResponseLimit: createAiLimit,
     })
@@ -187,6 +182,10 @@ export function AdminTenantsPage() {
     if (!editTarget) return
 
     const formData = new FormData(e.currentTarget)
+    const selectedPlan = plans?.find((plan) => plan.code === editPlanCode)
+    const totalLineCount = selectedPlan?.isSelectable
+      ? selectedPlan.defaultLineCount
+      : editTarget.officialApiLineCount + editTarget.qrCodeLineCount
     updateMutation.mutate({
       tenant: editTarget,
       data: {
@@ -194,8 +193,8 @@ export function AdminTenantsPage() {
         ownerEmail: String(formData.get('ownerEmail') ?? '').trim(),
         ownerDisplayName: String(formData.get('ownerDisplayName') ?? '').trim() || undefined,
         planCode: editPlanCode,
-        officialApiLineCount: plans?.find((plan) => plan.code === editPlanCode)?.defaultOfficialApiLineCount ?? editTarget.officialApiLineCount,
-        qrCodeLineCount: 0,
+        officialApiLineCount: editOfficialLineCount,
+        qrCodeLineCount: totalLineCount - editOfficialLineCount,
         operatorLimit: plans?.find((plan) => plan.code === editPlanCode)?.defaultOperatorLimit ?? editTarget.operatorLimit,
         monthlyAiResponseLimit: editAiLimit,
       },
@@ -225,6 +224,10 @@ export function AdminTenantsPage() {
   const selectablePlans = (plans ?? []).filter((plan) => plan.isSelectable)
   const selectedCreatePlan = plans?.find((plan) => plan.code === createPlanCode)
   const selectedEditPlan = plans?.find((plan) => plan.code === editPlanCode)
+  const createTotalLineCount = selectedCreatePlan?.defaultLineCount ?? 0
+  const editTotalLineCount = selectedEditPlan?.isSelectable
+    ? selectedEditPlan.defaultLineCount
+    : (editTarget?.officialApiLineCount ?? 0) + (editTarget?.qrCodeLineCount ?? 0)
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -604,6 +607,7 @@ export function AdminTenantsPage() {
                               setEditPlanCode(currentPlan?.code ?? '')
                               setEditAiLimit(tenant.monthlyAiBaseResponseLimit ?? tenant.monthlyAiResponseLimit ??
                                 currentPlan?.defaultMonthlyAiResponseLimit ?? 0)
+                              setEditOfficialLineCount(tenant.officialApiLineCount)
                               setEditTarget(tenant)
                             }}
                             className="inline-flex shrink-0 items-center text-xs text-slate-600 hover:text-emerald-700 font-medium"
@@ -612,15 +616,6 @@ export function AdminTenantsPage() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          <select
-                            value={plans?.find(p => p.id === tenant.planId)?.code || ''}
-                            onChange={(e) => updatePlanMutation.mutate({ tenant, planCode: e.target.value })}
-                            className="text-xs px-2 py-1 border border-slate-200 rounded-lg"
-                          >
-                            {plans?.filter((plan) => plan.isSelectable || plan.id === tenant.planId).map(p => (
-                              <option key={p.id} value={p.code}>{p.name}</option>
-                            ))}
-                          </select>
                           <button
                             onClick={() => resetOwnerPasswordMutation.mutate(tenant.id)}
                             disabled={!tenant.ownerEmail || resetOwnerPasswordMutation.isPending}
@@ -918,6 +913,7 @@ export function AdminTenantsPage() {
                     const plan = plans?.find((item) => item.code === event.target.value)
                     setCreatePlanCode(event.target.value)
                     setCreateAiLimit(plan?.defaultMonthlyAiResponseLimit ?? 0)
+                    setCreateOfficialLineCount(plan?.defaultLineCount ?? 0)
                   }}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 >
@@ -932,8 +928,24 @@ export function AdminTenantsPage() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-                <div><span className="block text-xs text-slate-400">Linhas oficiais</span><strong>{selectedCreatePlan?.defaultOfficialApiLineCount ?? 0}</strong></div>
+                <div><span className="block text-xs text-slate-400">Total de linhas</span><strong>{createTotalLineCount}</strong></div>
                 <div><span className="block text-xs text-slate-400">Operadores</span><strong>{selectedCreatePlan?.defaultOperatorLimit ?? 0}</strong></div>
+              </div>
+              <div>
+                <label htmlFor="create-line-distribution" className="block text-sm font-medium text-slate-700 mb-1.5">Distribuição das linhas</label>
+                <select
+                  id="create-line-distribution"
+                  value={createOfficialLineCount}
+                  onChange={(event) => setCreateOfficialLineCount(Number(event.target.value))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                >
+                  {Array.from({ length: createTotalLineCount + 1 }, (_, officialCount) => (
+                    <option key={officialCount} value={officialCount}>
+                      {officialCount} API Oficial + {createTotalLineCount - officialCount} QR Code
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Distribua todas as vagas do plano entre API Oficial e QR Code.</p>
               </div>
               <div>
                 <label htmlFor="create-ai-limit" className="block text-sm font-medium text-slate-700 mb-1.5">Respostas da IA por mês</label>
@@ -1034,6 +1046,7 @@ export function AdminTenantsPage() {
                     const plan = plans?.find((item) => item.code === event.target.value)
                     setEditPlanCode(event.target.value)
                     setEditAiLimit(plan?.defaultMonthlyAiResponseLimit ?? 0)
+                    setEditOfficialLineCount(plan?.isSelectable ? plan.defaultLineCount : editTarget.officialApiLineCount)
                   }}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 >
@@ -1041,8 +1054,23 @@ export function AdminTenantsPage() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-                <div><span className="block text-xs text-slate-400">Linhas oficiais</span><strong>{selectedEditPlan?.isSelectable ? selectedEditPlan.defaultOfficialApiLineCount : editTarget.officialApiLineCount}</strong></div>
+                <div><span className="block text-xs text-slate-400">Total de linhas</span><strong>{editTotalLineCount}</strong></div>
                 <div><span className="block text-xs text-slate-400">Operadores</span><strong>{selectedEditPlan?.isSelectable ? selectedEditPlan.defaultOperatorLimit : editTarget.operatorLimit}</strong></div>
+              </div>
+              <div>
+                <label htmlFor="edit-line-distribution" className="block text-sm font-medium text-slate-700 mb-1.5">Distribuição das linhas</label>
+                <select
+                  id="edit-line-distribution"
+                  value={editOfficialLineCount}
+                  onChange={(event) => setEditOfficialLineCount(Number(event.target.value))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                >
+                  {Array.from({ length: editTotalLineCount + 1 }, (_, officialCount) => (
+                    <option key={officialCount} value={officialCount}>
+                      {officialCount} API Oficial + {editTotalLineCount - officialCount} QR Code
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Respostas da IA por mês</label>

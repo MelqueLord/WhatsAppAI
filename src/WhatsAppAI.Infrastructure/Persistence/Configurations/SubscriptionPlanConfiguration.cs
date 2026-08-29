@@ -23,7 +23,7 @@ public class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Subscripti
         builder.Property(p => p.TagsEnabled).HasColumnName("tags_enabled").IsRequired();
         builder.Property(p => p.AutomaticDistributionEnabled).HasColumnName("automatic_distribution_enabled").IsRequired();
         builder.Property(p => p.IsSelectable).HasColumnName("is_selectable").IsRequired();
-        builder.Property(p => p.DefaultOfficialApiLineCount).HasColumnName("default_official_api_line_count").IsRequired();
+        builder.Property(p => p.DefaultLineCount).HasColumnName("default_line_count").IsRequired();
         builder.Property(p => p.DefaultOperatorLimit).HasColumnName("default_operator_limit").IsRequired();
         builder.Property(p => p.DefaultMonthlyAiResponseLimit).HasColumnName("default_monthly_ai_response_limit");
         builder.Property(p => p.MaxOperators).HasColumnName("max_operators");

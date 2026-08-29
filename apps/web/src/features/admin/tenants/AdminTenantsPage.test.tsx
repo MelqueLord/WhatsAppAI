@@ -82,13 +82,13 @@ describe('AdminTenantsPage capacity', () => {
       {
         id: 'star', name: 'STAR', code: 'STAR', description: 'Essencial', aiEnabled: true,
         botEnabled: false, tagsEnabled: false, automaticDistributionEnabled: false,
-        isSelectable: true, defaultOfficialApiLineCount: 1, defaultOperatorLimit: 2,
+        isSelectable: true, defaultLineCount: 1, defaultOperatorLimit: 2,
         defaultMonthlyAiResponseLimit: 1500,
       },
       {
         id: 'flow', name: 'FLOW', code: 'FLOW', description: 'Agilidade', aiEnabled: true,
         botEnabled: true, tagsEnabled: true, automaticDistributionEnabled: true,
-        isSelectable: true, defaultOfficialApiLineCount: 2, defaultOperatorLimit: 4,
+        isSelectable: true, defaultLineCount: 2, defaultOperatorLimit: 4,
         defaultMonthlyAiResponseLimit: 5000,
       },
     ])
@@ -100,10 +100,20 @@ describe('AdminTenantsPage capacity', () => {
 
     const plan = screen.getByLabelText('Plano *')
     const allowance = screen.getByLabelText('Respostas da IA por mês')
+    const lineDistribution = screen.getByLabelText('Distribuição das linhas')
     expect(allowance).toHaveValue(1500)
+    expect(lineDistribution).toHaveValue('1')
+
+    fireEvent.change(lineDistribution, { target: { value: '0' } })
+    expect(lineDistribution).toHaveValue('0')
+    expect(screen.getByRole('option', { name: '0 API Oficial + 1 QR Code' })).toBeInTheDocument()
 
     fireEvent.change(plan, { target: { value: 'FLOW' } })
     expect(allowance).toHaveValue(5000)
+    expect(lineDistribution).toHaveValue('2')
+
+    fireEvent.change(lineDistribution, { target: { value: '1' } })
+    expect(screen.getByRole('option', { name: '1 API Oficial + 1 QR Code' })).toBeInTheDocument()
 
     fireEvent.change(allowance, { target: { value: '6500' } })
     expect(allowance).toHaveValue(6500)

@@ -227,7 +227,7 @@ export interface Plan {
   tagsEnabled: boolean
   automaticDistributionEnabled: boolean
   isSelectable: boolean
-  defaultOfficialApiLineCount: number
+  defaultLineCount: number
   defaultOperatorLimit: number
   defaultMonthlyAiResponseLimit?: number | null
   maxOperators?: number

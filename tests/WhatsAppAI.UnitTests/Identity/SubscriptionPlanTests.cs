@@ -54,7 +54,7 @@ public class SubscriptionPlanTests
         Assert.Equal(code, plan.Code);
         Assert.True(plan.AiEnabled);
         Assert.True(plan.IsSelectable);
-        Assert.Equal(lines, plan.DefaultOfficialApiLineCount);
+        Assert.Equal(lines, plan.DefaultLineCount);
         Assert.Equal(operators, plan.DefaultOperatorLimit);
         Assert.Equal(aiResponses, plan.DefaultMonthlyAiResponseLimit);
         Assert.Equal(botEnabled, plan.BotEnabled);
