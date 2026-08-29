@@ -1,10 +1,12 @@
 using WhatsAppAI.Domain.Integrations;
+using System.Text.Json;
 using Xunit;
 
 namespace WhatsAppAI.UnitTests.Integrations;
 
 public class BotConfigurationTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     [Fact]
     public void Create_DefaultModeIsManual()
     {
@@ -87,4 +89,32 @@ public class BotConfigurationTests
 
         Assert.True(config.Enabled);
     }
+
+    [Fact]
+    public void UpdateBusinessHours_PersistsScheduleAndTimezone()
+    {
+        var config = BotConfiguration.Create(Guid.NewGuid());
+        var schedule = JsonSerializer.Serialize(DefaultSchedule(), JsonOptions);
+
+        config.UpdateBusinessHours(true, "America/Sao_Paulo", schedule);
+
+        Assert.True(config.BusinessHoursEnabled);
+        Assert.Equal("America/Sao_Paulo", config.TimeZoneId);
+        Assert.Equal(schedule, config.BusinessHoursJson);
+    }
+
+    [Fact]
+    public void BusinessHoursPolicy_UsesConfiguredTimezoneAndDay()
+    {
+        var schedule = JsonSerializer.Serialize(DefaultSchedule(), JsonOptions);
+
+        Assert.True(BusinessHoursPolicy.IsOpen(true, schedule, "America/Sao_Paulo", new DateTime(2026, 8, 28, 14, 0, 0, DateTimeKind.Utc)));
+        Assert.False(BusinessHoursPolicy.IsOpen(true, schedule, "America/Sao_Paulo", new DateTime(2026, 8, 28, 22, 0, 0, DateTimeKind.Utc)));
+        Assert.True(BusinessHoursPolicy.IsOpen(false, null, "America/Sao_Paulo", DateTime.UtcNow));
+    }
+
+    private static BusinessHoursDay[] DefaultSchedule() =>
+        Enumerable.Range(0, 7)
+            .Select(day => new BusinessHoursDay(day, day is >= 1 and <= 5, "09:00", "18:00"))
+            .ToArray();
 }

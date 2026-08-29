@@ -202,13 +202,33 @@ public sealed class AiOrchestrationWorker(
 
                 try
                 {
-                    var previousInboundCount = await dbContext.Messages
-                        .IgnoreQueryFilters()
-                        .CountAsync(item => item.ConversationId == message.ConversationId &&
-                            item.Direction == MessageDirection.Inbound && item.Id != message.Id, cancellationToken);
-                    var replyContent = FindFlowReply(botConfig.FlowStepsJson, message.Content)
-                        ?? (previousInboundCount > 0 ? botConfig.ReturningMessage : botConfig.WelcomeMessage)
-                        ?? botConfig.FallbackMessage;
+                    var withinBusinessHours = BusinessHoursPolicy.IsOpen(
+                        botConfig.BusinessHoursEnabled,
+                        botConfig.BusinessHoursJson,
+                        botConfig.TimeZoneId,
+                        DateTime.UtcNow);
+                    string? replyContent;
+                    if (!withinBusinessHours)
+                    {
+                        replyContent = botConfig.OfflineMessage;
+                        if (string.IsNullOrWhiteSpace(replyContent))
+                        {
+                            message.MarkProcessedByAi();
+                            await messageRepository.UpdateAsync(message, cancellationToken);
+                            logger.LogInformation("SimpleAutoReply skipped outside business hours for tenant {TenantId}", message.TenantId);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        var previousInboundCount = await dbContext.Messages
+                            .IgnoreQueryFilters()
+                            .CountAsync(item => item.ConversationId == message.ConversationId &&
+                                item.Direction == MessageDirection.Inbound && item.Id != message.Id, cancellationToken);
+                        replyContent = FindFlowReply(botConfig.FlowStepsJson, message.Content)
+                            ?? (previousInboundCount > 0 ? botConfig.ReturningMessage : botConfig.WelcomeMessage)
+                            ?? botConfig.FallbackMessage;
+                    }
                     if (string.IsNullOrWhiteSpace(replyContent))
                         replyContent = "Obrigado pela sua mensagem. Em breve retornaremos o contato.";
 

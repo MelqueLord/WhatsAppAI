@@ -1,5 +1,5 @@
 import { fetchWithCsrf } from '../../lib/api'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../lib/auth'
 import {
@@ -16,6 +16,13 @@ interface FlowStep {
   response: string
 }
 
+interface BusinessHoursDay {
+  dayOfWeek: number
+  enabled: boolean
+  open: string
+  close: string
+}
+
 interface BotConfig {
   configured: boolean
   mode: string
@@ -29,9 +36,14 @@ interface BotConfig {
   enabled: boolean
   version?: number
   flowSteps?: FlowStep[]
+  businessHoursEnabled?: boolean
+  timeZoneId?: string
+  businessHours?: BusinessHoursDay[]
 }
 
 const newStep = (): FlowStep => ({ id: `step-${Date.now()}`, title: '', keywords: '', response: '' })
+const defaultBusinessHours = (): BusinessHoursDay[] => Array.from({ length: 7 }, (_, dayOfWeek) => ({ dayOfWeek, enabled: false, open: '09:00', close: '18:00' }))
+const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +110,9 @@ export function BotConfigPage() {
   const [handoffMessage, setHandoffMessage] = useState<string | undefined>(undefined)
   const [queueTransferMessage, setQueueTransferMessage] = useState<string | undefined>(undefined)
   const [flowSteps, setFlowSteps] = useState<FlowStep[] | undefined>(undefined)
+  const [businessHoursEnabled, setBusinessHoursEnabled] = useState(false)
+  const [timeZoneId, setTimeZoneId] = useState('America/Sao_Paulo')
+  const [businessHours, setBusinessHours] = useState<BusinessHoursDay[]>(defaultBusinessHours)
   const [success, setSuccess] = useState(false)
   const [expandedStep, setExpandedStep] = useState<string | null>(null)
   const [previewInput, setPreviewInput] = useState('')
@@ -112,6 +127,14 @@ export function BotConfigPage() {
       return res.json() as Promise<BotConfig>
     },
   })
+
+  useEffect(() => {
+    if (!config) return
+    setBusinessHoursEnabled(config.businessHoursEnabled === true)
+    setTimeZoneId(config.timeZoneId ?? 'America/Sao_Paulo')
+    setBusinessHours(config.businessHours?.length === 7 ? config.businessHours : defaultBusinessHours())
+    setFlowSteps(config.flowSteps ?? [])
+  }, [config])
 
   const version = config?.version ?? 0
 
@@ -151,6 +174,9 @@ export function BotConfigPage() {
           handoffMessage: handoffMessage ?? config?.handoffMessage ?? '',
           queueTransferMessage: queueTransferMessage ?? config?.queueTransferMessage ?? '',
           flowSteps: steps,
+          businessHoursEnabled,
+          timeZoneId,
+          businessHours,
         }),
       })
       if (!res.ok) {
@@ -177,6 +203,9 @@ export function BotConfigPage() {
     setFlowSteps((prev) => [...(prev ?? effectiveSteps), s])
     setExpandedStep(s.id)
   }
+
+  const updateBusinessDay = (dayOfWeek: number, patch: Partial<BusinessHoursDay>) =>
+    setBusinessHours((days) => days.map((day) => day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day))
 
   if (isLoading)
     return (
@@ -248,6 +277,37 @@ export function BotConfigPage() {
             O BOT e a IA são mutuamente exclusivos: ativar o BOT desativa a IA, e ativar a IA desativa o BOT.
           </div>
         )}
+
+        <Section
+          title="Horário de atendimento"
+          description="Defina quando o BOT pode responder. Fora desse período, será usada a mensagem de fora do horário."
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} />
+              Ativar horário de atendimento
+            </label>
+            <label className="text-sm font-medium text-slate-700">Fuso horário
+              <select value={timeZoneId} onChange={(e) => setTimeZoneId(e.target.value)} className="ml-2 px-3 py-2 border border-slate-200 rounded-lg">
+                <option value="America/Sao_Paulo">Brasília (UTC−03:00)</option>
+                <option value="America/New_York">Nova York (UTC−05:00)</option>
+                <option value="Europe/Lisbon">Lisboa (UTC±00:00)</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </label>
+          </div>
+          <div className={`space-y-2 ${!businessHoursEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            {businessHours.map((day) => (
+              <div key={day.dayOfWeek} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 text-sm">
+                <label className="flex items-center gap-2 text-slate-700"><input type="checkbox" checked={day.enabled} onChange={(e) => updateBusinessDay(day.dayOfWeek, { enabled: e.target.checked })} />{dayNames[day.dayOfWeek]}</label>
+                <input type="time" value={day.open} onChange={(e) => updateBusinessDay(day.dayOfWeek, { open: e.target.value })} className="px-2 py-1.5 border border-slate-200 rounded-lg" />
+                <span className="text-slate-400">até</span>
+                <input type="time" value={day.close} onChange={(e) => updateBusinessDay(day.dayOfWeek, { close: e.target.value })} className="px-2 py-1.5 border border-slate-200 rounded-lg" />
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-slate-500">Salve esta configuração junto com as mensagens. Se nenhum dia estiver ativo, o BOT não responderá enquanto o horário estiver habilitado.</p>
+        </Section>
 
         {/* ── 1. Saudações ── */}
         <Section

@@ -13,6 +13,9 @@ public sealed class BotConfiguration
     public string? QueueTransferMessage { get; private set; }
     public string? MediaMessage { get; private set; }
     public string? FlowStepsJson { get; private set; }
+    public bool BusinessHoursEnabled { get; private set; }
+    public string TimeZoneId { get; private set; } = "America/Sao_Paulo";
+    public string? BusinessHoursJson { get; private set; }
     public double ConfidenceThreshold { get; private set; } = 0.5;
     public bool Enabled { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -72,6 +75,18 @@ public sealed class BotConfiguration
     public void UpdateFlowSteps(string? flowStepsJson)
     {
         FlowStepsJson = flowStepsJson;
+        UpdatedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public void UpdateBusinessHours(bool enabled, string? timeZoneId, string? businessHoursJson)
+    {
+        if (!BusinessHoursPolicy.TryValidate(enabled, timeZoneId, businessHoursJson, out var error))
+            throw new ArgumentException(error, nameof(businessHoursJson));
+
+        BusinessHoursEnabled = enabled;
+        TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? "America/Sao_Paulo" : timeZoneId.Trim();
+        BusinessHoursJson = enabled ? businessHoursJson : null;
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }

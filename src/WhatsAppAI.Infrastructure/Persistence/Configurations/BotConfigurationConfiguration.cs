@@ -21,6 +21,9 @@ public sealed class BotConfigurationConfiguration : IEntityTypeConfiguration<Bot
         builder.Property(b => b.HandoffMessage).HasColumnName("handoff_message").HasMaxLength(1000);
         builder.Property(b => b.QueueTransferMessage).HasColumnName("queue_transfer_message").HasMaxLength(1000);
         builder.Property(b => b.MediaMessage).HasColumnName("media_message").HasMaxLength(1000);
+        builder.Property(b => b.BusinessHoursEnabled).HasColumnName("business_hours_enabled").IsRequired();
+        builder.Property(b => b.TimeZoneId).HasColumnName("time_zone_id").HasMaxLength(100).HasDefaultValue("America/Sao_Paulo").IsRequired();
+        builder.Property(b => b.BusinessHoursJson).HasColumnName("business_hours_json").HasColumnType("text");
         builder.Property(b => b.ConfidenceThreshold).HasColumnName("confidence_threshold").HasDefaultValue(0.5).IsRequired();
         builder.Property(b => b.Enabled).HasColumnName("enabled").IsRequired();
         builder.Property(b => b.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();

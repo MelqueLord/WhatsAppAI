@@ -24,6 +24,9 @@ describe('BotConfigPage', () => {
   it('preserves the current mode when saving BOT messages', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Fluxo do Bot')).toBeInTheDocument())
+    expect(screen.getByText('Horário de atendimento')).toBeInTheDocument()
+    expect(screen.getByText('Ativar horário de atendimento')).toBeInTheDocument()
+    expect(screen.getByText('Fuso horário')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar configuração' }))
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/bot-config', expect.objectContaining({ method: 'POST' })))
     const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url, opts]) => url === '/api/bot-config' && opts?.method === 'POST')

@@ -42,12 +42,15 @@ public static class BotConfigurationEndpoints
             mode = config.Mode.ToString(),
             welcomeMessage = config.WelcomeMessage,
             returningMessage = config.ReturningMessage,
-            flowSteps = ParseFlowSteps(config.FlowStepsJson),
+            flowSteps = ParseJsonArray(config.FlowStepsJson),
             offlineMessage = config.OfflineMessage,
             fallbackMessage = config.FallbackMessage,
             handoffMessage = config.HandoffMessage,
             queueTransferMessage = config.QueueTransferMessage,
             mediaMessage = config.MediaMessage,
+            businessHoursEnabled = config.BusinessHoursEnabled,
+            timeZoneId = config.TimeZoneId,
+            businessHours = ParseJsonArray(config.BusinessHoursJson),
             enabled = config.Enabled,
             version = config.Version
         });
@@ -69,6 +72,9 @@ public static class BotConfigurationEndpoints
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply or AiPowered" });
         if (!TryValidateFlowSteps(request.FlowSteps, out var flowError))
             return Results.BadRequest(new { error = flowError });
+        var businessHoursJson = SerializeBusinessHours(request.BusinessHours);
+        if (!BusinessHoursPolicy.TryValidate(request.BusinessHoursEnabled, request.TimeZoneId, businessHoursJson, out var businessHoursError))
+            return Results.BadRequest(new { error = businessHoursError });
 
         BotConfiguration? config = null;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
@@ -94,6 +100,7 @@ public static class BotConfigurationEndpoints
                 config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
                 config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
                 config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
+                config.UpdateBusinessHours(request.BusinessHoursEnabled, request.TimeZoneId, businessHoursJson);
                 await repo.AddAsync(config, httpContext.RequestAborted);
             }
             else
@@ -104,6 +111,7 @@ public static class BotConfigurationEndpoints
                     config.UpdateMode(mode);
                 config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
                 config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
+                config.UpdateBusinessHours(request.BusinessHoursEnabled, request.TimeZoneId, businessHoursJson);
                 await repo.UpdateAsync(config, httpContext.RequestAborted);
             }
 
@@ -286,7 +294,7 @@ public static class BotConfigurationEndpoints
         return Results.Ok(new { enabled = config.Enabled, mode = config.Mode.ToString(), version = config.Version });
     }
 
-    private static JsonElement[] ParseFlowSteps(string? value)
+    private static JsonElement[] ParseJsonArray(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return [];
         try { return JsonSerializer.Deserialize<JsonElement[]>(value) ?? []; }
@@ -294,6 +302,11 @@ public static class BotConfigurationEndpoints
     }
 
     private static string? SerializeFlowSteps(JsonElement? value) =>
+        value is { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined }
+            ? value.Value.GetRawText()
+            : null;
+
+    private static string? SerializeBusinessHours(JsonElement? value) =>
         value is { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined }
             ? value.Value.GetRawText()
             : null;
@@ -332,7 +345,10 @@ public sealed record SaveBotConfigRequest(
     string? HandoffMessage,
     string? QueueTransferMessage,
     string? MediaMessage,
-    JsonElement? FlowSteps);
+    JsonElement? FlowSteps,
+    bool BusinessHoursEnabled = false,
+    string? TimeZoneId = null,
+    JsonElement? BusinessHours = null);
 
 public sealed record UpdateModeRequest(string Mode);
 public sealed record UpdateMessagesRequest(string? WelcomeMessage, string? ReturningMessage, string? OfflineMessage, string? FallbackMessage, string? HandoffMessage, string? QueueTransferMessage, string? MediaMessage);
