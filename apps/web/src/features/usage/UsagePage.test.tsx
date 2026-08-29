@@ -8,10 +8,6 @@ vi.mock('../../lib/api', () => ({
   api: { usage: { get: vi.fn() } },
 }))
 
-vi.mock('../../lib/auth', () => ({
-  useAuth: () => ({ user: { aiEnabled: true }, isLoading: false }),
-}))
-
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   return render(
@@ -25,20 +21,14 @@ describe('UsagePage AI quota', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.usage.get).mockResolvedValue({
-      from: new Date().toISOString(),
-      to: new Date().toISOString(),
-      entries: [],
       aiResponseQuota: { limit: 1500, used: 0, remaining: 1500, utilizationPercentage: 0, status: 'normal' },
-      disclaimer: 'Estimativas de uso. Não é uma fatura.',
     })
   })
 
   it('shows a warning when the tenant reaches 80 percent', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
-      from: '', to: '', entries: [],
       aiResponseQuota: { limit: 1500, used: 1200, remaining: 300, utilizationPercentage: 80, status: 'warning' },
       quotaAlerts: [{ action: 'AiQuota.WarningReached', entityId: '2026-08:Warning', occurredAt: new Date().toISOString() }],
-      disclaimer: 'Uso',
     })
 
     renderPage()
@@ -46,25 +36,23 @@ describe('UsagePage AI quota', () => {
     expect(await screen.findByText('Restam 300 respostas.')).toBeInTheDocument()
     expect(screen.getByText('80%')).toBeInTheDocument()
     expect(screen.getByText('Histórico recente da franquia')).toBeInTheDocument()
+    expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/custo/i)).not.toBeInTheDocument()
   })
 
   it('shows the safe fallback message when the quota is exhausted', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
-      from: '', to: '', entries: [],
       aiResponseQuota: { limit: 1500, used: 1500, remaining: 0, utilizationPercentage: 100, status: 'exhausted' },
-      disclaimer: 'Uso',
     })
 
     renderPage()
 
-    expect(await screen.findByText(/Franquia esgotada/)).toBeInTheDocument()
+    expect(await screen.findByText(/franquia esgotada/i)).toBeInTheDocument()
   })
 
   it('does not show a progress bar for an unlimited tenant', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
-      from: '', to: '', entries: [],
       aiResponseQuota: { limit: null, used: 10, remaining: null, utilizationPercentage: null, status: 'unlimited' },
-      disclaimer: 'Uso',
     })
 
     renderPage()

@@ -26,42 +26,14 @@ public static class UsageEndpoints
         ICurrentTenant currentTenant,
         IUsageLedgerRepository usageRepository,
         IAuditLogRepository auditLogRepository,
-        AppDbContext dbContext,
-        string? provider = null,
-        DateTime? from = null,
-        DateTime? to = null)
+        AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
-        var startDate = from ?? DateTime.UtcNow.AddDays(-30);
-        var endDate = to ?? DateTime.UtcNow;
-
         var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
         if (tenant is null)
             return Results.Unauthorized();
-
-        var entries = await usageRepository.GetByTenantAsync(
-            currentTenant.TenantId.Value, startDate, endDate);
-
-        var filtered = provider is not null
-            ? entries.Where(e => e.Provider.Equals(provider, StringComparison.OrdinalIgnoreCase)).ToList()
-            : entries;
-
-        var summary = filtered
-            .GroupBy(e => new { e.Provider, e.Metric })
-            .Select(g => new
-            {
-                provider = g.Key.Provider,
-                metric = g.Key.Metric,
-                totalQuantity = g.Sum(e => e.Quantity),
-                totalCostMinorUnits = g.Sum(e => e.CostMinorUnits ?? 0),
-                currency = g.FirstOrDefault(e => e.Currency != null)?.Currency,
-                unit = g.FirstOrDefault(e => e.Unit != null)?.Unit,
-                count = g.Count()
-            })
-            .OrderByDescending(s => s.totalQuantity)
-            .ToList();
 
         var monthStart = new DateTime(
             DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -88,9 +60,6 @@ public static class UsageEndpoints
 
         return Results.Ok(new
         {
-            from = startDate,
-            to = endDate,
-            entries = summary,
             aiResponseQuota = new
             {
                 baseLimit = tenant.MonthlyAiResponseLimit,
@@ -114,8 +83,7 @@ public static class UsageEndpoints
                     details = alert.Details,
                     occurredAt = alert.OccurredAt
                 })
-                .ToList(),
-            disclaimer = "Usage estimates only. Not an invoice."
+                .ToList()
         });
     }
 }

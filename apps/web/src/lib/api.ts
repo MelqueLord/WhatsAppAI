@@ -310,23 +310,9 @@ export interface AiResponseTopUpResult {
   aiSuspended: boolean
 }
 
-export interface UsageSummary {
-  provider: string
-  metric: string
-  totalQuantity: number
-  totalCostMinorUnits: number
-  currency: string | null
-  unit: string | null
-  count: number
-}
-
 export interface UsageResponse {
-  from: string
-  to: string
-  entries: UsageSummary[]
   aiResponseQuota: AiResponseQuota
   quotaAlerts?: AiQuotaAlert[]
-  disclaimer: string
 }
 
 export interface WebhookEvent {
@@ -430,13 +416,7 @@ export const api = {
   },
 
   usage: {
-    get: (from?: string, to?: string) => {
-      const params = new URLSearchParams()
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
-      const query = params.toString()
-      return fetchApi<UsageResponse>(`/api/usage${query ? `?${query}` : ''}`)
-    },
+    get: () => fetchApi<UsageResponse>('/api/usage'),
   },
 
   conversations: {

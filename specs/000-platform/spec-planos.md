@@ -120,7 +120,7 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **FR-P016:** Limites de linhas e Operators são provisionados automaticamente pelo plano
 - **FR-P017:** Franquia mensal de respostas de IA é inicializada pelo plano e personalizável por tenant
 - **FR-P018:** PlatformAdmin pode liberar ou renovar a franquia de respostas por tenant; o TenantOwner consulta o saldo no dashboard e recebe alerta a partir de 80%
-- **FR-P019:** PlatformAdmin consulta tokens reais de entrada/saída por tenant, provedor e modelo para estimar o custo da plataforma; tokens não substituem a franquia de respostas
+- **FR-P019:** somente o PlatformAdmin consulta tokens reais de entrada/saída por tenant, provedor e modelo para estimar o custo da plataforma; tokens não substituem a franquia de respostas e não são exibidos ao TenantOwner
 - **FR-P020:** preços de entrada e saída são versionados por provedor/modelo e aplicados ao uso registrado sem criar uma segunda quota para o tenant
 - **FR-P021:** a quantidade de linhas do plano é um total distribuível entre API Oficial e QR Code no cadastro e na edição da empresa
 
@@ -190,7 +190,7 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 - Indicação do plano atual
 - Cards de funcionalidades habilitadas/desabilitadas
 - Guia de configuração obrigatória
-- Consumo do pacote de respostas no mês, saldo e alerta de atenção a partir de 80%
+- Consumo do pacote de respostas no mês, saldo e alerta de atenção a partir de 80%; sem tokens, provedor, modelo ou custo técnico
 
 ### Painel do PlatformAdmin
 
