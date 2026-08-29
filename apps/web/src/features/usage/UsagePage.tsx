@@ -2,23 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Loader2, Info } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
-
-interface UsageSummary {
-  provider: string
-  metric: string
-  totalQuantity: number
-  totalCostMinorUnits: number
-  currency: string | null
-  unit: string | null
-  count: number
-}
-
-interface UsageResponse {
-  from: string
-  to: string
-  entries: UsageSummary[]
-  disclaimer: string
-}
+import { api } from '../../lib/api'
 
 export function UsagePage() {
   const [days, setDays] = useState(30)
@@ -27,10 +11,9 @@ export function UsagePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['usage', days],
-    queryFn: async () => {
+    queryFn: () => {
       const from = new Date(Date.now() - days * 86400000).toISOString()
-      const res = await fetch(`/api/usage?from=${from}`, { credentials: 'include' })
-      return res.json() as Promise<UsageResponse>
+      return api.usage.get(from)
     },
   })
 
@@ -49,6 +32,11 @@ export function UsagePage() {
       currency: currency,
     }).format(minorUnits / 100)
   }
+
+  const quota = data?.aiResponseQuota
+  const quotaPercent = quota?.utilizationPercentage ?? 0
+  const quotaWarning = quota?.limit !== null && quotaPercent >= 80 && quotaPercent < 100
+  const quotaExhausted = quota?.limit !== null && (quota?.limit === 0 || quotaPercent >= 100)
 
   return (
     <div className="h-full overflow-y-auto">
@@ -79,6 +67,49 @@ export function UsagePage() {
           <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-blue-700">{data?.disclaimer || 'Estimativas de uso. Não é uma fatura.'}</p>
         </div>
+
+        {quota && (
+          <div className={`mb-6 rounded-xl border p-5 ${
+            quotaExhausted
+              ? 'border-red-200 bg-red-50'
+              : quotaWarning
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-slate-200 bg-white'
+          }`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Franquia de respostas da IA</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {quota.limit === null
+                    ? 'Sem limite mensal configurado.'
+                    : `${quota.used.toLocaleString('pt-BR')} de ${quota.limit.toLocaleString('pt-BR')} respostas usadas neste mês.`}
+                </p>
+              </div>
+              {quota.limit !== null && (
+                <span className={`text-sm font-semibold ${quotaExhausted ? 'text-red-700' : quotaWarning ? 'text-amber-700' : 'text-slate-700'}`}>
+                  {Math.min(100, quotaPercent).toLocaleString('pt-BR')}%
+                </span>
+              )}
+            </div>
+            {quota.limit !== null && (
+              <>
+                <div className="mt-3 h-2 rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${quotaExhausted ? 'bg-red-500' : quotaWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min(100, Math.max(0, quotaPercent))}%` }}
+                  />
+                </div>
+                <p className={`text-xs mt-2 ${quotaExhausted ? 'text-red-700' : quotaWarning ? 'text-amber-700' : 'text-slate-500'}`}>
+                  {quotaExhausted
+                    ? 'Franquia esgotada. Novas respostas automáticas seguem o fallback configurado.'
+                    : quotaWarning
+                      ? `Restam ${quota.remaining?.toLocaleString('pt-BR') ?? 0} respostas.`
+                      : `Restam ${quota.remaining?.toLocaleString('pt-BR') ?? 0} respostas.`}
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Usage Table */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

@@ -241,6 +241,31 @@ export interface DashboardStats {
   activeConversations: number
 }
 
+export interface AiResponseQuota {
+  limit: number | null
+  used: number
+  remaining: number | null
+  utilizationPercentage: number | null
+}
+
+export interface UsageSummary {
+  provider: string
+  metric: string
+  totalQuantity: number
+  totalCostMinorUnits: number
+  currency: string | null
+  unit: string | null
+  count: number
+}
+
+export interface UsageResponse {
+  from: string
+  to: string
+  entries: UsageSummary[]
+  aiResponseQuota: AiResponseQuota
+  disclaimer: string
+}
+
 export interface WebhookEvent {
   id: string
   phoneNumberId: string
@@ -339,6 +364,16 @@ export const api = {
 
   dashboard: {
     getStats: () => fetchApi<DashboardStats>('/api/dashboard/stats'),
+  },
+
+  usage: {
+    get: (from?: string, to?: string) => {
+      const params = new URLSearchParams()
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+      const query = params.toString()
+      return fetchApi<UsageResponse>(`/api/usage${query ? `?${query}` : ''}`)
+    },
   },
 
   conversations: {
