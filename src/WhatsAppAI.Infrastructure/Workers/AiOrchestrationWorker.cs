@@ -124,7 +124,11 @@ public sealed class AiOrchestrationWorker(
             }
 
             if (conversation.Mode != ConversationMode.Automatic)
+            {
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
                 return;
+            }
 
             var expectedConversationVersion = conversation.Version;
 
@@ -529,9 +533,14 @@ public sealed class AiOrchestrationWorker(
 
                 if (string.IsNullOrWhiteSpace(response.Content))
                 {
-                    await RegisterAutomaticHandoffAsync(
-                        message.TenantId, conversation, "empty_ai_reply",
-                        conversationRepository, handoffEventRepository, cancellationToken);
+                    if (!await RegisterAutomaticHandoffAsync(
+                            message.TenantId, conversation, "empty_ai_reply",
+                            conversationRepository, handoffEventRepository, cancellationToken))
+                    {
+                        message.MarkProcessedByAi();
+                        await messageRepository.UpdateAsync(message, cancellationToken);
+                        return;
+                    }
 
                     var fallbackMessage = Message.CreateOutbound(
                         message.TenantId, conversation.Id, message.ContactId,
@@ -641,9 +650,14 @@ public sealed class AiOrchestrationWorker(
                     return;
                 }
 
-                await RegisterAutomaticHandoffAsync(
-                    message.TenantId, conversation, response.Decision.HandoffReason ?? "handoff",
-                    conversationRepository, handoffEventRepository, cancellationToken);
+                if (!await RegisterAutomaticHandoffAsync(
+                        message.TenantId, conversation, response.Decision.HandoffReason ?? "handoff",
+                        conversationRepository, handoffEventRepository, cancellationToken))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    return;
+                }
 
                 // Send handoff message to client
                 var handoffText = ResolveHandoffMessage(botConfig);
@@ -678,9 +692,14 @@ public sealed class AiOrchestrationWorker(
                 var currentConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
                 if (currentConversation is not null && currentConversation.Mode == ConversationMode.Automatic && currentConversation.IsWindowOpen(DateTime.UtcNow))
                 {
-                    await RegisterAutomaticHandoffAsync(
-                        message.TenantId, currentConversation, "ai_quota_exhausted",
-                        conversationRepository, handoffEventRepository, cancellationToken);
+                    if (!await RegisterAutomaticHandoffAsync(
+                            message.TenantId, currentConversation, "ai_quota_exhausted",
+                            conversationRepository, handoffEventRepository, cancellationToken))
+                    {
+                        message.MarkProcessedByAi();
+                        await messageRepository.UpdateAsync(message, cancellationToken);
+                        return;
+                    }
 
                     var unavailableMessage = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
@@ -708,9 +727,14 @@ public sealed class AiOrchestrationWorker(
             if (failedConversation is not null && failedConversation.Mode == ConversationMode.Automatic && failedConversation.IsWindowOpen(DateTime.UtcNow))
             {
                 var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
-                await RegisterAutomaticHandoffAsync(
-                    message.TenantId, failedConversation, "ai_retry_exhausted",
-                    conversationRepository, handoffEventRepository, cancellationToken);
+                if (!await RegisterAutomaticHandoffAsync(
+                        message.TenantId, failedConversation, "ai_retry_exhausted",
+                        conversationRepository, handoffEventRepository, cancellationToken))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    return;
+                }
 
                     var handoffMsg = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
@@ -744,9 +768,14 @@ public sealed class AiOrchestrationWorker(
             return;
         }
 
-        await RegisterAutomaticHandoffAsync(
-            message.TenantId, conversation, "ai_unavailable",
-            conversationRepository, handoffEventRepository, cancellationToken);
+        if (!await RegisterAutomaticHandoffAsync(
+                message.TenantId, conversation, "ai_unavailable",
+                conversationRepository, handoffEventRepository, cancellationToken))
+        {
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            return;
+        }
         var fallbackMessage = ApplyUnavailableAiFallback(message, botConfig, conversation.Version);
         await messageRepository.UpdateAsync(message, cancellationToken);
         await messageRepository.AddAsync(fallbackMessage, cancellationToken);
@@ -801,13 +830,18 @@ public sealed class AiOrchestrationWorker(
             transactionAlreadyHeld: false,
             cancellationToken);
 
-        await RegisterAutomaticHandoffAsync(
-            message.TenantId,
-            conversation,
-            "ai_quota_exhausted",
-            conversationRepository,
-            handoffEventRepository,
-            cancellationToken);
+        if (!await RegisterAutomaticHandoffAsync(
+                message.TenantId,
+                conversation,
+                "ai_quota_exhausted",
+                conversationRepository,
+                handoffEventRepository,
+                cancellationToken))
+        {
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            return;
+        }
 
         var fallbackMessage = Message.CreateOutbound(
             message.TenantId,
@@ -918,7 +952,7 @@ public sealed class AiOrchestrationWorker(
         return "Vou encaminhar voce para um atendente.";
     }
 
-    internal static async Task RegisterAutomaticHandoffAsync(
+    internal static async Task<bool> RegisterAutomaticHandoffAsync(
         Guid tenantId,
         Conversation conversation,
         string reason,
@@ -927,12 +961,13 @@ public sealed class AiOrchestrationWorker(
         CancellationToken cancellationToken)
     {
         if (conversation.Mode == ConversationMode.Human)
-            return;
+            return false;
 
         var previousMode = conversation.SwitchMode(ConversationMode.Human, conversation.Version, null);
         await conversationRepository.UpdateAsync(conversation, cancellationToken);
         await handoffEventRepository.AddAsync(HandoffEvent.Create(
             tenantId, conversation.Id, previousMode, ConversationMode.Human, null, reason));
+        return true;
     }
 
     private static string? FindFlowReply(string? flowStepsJson, string? content)

@@ -89,9 +89,10 @@ public sealed class AiOrchestrationWorkerTests
         var conversationRepository = new FakeConversationRepository();
         var handoffRepository = new FakeHandoffEventRepository();
 
-        await AiOrchestrationWorker.RegisterAutomaticHandoffAsync(
+        var registered = await AiOrchestrationWorker.RegisterAutomaticHandoffAsync(
             tenantId, conversation, "low_confidence", conversationRepository, handoffRepository, CancellationToken.None);
 
+        Assert.False(registered);
         Assert.Empty(conversationRepository.Updated);
         Assert.Empty(handoffRepository.Events);
     }
