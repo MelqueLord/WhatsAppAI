@@ -9,7 +9,7 @@ public class UsageLedgerTests
     public void Create_SetsAllProperties()
     {
         var tenantId = Guid.NewGuid();
-        var ledger = UsageLedger.Create(tenantId, "OpenAI", "tokens", "msg123", 1500, "tokens", 50, "BRL");
+        var ledger = UsageLedger.Create(tenantId, "OpenAI", "tokens", "msg123", 1500, "tokens", 50, "BRL", 2);
 
         Assert.Equal(tenantId, ledger.TenantId);
         Assert.Equal("OpenAI", ledger.Provider);
@@ -19,6 +19,7 @@ public class UsageLedgerTests
         Assert.Equal("tokens", ledger.Unit);
         Assert.Equal(50, ledger.CostMinorUnits);
         Assert.Equal("BRL", ledger.Currency);
+        Assert.Equal(2, ledger.PriceVersion);
     }
 
     [Fact]

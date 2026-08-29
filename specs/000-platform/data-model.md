@@ -98,7 +98,11 @@ Nunca persistir prompt completo, raciocínio interno, resposta bruta do provedor
 
 ### UsageLedger
 
-`id`, `tenant_id`, `provider`, `metric`, `quantity`, `unit`, `estimated_cost_minor`, `currency`, `price_version`, `source_id`, `occurred_at`.
+`id`, `tenant_id`, `provider`, `metric`, `quantity`, `unit`, `estimated_cost_minor`, `currency`, `price_version`, `source_id`, `occurred_at`. Para métricas de tokens, `price_version` identifica a versão do catálogo usada no cálculo.
+
+### AiModelPricing
+
+Entidade global da plataforma, não pertencente a tenant: `id`, `provider`, `model_id`, `input_cost_per_1k_minor_units`, `output_cost_per_1k_minor_units`, `currency`, `version`, `effective_from`, `effective_to`, `created_at`. Cada versão é imutável após sua vigência; uma nova versão encerra a anterior e passa a ser usada somente a partir de `effective_from`.
 
 Unidades são canônicas; custo pode ser nulo e, quando presente, é inteiro na unidade menor da moeda ISO 4217. Único por `(tenant_id, provider, metric, source_id)` quando aplicável (**FR-018**, **BR-007**, **NFR-006**). Cada resposta de IA efetivamente enfileirada registra `metric = ai_responses`, quantidade `1`; mensagens recebidas e fallbacks operacionais não consomem a franquia comercial (**FR-043**, **BR-021**).
 

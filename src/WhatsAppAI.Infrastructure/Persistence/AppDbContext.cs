@@ -38,6 +38,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<AiProviderCredential> AiProviderCredentials => Set<AiProviderCredential>();
     public DbSet<AiInteraction> AiInteractions => Set<AiInteraction>();
     public DbSet<UsageLedger> UsageLedger => Set<UsageLedger>();
+    public DbSet<AiModelPricing> AiModelPricing => Set<AiModelPricing>();
     public DbSet<ModelEvaluation> ModelEvaluations => Set<ModelEvaluation>();
     public DbSet<KnowledgeItem> KnowledgeItems => Set<KnowledgeItem>();
     public DbSet<ClientTag> ClientTags => Set<ClientTag>();

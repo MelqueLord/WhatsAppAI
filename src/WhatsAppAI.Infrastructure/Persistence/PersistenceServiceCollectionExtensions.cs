@@ -60,6 +60,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IServiceLineRepository, ServiceLineRepository>();
         services.AddScoped<IAiInteractionRepository, AiInteractionRepository>();
         services.AddScoped<IUsageLedgerRepository, UsageLedgerRepository>();
+        services.AddScoped<IAiModelPricingRepository, AiModelPricingRepository>();
         services.AddScoped<IModelEvaluationRepository, ModelEvaluationRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IBroadcastRepository, BroadcastRepository>();

@@ -64,6 +64,7 @@ public sealed class AiOrchestrationWorker(
         var handoffEventRepository = scope.ServiceProvider.GetRequiredService<IHandoffEventRepository>();
         var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
         var usageRepository = scope.ServiceProvider.GetRequiredService<IUsageLedgerRepository>();
+        var pricingRepository = scope.ServiceProvider.GetRequiredService<IAiModelPricingRepository>();
         var auditLogRepository = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -80,7 +81,7 @@ public sealed class AiOrchestrationWorker(
                 messageRepository, conversationRepository,
                 credentialRepository, secretStore, aiProviderResolver,
                 contextAssembler, outboxRepository, interactionRepository,
-                usageRepository, auditLogRepository, handoffEventRepository, cancellationToken);
+                usageRepository, pricingRepository, auditLogRepository, handoffEventRepository, cancellationToken);
         }
     }
 
@@ -100,6 +101,7 @@ public sealed class AiOrchestrationWorker(
         IOutboxMessageRepository outboxRepository,
         IAiInteractionRepository interactionRepository,
         IUsageLedgerRepository usageRepository,
+        IAiModelPricingRepository pricingRepository,
         IAuditLogRepository auditLogRepository,
         IHandoffEventRepository handoffEventRepository,
         CancellationToken cancellationToken)
@@ -358,6 +360,8 @@ public sealed class AiOrchestrationWorker(
             };
 
             var response = await aiProvider.GetResponseAsync(request, cancellationToken);
+            var pricing = await pricingRepository.GetActiveAsync(
+                credential.Provider, credential.ModelId, DateTime.UtcNow, cancellationToken);
 
             // Apply behavior policy
             var sanitizedDecision = BehaviorPolicy.SanitizeDecision(
@@ -385,7 +389,10 @@ public sealed class AiOrchestrationWorker(
                 var usage = UsageLedger.Create(
                     message.TenantId, credential.Provider, "input_tokens",
                     response.RawResponseId ?? message.Id.ToString(),
-                    response.InputTokens, "tokens");
+                    response.InputTokens, "tokens",
+                    pricing?.CalculateCostMinorUnits(response.InputTokens, input: true),
+                    pricing?.Currency,
+                    pricing?.Version);
                 await usageRepository.AddAsync(usage, cancellationToken);
             }
             if (response.OutputTokens > 0)
@@ -393,7 +400,10 @@ public sealed class AiOrchestrationWorker(
                 var usage = UsageLedger.Create(
                     message.TenantId, credential.Provider, "output_tokens",
                     response.RawResponseId ?? message.Id.ToString(),
-                    response.OutputTokens, "tokens");
+                    response.OutputTokens, "tokens",
+                    pricing?.CalculateCostMinorUnits(response.OutputTokens, input: false),
+                    pricing?.Currency,
+                    pricing?.Version);
                 await usageRepository.AddAsync(usage, cancellationToken);
             }
 

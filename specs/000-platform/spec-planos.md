@@ -119,6 +119,7 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **FR-P017:** Franquia mensal de respostas de IA é inicializada pelo plano e personalizável por tenant
 - **FR-P018:** PlatformAdmin pode liberar ou renovar a franquia de respostas por tenant; o TenantOwner consulta o saldo no dashboard e recebe alerta a partir de 80%
 - **FR-P019:** PlatformAdmin consulta tokens reais de entrada/saída por tenant, provedor e modelo para estimar o custo da plataforma; tokens não substituem a franquia de respostas
+- **FR-P020:** preços de entrada e saída são versionados por provedor/modelo e aplicados ao uso registrado sem criar uma segunda quota para o tenant
 
 ## 6. Regras de Negócio
 

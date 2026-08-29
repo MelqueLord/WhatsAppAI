@@ -237,6 +237,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-046:** disponibilizar ao PlatformAdmin o consumo mensal real de tokens por tenant, separado em entrada/saída e distribuído por provedor e modelo, usando os valores retornados pelo provedor.
 - **FR-047:** exibir no dashboard do TenantOwner o pacote de respostas, saldo, percentual usado e aviso a partir de 80%; recarga permanece uma ação administrativa.
 - **FR-048:** calcular custo somente quando houver preço registrado para o modelo/provedor, preservando tokens como fonte auditável e identificando a estimativa como não faturamento.
+- **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 
 ## 6. Regras de negócio
 

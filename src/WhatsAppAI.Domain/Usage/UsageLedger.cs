@@ -11,6 +11,7 @@ public sealed class UsageLedger
     public string? Unit { get; private set; }
     public long? CostMinorUnits { get; private set; }
     public string? Currency { get; private set; }
+    public int? PriceVersion { get; private set; }
     public DateTime RecordedAt { get; private set; }
 
     private UsageLedger() { }
@@ -23,7 +24,8 @@ public sealed class UsageLedger
         long quantity,
         string? unit,
         long? costMinorUnits = null,
-        string? currency = null)
+        string? currency = null,
+        int? priceVersion = null)
     {
         return new UsageLedger
         {
@@ -36,6 +38,7 @@ public sealed class UsageLedger
             Unit = unit,
             CostMinorUnits = costMinorUnits,
             Currency = currency,
+            PriceVersion = priceVersion,
             RecordedAt = DateTime.UtcNow
         };
     }

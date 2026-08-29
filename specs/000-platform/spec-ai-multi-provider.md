@@ -65,6 +65,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **FR-AI-008:** as diretrizes da IA devem permitir selecionar filas ativas do tenant para encaminhamento automático conforme a escolha ou intenção expressa pelo cliente.
 - **FR-AI-009:** as diretrizes da IA devem permitir selecionar tags ativas do tenant para categorização automática do contato conforme o conteúdo da conversa.
 - **FR-AI-010:** o consumo real de tokens deve ser registrado por tenant, provedor e modelo, separando entrada e saída para permitir estimativa de custo sem expor prompts ou credenciais.
+- **FR-AI-011:** o cálculo de custo deve usar a versão de preço vigente para o provedor/modelo e gravar `cost_minor_units`, `currency` e `price_version` em cada métrica de tokens.
 
 ## 5. Regras de negócio
 

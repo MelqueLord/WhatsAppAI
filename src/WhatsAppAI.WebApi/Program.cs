@@ -411,6 +411,7 @@ app.MapAntiforgeryBootstrap();
 app.MapAuthEndpoints();
 app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
+app.MapAdminAiPricingEndpoints();
 app.MapSubscriptionPlanEndpoints();
 app.MapSupportSessionEndpoints();
 app.MapOperatorEndpoints();
