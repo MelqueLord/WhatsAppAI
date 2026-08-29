@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -23,6 +24,7 @@ public static class UsageEndpoints
     private static async Task<IResult> GetUsageAsync(
         ICurrentTenant currentTenant,
         IUsageLedgerRepository usageRepository,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
         string? provider = null,
         DateTime? from = null,
@@ -74,6 +76,9 @@ public static class UsageEndpoints
         else if (monthlyLimit == 0)
             utilizationPercentage = 100d;
 
+        var quotaAlerts = await auditLogRepository.GetByTenantAsync(
+            tenant.Id, DateTime.UtcNow.AddMonths(-3), DateTime.UtcNow, 20);
+
         return Results.Ok(new
         {
             from = startDate,
@@ -88,6 +93,16 @@ public static class UsageEndpoints
                     : Math.Max(0, monthlyLimit.Value - monthlyAiResponsesUsed),
                 utilizationPercentage,
             },
+            quotaAlerts = quotaAlerts
+                .Where(alert => alert.EntityType == "AiResponseQuota")
+                .Select(alert => new
+                {
+                    action = alert.Action,
+                    entityId = alert.EntityId,
+                    details = alert.Details,
+                    occurredAt = alert.OccurredAt
+                })
+                .ToList(),
             disclaimer = "Usage estimates only. Not an invoice."
         });
     }

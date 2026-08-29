@@ -270,6 +270,7 @@ export interface UsageResponse {
   to: string
   entries: UsageSummary[]
   aiResponseQuota: AiResponseQuota
+  quotaAlerts?: AiQuotaAlert[]
   disclaimer: string
 }
 

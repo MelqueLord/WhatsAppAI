@@ -37,6 +37,7 @@ describe('UsagePage AI quota', () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
       from: '', to: '', entries: [],
       aiResponseQuota: { limit: 1500, used: 1200, remaining: 300, utilizationPercentage: 80 },
+      quotaAlerts: [{ action: 'AiQuota.WarningReached', entityId: '2026-08:Warning', occurredAt: new Date().toISOString() }],
       disclaimer: 'Uso',
     })
 
@@ -44,6 +45,7 @@ describe('UsagePage AI quota', () => {
 
     expect(await screen.findByText('Restam 300 respostas.')).toBeInTheDocument()
     expect(screen.getByText('80%')).toBeInTheDocument()
+    expect(screen.getByText('Histórico recente da franquia')).toBeInTheDocument()
   })
 
   it('shows the safe fallback message when the quota is exhausted', async () => {

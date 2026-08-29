@@ -111,6 +111,22 @@ export function UsagePage() {
           </div>
         )}
 
+        {data?.quotaAlerts && data.quotaAlerts.length > 0 && (
+          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5" aria-label="Histórico da franquia de IA">
+            <h2 className="text-sm font-semibold text-slate-900">Histórico recente da franquia</h2>
+            <div className="mt-3 space-y-2">
+              {data.quotaAlerts.map((alert) => (
+                <div key={`${alert.action}-${alert.entityId ?? alert.occurredAt}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
+                  <span className={`text-sm font-medium ${alert.action.endsWith('Exhausted') ? 'text-red-700' : 'text-amber-700'}`}>
+                    {alert.action.endsWith('Exhausted') ? 'Franquia esgotada' : 'Alerta de 80%'}
+                  </span>
+                  <time className="text-xs text-slate-400">{new Date(alert.occurredAt).toLocaleString('pt-BR')}</time>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Usage Table */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <table className="w-full">
