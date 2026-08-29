@@ -500,7 +500,8 @@ public static class AiProviderEndpoints
             MaxTokens = credential.MaxTokensPerResponse,
             Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
         });
-        var decision = BehaviorPolicy.SanitizeDecision(response.Decision, botConfig?.ConfidenceThreshold ?? 0.5);
+        response = BehaviorPolicy.SanitizeResponse(response, botConfig?.ConfidenceThreshold ?? 0.5);
+        var decision = response.Decision;
 
         var userId = Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
             ? parsedUserId
@@ -517,7 +518,7 @@ public static class AiProviderEndpoints
         return Results.Ok(new
         {
             decision = decision.Action.ToString(),
-            text = decision.Text,
+            text = decision.Action == AiAction.Reply ? response.Content : null,
             confidence = decision.Confidence,
             handoffReason = decision.Action == AiAction.Handoff ? decision.HandoffReason : null,
             fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null

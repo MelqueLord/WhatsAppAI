@@ -419,13 +419,13 @@ public sealed class AiOrchestrationWorker(
                 credential.Provider, credential.ModelId, DateTime.UtcNow, cancellationToken);
 
             // Apply behavior policy
-            var sanitizedDecision = BehaviorPolicy.SanitizeDecision(
-                response.Decision, botConfig.ConfidenceThreshold);
+            var sanitizedResponse = BehaviorPolicy.SanitizeResponse(
+                response, botConfig.ConfidenceThreshold);
             var routingResult = QueueRoutingPolicy.Apply(
-                sanitizedDecision,
+                sanitizedResponse.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
                 conversation.QueueId is not null);
-            response = response with { Decision = routingResult.Decision };
+            response = sanitizedResponse with { Decision = routingResult.Decision };
             var categorizedTagIds = TagCategorizationPolicy.ResolveAuthorizedTagIds(
                 response.Decision.TagNames,
                 routingTags.Select(tag => new RoutingTagCandidate(tag.Id, tag.Name)).ToList());

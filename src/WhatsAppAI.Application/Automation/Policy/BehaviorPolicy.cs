@@ -10,7 +10,8 @@ public static class BehaviorPolicy
         "escalation_needed",
         "complaint",
         "refund_request",
-        "legal_issue"
+        "legal_issue",
+        AiOutputSafetyPolicy.UnsafeContentHandoffReason
     };
 
     private static bool ShouldBlock(string? handoffReason)
@@ -20,6 +21,18 @@ public static class BehaviorPolicy
 
     public static AiDecision SanitizeDecision(AiDecision decision, double confidenceThreshold)
     {
+        if (decision.Action == AiAction.Reply &&
+            !string.IsNullOrWhiteSpace(decision.Text) &&
+            !AiOutputSafetyPolicy.IsSafe(decision.Text))
+        {
+            return decision with
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = AiOutputSafetyPolicy.UnsafeContentHandoffReason,
+                Text = null
+            };
+        }
+
         if (decision.Action == AiAction.Reply &&
             (decision.Confidence < confidenceThreshold || ShouldBlock(decision.HandoffReason)))
         {
@@ -31,5 +44,27 @@ public static class BehaviorPolicy
         }
 
         return decision;
+    }
+
+    public static AiResponse SanitizeResponse(AiResponse response, double confidenceThreshold)
+    {
+        var decision = SanitizeDecision(response.Decision, confidenceThreshold);
+        if (decision.Action == AiAction.Reply &&
+            !string.IsNullOrWhiteSpace(response.Content) &&
+            !AiOutputSafetyPolicy.IsSafe(response.Content))
+        {
+            decision = decision with
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = AiOutputSafetyPolicy.UnsafeContentHandoffReason,
+                Text = null
+            };
+        }
+
+        return response with
+        {
+            Decision = decision,
+            Content = decision.Action == AiAction.Reply ? response.Content : null
+        };
     }
 }
