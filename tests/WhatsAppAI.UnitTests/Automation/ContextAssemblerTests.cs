@@ -43,7 +43,7 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
-    public async Task BuildAsync_UsesKnowledgeWhenCustomerMessageHasNoMatchingTerms()
+    public async Task BuildAsync_DoesNotInjectUnrelatedKnowledgeWhenCustomerMessageHasNoMatchingTerms()
     {
         var tenantId = Guid.NewGuid();
         var knowledge = new FakeKnowledgeRepository(
@@ -62,8 +62,9 @@ public sealed class ContextAssemblerTests
         var context = await new ContextAssembler(queries, knowledge).BuildAsync(
             tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
 
-        Assert.Contains("Maior prioridade:", context.SystemPrompt);
-        Assert.Contains("Menor prioridade:", context.SystemPrompt);
+        Assert.DoesNotContain("Maior prioridade:", context.SystemPrompt);
+        Assert.DoesNotContain("Menor prioridade:", context.SystemPrompt);
+        Assert.Contains("No relevant company knowledge was found", context.SystemPrompt);
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class ContextAssemblerTests
             Enumerable.Range(1, 6).Select(index => new MessageDto
             {
                 Direction = "Inbound",
-                Content = $"mensagem-{index}-" + new string('x', 1_000),
+                Content = $"mensagem-{index} {(index == 6 ? "boleto" : string.Empty)}-" + new string('x', 1_000),
                 CreatedAt = DateTime.UtcNow.AddMinutes(index)
             }).ToList());
 

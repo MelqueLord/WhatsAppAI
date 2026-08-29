@@ -244,6 +244,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-053:** tratar a quantidade de linhas do plano como limite total e exigir que o PlatformAdmin distribua todas as vagas entre API Oficial e QR Code no cadastro e na edição do tenant, inclusive em planos com uma única linha.
 - **FR-054:** expor tokens de entrada/saída, provedor, modelo e custo estimado somente ao PlatformAdmin, por tenant; endpoints e telas de TenantOwner/Operator retornam apenas a franquia de respostas, saldo e alertas operacionais.
 - **FR-055:** aplicar orçamento determinístico ao contexto de IA: histórico recente limitado, no máximo três itens relevantes de conhecimento com tamanho limitado, diretrizes livres limitadas e teto de saída de 240 tokens; as regras estruturadas e o contrato JSON devem permanecer íntegros mesmo sob contexto extenso.
+- **FR-056:** usar a base de conhecimento ativa do tenant como fonte prioritária para fatos da empresa; itens sem correspondência com a solicitação não podem ser injetados como contexto e, sem informação relevante, a IA deve evitar invenção e encaminhar quando a pergunta exigir um fato não documentado.
 
 ## 6. Regras de negócio
 
@@ -272,6 +273,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-023:** em planos comerciais, `official_api_line_count + qr_code_line_count` deve ser exatamente igual ao total de linhas do plano; valores negativos, excesso ou soma incompleta são rejeitados pelo backend.
 - **BR-024:** tokens e custos são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator, mesmo quando a credencial de IA pertence ao tenant.
 - **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
+- **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura ou handoff, nunca uma afirmação específica inventada.
 
 ## 7. Requisitos não funcionais
 

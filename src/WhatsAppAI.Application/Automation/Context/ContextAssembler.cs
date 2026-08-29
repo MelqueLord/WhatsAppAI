@@ -75,6 +75,10 @@ public sealed class ContextAssembler(
                 items.Add($"- {item}");
             dynamicParts.Add(string.Join('\n', items));
         }
+        else
+        {
+            dynamicParts.Add("No relevant company knowledge was found for this request. Do not invent company-specific information; use action \"handoff\" with handoff_reason \"out_of_scope\" when the customer asks about an undocumented company fact.");
+        }
 
         if (routingQueues is { Count: > 0 })
         {
@@ -117,6 +121,7 @@ public sealed class ContextAssembler(
                 Item = item,
                 Score = Score(item, queryTerms)
             })
+            .Where(result => result.Score > 0)
             .OrderByDescending(result => result.Score)
             .ThenByDescending(result => result.Item.Priority)
             .ThenByDescending(result => result.Item.CreatedAt)
