@@ -346,7 +346,8 @@ public static class AdminTenantEndpoints
         [FromBody] UpdateTenantRequest request,
         ITenantRepository tenantRepository,
         AppDbContext dbContext,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        IAuditLogRepository auditLogRepository)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
@@ -408,6 +409,8 @@ public static class AdminTenantEndpoints
         var monthlyAiResponseLimit = plan.IsSelectable
             ? request.MonthlyAiResponseLimit ?? plan.DefaultMonthlyAiResponseLimit
             : request.MonthlyAiResponseLimit;
+        var previousPlanId = tenant.PlanId;
+        var previousMonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit;
 
         tenant.UpdateDetails(
             request.Name,
@@ -420,6 +423,16 @@ public static class AdminTenantEndpoints
         owner.UpdateEmail(ownerEmail);
         owner.UpdateDisplayName(request.OwnerDisplayName);
         await tenantRepository.UpdateAsync(tenant);
+        if (previousPlanId != tenant.PlanId || previousMonthlyAiResponseLimit != tenant.MonthlyAiResponseLimit)
+        {
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                tenant.Id,
+                null,
+                "Tenant.AiQuotaChanged",
+                "Tenant",
+                tenant.Id.ToString(),
+                $"version={tenant.Version};previous_limit={previousMonthlyAiResponseLimit?.ToString() ?? "unlimited"};new_limit={tenant.MonthlyAiResponseLimit?.ToString() ?? "unlimited"}"));
+        }
 
         return Results.Ok(new TenantResponse
         {
@@ -542,7 +555,8 @@ public static class AdminTenantEndpoints
         [FromBody] UpdatePlanRequest request,
         ITenantRepository tenantRepository,
         AppDbContext dbContext,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        IAuditLogRepository auditLogRepository)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
@@ -575,6 +589,13 @@ public static class AdminTenantEndpoints
             plan.DefaultOperatorLimit,
             monthlyAiResponseLimit);
         await tenantRepository.UpdateAsync(tenant);
+        await auditLogRepository.AddAsync(AuditLog.Create(
+            tenant.Id,
+            null,
+            "Tenant.PlanChanged",
+            "Tenant",
+            tenant.Id.ToString(),
+            $"version={tenant.Version};plan={plan.Code};monthly_limit={monthlyAiResponseLimit?.ToString() ?? "unlimited"}"));
 
         return Results.Ok(new TenantResponse
         {
