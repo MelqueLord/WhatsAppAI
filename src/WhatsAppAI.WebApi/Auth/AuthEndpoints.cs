@@ -129,9 +129,14 @@ public static class AuthEndpoints
 
         string? planCode = null;
         bool? aiEnabled = null;
+        bool? botEnabled = null;
+        bool? tagsEnabled = null;
+        bool? automaticDistributionEnabled = null;
         int? officialApiLineCount = null;
         int? qrCodeLineCount = null;
         int? operatorLimit = null;
+        int? monthlyAiResponseLimit = null;
+        long monthlyAiResponsesUsed = 0;
         DateTime? dueDate = null;
         string? tenantStatus = null;
         string? assignedConnectionType = null;
@@ -161,9 +166,10 @@ public static class AuthEndpoints
             var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
             if (tenant is not null)
             {
-            officialApiLineCount = tenant.OfficialApiLineCount;
-            qrCodeLineCount = tenant.QrCodeLineCount;
+                officialApiLineCount = tenant.OfficialApiLineCount;
+                qrCodeLineCount = tenant.QrCodeLineCount;
                 operatorLimit = tenant.OperatorLimit;
+                monthlyAiResponseLimit = tenant.MonthlyAiResponseLimit;
                 dueDate = tenant.DueDate;
                 tenantStatus = tenant.Status.ToString();
                 var plan = await dbContext.SubscriptionPlans.FindAsync(tenant.PlanId);
@@ -171,7 +177,16 @@ public static class AuthEndpoints
                 {
                     planCode = plan.Code;
                     aiEnabled = plan.AiEnabled;
+                    botEnabled = plan.BotEnabled;
+                    tagsEnabled = plan.TagsEnabled;
+                    automaticDistributionEnabled = plan.AutomaticDistributionEnabled;
                 }
+
+                var monthStart = new DateTime(
+                    DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                monthlyAiResponsesUsed = await dbContext.UsageLedger
+                    .Where(usage => usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
+                    .SumAsync(usage => (long?)usage.Quantity) ?? 0;
             }
         }
 
@@ -186,9 +201,14 @@ public static class AuthEndpoints
             MustChangePassword = user.MustChangePassword,
             PlanCode = planCode,
             AiEnabled = aiEnabled,
+            BotEnabled = botEnabled,
+            TagsEnabled = tagsEnabled,
+            AutomaticDistributionEnabled = automaticDistributionEnabled,
             OfficialApiLineCount = officialApiLineCount,
             QrCodeLineCount = qrCodeLineCount,
             OperatorLimit = operatorLimit,
+            MonthlyAiResponseLimit = monthlyAiResponseLimit,
+            MonthlyAiResponsesUsed = monthlyAiResponsesUsed,
             DueDate = dueDate,
             TenantStatus = tenantStatus,
             AssignedConnectionType = assignedConnectionType,
@@ -255,9 +275,14 @@ public sealed class UserResponse
     public bool MustChangePassword { get; init; }
     public string? PlanCode { get; init; }
     public bool? AiEnabled { get; init; }
+    public bool? BotEnabled { get; init; }
+    public bool? TagsEnabled { get; init; }
+    public bool? AutomaticDistributionEnabled { get; init; }
     public int? OfficialApiLineCount { get; init; }
     public int? QrCodeLineCount { get; init; }
     public int? OperatorLimit { get; init; }
+    public int? MonthlyAiResponseLimit { get; init; }
+    public long MonthlyAiResponsesUsed { get; init; }
     public DateTime? DueDate { get; init; }
     public string? TenantStatus { get; init; }
     public string? AssignedConnectionType { get; init; }

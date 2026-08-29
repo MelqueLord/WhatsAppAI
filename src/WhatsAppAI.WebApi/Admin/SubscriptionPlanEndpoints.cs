@@ -29,6 +29,13 @@ public static class SubscriptionPlanEndpoints
                 Code = p.Code,
                 Description = p.Description,
                 AiEnabled = p.AiEnabled,
+                BotEnabled = p.BotEnabled,
+                TagsEnabled = p.TagsEnabled,
+                AutomaticDistributionEnabled = p.AutomaticDistributionEnabled,
+                IsSelectable = p.IsSelectable,
+                DefaultOfficialApiLineCount = p.DefaultOfficialApiLineCount,
+                DefaultOperatorLimit = p.DefaultOperatorLimit,
+                DefaultMonthlyAiResponseLimit = p.DefaultMonthlyAiResponseLimit,
                 MaxOperators = p.MaxOperators
             })
             .ToListAsync();
@@ -44,5 +51,12 @@ public sealed class PlanResponse
     public string Code { get; init; } = string.Empty;
     public string? Description { get; init; }
     public bool AiEnabled { get; init; }
+    public bool BotEnabled { get; init; }
+    public bool TagsEnabled { get; init; }
+    public bool AutomaticDistributionEnabled { get; init; }
+    public bool IsSelectable { get; init; }
+    public int DefaultOfficialApiLineCount { get; init; }
+    public int DefaultOperatorLimit { get; init; }
+    public int? DefaultMonthlyAiResponseLimit { get; init; }
     public int? MaxOperators { get; init; }
 }

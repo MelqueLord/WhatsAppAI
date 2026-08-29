@@ -1,7 +1,7 @@
 # Especificação: Sistema de Planos e Gestão de Empresas
 
 **Status:** Implementado  
-**Versão:** 1.1.0
+**Versão:** 2.0.0
 **Data:** 2026-08-16
 **Spec relacionada:** `spec.md` (plataforma base)
 **Implementado em:** Fase 9 (T090-T112)
@@ -22,27 +22,15 @@ Atualmente, a plataforma provisiona tenants manualmente pelo PlatformAdmin. É n
 
 ## 3. Tipos de Plano
 
-### Plano 1: BOT (Sem IA)
+| Plano | Linhas oficiais | Operators | IA/mês padrão | Recursos implementados |
+|---|---:|---:|---:|---|
+| STAR | 1 | 2 | 1.500 | Inbox, dashboard, histórico, atendimento compartilhado, IA e conhecimento |
+| FLOW | 2 | 4 | 5.000 | Tudo do STAR, BOT, tags e filas/distribuição |
+| SCALA | 3 | 8 | 12.000 | Todos os recursos implementados do FLOW e maior capacidade operacional |
 
-- **Todos os recursos da plataforma**, exceto IA para atendimento
-- Inbox em tempo real
-- Resposta humana manual
-- Modos `Automatic`, `Human` e `Paused`
-- Gestão de operadores
-- Base de conhecimento (para consulta manual, não alimenta IA)
-- Mídia, tags, auditoria, uso
-- WhatsApp Cloud API integrado
-- Ideal para atendimento 100% humano sem automação por IA
+Os valores de IA são sugestões iniciais e podem ser personalizados pelo PlatformAdmin em cada tenant. Pipeline, relatório avançado e respostas rápidas anunciados comercialmente ainda não possuem módulos implementados e não devem aparecer como permissão ativa até entrega própria especificada.
 
-### Plano 2: IA + BOT (Completo com IA)
-
-- **Todos os recursos do plano BOT**
-- Resposta automática por IA
-- IA utiliza conhecimento para gerar respostas
-- Behavior policy e circuit breaker
-- AiInteraction e métricas de IA
-- Configuração de OpenAI obrigatória
-- Ideal para atendimento automatizado com supervisão humana
+`BOT` e `IA_BOT` permanecem somente para compatibilidade de tenants existentes e não aparecem como opção para novos cadastros.
 
 ## 4. Histórias de Usuário
 
@@ -52,7 +40,7 @@ Como PlatformAdmin, quero cadastrar uma empresa selecionando um plano para provi
 
 **Aceite:**
 
-1. PlatformAdmin seleciona plano (BOT ou IA+BOT) ao criar tenant
+1. PlatformAdmin seleciona STAR, FLOW ou SCALA ao criar tenant
 2. Plano é persistido no tenant e controla funcionalidades disponíveis
 3. Tenant criado recebe status `Pending` até ativação pelo TenantOwner
 4. Link de ativação é gerado para envio manual
@@ -65,8 +53,8 @@ Como TenantOwner, quero ativar minha empresa e configurar o ambiente conforme o 
 
 1. Ativação define senha e ativa TenantOwner
 2. Interface mostra apenas funcionalidades do plano contratado
-3. Configurações obrigatórias são guiadas (WhatsApp para ambos, OpenAI apenas para IA+BOT)
-4. Plano BOT não mostra configurações de IA nem métricas de IA
+3. Configurações obrigatórias são guiadas conforme as permissões efetivas retornadas no login
+4. Recursos não contratados não aparecem na navegação e são bloqueados no backend
 
 ### US-P003 — Gerenciar operadores (P1)
 
@@ -74,11 +62,10 @@ Como TenantOwner, quero convidar e gerenciar operadores para atendimento humano.
 
 **Aceite:**
 
-1. Ambos os planos permitem gestão de operadores
+1. Todos os planos comerciais permitem gestão de operadores
 2. Operadores têm acesso à inbox e modos de conversa
-3. Plano BOT: operadores atendem manualmente sem IA
-4. Plano IA+BOT: operadores atendem manualmente e IA responde automaticamente
-5. Limite de operadores pode ser configurável por plano
+3. STAR permite até 2, FLOW até 4 e SCALA até 8 Operators
+4. A IA responde até a franquia personalizada do tenant
 
 ### US-P004 — Configurar atendimento (P1)
 
@@ -104,10 +91,10 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 
 ### Plano e Tenant
 
-- **FR-P001:** PlatformAdmin pode criar tenant selecionando plano (BOT ou IA+BOT)
+- **FR-P001:** PlatformAdmin pode criar tenant selecionando STAR, FLOW ou SCALA
 - **FR-P002:** Plano é persistido em `Tenant` e controla acesso a funcionalidades
-- **FR-P003:** Plano BOT desabilita: IA para atendimento, configuração de OpenAI, métricas de IA, AiInteraction
-- **FR-P004:** Plano IA+BOT habilita todas as funcionalidades incluindo IA
+- **FR-P003:** STAR habilita IA e desabilita BOT, tags e filas/distribuição
+- **FR-P004:** FLOW e SCALA habilitam IA, BOT, tags e filas/distribuição implementadas
 - **FR-P005:** Plano pode ser alterado por PlatformAdmin (upgrade/downgrade com validação)
 
 ### Cadastro de Empresa
@@ -119,26 +106,29 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 
 ### Configuração por Plano
 
-- **FR-P010:** Interface filtra funcionalidades de IA baseado no plano
+- **FR-P010:** Interface filtra funcionalidades com permissões efetivas retornadas pelo backend
 - **FR-P011:** Endpoints de IA validam plano antes de executar
 - **FR-P012:** Configuração de WhatsApp é obrigatória para ambos os planos
-- **FR-P013:** Configuração de OpenAI é obrigatória apenas para plano IA+BOT
+- **FR-P013:** Configuração de provedor de IA é obrigatória nos três planos comerciais quando a IA estiver ativa
 
 ### Operadores
 
 - **FR-P014:** Gestão de operadores disponível para ambos os planos
 - **FR-P015:** Ambos os planos permitem criação de memberships Operator
-- **FR-P016:** Limite de operadores pode ser configurado por plano (futuro)
+- **FR-P016:** Limites de linhas e Operators são provisionados automaticamente pelo plano
+- **FR-P017:** Franquia mensal de respostas de IA é inicializada pelo plano e personalizável por tenant
 
 ## 6. Regras de Negócio
 
 - **BR-P001:** Um tenant possui exatamente um plano ativo
-- **BR-P002:** Plano BOT não pode usar IA para atendimento (AiOrchestrationWorker não processa)
+- **BR-P002:** Planos comerciais habilitam IA; BOT legado não pode usar IA
 - **BR-P003:** Plano BOT pode usar todos os modos de conversa (Automatic, Human, Paused) para resposta humana
 - **BR-P004:** Mudança de plano preserva dados existentes mas altera funcionalidades disponíveis
 - **BR-P005:** Downgrade de IA+BOT para BOT desabilita IA mas preserva histórico de AiInteraction
 - **BR-P006:** Cadastro de empresa exige seleção de plano obrigatória
-- **BR-P007:** Plano BOT não requer configuração de OpenAI
+- **BR-P007:** BOT legado não requer configuração de IA
+- **BR-P008:** apenas respostas válidas da IA enfileiradas consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem
+- **BR-P009:** franquia esgotada bloqueia o provedor e aplica handoff/fallback seguro
 
 ## 7. Modelo de Dados
 
@@ -149,7 +139,8 @@ id, name, code, description, features_json, max_operators, max_knowledge_items,
 is_active, created_at, updated_at
 ```
 
-**Códigos:** `BOT`, `IA_BOT`
+**Códigos selecionáveis:** `STAR`, `FLOW`, `SCALA`
+**Códigos legados:** `BOT`, `IA_BOT`
 
 **features_json:** JSON com funcionalidades habilitadas:
 ```json
@@ -160,8 +151,7 @@ is_active, created_at, updated_at
 }
 ```
 
-**Plano BOT:** `ai_enabled: false`  
-**Plano IA+BOT:** `ai_enabled: true, openai_required: true, ai_metrics: true`
+Além dos campos existentes, o plano persiste `is_selectable`, permissões de BOT/tags/distribuição e padrões de linhas, Operators e franquia de IA.
 
 ### Alteração em Tenant
 
@@ -169,6 +159,7 @@ Adicionar campos:
 - `plan_id` (FK para SubscriptionPlan)
 - `plan_activated_at`
 - `plan_expires_at` (futuro, para trial/pagamento)
+- `monthly_ai_response_limit` (personalizado; `null` apenas para compatibilidade legada)
 
 ### Alteração em TenantMembership
 
@@ -181,9 +172,10 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 1. Nome da empresa
 2. Nome do TenantOwner
 3. E-mail do TenantOwner
-4. Seleção de plano (BOT ou IA+BOT) com descrição de funcionalidades
-5. Botão "Criar Empresa"
-6. Link de ativação exibido uma única vez
+4. Seleção de STAR, FLOW ou SCALA; linhas e Operators são preenchidos automaticamente
+5. Franquia mensal de respostas da IA preenchida pelo plano e editável
+6. Botão "Criar Empresa"
+7. Senha temporária exibida uma única vez
 
 ### Dashboard do TenantOwner
 
@@ -193,9 +185,8 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 
 ### Menu Lateral
 
-**Ambos os planos:** Dashboard, Inbox, Operadores, Configurações, Conhecimento, Tags, Uso
-
-**Plano IA+BOT (adicional):** Configurações de IA, Métricas de IA
+**STAR:** Dashboard, Inbox, Operadores, WhatsApp, IA, Conhecimento e Uso.
+**FLOW/SCALA:** recursos do STAR mais BOT, Tags e Filas.
 
 ## 9. Dependências
 
@@ -208,8 +199,8 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 - Pagamento/recorrência de planos
 - Trial period
 - Upgrade/downgrade self-service
-- Planos customizados
-- Limites de uso por plano (mensagens, tokens)
+- Criação arbitrária de novos planos pela interface
+- Cobrança automática de excedentes
 - Marketplace de planos
 
 ## 11. Capacidade da instalação

@@ -113,9 +113,14 @@ export interface User {
   mustChangePassword: boolean
   planCode?: string
   aiEnabled?: boolean
+  botEnabled?: boolean
+  tagsEnabled?: boolean
+  automaticDistributionEnabled?: boolean
   officialApiLineCount?: number
   qrCodeLineCount?: number
   operatorLimit?: number
+  monthlyAiResponseLimit?: number | null
+  monthlyAiResponsesUsed?: number
   dueDate?: string
   tenantStatus?: string
   assignedConnectionType?: string
@@ -157,6 +162,8 @@ export interface Tenant {
   officialApiLineCount: number
   qrCodeLineCount: number
   operatorLimit: number
+  monthlyAiResponseLimit?: number | null
+  monthlyAiResponsesUsed: number
   ownerEmail?: string
   ownerDisplayName?: string
   suspendedAt?: string
@@ -170,6 +177,13 @@ export interface Plan {
   code: string
   description?: string
   aiEnabled: boolean
+  botEnabled: boolean
+  tagsEnabled: boolean
+  automaticDistributionEnabled: boolean
+  isSelectable: boolean
+  defaultOfficialApiLineCount: number
+  defaultOperatorLimit: number
+  defaultMonthlyAiResponseLimit?: number | null
   maxOperators?: number
 }
 
@@ -202,6 +216,7 @@ export interface CreateTenantResponse {
   officialApiLineCount: number
   qrCodeLineCount: number
   operatorLimit: number
+  monthlyAiResponseLimit?: number | null
   temporaryPassword: string
   message: string
 }
@@ -554,6 +569,7 @@ export const api = {
         officialApiLineCount: number
         qrCodeLineCount: number
         operatorLimit: number
+        monthlyAiResponseLimit?: number | null
       }) =>
         fetchApi<CreateTenantResponse>('/api/admin/tenants', {
           method: 'POST',
@@ -570,6 +586,7 @@ export const api = {
           officialApiLineCount: number
           qrCodeLineCount: number
           operatorLimit: number
+          monthlyAiResponseLimit?: number | null
         },
         version: number
       ) =>
@@ -601,10 +618,11 @@ export const api = {
           }
         ),
 
-      updatePlan: (id: string, planCode: string) =>
+      updatePlan: (id: string, planCode: string, version: number) =>
         fetchApi<Tenant>(`/api/admin/tenants/${id}/plan`, {
           method: 'PUT',
           body: JSON.stringify({ planCode }),
+          headers: { 'If-Match': `"${version}"` },
         }),
 
       resetOwnerPassword: (id: string) =>

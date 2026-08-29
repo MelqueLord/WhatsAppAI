@@ -1,6 +1,6 @@
 # Constituição do WhatsApp AI Manager
 
-**Versão:** 1.2.0
+**Versão:** 1.3.0
 **Ratificada:** 2026-08-27
 
 ## I. Simplicidade orientada ao atendimento
@@ -9,7 +9,7 @@ O produto existe para gerenciar conversas do WhatsApp e automatizar atendimento 
 
 ## II. Integrações WhatsApp e responsabilidade clara
 
-A API oficial Cloud da Meta e a ponte WhatsApp Web via Baileys podem participar do caminho crítico; a OpenAI usa sua API oficial. Cada tenant mantém titularidade, aceite de termos, responsabilidade pelos riscos do canal QR e faturamento direto de suas contas. A plataforma configura e opera as conexões, mas não revende consumo dos provedores.
+A API oficial Cloud da Meta e a ponte WhatsApp Web via Baileys podem participar do caminho crítico; provedores de IA usam suas APIs oficiais. Cada tenant mantém titularidade, aceite de termos e responsabilidade pelos riscos e custos dos canais WhatsApp. A IA pode usar credencial própria do tenant ou capacidade incluída no plano pela plataforma, sempre com segredo protegido, isolamento e franquia contabilizada por tenant.
 
 ## III. Automação sob controle humano
 

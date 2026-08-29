@@ -3,6 +3,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.WebApi;
 
 namespace WhatsAppAI.WebApi.Tags;
 
@@ -12,7 +13,8 @@ public static class ClientTagEndpoints
     {
         var group = app.MapGroup("/api/client-tags")
             .WithTags("Client Tags")
-            .RequireAuthorization("RequireTenantContext");
+            .RequireAuthorization("RequireTenantContext")
+            .RequirePlanFeature(PlanFeature.Tags);
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);

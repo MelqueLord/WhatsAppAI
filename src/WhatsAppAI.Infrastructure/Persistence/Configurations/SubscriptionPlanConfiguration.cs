@@ -19,6 +19,13 @@ public class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Subscripti
         builder.Property(p => p.AiEnabled).HasColumnName("ai_enabled").IsRequired();
         builder.Property(p => p.OpenAiRequired).HasColumnName("openai_required").IsRequired();
         builder.Property(p => p.AiMetrics).HasColumnName("ai_metrics").IsRequired();
+        builder.Property(p => p.BotEnabled).HasColumnName("bot_enabled").IsRequired();
+        builder.Property(p => p.TagsEnabled).HasColumnName("tags_enabled").IsRequired();
+        builder.Property(p => p.AutomaticDistributionEnabled).HasColumnName("automatic_distribution_enabled").IsRequired();
+        builder.Property(p => p.IsSelectable).HasColumnName("is_selectable").IsRequired();
+        builder.Property(p => p.DefaultOfficialApiLineCount).HasColumnName("default_official_api_line_count").IsRequired();
+        builder.Property(p => p.DefaultOperatorLimit).HasColumnName("default_operator_limit").IsRequired();
+        builder.Property(p => p.DefaultMonthlyAiResponseLimit).HasColumnName("default_monthly_ai_response_limit");
         builder.Property(p => p.MaxOperators).HasColumnName("max_operators");
         builder.Property(p => p.MaxKnowledgeItems).HasColumnName("max_knowledge_items");
         builder.Property(p => p.IsActive).HasColumnName("is_active").IsRequired();

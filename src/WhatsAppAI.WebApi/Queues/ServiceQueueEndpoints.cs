@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.WebApi;
 
 namespace WhatsAppAI.WebApi.Queues;
 
@@ -11,7 +12,8 @@ public static class ServiceLineEndpoints
     {
         var group = app.MapGroup("/api/service-queues")
             .WithTags("Service Queues")
-            .RequireAuthorization("RequireTenantContext");
+            .RequireAuthorization("RequireTenantContext")
+            .RequirePlanFeature(PlanFeature.AutomaticDistribution);
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);

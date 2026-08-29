@@ -13,14 +13,24 @@ public static class SubscriptionPlanSeeder
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        if (await db.SubscriptionPlans.AnyAsync())
-            return;
-
-        var plans = new List<SubscriptionPlan>
+        var defaults = new List<SubscriptionPlan>
         {
             SubscriptionPlan.CreateBot(),
-            SubscriptionPlan.CreateAiBot()
+            SubscriptionPlan.CreateAiBot(),
+            SubscriptionPlan.CreateStar(),
+            SubscriptionPlan.CreateFlow(),
+            SubscriptionPlan.CreateScala()
         };
+
+        var existingCodes = await db.SubscriptionPlans
+            .Select(plan => plan.Code)
+            .ToListAsync();
+        var plans = defaults
+            .Where(plan => !existingCodes.Contains(plan.Code, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        if (plans.Count == 0)
+            return;
 
         await db.SubscriptionPlans.AddRangeAsync(plans);
         await db.SaveChangesAsync();

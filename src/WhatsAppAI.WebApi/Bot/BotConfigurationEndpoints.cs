@@ -53,7 +53,8 @@ public static class BotConfigurationEndpoints
 
     private static async Task<IResult> SaveAsync(
         [FromBody] SaveBotConfigRequest request,
-        ICurrentTenant currentTenant, IBotConfigurationRepository repo, HttpContext httpContext)
+        ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
@@ -63,6 +64,9 @@ public static class BotConfigurationEndpoints
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply or AiPowered" });
+        if (mode == BotMode.SimpleAutoReply &&
+            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
         if (!TryValidateFlowSteps(request.FlowSteps, out var flowError))
             return Results.BadRequest(new { error = flowError });
 
@@ -105,6 +109,9 @@ public static class BotConfigurationEndpoints
 
         if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
+        if (mode == BotMode.SimpleAutoReply &&
+            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
 
         config.UpdateMode(mode);
         await repo.UpdateAsync(config);
@@ -153,9 +160,16 @@ public static class BotConfigurationEndpoints
 
             if (mode == BotMode.AiPowered && !await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
                 return Results.BadRequest(new { error = "AiPowered mode requires IA+BOT plan." });
+            if (mode == BotMode.SimpleAutoReply &&
+                !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+                return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
 
             config.UpdateMode(mode);
         }
+
+        if (request.Enabled && config.Mode == BotMode.SimpleAutoReply &&
+            !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
 
         config.Toggle(request.Enabled);
         await repo.UpdateAsync(config);

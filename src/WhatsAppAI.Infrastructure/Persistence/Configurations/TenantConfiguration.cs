@@ -46,6 +46,9 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasDefaultValue(0)
             .IsRequired();
 
+        builder.Property(t => t.MonthlyAiResponseLimit)
+            .HasColumnName("monthly_ai_response_limit");
+
         builder.Property(t => t.Status)
             .HasColumnName("status")
             .HasConversion<string>()

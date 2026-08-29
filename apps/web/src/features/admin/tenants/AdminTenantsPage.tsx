@@ -33,6 +33,10 @@ export function AdminTenantsPage() {
   const [editTarget, setEditTarget] = useState<Tenant | null>(null)
   const [paymentTarget, setPaymentTarget] = useState<Tenant | null>(null)
   const [paymentDate, setPaymentDate] = useState('')
+  const [createPlanCode, setCreatePlanCode] = useState('STAR')
+  const [createAiLimit, setCreateAiLimit] = useState(1500)
+  const [editPlanCode, setEditPlanCode] = useState('')
+  const [editAiLimit, setEditAiLimit] = useState(0)
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -51,7 +55,7 @@ export function AdminTenantsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number }) =>
+    mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number }) =>
       api.admin.tenants.create(data),
     onSuccess: (data) => {
       setCreateResult(data)
@@ -88,8 +92,8 @@ export function AdminTenantsPage() {
   })
 
   const updatePlanMutation = useMutation({
-    mutationFn: ({ tenantId, planCode }: { tenantId: string; planCode: string }) =>
-      api.admin.tenants.updatePlan(tenantId, planCode),
+    mutationFn: ({ tenant, planCode }: { tenant: Tenant; planCode: string }) =>
+      api.admin.tenants.updatePlan(tenant.id, planCode, tenant.version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
     },
@@ -108,7 +112,7 @@ export function AdminTenantsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number } }) =>
+    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number } }) =>
       api.admin.tenants.update(tenant.id, data, tenant.version),
     onSuccess: () => {
       setEditTarget(null)
@@ -139,10 +143,11 @@ export function AdminTenantsPage() {
       name: formData.get('name') as string,
       ownerEmail: formData.get('ownerEmail') as string,
       ownerDisplayName: (formData.get('ownerDisplayName') as string) || undefined,
-      planCode: formData.get('planCode') as string,
-      officialApiLineCount: Number(formData.get('officialApiLineCount') ?? 0),
-      qrCodeLineCount: Number(formData.get('qrCodeLineCount') ?? 0),
-      operatorLimit: Number(formData.get('operatorLimit') ?? 0),
+      planCode: createPlanCode,
+      officialApiLineCount: plans?.find((plan) => plan.code === createPlanCode)?.defaultOfficialApiLineCount ?? 0,
+      qrCodeLineCount: 0,
+      operatorLimit: plans?.find((plan) => plan.code === createPlanCode)?.defaultOperatorLimit ?? 0,
+      monthlyAiResponseLimit: createAiLimit,
     })
   }
 
@@ -163,10 +168,11 @@ export function AdminTenantsPage() {
         name: String(formData.get('name') ?? '').trim(),
         ownerEmail: String(formData.get('ownerEmail') ?? '').trim(),
         ownerDisplayName: String(formData.get('ownerDisplayName') ?? '').trim() || undefined,
-        planCode: String(formData.get('planCode') ?? ''),
-        officialApiLineCount: Number(formData.get('officialApiLineCount') ?? 0),
-        qrCodeLineCount: Number(formData.get('qrCodeLineCount') ?? 0),
-        operatorLimit: Number(formData.get('operatorLimit') ?? 0),
+        planCode: editPlanCode,
+        officialApiLineCount: plans?.find((plan) => plan.code === editPlanCode)?.defaultOfficialApiLineCount ?? editTarget.officialApiLineCount,
+        qrCodeLineCount: 0,
+        operatorLimit: plans?.find((plan) => plan.code === editPlanCode)?.defaultOperatorLimit ?? editTarget.operatorLimit,
+        monthlyAiResponseLimit: editAiLimit,
       },
     })
   }
@@ -174,6 +180,9 @@ export function AdminTenantsPage() {
   const filteredTenants = (tenants ?? []).filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase())
   )
+  const selectablePlans = (plans ?? []).filter((plan) => plan.isSelectable)
+  const selectedCreatePlan = plans?.find((plan) => plan.code === createPlanCode)
+  const selectedEditPlan = plans?.find((plan) => plan.code === editPlanCode)
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -215,11 +224,16 @@ export function AdminTenantsPage() {
             <p className="text-sm text-slate-400 mt-0.5">Gerencie as empresas da plataforma</p>
           </div>
           <button
+            disabled={selectablePlans.length === 0}
             onClick={() => {
               createMutation.reset()
+              const defaultPlan = plans?.find((plan) => plan.code === 'STAR') ??
+                plans?.find((plan) => plan.isSelectable)
+              setCreatePlanCode(defaultPlan?.code ?? 'STAR')
+              setCreateAiLimit(defaultPlan?.defaultMonthlyAiResponseLimit ?? 0)
               setShowCreateForm(true)
             }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> Nova Empresa
           </button>
@@ -407,6 +421,9 @@ export function AdminTenantsPage() {
                     Operadores
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Respostas IA/mês
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Vencimento
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -423,7 +440,7 @@ export function AdminTenantsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTenants.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
                       {search ? 'Nenhum tenant encontrado com esse filtro.' : 'Nenhum tenant cadastrado.'}
                     </td>
                   </tr>
@@ -450,6 +467,10 @@ export function AdminTenantsPage() {
                         <div>QR: <span className="font-medium">{tenant.qrCodeLineCount}</span></div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">{tenant.operatorLimit || 'Ilimitado'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <span className="font-medium">{tenant.monthlyAiResponsesUsed ?? 0}</span>
+                        {' / '}{tenant.monthlyAiResponseLimit ?? 'Ilimitado'}
+                      </td>
                       <td className="px-6 py-4 text-sm">
                         {tenant.dueDate ? (
                           <div>
@@ -470,6 +491,10 @@ export function AdminTenantsPage() {
                           <button
                             onClick={() => {
                               updateMutation.reset()
+                              const currentPlan = plans?.find((plan) => plan.id === tenant.planId)
+                              setEditPlanCode(currentPlan?.code ?? '')
+                              setEditAiLimit(tenant.monthlyAiResponseLimit ??
+                                currentPlan?.defaultMonthlyAiResponseLimit ?? 0)
                               setEditTarget(tenant)
                             }}
                             className="inline-flex shrink-0 items-center text-xs text-slate-600 hover:text-emerald-700 font-medium"
@@ -480,10 +505,10 @@ export function AdminTenantsPage() {
                           </button>
                           <select
                             value={plans?.find(p => p.id === tenant.planId)?.code || ''}
-                            onChange={(e) => updatePlanMutation.mutate({ tenantId: tenant.id, planCode: e.target.value })}
+                            onChange={(e) => updatePlanMutation.mutate({ tenant, planCode: e.target.value })}
                             className="text-xs px-2 py-1 border border-slate-200 rounded-lg"
                           >
-                            {plans?.map(p => (
+                            {plans?.filter((plan) => plan.isSelectable || plan.id === tenant.planId).map(p => (
                               <option key={p.id} value={p.code}>{p.name}</option>
                             ))}
                           </select>
@@ -613,66 +638,48 @@ export function AdminTenantsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="create-plan" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Plano *
                 </label>
                 <select
+                  id="create-plan"
                   name="planCode"
                   required
+                  value={createPlanCode}
+                  onChange={(event) => {
+                    const plan = plans?.find((item) => item.code === event.target.value)
+                    setCreatePlanCode(event.target.value)
+                    setCreateAiLimit(plan?.defaultMonthlyAiResponseLimit ?? 0)
+                  }}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 >
-                  {plans?.map((plan) => (
+                  {selectablePlans.map((plan) => (
                     <option key={plan.id} value={plan.code}>
                       {plan.name} — {plan.description}
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-slate-500 mt-1">
-                  BOT: todos os recursos exceto IA | IA+BOT: completo com IA
+                  Os recursos e limites operacionais são aplicados automaticamente.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Linhas API oficial
-                  </label>
-                  <input
-                    name="officialApiLineCount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    defaultValue="0"
-                    required
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Linhas por QR Code
-                  </label>
-                  <input
-                    name="qrCodeLineCount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    defaultValue="0"
-                    required
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                <div><span className="block text-xs text-slate-400">Linhas oficiais</span><strong>{selectedCreatePlan?.defaultOfficialApiLineCount ?? 0}</strong></div>
+                <div><span className="block text-xs text-slate-400">Operadores</span><strong>{selectedCreatePlan?.defaultOperatorLimit ?? 0}</strong></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Limite de operadores</label>
+                <label htmlFor="create-ai-limit" className="block text-sm font-medium text-slate-700 mb-1.5">Respostas da IA por mês</label>
                 <input
-                  name="operatorLimit"
+                  id="create-ai-limit"
                   type="number"
                   min="0"
                   step="1"
-                  defaultValue="0"
+                  value={createAiLimit}
+                  onChange={(event) => setCreateAiLimit(Math.max(0, Number(event.target.value)))}
                   required
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">Use 0 para permitir operadores ilimitados.</p>
+                <p className="text-xs text-slate-500 mt-1">Personalize a franquia desta empresa. Mensagens recebidas não contam.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
@@ -754,50 +761,33 @@ export function AdminTenantsPage() {
                 <select
                   name="planCode"
                   required
-                  defaultValue={plans?.find((plan) => plan.id === editTarget.planId)?.code ?? ''}
+                  value={editPlanCode}
+                  onChange={(event) => {
+                    const plan = plans?.find((item) => item.code === event.target.value)
+                    setEditPlanCode(event.target.value)
+                    setEditAiLimit(plan?.defaultMonthlyAiResponseLimit ?? 0)
+                  }}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 >
-                  {plans?.map((plan) => <option key={plan.id} value={plan.code}>{plan.name} — {plan.description}</option>)}
+                  {plans?.filter((plan) => plan.isSelectable || plan.id === editTarget.planId).map((plan) => <option key={plan.id} value={plan.code}>{plan.name} — {plan.description}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Linhas API oficial</label>
-                  <input
-                    name="officialApiLineCount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    defaultValue={editTarget.officialApiLineCount}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Linhas por QR Code</label>
-                  <input
-                    name="qrCodeLineCount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    defaultValue={editTarget.qrCodeLineCount}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                <div><span className="block text-xs text-slate-400">Linhas oficiais</span><strong>{selectedEditPlan?.isSelectable ? selectedEditPlan.defaultOfficialApiLineCount : editTarget.officialApiLineCount}</strong></div>
+                <div><span className="block text-xs text-slate-400">Operadores</span><strong>{selectedEditPlan?.isSelectable ? selectedEditPlan.defaultOperatorLimit : editTarget.operatorLimit}</strong></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Limite de operadores</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Respostas da IA por mês</label>
                 <input
-                  name="operatorLimit"
                   type="number"
                   min="0"
                   step="1"
                   required
-                  defaultValue={editTarget.operatorLimit}
+                  value={editAiLimit}
+                  onChange={(event) => setEditAiLimit(Math.max(0, Number(event.target.value)))}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">Use 0 para permitir operadores ilimitados.</p>
+                <p className="text-xs text-slate-500 mt-1">Consumo atual: {editTarget.monthlyAiResponsesUsed ?? 0} respostas neste mês.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setEditTarget(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm hover:bg-slate-50">

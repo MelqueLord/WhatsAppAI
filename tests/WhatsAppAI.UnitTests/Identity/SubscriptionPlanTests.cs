@@ -31,6 +31,37 @@ public class SubscriptionPlanTests
         Assert.True(plan.IsActive);
     }
 
+    [Theory]
+    [InlineData("STAR", 1, 2, 1500, false, false, false)]
+    [InlineData("FLOW", 2, 4, 5000, true, true, true)]
+    [InlineData("SCALA", 3, 8, 12000, true, true, true)]
+    public void CreateCommercialPlan_ReturnsConfiguredEntitlements(
+        string code,
+        int lines,
+        int operators,
+        int aiResponses,
+        bool botEnabled,
+        bool tagsEnabled,
+        bool automaticDistributionEnabled)
+    {
+        var plan = code switch
+        {
+            "STAR" => SubscriptionPlan.CreateStar(),
+            "FLOW" => SubscriptionPlan.CreateFlow(),
+            _ => SubscriptionPlan.CreateScala()
+        };
+
+        Assert.Equal(code, plan.Code);
+        Assert.True(plan.AiEnabled);
+        Assert.True(plan.IsSelectable);
+        Assert.Equal(lines, plan.DefaultOfficialApiLineCount);
+        Assert.Equal(operators, plan.DefaultOperatorLimit);
+        Assert.Equal(aiResponses, plan.DefaultMonthlyAiResponseLimit);
+        Assert.Equal(botEnabled, plan.BotEnabled);
+        Assert.Equal(tagsEnabled, plan.TagsEnabled);
+        Assert.Equal(automaticDistributionEnabled, plan.AutomaticDistributionEnabled);
+    }
+
     [Fact]
     public void Create_WithCustomValues_SetsProperties()
     {

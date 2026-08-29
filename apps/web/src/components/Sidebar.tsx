@@ -31,6 +31,9 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   const { user, isPlatformAdmin, isTenantOwner, isOperator, logout } = useAuth()
 
   const aiEnabled = user?.aiEnabled === true
+  const botEnabled = user?.botEnabled === true
+  const tagsEnabled = user?.tagsEnabled === true
+  const automaticDistributionEnabled = user?.automaticDistributionEnabled === true
 
   if (isOperator) {
     return (
@@ -78,18 +81,20 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
             <Users className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Contatos</span>}
           </NavLink>
-          <NavLink
-            to="/queue-inbox"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                isActive ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'
-              )
-            }
-          >
-            <ListOrdered className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Filas Inbox</span>}
-          </NavLink>
+          {automaticDistributionEnabled && (
+            <NavLink
+              to="/queue-inbox"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  isActive ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                )
+              }
+            >
+              <ListOrdered className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Filas Inbox</span>}
+            </NavLink>
+          )}
           <NavLink
             to="/broadcast"
             className={({ isActive }) =>
@@ -129,16 +134,16 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
     ...(isPlatformAdmin ? [] : [{ to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }]),
     ...(isPlatformAdmin ? [] : [{ to: '/inbox', icon: MessageSquare, label: 'Inbox' }]),
     ...(isPlatformAdmin ? [] : [{ to: '/contacts', icon: Users, label: 'Contatos' }]),
-    ...(isPlatformAdmin ? [] : [{ to: '/queue-inbox', icon: ListOrdered, label: 'Filas Inbox' }]),
+    ...(isPlatformAdmin || !automaticDistributionEnabled ? [] : [{ to: '/queue-inbox', icon: ListOrdered, label: 'Filas Inbox' }]),
     ...(isTenantOwner
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
-          { to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' },
+          ...(botEnabled ? [{ to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' }] : []),
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
-          { to: '/queues', icon: ListOrdered, label: 'Filas' },
-          { to: '/tags', icon: Tags, label: 'Tags' },
+          ...(automaticDistributionEnabled ? [{ to: '/queues', icon: ListOrdered, label: 'Filas' }] : []),
+          ...(tagsEnabled ? [{ to: '/tags', icon: Tags, label: 'Tags' }] : []),
           { to: '/broadcast', icon: Radio, label: 'Disparo em massa' },
         ]
       : []),

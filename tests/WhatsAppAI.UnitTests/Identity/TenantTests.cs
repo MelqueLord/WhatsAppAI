@@ -124,4 +124,26 @@ public class TenantTests
         Assert.Equal(3, tenant.OperatorLimit);
         Assert.Equal(originalVersion + 1, tenant.Version);
     }
+
+    [Fact]
+    public void ChangePlan_WithCommercialDefaults_UpdatesLimitsAndQuota()
+    {
+        var tenant = Tenant.Create("Test", "test", Guid.NewGuid());
+        var planId = Guid.NewGuid();
+
+        tenant.ChangePlan(planId, 2, 0, 4, 7_500);
+
+        Assert.Equal(planId, tenant.PlanId);
+        Assert.Equal(2, tenant.OfficialApiLineCount);
+        Assert.Equal(0, tenant.QrCodeLineCount);
+        Assert.Equal(4, tenant.OperatorLimit);
+        Assert.Equal(7_500, tenant.MonthlyAiResponseLimit);
+    }
+
+    [Fact]
+    public void Create_RejectsNegativeMonthlyAiResponseLimit()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Tenant.Create("Test", "test", Guid.NewGuid(), 1, 0, 2, -1));
+    }
 }

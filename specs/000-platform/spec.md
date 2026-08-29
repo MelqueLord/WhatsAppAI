@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.16.0
+**Versão:** 0.17.0
 **Data:** 2026-08-28
 
 ## 1. Problema
@@ -164,6 +164,18 @@ Como PlatformAdmin, quero acompanhar clientes, linhas e operadores hospedados pa
 3. Ao atingir qualquer limite, a interface mostra de forma destacada que a migração do KVM é necessária.
 4. Tenants suspensos continuam na contagem; tenants encerrados e seus recursos não contam.
 
+### US-012 — Provisionar plano comercial e franquia de IA (P1)
+
+Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franquia mensal de IA para que cada empresa receba automaticamente os recursos contratados ao entrar.
+
+**Aceite:**
+
+1. STAR provisiona 1 linha oficial e 2 Operators; FLOW, 2 linhas e 4 Operators; SCALA, 3 linhas e 8 Operators.
+2. Todos incluem IA; BOT, tags e filas automáticas são liberados apenas nos planos que os oferecem.
+3. A franquia começa com o padrão do plano, mas pode ser personalizada por empresa com concorrência otimista.
+4. Somente respostas válidas da IA enfileiradas para envio consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem.
+5. Ao atingir a franquia, nenhuma nova resposta da IA é enviada e o fluxo aplica o handoff/fallback seguro existente.
+
 ## 5. Requisitos funcionais
 
 - **FR-001:** autenticar usuários com frontend e backend no mesmo site; em produção o cookie de sessão é `HttpOnly`, `Secure` e `SameSite=Lax`, e toda mutação autenticada exige token antiforgery enviado em `X-CSRF-TOKEN`.
@@ -207,6 +219,10 @@ Como PlatformAdmin, quero acompanhar clientes, linhas e operadores hospedados pa
 - **FR-039:** permitir ao TenantOwner importar até 5.000 contatos por arquivo `.csv` ou `.xlsx` de até 2 MB, usando as colunas obrigatórias `nome` e `contato`, com resultado parcial e isolamento pelo tenant corrente.
 - **FR-040:** disponibilizar somente ao PlatformAdmin um resumo global de capacidade com quantidade atual, limite configurado e percentual de uso para clientes não encerrados, conexões WhatsApp ativas e memberships `Operator` ativas.
 - **FR-041:** sinalizar necessidade de migração da infraestrutura quando qualquer indicador atingir ou ultrapassar seu limite; os padrões são 25 clientes, 40 linhas e 90 operadores e podem ser substituídos por configuração de ambiente.
+- **FR-042:** cadastrar novos tenants somente nos planos comerciais STAR, FLOW e SCALA, aplicando no backend as quantidades padrão de linhas e Operators do plano e preservando BOT/IA_BOT apenas para tenants legados.
+- **FR-043:** expor no login as permissões efetivas de IA, BOT, tags e distribuição/filas para que frontend e backend ocultem ou bloqueiem recursos não contratados.
+- **FR-044:** permitir ao PlatformAdmin definir `monthly_ai_response_limit` por tenant, mostrar o consumo do mês UTC e atualizar plano/franquia com `If-Match`.
+- **FR-045:** contabilizar em `UsageLedger` somente respostas válidas da IA criadas para envio e impedir nova resposta ao atingir a franquia, usando fallback/handoff configurado sem reprocessamento infinito.
 
 ## 6. Regras de negócio
 
@@ -230,6 +246,8 @@ Como PlatformAdmin, quero acompanhar clientes, linhas e operadores hospedados pa
 - **BR-018:** `assigned_queue_id` nulo representa atendimento geral; quando preenchido, uma conversa só pode ser listada, aberta ou respondida pelo Operator se possuir exatamente essa fila, sem aceitar fila inativa, inexistente ou de outro tenant na configuração.
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
 - **BR-020:** capacidade de clientes inclui tenants `Pending`, `Active` e `Suspended`; linhas incluem `WhatsAppAccount` ativo desses tenants; operadores incluem membership `Operator` ativa desses tenants. Tenant `Closed` e seus recursos ficam fora dos três indicadores.
+- **BR-021:** STAR libera IA e base de conhecimento, com 1 linha oficial e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 linhas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 linhas e 8 Operators.
+- **BR-022:** a franquia mensal persistida no tenant prevalece sobre o padrão do plano; `null` preserva tenants legados sem limite, `0` bloqueia respostas da IA e valores positivos limitam o mês civil UTC.
 
 ## 7. Requisitos não funcionais
 

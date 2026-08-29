@@ -155,6 +155,7 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 - `docs/architecture/adr/0005-postgres-inbox-outbox.md`;
 - `docs/architecture/adr/0006-hosting-and-secrets.md`;
 - `docs/architecture/adr/0009-baileys-production-qr.md`.
+- `docs/architecture/adr/0010-platform-managed-ai-allowances.md`.
 
 A topologia de um Meta App compartilhado especializa ADR-0002/0003 e está registrada em **R-010**. A política normativa de IA é `docs/ai/behavior-policy.md`.
 

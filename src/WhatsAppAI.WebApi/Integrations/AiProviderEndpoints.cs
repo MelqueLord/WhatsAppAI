@@ -218,6 +218,7 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         IServiceLineRepository queueRepository,
         IClientTagRepository tagRepository,
+        AppDbContext dbContext,
         HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
@@ -238,12 +239,20 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "O limiar de confiança deve estar entre 0 e 1." });
 
         var requestedQueueIds = (request.RoutingQueueIds ?? []).Distinct().ToArray();
+        if (requestedQueueIds.Length > 0 &&
+            !await dbContext.HasAutomaticDistributionEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "A distribuição automática não está disponível neste plano." });
+
         var activeQueues = await queueRepository.GetActiveByTenantAsync(currentTenant.TenantId.Value);
         var activeQueueIds = activeQueues.Select(queue => queue.Id).ToHashSet();
         if (Array.Exists(requestedQueueIds, id => !activeQueueIds.Contains(id)))
             return Results.BadRequest(new { error = "Selecione somente filas ativas desta empresa." });
 
         var requestedTagIds = (request.RoutingTagIds ?? []).Distinct().ToArray();
+        if (requestedTagIds.Length > 0 &&
+            !await dbContext.HasTagsEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "As tags não estão disponíveis neste plano." });
+
         var activeTags = await tagRepository.GetActiveByTenantAsync(currentTenant.TenantId.Value);
         var activeTagIds = activeTags.Select(tag => tag.Id).ToHashSet();
         if (Array.Exists(requestedTagIds, id => !activeTagIds.Contains(id)))

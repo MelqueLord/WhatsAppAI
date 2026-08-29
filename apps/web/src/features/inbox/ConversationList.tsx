@@ -17,6 +17,7 @@ function lineLabel(line: LineAssignment) {
 
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
   const { isTenantOwner, user } = useAuth()
+  const queuesEnabled = user?.automaticDistributionEnabled === true
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
   const [queueFilter, setQueueFilter] = useState<string>('all')
@@ -51,6 +52,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
       const response = await api.serviceQueues.list()
       return response.filter((queue) => queue.isActive)
     },
+    enabled: queuesEnabled,
   })
 
   const { data: operators = [] } = useQuery({

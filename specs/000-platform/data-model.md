@@ -11,9 +11,9 @@
 
 ### Tenant
 
-`id`, `name`, `slug`, `status`, `official_api_line_count`, `qr_code_line_count`, `operator_limit`, `retention_days`, `version`, `created_at`, `suspended_at`.
+`id`, `name`, `slug`, `status`, `official_api_line_count`, `qr_code_line_count`, `operator_limit`, `monthly_ai_response_limit`, `retention_days`, `version`, `created_at`, `suspended_at`.
 
-Invariantes: `slug` único; status `Active|Suspended`; contagens de linhas e `operator_limit` são inteiros não negativos; `operator_limit = 0` significa ilimitado; retenção dentro de faixa configurada. As contagens representam capacidade contratada e não alteram a regra do MVP de um número ativo por tenant.
+Invariantes: `slug` único; status `Active|Suspended`; contagens de linhas, `operator_limit` e `monthly_ai_response_limit` são inteiros não negativos; `operator_limit = 0` significa ilimitado; limite mensal nulo preserva tenants legados sem franquia. As contagens representam capacidade contratada.
 
 ### User e TenantMembership
 
@@ -100,7 +100,7 @@ Nunca persistir prompt completo, raciocínio interno, resposta bruta do provedor
 
 `id`, `tenant_id`, `provider`, `metric`, `quantity`, `unit`, `estimated_cost_minor`, `currency`, `price_version`, `source_id`, `occurred_at`.
 
-Unidades são canônicas; custo pode ser nulo e, quando presente, é inteiro na unidade menor da moeda ISO 4217. Único por `(tenant_id, provider, metric, source_id)` quando aplicável (**FR-018**, **BR-007**, **NFR-006**).
+Unidades são canônicas; custo pode ser nulo e, quando presente, é inteiro na unidade menor da moeda ISO 4217. Único por `(tenant_id, provider, metric, source_id)` quando aplicável (**FR-018**, **BR-007**, **NFR-006**). Cada resposta de IA efetivamente enfileirada registra `metric = ai_responses`, quantidade `1`; mensagens recebidas e fallbacks operacionais não consomem a franquia comercial (**FR-043**, **BR-021**).
 
 ### AuditLog
 
@@ -110,9 +110,9 @@ Somente append; metadata sanitizada. A identidade de banco usada pela aplicaçã
 
 ### SubscriptionPlan
 
-`id`, `name`, `code`, `description`, `ai_enabled`, `openai_required`, `ai_metrics`, `max_operators`, `max_knowledge_items`, `is_active`, `created_at`, `updated_at`.
+`id`, `name`, `code`, `description`, `ai_enabled`, `openai_required`, `ai_metrics`, `bot_enabled`, `tags_enabled`, `automatic_distribution_enabled`, `is_selectable`, `default_official_api_line_count`, `default_operator_limit`, `default_monthly_ai_response_limit`, `max_operators`, `max_knowledge_items`, `is_active`, `created_at`, `updated_at`.
 
-Planos disponíveis: `BOT` (sem IA) e `IA_BOT` (com IA). `ai_enabled` controla acesso a funcionalidades de IA. Único `code`. Seed automático na inicialização (**FR-P001**, **FR-P002**, **BR-P001**).
+Planos comerciais selecionáveis: `STAR` (1 linha, 2 operadores, IA), `FLOW` (2 linhas, 4 operadores, IA, BOT, tags e distribuição) e `SCALA` (3 linhas, 8 operadores, os mesmos módulos atualmente implementados do FLOW). `BOT` e `IA_BOT` permanecem legados e não selecionáveis. A franquia de respostas parte do padrão do plano e pode ser personalizada por tenant. Único `code`; seed e migration garantem os planos (**FR-042** a **FR-045**, **BR-021**, **BR-022**).
 
 ### BotConfiguration
 
@@ -198,7 +198,7 @@ erDiagram
 | **NFR-001, NFR-002, NFR-004, NFR-005, NFR-007** | Metas operacionais não criam entidades de domínio; evidências ficam em telemetria e runbooks sanitizados. |
 | **NFR-006, SC-005** | Toda entidade tenant-owned usa `tenant_id NOT NULL`; FKs, índices e unicidades incluem/validam tenant. |
 | **SC-001, SC-002, SC-003, SC-006** | Evidências são produzidas por testes/piloto; entidades acima fornecem status, timestamps e correlação. |
-| **FR-P001, FR-P002, BR-P001** | `SubscriptionPlan` define planos (BOT/IA_BOT); `Tenant.plan_id` controla acesso a funcionalidades de IA. |
+| **FR-P001, FR-P002, BR-P001, FR-042–FR-045** | `SubscriptionPlan` define planos e recursos; `Tenant.plan_id` controla os módulos e `monthly_ai_response_limit` a franquia personalizada. |
 
 ## Prontidão de produção
 

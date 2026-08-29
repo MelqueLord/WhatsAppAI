@@ -168,6 +168,16 @@ public sealed class AiOrchestrationWorker(
             // Handle SimpleAutoReply mode
             if (botConfig.Mode == BotMode.SimpleAutoReply)
             {
+                if (!await dbContext.HasBotEnabledAsync(message.TenantId, cancellationToken))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation(
+                        "SimpleAutoReply blocked by plan for tenant {TenantId}",
+                        message.TenantId);
+                    return;
+                }
+
                 try
                 {
                     var previousInboundCount = await dbContext.Messages
@@ -217,6 +227,21 @@ public sealed class AiOrchestrationWorker(
                     message, conversation, botConfig, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, cancellationToken);
                 logger.LogWarning("AI not enabled for tenant {TenantId} plan", message.TenantId);
+                return;
+            }
+
+            var monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
+                dbContext, message.TenantId, cancellationToken);
+            if (!AiResponseQuotaPolicy.HasAvailableResponse(
+                    tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
+            {
+                await FinalizeAiResponseQuotaExceededAsync(
+                    message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
+                    conversationRepository, outboxRepository, handoffEventRepository,
+                    cancellationToken);
+                logger.LogWarning(
+                    "Monthly AI response quota exhausted for tenant {TenantId}",
+                    message.TenantId);
                 return;
             }
 
@@ -292,14 +317,20 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            var configuredQueueIds = credential.GetRoutingQueueIds().ToHashSet();
+            var configuredQueueIds = await dbContext.HasAutomaticDistributionEnabledAsync(
+                message.TenantId, cancellationToken)
+                ? credential.GetRoutingQueueIds().ToHashSet()
+                : [];
             List<ServiceLine> routingQueues = configuredQueueIds.Count == 0
                 ? []
                 : (await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
                     .Where(queue => configuredQueueIds.Contains(queue.Id))
                     .ToList();
 
-            var configuredTagIds = credential.GetRoutingTagIds().ToHashSet();
+            var configuredTagIds = await dbContext.HasTagsEnabledAsync(
+                message.TenantId, cancellationToken)
+                ? credential.GetRoutingTagIds().ToHashSet()
+                : [];
             List<ClientTag> routingTags = configuredTagIds.Count == 0
                 ? []
                 : (await tagRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
@@ -481,6 +512,46 @@ public sealed class AiOrchestrationWorker(
                     return;
                 }
 
+                await using var quotaTransaction = await dbContext.Database
+                    .BeginTransactionAsync(cancellationToken);
+                if (dbContext.Database.IsNpgsql())
+                {
+                    await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                        $"SELECT pg_advisory_xact_lock(hashtext({message.TenantId.ToString()}))",
+                        cancellationToken);
+                }
+
+                monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
+                    dbContext, message.TenantId, cancellationToken);
+                if (!AiResponseQuotaPolicy.HasAvailableResponse(
+                        tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
+                {
+                    await quotaTransaction.RollbackAsync(cancellationToken);
+                    await quotaTransaction.DisposeAsync();
+                    await FinalizeAiResponseQuotaExceededAsync(
+                        message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
+                        conversationRepository, outboxRepository, handoffEventRepository,
+                        cancellationToken);
+                    logger.LogWarning(
+                        "AI reply discarded because tenant {TenantId} reached its monthly quota",
+                        message.TenantId);
+                    return;
+                }
+
+                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                if (!AiReplyDeliveryGuard.CanSend(
+                        conversation, expectedConversationVersion, DateTime.UtcNow))
+                {
+                    await quotaTransaction.RollbackAsync(cancellationToken);
+                    await quotaTransaction.DisposeAsync();
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation(
+                        "AI reply discarded after conversation {ConversationId} changed while reserving quota",
+                        message.ConversationId);
+                    return;
+                }
+
                 var replyMessage = Message.CreateOutbound(
                     message.TenantId,
                     message.ConversationId,
@@ -495,10 +566,25 @@ public sealed class AiOrchestrationWorker(
                 var outboxMessage = OutboxMessage.Create(message.TenantId, replyMessage.Id);
                 await outboxRepository.AddAsync(outboxMessage);
 
+                var responseUsage = UsageLedger.Create(
+                    message.TenantId,
+                    credential.Provider,
+                    "ai_responses",
+                    replyMessage.Id.ToString(),
+                    1,
+                    "responses");
+                await usageRepository.AddAsync(responseUsage, cancellationToken);
+
                 conversation.RecordMessage();
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
 
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
+
+                await quotaTransaction.CommitAsync(cancellationToken);
+
                 logger.LogInformation("AI reply created for message {MessageId}", message.Id);
+                return;
             }
             else if (response.Decision.Action == AiAction.Handoff)
             {
@@ -617,6 +703,64 @@ public sealed class AiOrchestrationWorker(
             conversationRepository, handoffEventRepository, cancellationToken);
         await messageRepository.AddAsync(fallbackMessage, cancellationToken);
         await outboxRepository.AddAsync(OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
+    }
+
+    private static async Task<long> GetMonthlyAiResponsesUsedAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
+            .SumAsync(usage => (long?)usage.Quantity, cancellationToken) ?? 0;
+    }
+
+    private static async Task FinalizeAiResponseQuotaExceededAsync(
+        Message message,
+        Conversation conversation,
+        uint expectedConversationVersion,
+        BotConfiguration? botConfig,
+        AppDbContext dbContext,
+        IMessageRepository messageRepository,
+        IConversationRepository conversationRepository,
+        IOutboxMessageRepository outboxRepository,
+        IHandoffEventRepository handoffEventRepository,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+        if (!AiReplyDeliveryGuard.CanSend(
+                conversation, expectedConversationVersion, DateTime.UtcNow))
+        {
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            return;
+        }
+
+        await RegisterAutomaticHandoffAsync(
+            message.TenantId,
+            conversation,
+            "ai_quota_exhausted",
+            conversationRepository,
+            handoffEventRepository,
+            cancellationToken);
+
+        var fallbackMessage = Message.CreateOutbound(
+            message.TenantId,
+            message.ConversationId,
+            message.ContactId,
+            MessageType.Text,
+            ResolveHandoffMessage(botConfig),
+            $"ai-quota:{message.Id}");
+        await messageRepository.AddAsync(fallbackMessage, cancellationToken);
+        await outboxRepository.AddAsync(
+            OutboxMessage.Create(message.TenantId, fallbackMessage.Id));
+
+        message.MarkProcessedByAi();
+        await messageRepository.UpdateAsync(message, cancellationToken);
     }
 
     internal static Message ApplyUnavailableAiFallback(

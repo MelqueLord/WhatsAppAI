@@ -68,6 +68,18 @@ function TenantRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function PlanFeatureRoute({
+  children,
+  feature,
+}: {
+  children: React.ReactNode
+  feature: 'botEnabled' | 'tagsEnabled' | 'automaticDistributionEnabled'
+}) {
+  const { user } = useAuth()
+  if (user?.[feature] !== true) return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
 function OperatorRoute({ children }: { children: React.ReactNode }) {
   const { isOperator } = useAuth()
   // Operators can only access inbox
@@ -105,13 +117,13 @@ function App() {
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
-              <Route path="/bot-config" element={<OwnerRoute><BotConfigPage /></OwnerRoute>} />
+              <Route path="/bot-config" element={<OwnerRoute><PlanFeatureRoute feature="botEnabled"><BotConfigPage /></PlanFeatureRoute></OwnerRoute>} />
               <Route path="/integrations/ai/instructions" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/knowledge" element={<OwnerRoute><KnowledgePage /></OwnerRoute>} />
-              <Route path="/tags" element={<OwnerRoute><ClientTagsPage /></OwnerRoute>} />
+              <Route path="/tags" element={<OwnerRoute><PlanFeatureRoute feature="tagsEnabled"><ClientTagsPage /></PlanFeatureRoute></OwnerRoute>} />
               <Route path="/broadcast" element={<TenantRoute><BroadcastPage /></TenantRoute>} />
-              <Route path="/queues" element={<OwnerRoute><QueuesPage /></OwnerRoute>} />
-              <Route path="/queue-inbox" element={<TenantRoute><QueueInboxPage /></TenantRoute>} />
+              <Route path="/queues" element={<OwnerRoute><PlanFeatureRoute feature="automaticDistributionEnabled"><QueuesPage /></PlanFeatureRoute></OwnerRoute>} />
+              <Route path="/queue-inbox" element={<TenantRoute><PlanFeatureRoute feature="automaticDistributionEnabled"><QueueInboxPage /></PlanFeatureRoute></TenantRoute>} />
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />

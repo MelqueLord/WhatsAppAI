@@ -9,7 +9,7 @@ Este documento é um mapa operacional para consulta. Ele descreve o que já func
 ## 1. Limites do produto
 
 - O MVP automatiza atendimento por WhatsApp; não é CRM de funil, agenda, catálogo, campanha ou construtor de bot.
-- BOT e IA são produtos separados. O plano **BOT** pode operar sem provedor ou credencial de IA; o plano **IA + BOT** libera os dois módulos.
+- BOT e IA continuam módulos operacionais separados e mutuamente exclusivos no atendimento. Os códigos legados **BOT** e **IA + BOT** são preservados; novas empresas usam os planos comerciais **STAR**, **FLOW** ou **SCALA**, que combinam os módulos autorizados sem fundir suas telas ou configurações.
 - As telas `/bot` e `/integrations/ai` permanecem separadas. Ambas alteram a configuração operacional do tenant, mas não duplicam o fluxo de atendimento.
 - O modo do `BotConfiguration` é a fonte única de exclusividade: `Manual`, `SimpleAutoReply` ou `AiPowered`. Ativar BOT simples desativa IA operacional; ativar IA coloca o BOT em `AiPowered`.
 - A base de conhecimento usa recuperação lexical determinística (termos da mensagem, título com peso 3 e conteúdo com peso 1). RAG vetorial não faz parte do MVP.
@@ -200,9 +200,14 @@ Serviço: `src/WhatsAppAI.Application/Contacts/ContactImportService.cs`
 
 ### Planos, filas e classificação
 
-- Planos controlam limites e funcionalidades; endpoints e worker bloqueiam IA quando o plano não autoriza.
+- O PlatformAdmin seleciona STAR, FLOW ou SCALA no cadastro/edição da empresa; linhas oficiais e operadores recebem os padrões do plano automaticamente.
+- STAR libera IA, 1 linha e 2 operadores. FLOW libera também BOT, tags e distribuição automática, com 2 linhas e 4 operadores. SCALA usa esses módulos implementados, com 3 linhas e 8 operadores.
+- A franquia mensal de respostas da IA inicia em 1.500/5.000/12.000 respectivamente e pode ser personalizada por empresa. Apenas respostas válidas de IA efetivamente enfileiradas contam; mensagens recebidas não contam.
+- O login retorna os recursos do plano e o frontend oculta rotas sem acesso; o backend e o worker repetem a autorização, portanto ocultar a tela não é a barreira de segurança.
+- Ao atingir a franquia, o provedor não é chamado em novos atendimentos, a mensagem inbound é finalizada e o fluxo seguro existente aplica handoff/fallback sem reprocessamento infinito.
 - Filas e tags ativas podem ser autorizadas para a IA; referências inválidas ou de outro tenant são ignoradas.
 - Operador pode ser restrito a uma fila ou permanecer em atendimento geral; a restrição é aplicada no backend.
+- Pipeline comercial, relatório avançado e respostas rápidas anunciados no site ainda não existem como módulos do sistema e não são liberados artificialmente pelo plano.
 
 ### Uso, privacidade e broadcast
 

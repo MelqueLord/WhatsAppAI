@@ -105,6 +105,8 @@ public static class AdminTenantEndpoints
                 return Results.BadRequest(new { error = "Line counts cannot be negative." });
             if (request.OperatorLimit < 0)
                 return Results.BadRequest(new { error = "Operator limit cannot be negative." });
+            if (request.MonthlyAiResponseLimit is < 0)
+                return Results.BadRequest(new { error = "Monthly AI response limit cannot be negative." });
 
             var existingTenant = await dbContext.Tenants
                 .IgnoreQueryFilters()
@@ -137,16 +139,20 @@ public static class AdminTenantEndpoints
             var planCode = request.PlanCode.Trim().ToUpperInvariant();
             var plan = await dbContext.SubscriptionPlans
                 .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
-            if (plan is null)
-                return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+            if (plan is null || !plan.IsSelectable)
+                return Results.BadRequest(new { error = "Invalid or unavailable commercial plan code." });
+
+            var monthlyAiResponseLimit = request.MonthlyAiResponseLimit ??
+                plan.DefaultMonthlyAiResponseLimit;
 
             var tenant = Tenant.Create(
                 request.Name,
                 slug,
                 plan.Id,
-                request.OfficialApiLineCount,
-                request.QrCodeLineCount,
-                request.OperatorLimit);
+                plan.DefaultOfficialApiLineCount,
+                0,
+                plan.DefaultOperatorLimit,
+                monthlyAiResponseLimit);
             tenant.Activate();
             dbContext.Tenants.Add(tenant);
 
@@ -185,6 +191,7 @@ public static class AdminTenantEndpoints
                 OfficialApiLineCount = tenant.OfficialApiLineCount,
                 QrCodeLineCount = tenant.QrCodeLineCount,
                 OperatorLimit = tenant.OperatorLimit,
+                MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
                 TemporaryPassword = temporaryPassword,
                 Message = "Guarde a senha temporária. Ela será exigida no primeiro login e deverá ser alterada."
             });
@@ -237,6 +244,14 @@ public static class AdminTenantEndpoints
             .Where(m => m.Role == MembershipRole.TenantOwner)
             .Select(m => new { m.TenantId, m.User.Email, m.User.DisplayName })
             .ToDictionaryAsync(x => x.TenantId);
+        var monthStart = new DateTime(
+            DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var aiResponsesByTenant = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
+            .GroupBy(usage => usage.TenantId)
+            .Select(group => new { TenantId = group.Key, Used = group.Sum(usage => usage.Quantity) })
+            .ToDictionaryAsync(item => item.TenantId, item => item.Used);
 
         return Results.Ok(tenants.Select(t => new TenantResponse
         {
@@ -252,6 +267,8 @@ public static class AdminTenantEndpoints
             OfficialApiLineCount = t.OfficialApiLineCount,
             QrCodeLineCount = t.QrCodeLineCount,
             OperatorLimit = t.OperatorLimit,
+            MonthlyAiResponseLimit = t.MonthlyAiResponseLimit,
+            MonthlyAiResponsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id),
             OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
             OwnerDisplayName = owner?.DisplayName,
             SuspendedAt = t.SuspendedAt
@@ -260,11 +277,20 @@ public static class AdminTenantEndpoints
 
     private static async Task<IResult> GetTenantByIdAsync(
         Guid tenantId,
-        ITenantRepository tenantRepository)
+        ITenantRepository tenantRepository,
+        AppDbContext dbContext)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
             return Results.NotFound();
+
+        var monthStart = new DateTime(
+            DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var aiResponsesUsed = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
+            .SumAsync(usage => (long?)usage.Quantity) ?? 0;
 
         return Results.Ok(new TenantResponse
         {
@@ -280,6 +306,8 @@ public static class AdminTenantEndpoints
             OfficialApiLineCount = tenant.OfficialApiLineCount,
             QrCodeLineCount = tenant.QrCodeLineCount,
             OperatorLimit = tenant.OperatorLimit,
+            MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
+            MonthlyAiResponsesUsed = aiResponsesUsed,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -311,6 +339,8 @@ public static class AdminTenantEndpoints
             return Results.BadRequest(new { error = "Line counts cannot be negative." });
         if (request.OperatorLimit < 0)
             return Results.BadRequest(new { error = "Operator limit cannot be negative." });
+        if (request.MonthlyAiResponseLimit is < 0)
+            return Results.BadRequest(new { error = "Monthly AI response limit cannot be negative." });
 
         var slug = TenantSlugHelper.GenerateSlug(request.Name);
         if (string.IsNullOrWhiteSpace(slug))
@@ -325,7 +355,7 @@ public static class AdminTenantEndpoints
         var planCode = request.PlanCode.Trim().ToUpperInvariant();
         var plan = await dbContext.SubscriptionPlans
             .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
-        if (plan is null)
+        if (plan is null || (!plan.IsSelectable && plan.Id != tenant.PlanId))
             return Results.BadRequest(new { error = "Invalid or inactive plan code." });
 
         var owner = await dbContext.TenantMemberships
@@ -340,13 +370,25 @@ public static class AdminTenantEndpoints
         if (await dbContext.Users.AnyAsync(u => u.Id != owner.Id && u.Email == ownerEmail))
             return Results.Conflict(new { error = "This email is already in use." });
 
+        var officialApiLineCount = plan.IsSelectable
+            ? plan.DefaultOfficialApiLineCount
+            : request.OfficialApiLineCount;
+        var qrCodeLineCount = plan.IsSelectable ? 0 : request.QrCodeLineCount;
+        var operatorLimit = plan.IsSelectable
+            ? plan.DefaultOperatorLimit
+            : request.OperatorLimit;
+        var monthlyAiResponseLimit = plan.IsSelectable
+            ? request.MonthlyAiResponseLimit ?? plan.DefaultMonthlyAiResponseLimit
+            : request.MonthlyAiResponseLimit;
+
         tenant.UpdateDetails(
             request.Name,
             slug,
             plan.Id,
-            request.OfficialApiLineCount,
-            request.QrCodeLineCount,
-            request.OperatorLimit);
+            officialApiLineCount,
+            qrCodeLineCount,
+            operatorLimit,
+            monthlyAiResponseLimit);
         owner.UpdateEmail(ownerEmail);
         owner.UpdateDisplayName(request.OwnerDisplayName);
         await tenantRepository.UpdateAsync(tenant);
@@ -365,6 +407,7 @@ public static class AdminTenantEndpoints
             OfficialApiLineCount = tenant.OfficialApiLineCount,
             QrCodeLineCount = tenant.QrCodeLineCount,
             OperatorLimit = tenant.OperatorLimit,
+            MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -470,22 +513,33 @@ public static class AdminTenantEndpoints
         Guid tenantId,
         [FromBody] UpdatePlanRequest request,
         ITenantRepository tenantRepository,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
             return Results.NotFound();
 
+        if (!TryGetIfMatchVersion(httpContext, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header with current version is required." });
+        if (tenant.Version != expectedVersion)
+            return Results.Conflict(new { error = "Tenant was modified by another request. Please refresh and try again." });
+
         var planCode = request.PlanCode.Trim().ToUpperInvariant();
         var plan = await dbContext.SubscriptionPlans
             .FirstOrDefaultAsync(p => p.Code == planCode && p.IsActive);
-        if (plan is null)
-            return Results.BadRequest(new { error = "Invalid or inactive plan code." });
+        if (plan is null || !plan.IsSelectable)
+            return Results.BadRequest(new { error = "Invalid or unavailable commercial plan code." });
 
         if (tenant.PlanId == plan.Id)
             return Results.Ok(new { message = "Tenant already on this plan." });
 
-        tenant.ChangePlan(plan.Id);
+        tenant.ChangePlan(
+            plan.Id,
+            plan.DefaultOfficialApiLineCount,
+            0,
+            plan.DefaultOperatorLimit,
+            plan.DefaultMonthlyAiResponseLimit);
         await tenantRepository.UpdateAsync(tenant);
 
         return Results.Ok(new TenantResponse
@@ -495,7 +549,8 @@ public static class AdminTenantEndpoints
             Slug = tenant.Slug,
             PlanId = tenant.PlanId,
             Status = tenant.Status.ToString(),
-            Version = tenant.Version
+            Version = tenant.Version,
+            MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit
         });
     }
 
@@ -541,10 +596,11 @@ public sealed class CreateTenantRequest
     public string Name { get; init; } = string.Empty;
     public string OwnerEmail { get; init; } = string.Empty;
     public string? OwnerDisplayName { get; init; }
-    public string PlanCode { get; init; } = "BOT";
+    public string PlanCode { get; init; } = "STAR";
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
+    public int? MonthlyAiResponseLimit { get; init; }
 }
 
 public sealed class CreateTenantResponse
@@ -559,6 +615,7 @@ public sealed class CreateTenantResponse
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
+    public int? MonthlyAiResponseLimit { get; init; }
     public string TemporaryPassword { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
 }
@@ -587,6 +644,7 @@ public sealed class UpdateTenantRequest
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
+    public int? MonthlyAiResponseLimit { get; init; }
 }
 
 public sealed class TenantResponse
@@ -603,6 +661,8 @@ public sealed class TenantResponse
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
+    public int? MonthlyAiResponseLimit { get; init; }
+    public long MonthlyAiResponsesUsed { get; init; }
     public string? OwnerEmail { get; init; }
     public string? OwnerDisplayName { get; init; }
     public DateTime? SuspendedAt { get; init; }

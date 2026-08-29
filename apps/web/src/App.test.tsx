@@ -1,14 +1,12 @@
-import { render, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import App from './App'
 
 describe('App', () => {
-  it('renders the login page when not authenticated', async () => {
+  it('renders the public landing page when not authenticated', () => {
     render(<App />)
 
-    await waitFor(() => {
-      expect(window.location.pathname).toBe('/login')
-    })
+    expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/login')
   })
 })

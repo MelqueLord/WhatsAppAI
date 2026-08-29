@@ -4,6 +4,7 @@ import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatTime } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
+import { useAuth } from '../../lib/auth'
 import {
   Send,
   Paperclip,
@@ -31,6 +32,9 @@ export function MessagePanel({
   conversation,
   onBack,
 }: MessagePanelProps) {
+  const { user } = useAuth()
+  const queuesEnabled = user?.automaticDistributionEnabled === true
+  const tagsEnabled = user?.tagsEnabled === true
   const [message, setMessage] = useState('')
   const [modeOverride, setModeOverride] = useState<string | null>(null)
   const [showSaveContact, setShowSaveContact] = useState(false)
@@ -51,6 +55,7 @@ export function MessagePanel({
       const response = await api.serviceQueues.list()
       return response.filter((queue) => queue.isActive)
     },
+    enabled: queuesEnabled,
   })
 
   const saveContactMutation = useMutation({
@@ -297,7 +302,7 @@ export function MessagePanel({
               {conversation.contactPhone}
             </p>
 
-            {conversation.contactId && (
+            {conversation.contactId && tagsEnabled && (
               <TagAssigner
                 contactId={conversation.contactId}
                 compact

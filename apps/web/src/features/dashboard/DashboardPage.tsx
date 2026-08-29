@@ -19,7 +19,10 @@ import type { Conversation } from '../../lib/api'
 
 export function DashboardPage() {
   const { user, isPlatformAdmin, isTenantOwner } = useAuth()
-  const planName = user?.planCode === 'IA_BOT' ? 'IA + BOT' : user?.planCode === 'BOT' ? 'BOT' : '—'
+  const planNames: Record<string, string> = {
+    STAR: 'STAR', FLOW: 'FLOW', SCALA: 'SCALA', IA_BOT: 'IA + BOT', BOT: 'BOT',
+  }
+  const planName = user?.planCode ? planNames[user.planCode] ?? user.planCode : '—'
   const aiEnabled = user?.aiEnabled === true
   const renewalDate = user?.dueDate
     ? new Date(user.dueDate).toLocaleDateString('pt-BR')

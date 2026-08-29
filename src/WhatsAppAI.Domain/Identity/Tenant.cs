@@ -9,6 +9,7 @@ public sealed class Tenant
     public int OfficialApiLineCount { get; private set; }
     public int QrCodeLineCount { get; private set; }
     public int OperatorLimit { get; private set; }
+    public int? MonthlyAiResponseLimit { get; private set; }
     public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
     public DateTime DueDate { get; private set; }
@@ -31,11 +32,14 @@ public sealed class Tenant
         Guid planId,
         int officialApiLineCount = 0,
         int qrCodeLineCount = 0,
-        int operatorLimit = 0)
+        int operatorLimit = 0,
+        int? monthlyAiResponseLimit = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
+        if (monthlyAiResponseLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
 
         var createdAt = DateTime.UtcNow;
         return new Tenant
@@ -47,6 +51,7 @@ public sealed class Tenant
             OfficialApiLineCount = officialApiLineCount,
             QrCodeLineCount = qrCodeLineCount,
             OperatorLimit = operatorLimit,
+            MonthlyAiResponseLimit = monthlyAiResponseLimit,
             Status = TenantStatus.Pending,
             CreatedAt = createdAt,
             DueDate = createdAt.AddDays(30)
@@ -104,23 +109,53 @@ public sealed class Tenant
         Version++;
     }
 
-        public void RegisterPayment(DateTime paidAt)
-        {
-            LastPaymentAt = paidAt.ToUniversalTime();
-            DueDate = LastPaymentAt.Value.AddDays(30);
-            if (Status == TenantStatus.Suspended)
-                Reactivate();
-            else
-                Version++;
-        }
+    public void ChangePlan(
+        Guid planId,
+        int officialApiLineCount,
+        int qrCodeLineCount,
+        int operatorLimit,
+        int? monthlyAiResponseLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
+        if (monthlyAiResponseLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
 
-    public void UpdateDetails(string name, string slug, Guid planId, int officialApiLineCount, int qrCodeLineCount, int operatorLimit)
+        PlanId = planId;
+        OfficialApiLineCount = officialApiLineCount;
+        QrCodeLineCount = qrCodeLineCount;
+        OperatorLimit = operatorLimit;
+        MonthlyAiResponseLimit = monthlyAiResponseLimit;
+        Version++;
+    }
+
+    public void RegisterPayment(DateTime paidAt)
+    {
+        LastPaymentAt = paidAt.ToUniversalTime();
+        DueDate = LastPaymentAt.Value.AddDays(30);
+        if (Status == TenantStatus.Suspended)
+            Reactivate();
+        else
+            Version++;
+    }
+
+    public void UpdateDetails(
+        string name,
+        string slug,
+        Guid planId,
+        int officialApiLineCount,
+        int qrCodeLineCount,
+        int operatorLimit,
+        int? monthlyAiResponseLimit = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
         ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
+        if (monthlyAiResponseLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
 
         Name = name.Trim();
         Slug = slug.Trim().ToLowerInvariant();
@@ -128,8 +163,10 @@ public sealed class Tenant
         OfficialApiLineCount = officialApiLineCount;
         QrCodeLineCount = qrCodeLineCount;
         OperatorLimit = operatorLimit;
+        MonthlyAiResponseLimit = monthlyAiResponseLimit;
         Version++;
     }
+
 }
 
 public enum TenantStatus
