@@ -68,14 +68,14 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         var (client, tenantId) = await CreateTenantWithAiPlanAsync();
 
         // Save OpenAI credential
-        var r1 = await client.PostAsJsonAsync("/api/integrations/ai", new
+        var r1 = await PostConfigAsync(client, new
         {
             provider = "openai", modelId = "gpt-4o-mini", apiKey = "sk-test-openai"
         });
         Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
 
         // Save Gemini credential
-        var r2 = await client.PostAsJsonAsync("/api/integrations/ai", new
+        var r2 = await PostConfigAsync(client, new
         {
             provider = "gemini", modelId = "gemini-3.6-flash", apiKey = "AIza-test-gemini"
         });
@@ -115,11 +115,12 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         var (client, _) = await CreateTenantWithAiPlanAsync();
 
         // Save provider with bot config
-        await client.PostAsJsonAsync("/api/integrations/ai", new
+        var saveResponse = await PostConfigAsync(client, new
         {
             provider = "xiaomi", modelId = "mimo-v2.5-pro", apiKey = "sk-xiaomi-test",
             botConfig = new { mode = "AiPowered", welcomeMessage = "Olá!", maxTokensPerResponse = 800 }
         });
+        saveResponse.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync("/api/integrations/ai");
         response.EnsureSuccessStatusCode();
@@ -137,10 +138,11 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     public async Task UpdateInstructions_RequiresIfMatchAndRejectsStaleVersion()
     {
         var (client, _) = await CreateTenantWithAiPlanAsync();
-        await client.PostAsJsonAsync("/api/integrations/ai", new
+        var saveResponse = await PostConfigAsync(client, new
         {
             provider = "openai", modelId = "gpt-4o-mini", apiKey = "sk-test-openai"
         });
+        saveResponse.EnsureSuccessStatusCode();
 
         var payload = new
         {
@@ -181,4 +183,14 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     }
 
     private sealed record ProviderDto(string Id, string Name, object[] Models);
+
+    private static async Task<HttpResponseMessage> PostConfigAsync(HttpClient client, object payload)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/integrations/ai")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", "0");
+        return await client.SendAsync(request);
+    }
 }

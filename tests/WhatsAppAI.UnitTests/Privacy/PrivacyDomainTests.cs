@@ -49,6 +49,7 @@ public sealed class PrivacyDomainTests
         message.RedactPersonalData();
 
         Assert.StartsWith("anon-", contact.PhoneNumber);
+        Assert.True(contact.PhoneNumber.Length <= 20);
         Assert.Null(contact.Name);
         Assert.Null(contact.ProfilePictureUrl);
         Assert.Null(message.ExternalId);

@@ -37,6 +37,10 @@
 
 Testcontainers fornece PostgreSQL real por suíte de integração. SDKs externos ficam atrás de servidores HTTP fake; sandbox/contas de teste só entram em smoke tests opt-in. Nunca executar testes destrutivos em conta de cliente.
 
+### Estação local autorizada
+
+Em 2026-08-29 foi confirmado que a estação de desenvolvimento Windows possui Docker Desktop e Docker Compose instalados, e que o responsável possui permissão administrativa para executar os testes locais em containers. Antes da suíte de integração, confirmar que o Docker Engine está em execução. Essa autorização cobre apenas containers locais de teste e não autoriza operações destrutivas em bancos ou ambientes de clientes.
+
 ## Gates
 
 PR exige lint/build, unitários, arquitetura e integrações afetadas. Merge para piloto exige E2E crítico e avaliações da IA. Deploy exige migration ensaiada, smoke test e plano de rollback.

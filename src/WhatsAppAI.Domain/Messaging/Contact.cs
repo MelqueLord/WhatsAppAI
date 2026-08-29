@@ -50,7 +50,7 @@ public sealed class Contact
 
     public void Anonymize()
     {
-        PhoneNumber = $"anon-{Id:N}";
+        PhoneNumber = $"anon-{Id:N}"[..20];
         Name = null;
         ProfilePictureUrl = null;
         UpdatedAt = DateTime.UtcNow;
