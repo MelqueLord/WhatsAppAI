@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../../lib/api'
+import { api, type Tenant } from '../../../lib/api'
 import { AdminTenantsPage } from './AdminTenantsPage'
 
 vi.mock('../../../lib/api', () => ({
@@ -91,5 +91,30 @@ describe('AdminTenantsPage capacity', () => {
 
     fireEvent.change(allowance, { target: { value: '6500' } })
     expect(allowance).toHaveValue(6500)
+  })
+
+  it('filters tenants by AI allowance status', async () => {
+    const makeTenant = (id: string, used: number, limit: number | null): Tenant => ({
+      id, name: `Empresa ${id}`, slug: id, planId: '', status: 'Active', version: 0,
+      createdAt: new Date().toISOString(), dueDate: new Date().toISOString(),
+      officialApiLineCount: 1, qrCodeLineCount: 0, operatorLimit: 2,
+      monthlyAiResponseLimit: limit, monthlyAiResponsesUsed: used,
+    })
+    vi.mocked(api.admin.tenants.list).mockResolvedValue([
+      makeTenant('normal', 100, 1500),
+      makeTenant('warning', 1200, 1500),
+      makeTenant('exhausted', 1500, 1500),
+      makeTenant('unlimited', 9000, null),
+    ])
+
+    renderPage()
+
+    expect(await screen.findByText('Empresa normal')).toBeInTheDocument()
+    const filter = screen.getByLabelText('Filtrar franquia de IA')
+    fireEvent.change(filter, { target: { value: 'exhausted' } })
+
+    expect(screen.getByText('Empresa exhausted')).toBeInTheDocument()
+    expect(screen.queryByText('Empresa normal')).not.toBeInTheDocument()
+    expect(screen.getByText('Esgotadas (1)')).toBeInTheDocument()
   })
 })

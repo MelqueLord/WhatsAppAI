@@ -37,6 +37,7 @@ export function AdminTenantsPage() {
   const [createAiLimit, setCreateAiLimit] = useState(1500)
   const [editPlanCode, setEditPlanCode] = useState('')
   const [editAiLimit, setEditAiLimit] = useState(0)
+  const [quotaFilter, setQuotaFilter] = useState<'all' | 'normal' | 'warning' | 'exhausted' | 'unlimited'>('all')
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -177,9 +178,24 @@ export function AdminTenantsPage() {
     })
   }
 
+  const getQuotaStatus = (tenant: Tenant) => {
+    if (tenant.monthlyAiResponseLimit === null || tenant.monthlyAiResponseLimit === undefined)
+      return 'unlimited' as const
+    if (tenant.monthlyAiResponseLimit <= 0 || (tenant.monthlyAiResponsesUsed ?? 0) >= tenant.monthlyAiResponseLimit)
+      return 'exhausted' as const
+    return (tenant.monthlyAiResponsesUsed ?? 0) / tenant.monthlyAiResponseLimit >= 0.8
+      ? 'warning' as const
+      : 'normal' as const
+  }
+
   const filteredTenants = (tenants ?? []).filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase())
+    t.name.toLowerCase().includes(search.toLowerCase()) &&
+    (quotaFilter === 'all' || getQuotaStatus(t) === quotaFilter)
   )
+  const quotaCounts = (tenants ?? []).reduce((counts, tenant) => {
+    counts[getQuotaStatus(tenant)]++
+    return counts
+  }, { normal: 0, warning: 0, exhausted: 0, unlimited: 0 })
   const selectablePlans = (plans ?? []).filter((plan) => plan.isSelectable)
   const selectedCreatePlan = plans?.find((plan) => plan.code === createPlanCode)
   const selectedEditPlan = plans?.find((plan) => plan.code === editPlanCode)
@@ -383,15 +399,29 @@ export function AdminTenantsPage() {
         )}
 
         <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar tenants..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#0b1222] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar tenants..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-[#0b1222] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <select
+              aria-label="Filtrar franquia de IA"
+              value={quotaFilter}
+              onChange={(e) => setQuotaFilter(e.target.value as typeof quotaFilter)}
+              className="rounded-xl border border-white/10 bg-[#0b1222] px-3 py-2.5 text-sm text-white"
+            >
+              <option value="all">Todas as franquias</option>
+              <option value="normal">Franquia normal ({quotaCounts.normal})</option>
+              <option value="warning">Em atenção ({quotaCounts.warning})</option>
+              <option value="exhausted">Esgotadas ({quotaCounts.exhausted})</option>
+              <option value="unlimited">Sem limite ({quotaCounts.unlimited})</option>
+            </select>
           </div>
         </div>
 
@@ -470,6 +500,12 @@ export function AdminTenantsPage() {
                       <td className="px-6 py-4 text-sm text-slate-600">
                         <span className="font-medium">{tenant.monthlyAiResponsesUsed ?? 0}</span>
                         {' / '}{tenant.monthlyAiResponseLimit ?? 'Ilimitado'}
+                        {getQuotaStatus(tenant) === 'warning' && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">Atenção</span>
+                        )}
+                        {getQuotaStatus(tenant) === 'exhausted' && (
+                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">Esgotada</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         {tenant.dueDate ? (
