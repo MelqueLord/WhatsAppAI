@@ -251,6 +251,7 @@ Para alterar qualquer regra crítica, atualizar também a especificação/ADR co
 | Segurança/LGPD | `docs/security/lgpd-checklist.md` e `docs/security/threat-model.md` |
 | Observabilidade | `docs/runbooks/observability.md` |
 | Estratégia de testes | `docs/testing/strategy.md` |
+| Retomada do controle de franquia de IA | `docs/runbooks/ai-quota-continuation.md` |
 | Contrato do produto | `specs/000-platform/spec.md` |
 | Plano técnico | `specs/000-platform/plan.md` |
 | Tarefas e rastreabilidade | `specs/000-platform/tasks.md` |
