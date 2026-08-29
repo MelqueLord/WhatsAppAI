@@ -2,11 +2,13 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public sealed class CircuitBreaker
 {
+    private readonly Lock _sync = new();
     private readonly int _failureThreshold;
     private readonly TimeSpan _resetTimeout;
     private int _failureCount;
     private DateTime? _lastFailureAt;
     private CircuitState _state = CircuitState.Closed;
+    private bool _halfOpenProbeInFlight;
 
     public CircuitBreaker(int failureThreshold = 5, TimeSpan? resetTimeout = null)
     {
@@ -18,30 +20,65 @@ public sealed class CircuitBreaker
     {
         get
         {
-            if (_state == CircuitState.Open && _lastFailureAt.HasValue
-                && DateTime.UtcNow - _lastFailureAt.Value > _resetTimeout)
+            lock (_sync)
             {
-                _state = CircuitState.HalfOpen;
+                TransitionToHalfOpenIfReady();
+                return _state;
             }
-            return _state;
         }
     }
 
-    public bool CanExecute() => State != CircuitState.Open;
+    public bool CanExecute()
+    {
+        lock (_sync)
+        {
+            TransitionToHalfOpenIfReady();
+            if (_state == CircuitState.Open)
+                return false;
+            if (_state == CircuitState.HalfOpen)
+            {
+                if (_halfOpenProbeInFlight)
+                    return false;
+
+                _halfOpenProbeInFlight = true;
+            }
+
+            return true;
+        }
+    }
 
     public void RecordSuccess()
     {
-        _failureCount = 0;
-        _state = CircuitState.Closed;
+        lock (_sync)
+        {
+            _failureCount = 0;
+            _lastFailureAt = null;
+            _halfOpenProbeInFlight = false;
+            _state = CircuitState.Closed;
+        }
     }
 
     public void RecordFailure()
     {
-        _failureCount++;
-        _lastFailureAt = DateTime.UtcNow;
+        lock (_sync)
+        {
+            _failureCount++;
+            _lastFailureAt = DateTime.UtcNow;
+            _halfOpenProbeInFlight = false;
 
-        if (_failureCount >= _failureThreshold)
-            _state = CircuitState.Open;
+            if (_failureCount >= _failureThreshold)
+                _state = CircuitState.Open;
+        }
+    }
+
+    private void TransitionToHalfOpenIfReady()
+    {
+        if (_state == CircuitState.Open && _lastFailureAt.HasValue &&
+            DateTime.UtcNow - _lastFailureAt.Value >= _resetTimeout)
+        {
+            _state = CircuitState.HalfOpen;
+            _halfOpenProbeInFlight = false;
+        }
     }
 }
 

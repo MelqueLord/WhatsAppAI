@@ -75,6 +75,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **BR-AI-004:** provedor com credencial inválida ou ausente não bloqueia o modo Manual ou SimpleAutoReply.
 - **BR-AI-005:** o teste de conexão deve usar o adaptador correto conforme o provedor selecionado.
 - **BR-AI-006:** o PlatformAdmin controla a franquia de respostas por empresa; tokens servem para medir e distribuir custo, sem substituir o limite comercial de respostas.
+- **BR-AI-007:** falhas transitórias têm no máximo três tentativas por mensagem; o circuit breaker é isolado por tenant/provedor e uma abertura impede novas chamadas até a janela de recuperação.
 
 ## 6. Adaptadores por provedor
 

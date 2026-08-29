@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ public sealed class AiOrchestrationWorker(
     ILogger<AiOrchestrationWorker> logger) : BackgroundService
 {
     private const int MaxAiAttempts = 3;
+    private readonly ConcurrentDictionary<string, CircuitBreaker> _providerBreakers = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -359,7 +361,31 @@ public sealed class AiOrchestrationWorker(
                 MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 80, 300)
             };
 
-            var response = await aiProvider.GetResponseAsync(request, cancellationToken);
+            var providerBreaker = _providerBreakers.GetOrAdd(
+                $"{message.TenantId:N}:{credential.Provider}",
+                _ => new CircuitBreaker());
+            if (!providerBreaker.CanExecute())
+            {
+                await FinalizeUnavailableAiAsync(
+                    message, conversation, botConfig, messageRepository, conversationRepository,
+                    outboxRepository, handoffEventRepository, cancellationToken);
+                logger.LogWarning(
+                    "AI provider circuit is open for tenant {TenantId} and provider {Provider}",
+                    message.TenantId, credential.Provider);
+                return;
+            }
+
+            AiResponse response;
+            try
+            {
+                response = await aiProvider.GetResponseAsync(request, cancellationToken);
+                providerBreaker.RecordSuccess();
+            }
+            catch
+            {
+                providerBreaker.RecordFailure();
+                throw;
+            }
             var pricing = await pricingRepository.GetActiveAsync(
                 credential.Provider, credential.ModelId, DateTime.UtcNow, cancellationToken);
 
