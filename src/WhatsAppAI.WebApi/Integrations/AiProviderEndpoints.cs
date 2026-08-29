@@ -216,6 +216,9 @@ public static class AiProviderEndpoints
         if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
+
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null)
             return Results.BadRequest(new { error = "Configure um provedor de IA antes das diretrizes." });

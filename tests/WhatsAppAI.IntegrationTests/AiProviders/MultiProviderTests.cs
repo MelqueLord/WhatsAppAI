@@ -19,10 +19,13 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     public MultiProviderTests(TestWebApplicationFactory factory) => _factory = factory;
 
     private async Task<(HttpClient client, Guid tenantId)> CreateTenantWithAiPlanAsync()
+        => await CreateTenantWithPlanAsync("IA_BOT");
+
+    private async Task<(HttpClient client, Guid tenantId)> CreateTenantWithPlanAsync(string planCode)
     {
         var db = await _factory.GetDbContextAsync();
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == "IA_BOT");
+        var plan = await db.SubscriptionPlans.FirstAsync(p => p.Code == planCode);
         var tenant = Tenant.Create($"AI Tenant {suffix}", $"ai-tenant-{suffix}", plan.Id);
         tenant.Activate();
         db.Tenants.Add(tenant);
@@ -184,6 +187,37 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(1U, config.GetProperty("version").GetUInt32());
         Assert.True(config.GetProperty("guidelines").GetProperty("security").GetArrayLength() > 0);
         Assert.True(config.GetProperty("guidelines").GetProperty("handoff").GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task UpdateInstructions_RejectsBotOnlyPlanBeforeChangingAiConfiguration()
+    {
+        var (client, tenantId) = await CreateTenantWithPlanAsync("BOT");
+        var db = await _factory.GetDbContextAsync();
+        db.AiProviderCredentials.Add(AiProviderCredential.Create(
+            tenantId, "openai", "gpt-4o-mini", $"ai:{tenantId}:openai:apikey"));
+        await db.SaveChangesAsync();
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put, "/api/integrations/ai/instructions")
+        {
+            Content = JsonContent.Create(new
+            {
+                systemPrompt = "não deve salvar",
+                maxTokensPerResponse = 180,
+                confidenceThreshold = 0.5,
+                routingQueueIds = Array.Empty<Guid>(),
+                routingTagIds = Array.Empty<Guid>()
+            })
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", "0");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("AI not available", await response.Content.ReadAsStringAsync());
+        Assert.Null(await db.BotConfigurations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(config => config.TenantId == tenantId));
     }
 
     private sealed record ProviderDto(string Id, string Name, object[] Models);
