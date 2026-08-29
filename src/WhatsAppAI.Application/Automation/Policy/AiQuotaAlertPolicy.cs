@@ -6,8 +6,28 @@ public enum AiQuotaAlertLevel
     Exhausted
 }
 
+public enum AiQuotaStatus
+{
+    Normal,
+    Warning,
+    Exhausted,
+    Unlimited
+}
+
 public static class AiQuotaAlertPolicy
 {
+    public static AiQuotaStatus GetStatus(int? monthlyLimit, long responsesUsed)
+    {
+        var level = GetLevel(monthlyLimit, responsesUsed);
+        return level switch
+        {
+            AiQuotaAlertLevel.Warning => AiQuotaStatus.Warning,
+            AiQuotaAlertLevel.Exhausted => AiQuotaStatus.Exhausted,
+            null when monthlyLimit is null => AiQuotaStatus.Unlimited,
+            _ => AiQuotaStatus.Normal
+        };
+    }
+
     public static AiQuotaAlertLevel? GetLevel(int? monthlyLimit, long responsesUsed)
     {
         if (monthlyLimit is < 0)

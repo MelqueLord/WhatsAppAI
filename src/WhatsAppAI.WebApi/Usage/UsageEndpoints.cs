@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
@@ -92,6 +93,8 @@ public static class UsageEndpoints
                     ? (long?)null
                     : Math.Max(0, monthlyLimit.Value - monthlyAiResponsesUsed),
                 utilizationPercentage,
+                status = AiQuotaAlertPolicy.GetStatus(monthlyLimit, monthlyAiResponsesUsed)
+                    .ToString().ToLowerInvariant(),
             },
             quotaAlerts = quotaAlerts
                 .Where(alert => alert.EntityType == "AiResponseQuota")

@@ -272,6 +272,9 @@ public static class AdminTenantEndpoints
             OperatorLimit = t.OperatorLimit,
             MonthlyAiResponseLimit = t.MonthlyAiResponseLimit,
             MonthlyAiResponsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id),
+            MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
+                t.MonthlyAiResponseLimit, aiResponsesByTenant.GetValueOrDefault(t.Id))
+                .ToString().ToLowerInvariant(),
             OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
             OwnerDisplayName = owner?.DisplayName,
             SuspendedAt = t.SuspendedAt
@@ -312,6 +315,8 @@ public static class AdminTenantEndpoints
             OperatorLimit = tenant.OperatorLimit,
             MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
             MonthlyAiResponsesUsed = aiResponsesUsed,
+            MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
+                tenant.MonthlyAiResponseLimit, aiResponsesUsed).ToString().ToLowerInvariant(),
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -718,6 +723,7 @@ public sealed class TenantResponse
     public int OperatorLimit { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
     public long MonthlyAiResponsesUsed { get; init; }
+    public string MonthlyAiResponseStatus { get; init; } = "unlimited";
     public string? OwnerEmail { get; init; }
     public string? OwnerDisplayName { get; init; }
     public DateTime? SuspendedAt { get; init; }

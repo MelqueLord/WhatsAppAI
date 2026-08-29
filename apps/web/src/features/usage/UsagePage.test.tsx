@@ -28,7 +28,7 @@ describe('UsagePage AI quota', () => {
       from: new Date().toISOString(),
       to: new Date().toISOString(),
       entries: [],
-      aiResponseQuota: { limit: 1500, used: 0, remaining: 1500, utilizationPercentage: 0 },
+      aiResponseQuota: { limit: 1500, used: 0, remaining: 1500, utilizationPercentage: 0, status: 'normal' },
       disclaimer: 'Estimativas de uso. Não é uma fatura.',
     })
   })
@@ -36,7 +36,7 @@ describe('UsagePage AI quota', () => {
   it('shows a warning when the tenant reaches 80 percent', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
       from: '', to: '', entries: [],
-      aiResponseQuota: { limit: 1500, used: 1200, remaining: 300, utilizationPercentage: 80 },
+      aiResponseQuota: { limit: 1500, used: 1200, remaining: 300, utilizationPercentage: 80, status: 'warning' },
       quotaAlerts: [{ action: 'AiQuota.WarningReached', entityId: '2026-08:Warning', occurredAt: new Date().toISOString() }],
       disclaimer: 'Uso',
     })
@@ -51,7 +51,7 @@ describe('UsagePage AI quota', () => {
   it('shows the safe fallback message when the quota is exhausted', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
       from: '', to: '', entries: [],
-      aiResponseQuota: { limit: 1500, used: 1500, remaining: 0, utilizationPercentage: 100 },
+      aiResponseQuota: { limit: 1500, used: 1500, remaining: 0, utilizationPercentage: 100, status: 'exhausted' },
       disclaimer: 'Uso',
     })
 
@@ -63,7 +63,7 @@ describe('UsagePage AI quota', () => {
   it('does not show a progress bar for an unlimited tenant', async () => {
     vi.mocked(api.usage.get).mockResolvedValueOnce({
       from: '', to: '', entries: [],
-      aiResponseQuota: { limit: null, used: 10, remaining: null, utilizationPercentage: null },
+      aiResponseQuota: { limit: null, used: 10, remaining: null, utilizationPercentage: null, status: 'unlimited' },
       disclaimer: 'Uso',
     })
 

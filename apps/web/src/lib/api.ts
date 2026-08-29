@@ -164,6 +164,7 @@ export interface Tenant {
   operatorLimit: number
   monthlyAiResponseLimit?: number | null
   monthlyAiResponsesUsed: number
+  monthlyAiResponseStatus: 'normal' | 'warning' | 'exhausted' | 'unlimited'
   ownerEmail?: string
   ownerDisplayName?: string
   suspendedAt?: string
@@ -253,6 +254,7 @@ export interface AiResponseQuota {
   used: number
   remaining: number | null
   utilizationPercentage: number | null
+  status: 'normal' | 'warning' | 'exhausted' | 'unlimited'
 }
 
 export interface UsageSummary {

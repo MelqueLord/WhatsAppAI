@@ -29,4 +29,17 @@ public sealed class AiQuotaAlertPolicyTests
     {
         Assert.Null(AiQuotaAlertPolicy.GetLevel(null, 100_000));
     }
+
+    [Theory]
+    [InlineData(1500, 100, AiQuotaStatus.Normal)]
+    [InlineData(1500, 1200, AiQuotaStatus.Warning)]
+    [InlineData(1500, 1500, AiQuotaStatus.Exhausted)]
+    [InlineData(null, 100_000, AiQuotaStatus.Unlimited)]
+    public void Status_is_the_single_source_for_consumption_state(
+        int? limit,
+        long used,
+        AiQuotaStatus expected)
+    {
+        Assert.Equal(expected, AiQuotaAlertPolicy.GetStatus(limit, used));
+    }
 }

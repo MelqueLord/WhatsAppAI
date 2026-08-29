@@ -101,6 +101,7 @@ describe('AdminTenantsPage capacity', () => {
       createdAt: new Date().toISOString(), dueDate: new Date().toISOString(),
       officialApiLineCount: 1, qrCodeLineCount: 0, operatorLimit: 2,
       monthlyAiResponseLimit: limit, monthlyAiResponsesUsed: used,
+      monthlyAiResponseStatus: id as 'normal' | 'warning' | 'exhausted' | 'unlimited',
     })
     vi.mocked(api.admin.tenants.list).mockResolvedValue([
       makeTenant('normal', 100, 1500),
@@ -128,6 +129,7 @@ describe('AdminTenantsPage capacity', () => {
       createdAt: new Date().toISOString(), dueDate: new Date().toISOString(), officialApiLineCount: 1,
       qrCodeLineCount: 0, operatorLimit: 2, monthlyAiResponseLimit: 1500,
       monthlyAiResponsesUsed: 1200,
+      monthlyAiResponseStatus: 'warning',
     }
     vi.mocked(api.admin.tenants.list).mockResolvedValue([tenant])
     vi.mocked(api.admin.tenants.quotaAlerts).mockResolvedValue([{

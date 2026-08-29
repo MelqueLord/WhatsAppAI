@@ -35,8 +35,8 @@ export function UsagePage() {
 
   const quota = data?.aiResponseQuota
   const quotaPercent = quota?.utilizationPercentage ?? 0
-  const quotaWarning = quota?.limit !== null && quotaPercent >= 80 && quotaPercent < 100
-  const quotaExhausted = quota?.limit !== null && (quota?.limit === 0 || quotaPercent >= 100)
+  const quotaWarning = quota?.status === 'warning'
+  const quotaExhausted = quota?.status === 'exhausted'
 
   return (
     <div className="h-full overflow-y-auto">

@@ -186,13 +186,7 @@ export function AdminTenantsPage() {
   }
 
   const getQuotaStatus = (tenant: Tenant) => {
-    if (tenant.monthlyAiResponseLimit === null || tenant.monthlyAiResponseLimit === undefined)
-      return 'unlimited' as const
-    if (tenant.monthlyAiResponseLimit <= 0 || (tenant.monthlyAiResponsesUsed ?? 0) >= tenant.monthlyAiResponseLimit)
-      return 'exhausted' as const
-    return (tenant.monthlyAiResponsesUsed ?? 0) / tenant.monthlyAiResponseLimit >= 0.8
-      ? 'warning' as const
-      : 'normal' as const
+    return tenant.monthlyAiResponseStatus
   }
 
   const filteredTenants = (tenants ?? []).filter((t) =>
