@@ -162,11 +162,14 @@ export interface Tenant {
   officialApiLineCount: number
   qrCodeLineCount: number
   operatorLimit: number
+  monthlyAiBaseResponseLimit?: number | null
+  monthlyAiResponseTopUps?: number
   monthlyAiResponseLimit?: number | null
   monthlyAiResponsesUsed: number
   monthlyAiTokensUsed?: number
   monthlyAiEstimatedCostMinorUnits?: number
   monthlyAiResponseStatus: 'normal' | 'warning' | 'exhausted' | 'unlimited'
+  isAiSuspendedByQuota?: boolean
   ownerEmail?: string
   ownerDisplayName?: string
   suspendedAt?: string
@@ -186,10 +189,13 @@ export interface TenantAiUsage {
   periodEnd: string
   contractedModel?: { provider: string; modelId: string } | null
   responsePackage: {
+    baseLimit: number | null
+    topUps: number
     limit: number | null
     used: number
     remaining: number | null
     status: 'normal' | 'warning' | 'exhausted' | 'unlimited'
+    aiSuspended: boolean
   }
   tokens: {
     input: number
@@ -282,11 +288,26 @@ export interface DashboardStats {
 }
 
 export interface AiResponseQuota {
+  baseLimit?: number | null
+  topUps?: number
   limit: number | null
   used: number
   remaining: number | null
   utilizationPercentage: number | null
   status: 'normal' | 'warning' | 'exhausted' | 'unlimited'
+  aiSuspended?: boolean
+}
+
+export interface AiResponseTopUpResult {
+  added: boolean
+  quantity: number
+  baseLimit: number
+  topUps: number
+  limit: number
+  used: number
+  remaining: number
+  status: 'normal' | 'warning' | 'exhausted'
+  aiSuspended: boolean
 }
 
 export interface UsageSummary {
@@ -643,6 +664,12 @@ export const api = {
 
       aiUsage: (id: string) =>
         fetchApi<TenantAiUsage>(`/api/admin/tenants/${id}/ai-usage`),
+
+      addAiResponseTopUp: (id: string, idempotencyKey: string) =>
+        fetchApi<AiResponseTopUpResult>(`/api/admin/tenants/${id}/ai-response-topups`, {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+        }),
 
       create: (data: {
         name: string

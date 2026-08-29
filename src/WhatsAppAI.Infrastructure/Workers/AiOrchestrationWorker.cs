@@ -257,13 +257,17 @@ public sealed class AiOrchestrationWorker(
 
             var monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
                 usageRepository, message.TenantId, cancellationToken);
+            var monthlyAiResponseTopUps = await GetMonthlyAiResponseTopUpsAsync(
+                usageRepository, message.TenantId, cancellationToken);
+            var effectiveMonthlyAiResponseLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+                tenant.MonthlyAiResponseLimit, monthlyAiResponseTopUps);
             if (!AiResponseQuotaPolicy.HasAvailableResponse(
-                    tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
+                    effectiveMonthlyAiResponseLimit, monthlyAiResponsesUsed))
             {
                 await FinalizeAiResponseQuotaExceededAsync(
                     message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
                     conversationRepository, outboxRepository, auditLogRepository, handoffEventRepository,
-                    tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
+                    effectiveMonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
                 logger.LogWarning(
                     "Monthly AI response quota exhausted for tenant {TenantId}",
                     message.TenantId);
@@ -561,16 +565,20 @@ public sealed class AiOrchestrationWorker(
 
                 monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
                     usageRepository, message.TenantId, cancellationToken);
+                monthlyAiResponseTopUps = await GetMonthlyAiResponseTopUpsAsync(
+                    usageRepository, message.TenantId, cancellationToken);
                 await dbContext.Entry(tenant).ReloadAsync(cancellationToken);
+                effectiveMonthlyAiResponseLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+                    tenant.MonthlyAiResponseLimit, monthlyAiResponseTopUps);
                 if (!AiResponseQuotaPolicy.HasAvailableResponse(
-                        tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
+                        effectiveMonthlyAiResponseLimit, monthlyAiResponsesUsed))
                 {
                     await quotaTransaction.RollbackAsync(cancellationToken);
                     await quotaTransaction.DisposeAsync();
                     await FinalizeAiResponseQuotaExceededAsync(
                         message, conversation, expectedConversationVersion, botConfig, dbContext, messageRepository,
                         conversationRepository, outboxRepository, auditLogRepository, handoffEventRepository,
-                        tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
+                        effectiveMonthlyAiResponseLimit, monthlyAiResponsesUsed, cancellationToken);
                     logger.LogWarning(
                         "AI reply discarded because tenant {TenantId} reached its monthly quota",
                         message.TenantId);
@@ -617,7 +625,7 @@ public sealed class AiOrchestrationWorker(
                     dbContext,
                     auditLogRepository,
                     message.TenantId,
-                    tenant.MonthlyAiResponseLimit,
+                    effectiveMonthlyAiResponseLimit,
                     monthlyAiResponsesUsed + 1,
                     transactionAlreadyHeld: true,
                     cancellationToken);
@@ -746,6 +754,21 @@ public sealed class AiOrchestrationWorker(
         return await usageRepository.GetTotalQuantityAsync(
             tenantId,
             UsageMetricNames.AiResponses,
+            monthStart,
+            monthStart.AddMonths(1),
+            cancellationToken);
+    }
+
+    private static async Task<long> GetMonthlyAiResponseTopUpsAsync(
+        IUsageLedgerRepository usageRepository,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return await usageRepository.GetTotalQuantityAsync(
+            tenantId,
+            UsageMetricNames.AiResponseTopUps,
             monthStart,
             monthStart.AddMonths(1),
             cancellationToken);

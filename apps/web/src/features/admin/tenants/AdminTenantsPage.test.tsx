@@ -19,6 +19,7 @@ vi.mock('../../../lib/api', () => ({
         updatePlan: vi.fn(),
         quotaAlerts: vi.fn(),
         aiUsage: vi.fn(),
+        addAiResponseTopUp: vi.fn(),
         resetOwnerPassword: vi.fn(),
       },
     },
@@ -43,7 +44,10 @@ describe('AdminTenantsPage capacity', () => {
       periodStart: '2026-08-01T00:00:00Z',
       periodEnd: '2026-09-01T00:00:00Z',
       contractedModel: { provider: 'openai', modelId: 'gpt-4.1-mini' },
-      responsePackage: { limit: 1500, used: 0, remaining: 1500, status: 'normal' },
+      responsePackage: {
+        baseLimit: 1500, topUps: 0, limit: 1500, used: 0, remaining: 1500,
+        status: 'normal', aiSuspended: false,
+      },
       tokens: { input: 0, output: 0, total: 0, estimatedCostMinorUnits: 0 },
       byProvider: [],
       byModel: [],
@@ -156,6 +160,29 @@ describe('AdminTenantsPage capacity', () => {
     expect(screen.getByText('period=2026-08;used=1200;limit=1500')).toBeInTheDocument()
   })
 
+  it('adds exactly 500 responses to an exhausted tenant package', async () => {
+    const tenant: Tenant = {
+      id: 'tenant-topup', name: 'Empresa esgotada', slug: 'empresa-esgotada', planId: '', status: 'Active', version: 0,
+      createdAt: new Date().toISOString(), dueDate: new Date().toISOString(), officialApiLineCount: 1,
+      qrCodeLineCount: 0, operatorLimit: 2, monthlyAiBaseResponseLimit: 1500,
+      monthlyAiResponseTopUps: 0, monthlyAiResponseLimit: 1500, monthlyAiResponsesUsed: 1500,
+      monthlyAiResponseStatus: 'exhausted', isAiSuspendedByQuota: true,
+    }
+    vi.mocked(api.admin.tenants.list).mockResolvedValue([tenant])
+    vi.mocked(api.admin.tenants.addAiResponseTopUp).mockResolvedValue({
+      added: true, quantity: 500, baseLimit: 1500, topUps: 500, limit: 2000,
+      used: 1500, remaining: 500, status: 'normal', aiSuspended: false,
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: '+500 respostas' }))
+
+    await waitFor(() => expect(api.admin.tenants.addAiResponseTopUp).toHaveBeenCalledWith(
+      tenant.id,
+      expect.any(String),
+    ))
+  })
+
   it('shows real token usage and provider distribution for a tenant', async () => {
     const tenant: Tenant = {
       id: 'tenant-usage', name: 'Empresa consumo', slug: 'empresa-consumo', planId: '', status: 'Active', version: 0,
@@ -169,7 +196,10 @@ describe('AdminTenantsPage capacity', () => {
       periodStart: '2026-08-01T00:00:00Z',
       periodEnd: '2026-09-01T00:00:00Z',
       contractedModel: { provider: 'openai', modelId: 'gpt-4.1-mini' },
-      responsePackage: { limit: 1500, used: 900, remaining: 600, status: 'warning' },
+      responsePackage: {
+        baseLimit: 1500, topUps: 0, limit: 1500, used: 900, remaining: 600,
+        status: 'warning', aiSuspended: false,
+      },
       tokens: { input: 3000, output: 1200, total: 4200, estimatedCostMinorUnits: 12 },
       byProvider: [{ provider: 'openai', metric: 'input_tokens', tokens: 3000, estimatedCostMinorUnits: 8 }],
       byModel: [{ modelId: 'gpt-4.1-mini', inputTokens: 3000, outputTokens: 1200, interactions: 30 }],

@@ -70,7 +70,13 @@ public static class UsageEndpoints
             UsageMetricNames.AiResponses,
             monthStart,
             monthStart.AddMonths(1));
-        var monthlyLimit = tenant.MonthlyAiResponseLimit;
+        var monthlyTopUps = await usageRepository.GetTotalQuantityAsync(
+            tenant.Id,
+            UsageMetricNames.AiResponseTopUps,
+            monthStart,
+            monthStart.AddMonths(1));
+        var monthlyLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+            tenant.MonthlyAiResponseLimit, monthlyTopUps);
         double? utilizationPercentage = null;
         if (monthlyLimit is > 0)
             utilizationPercentage = Math.Round(monthlyAiResponsesUsed * 100d / monthlyLimit.Value, 2);
@@ -87,6 +93,8 @@ public static class UsageEndpoints
             entries = summary,
             aiResponseQuota = new
             {
+                baseLimit = tenant.MonthlyAiResponseLimit,
+                topUps = monthlyTopUps,
                 limit = monthlyLimit,
                 used = monthlyAiResponsesUsed,
                 remaining = monthlyLimit is null
@@ -95,6 +103,7 @@ public static class UsageEndpoints
                 utilizationPercentage,
                 status = AiQuotaAlertPolicy.GetStatus(monthlyLimit, monthlyAiResponsesUsed)
                     .ToString().ToLowerInvariant(),
+                aiSuspended = AiQuotaAlertPolicy.GetStatus(monthlyLimit, monthlyAiResponsesUsed) == AiQuotaStatus.Exhausted
             },
             quotaAlerts = quotaAlerts
                 .Where(alert => alert.EntityType == "AiResponseQuota")

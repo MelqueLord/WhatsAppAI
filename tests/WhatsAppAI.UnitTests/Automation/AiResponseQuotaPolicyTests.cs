@@ -27,4 +27,19 @@ public sealed class AiResponseQuotaPolicyTests
     {
         Assert.True(AiResponseQuotaPolicy.HasAvailableResponse(null, long.MaxValue));
     }
+
+    [Theory]
+    [InlineData(1_500, 0, 1_500)]
+    [InlineData(1_500, 500, 2_000)]
+    [InlineData(5_000, 1_000, 6_000)]
+    public void EffectiveLimitAddsCurrentMonthTopUps(int baseLimit, long topUps, int expected)
+    {
+        Assert.Equal(expected, AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(baseLimit, topUps));
+    }
+
+    [Fact]
+    public void UnlimitedQuotaRemainsUnlimitedAfterTopUp()
+    {
+        Assert.Null(AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(null, 500));
+    }
 }

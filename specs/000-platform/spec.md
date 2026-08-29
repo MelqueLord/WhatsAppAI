@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.17.0
-**Data:** 2026-08-28
+**Versão:** 0.18.0
+**Data:** 2026-08-29
 
 ## 1. Problema
 
@@ -114,7 +114,7 @@ Como PlatformAdmin, quero acompanhar o consumo de cada empresa e liberar ou reno
 **Aceite:**
 
 1. O administrador visualiza, por empresa e mês UTC, respostas consumidas, tokens de entrada, tokens de saída, total de tokens, provedor e modelo contratado.
-2. O administrador pode alterar o limite de respostas do pacote para liberar uma nova franquia ou renovar a atual, com concorrência otimista e registro de auditoria.
+2. O administrador pode alterar o limite-base do pacote e, quando necessário, adicionar recargas de 500 respostas válidas somente no mês UTC corrente, com idempotência e registro de auditoria.
 3. A visão permite comparar a distribuição de tokens entre empresas para estimar o gasto da plataforma.
 4. O consumo é isolado por tenant e não expõe credenciais, prompts ou conteúdo de conversas.
 
@@ -185,7 +185,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 2. Todos incluem IA; BOT, tags e filas automáticas são liberados apenas nos planos que os oferecem.
 3. A franquia começa com o padrão do plano, mas pode ser personalizada por empresa com concorrência otimista.
 4. Somente respostas válidas da IA enfileiradas para envio consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem.
-5. Ao atingir a franquia, nenhuma nova resposta da IA é enviada e o fluxo aplica o handoff/fallback seguro existente.
+5. Ao atingir a franquia efetiva, a IA é suspensa automaticamente: nenhuma nova resposta da IA é enviada e o fluxo aplica o handoff/fallback seguro existente; a IA volta a ficar disponível após recarga ou na virada do mês.
 
 ## 5. Requisitos funcionais
 
@@ -232,10 +232,10 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-041:** sinalizar necessidade de migração da infraestrutura quando qualquer indicador atingir ou ultrapassar seu limite; os padrões são 25 clientes, 40 linhas e 90 operadores e podem ser substituídos por configuração de ambiente.
 - **FR-042:** cadastrar novos tenants somente nos planos comerciais STAR, FLOW e SCALA, aplicando no backend as quantidades padrão de linhas e Operators do plano e preservando BOT/IA_BOT apenas para tenants legados.
 - **FR-043:** expor no login as permissões efetivas de IA, BOT, tags e distribuição/filas para que frontend e backend ocultem ou bloqueiem recursos não contratados.
-- **FR-044:** permitir ao PlatformAdmin definir, liberar e renovar `monthly_ai_response_limit` por tenant, mostrar o consumo do mês UTC e atualizar plano/franquia com `If-Match`.
-- **FR-045:** contabilizar em `UsageLedger` somente respostas válidas da IA criadas para envio e impedir nova resposta ao atingir a franquia, usando fallback/handoff configurado sem reprocessamento infinito.
+- **FR-044:** permitir ao PlatformAdmin definir o `monthly_ai_response_limit` base por tenant com `If-Match` e adicionar recargas idempotentes de exatamente 500 respostas ao mês UTC corrente, registradas no `UsageLedger` sem alterar o limite-base do plano.
+- **FR-045:** contabilizar em `UsageLedger` somente respostas válidas da IA criadas para envio e suspender automaticamente novas respostas ao atingir a franquia efetiva do mês, usando fallback/handoff configurado sem reprocessamento infinito; recarga ou novo mês removem a suspensão derivada.
 - **FR-046:** disponibilizar ao PlatformAdmin o consumo mensal real de tokens por tenant, separado em entrada/saída e distribuído por provedor e modelo, usando os valores retornados pelo provedor.
-- **FR-047:** exibir no dashboard do TenantOwner o pacote de respostas, saldo, percentual usado e aviso a partir de 80%; recarga permanece uma ação administrativa.
+- **FR-047:** exibir no dashboard do TenantOwner o pacote efetivo de respostas, separando limite-base e recargas, saldo, percentual usado, aviso a partir de 80% e estado de IA suspensa por franquia; recarga permanece uma ação administrativa.
 - **FR-048:** calcular custo somente quando houver preço registrado para o modelo/provedor, preservando tokens como fonte auditável e identificando a estimativa como não faturamento.
 - **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
@@ -265,7 +265,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
 - **BR-020:** capacidade de clientes inclui tenants `Pending`, `Active` e `Suspended`; linhas incluem `WhatsAppAccount` ativo desses tenants; operadores incluem membership `Operator` ativa desses tenants. Tenant `Closed` e seus recursos ficam fora dos três indicadores.
 - **BR-021:** STAR libera IA e base de conhecimento, com 1 linha oficial e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 linhas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 linhas e 8 Operators.
-- **BR-022:** a franquia mensal persistida no tenant prevalece sobre o padrão do plano; `null` preserva tenants legados sem limite, `0` bloqueia respostas da IA e valores positivos limitam o mês civil UTC. O alerta de atenção começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
+- **BR-022:** a franquia efetiva é o limite mensal persistido no tenant somado às recargas de 500 registradas no mês civil UTC; `null` preserva tenants legados sem limite, `0` sem recarga bloqueia respostas da IA e valores positivos limitam o mês. A suspensão por esgotamento afeta somente respostas da IA, preservando BOT, WhatsApp e atendimento humano. O alerta começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
 
 ## 7. Requisitos não funcionais
 

@@ -182,7 +182,7 @@ export function DashboardPage() {
                 </div>
                 <p className={`mt-2 text-xs ${aiPackagePercent >= 80 ? 'text-amber-700' : 'text-slate-500'}`}>
                   {aiPackagePercent >= 100
-                    ? 'Pacote esgotado. Solicite uma recarga ao administrador.'
+                    ? 'IA suspensa automaticamente. Solicite uma recarga de 500 respostas ao administrador; o atendimento humano e o BOT continuam disponíveis.'
                     : aiPackagePercent >= 80
                       ? 'Atenção: o pacote está próximo do fim. Solicite uma recarga.'
                       : `Restam ${Math.max(0, (aiPackageLimit ?? 0) - aiPackageUsed).toLocaleString('pt-BR')} respostas.`}

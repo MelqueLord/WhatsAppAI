@@ -136,6 +136,15 @@ export function AdminTenantsPage() {
     },
   })
 
+  const topUpMutation = useMutation({
+    mutationFn: (tenant: Tenant) =>
+      api.admin.tenants.addAiResponseTopUp(tenant.id, crypto.randomUUID()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-usage'] })
+    },
+  })
+
   const copyPassword = () => {
     if (createResult) {
       navigator.clipboard.writeText(createResult.temporaryPassword)
@@ -541,13 +550,30 @@ export function AdminTenantsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">{tenant.operatorLimit || 'Ilimitado'}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">
-                        <span className="font-medium">{tenant.monthlyAiResponsesUsed ?? 0}</span>
-                        {' / '}{tenant.monthlyAiResponseLimit ?? 'Ilimitado'}
+                        <div>
+                          <span className="font-medium">{tenant.monthlyAiResponsesUsed ?? 0}</span>
+                          {' / '}{tenant.monthlyAiResponseLimit ?? 'Ilimitado'}
+                        </div>
+                        {(tenant.monthlyAiResponseTopUps ?? 0) > 0 && (
+                          <div className="text-[11px] text-emerald-700">
+                            Base {tenant.monthlyAiBaseResponseLimit?.toLocaleString('pt-BR') ?? 0} + {tenant.monthlyAiResponseTopUps?.toLocaleString('pt-BR')} recarga
+                          </div>
+                        )}
                         {getQuotaStatus(tenant) === 'warning' && (
                           <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">Atenção</span>
                         )}
                         {getQuotaStatus(tenant) === 'exhausted' && (
-                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">Esgotada</span>
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">IA suspensa</span>
+                        )}
+                        {tenant.monthlyAiResponseLimit !== null && tenant.monthlyAiResponseLimit !== undefined && (
+                          <button
+                            type="button"
+                            onClick={() => topUpMutation.mutate(tenant)}
+                            disabled={topUpMutation.isPending && topUpMutation.variables?.id === tenant.id}
+                            className="ml-2 mt-1 inline-flex items-center rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {topUpMutation.isPending && topUpMutation.variables?.id === tenant.id ? 'Liberando...' : '+500 respostas'}
+                          </button>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
@@ -576,7 +602,7 @@ export function AdminTenantsPage() {
                               updateMutation.reset()
                               const currentPlan = plans?.find((plan) => plan.id === tenant.planId)
                               setEditPlanCode(currentPlan?.code ?? '')
-                              setEditAiLimit(tenant.monthlyAiResponseLimit ??
+                              setEditAiLimit(tenant.monthlyAiBaseResponseLimit ?? tenant.monthlyAiResponseLimit ??
                                 currentPlan?.defaultMonthlyAiResponseLimit ?? 0)
                               setEditTarget(tenant)
                             }}
@@ -761,6 +787,12 @@ export function AdminTenantsPage() {
                   <p className="mt-2 text-xs text-slate-500">
                     Pacote: {aiUsage.responsePackage.used.toLocaleString('pt-BR')} / {aiUsage.responsePackage.limit?.toLocaleString('pt-BR') ?? 'Ilimitado'} respostas
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Base: {aiUsage.responsePackage.baseLimit?.toLocaleString('pt-BR') ?? 'Ilimitado'} · Recargas do mês: {aiUsage.responsePackage.topUps.toLocaleString('pt-BR')}
+                  </p>
+                  {aiUsage.responsePackage.aiSuspended && (
+                    <p className="mt-2 text-sm font-semibold text-red-600">IA suspensa automaticamente por franquia esgotada.</p>
+                  )}
                 </div>
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>
@@ -1023,7 +1055,7 @@ export function AdminTenantsPage() {
                   onChange={(event) => setEditAiLimit(Math.max(0, Number(event.target.value)))}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">Consumo atual: {editTarget.monthlyAiResponsesUsed ?? 0} respostas. Altere este valor para liberar ou renovar o pacote da empresa.</p>
+                <p className="text-xs text-slate-500 mt-1">Limite-base do plano. Consumo atual: {editTarget.monthlyAiResponsesUsed ?? 0}; recargas do mês: {editTarget.monthlyAiResponseTopUps ?? 0}. Use “+500 respostas” na lista para recarga avulsa.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setEditTarget(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm hover:bg-slate-50">

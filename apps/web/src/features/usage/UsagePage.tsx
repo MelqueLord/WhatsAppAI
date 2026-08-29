@@ -84,6 +84,11 @@ export function UsagePage() {
                     ? 'Sem limite mensal configurado.'
                     : `${quota.used.toLocaleString('pt-BR')} de ${quota.limit.toLocaleString('pt-BR')} respostas usadas neste mês.`}
                 </p>
+                {(quota.topUps ?? 0) > 0 && (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Limite-base: {quota.baseLimit?.toLocaleString('pt-BR') ?? 0} · Recargas do mês: {quota.topUps?.toLocaleString('pt-BR')}
+                  </p>
+                )}
               </div>
               {quota.limit !== null && (
                 <span className={`text-sm font-semibold ${quotaExhausted ? 'text-red-700' : quotaWarning ? 'text-amber-700' : 'text-slate-700'}`}>
@@ -101,7 +106,7 @@ export function UsagePage() {
                 </div>
                 <p className={`text-xs mt-2 ${quotaExhausted ? 'text-red-700' : quotaWarning ? 'text-amber-700' : 'text-slate-500'}`}>
                   {quotaExhausted
-                    ? 'Franquia esgotada. Novas respostas automáticas seguem o fallback configurado.'
+                    ? 'IA suspensa automaticamente por franquia esgotada. Solicite uma recarga de 500 respostas; o atendimento humano e o BOT continuam disponíveis.'
                     : quotaWarning
                       ? `Restam ${quota.remaining?.toLocaleString('pt-BR') ?? 0} respostas.`
                       : `Restam ${quota.remaining?.toLocaleString('pt-BR') ?? 0} respostas.`}

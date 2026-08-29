@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
@@ -191,6 +192,13 @@ public static class AuthEndpoints
                     UsageMetricNames.AiResponses,
                     monthStart,
                     monthStart.AddMonths(1));
+                var monthlyAiResponseTopUps = await usageRepository.GetTotalQuantityAsync(
+                    tenant.Id,
+                    UsageMetricNames.AiResponseTopUps,
+                    monthStart,
+                    monthStart.AddMonths(1));
+                monthlyAiResponseLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+                    tenant.MonthlyAiResponseLimit, monthlyAiResponseTopUps);
             }
         }
 

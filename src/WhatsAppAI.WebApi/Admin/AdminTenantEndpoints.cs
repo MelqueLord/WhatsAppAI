@@ -38,6 +38,9 @@ public static class AdminTenantEndpoints
         group.MapGet("/{tenantId:guid}/ai-usage", GetAiUsageAsync)
             .WithName("GetTenantAiUsage");
 
+        group.MapPost("/{tenantId:guid}/ai-response-topups", AddAiResponseTopUpAsync)
+            .WithName("AddTenantAiResponseTopUp");
+
         group.MapPut("/{tenantId:guid}", UpdateTenantAsync)
             .WithName("UpdateTenant");
 
@@ -258,12 +261,18 @@ public static class AdminTenantEndpoints
             DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var aiResponsesByTenant = await usageRepository.GetTotalQuantityByTenantAsync(
             UsageMetricNames.AiResponses, monthStart, monthStart.AddMonths(1));
+        var aiResponseTopUpsByTenant = await usageRepository.GetTotalQuantityByTenantAsync(
+            UsageMetricNames.AiResponseTopUps, monthStart, monthStart.AddMonths(1));
         var tokenUsageByTenant = await GetMonthlyTokenUsageByTenantAsync(
             dbContext, monthStart, monthStart.AddMonths(1));
 
         return Results.Ok(tenants.Select(t =>
         {
             var tokenUsage = tokenUsageByTenant.GetValueOrDefault(t.Id);
+            var topUps = aiResponseTopUpsByTenant.GetValueOrDefault(t.Id);
+            var effectiveLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+                t.MonthlyAiResponseLimit, topUps);
+            var responsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id);
             return new TenantResponse
             {
                 Id = t.Id,
@@ -278,13 +287,17 @@ public static class AdminTenantEndpoints
                 OfficialApiLineCount = t.OfficialApiLineCount,
                 QrCodeLineCount = t.QrCodeLineCount,
                 OperatorLimit = t.OperatorLimit,
-                MonthlyAiResponseLimit = t.MonthlyAiResponseLimit,
-                MonthlyAiResponsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id),
+                MonthlyAiBaseResponseLimit = t.MonthlyAiResponseLimit,
+                MonthlyAiResponseTopUps = topUps,
+                MonthlyAiResponseLimit = effectiveLimit,
+                MonthlyAiResponsesUsed = responsesUsed,
                 MonthlyAiTokensUsed = tokenUsage?.TotalTokens ?? 0,
                 MonthlyAiEstimatedCostMinorUnits = tokenUsage?.EstimatedCostMinorUnits ?? 0,
                 MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
-                    t.MonthlyAiResponseLimit, aiResponsesByTenant.GetValueOrDefault(t.Id))
+                    effectiveLimit, responsesUsed)
                     .ToString().ToLowerInvariant(),
+                IsAiSuspendedByQuota = AiQuotaAlertPolicy.GetStatus(
+                    effectiveLimit, responsesUsed) == AiQuotaStatus.Exhausted,
                 OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
                 OwnerDisplayName = owner?.DisplayName,
                 SuspendedAt = t.SuspendedAt
@@ -309,6 +322,13 @@ public static class AdminTenantEndpoints
             UsageMetricNames.AiResponses,
             monthStart,
             monthStart.AddMonths(1));
+        var aiResponseTopUps = await usageRepository.GetTotalQuantityAsync(
+            tenantId,
+            UsageMetricNames.AiResponseTopUps,
+            monthStart,
+            monthStart.AddMonths(1));
+        var effectiveLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+            tenant.MonthlyAiResponseLimit, aiResponseTopUps);
         var tokenUsageByTenant = await GetMonthlyTokenUsageByTenantAsync(
             dbContext, monthStart, monthStart.AddMonths(1));
         var tokenUsage = tokenUsageByTenant.GetValueOrDefault(tenantId);
@@ -327,14 +347,107 @@ public static class AdminTenantEndpoints
             OfficialApiLineCount = tenant.OfficialApiLineCount,
             QrCodeLineCount = tenant.QrCodeLineCount,
             OperatorLimit = tenant.OperatorLimit,
-            MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
+            MonthlyAiBaseResponseLimit = tenant.MonthlyAiResponseLimit,
+            MonthlyAiResponseTopUps = aiResponseTopUps,
+            MonthlyAiResponseLimit = effectiveLimit,
             MonthlyAiResponsesUsed = aiResponsesUsed,
             MonthlyAiTokensUsed = tokenUsage?.TotalTokens ?? 0,
             MonthlyAiEstimatedCostMinorUnits = tokenUsage?.EstimatedCostMinorUnits ?? 0,
             MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
-                tenant.MonthlyAiResponseLimit, aiResponsesUsed).ToString().ToLowerInvariant(),
+                effectiveLimit, aiResponsesUsed).ToString().ToLowerInvariant(),
+            IsAiSuspendedByQuota = AiQuotaAlertPolicy.GetStatus(
+                effectiveLimit, aiResponsesUsed) == AiQuotaStatus.Exhausted,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
+        });
+    }
+
+    private static async Task<IResult> AddAiResponseTopUpAsync(
+        Guid tenantId,
+        ITenantRepository tenantRepository,
+        IUsageLedgerRepository usageRepository,
+        IAuditLogRepository auditLogRepository,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var idempotencyKey = httpContext.Request.Headers["Idempotency-Key"].FirstOrDefault()?.Trim();
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > 120)
+            return Results.BadRequest(new { error = "Idempotency-Key is required and must have at most 120 characters." });
+
+        var tenant = await tenantRepository.GetByIdAsync(tenantId, cancellationToken);
+        if (tenant is null)
+            return Results.NotFound();
+        if (tenant.Status == TenantStatus.Closed)
+            return Results.BadRequest(new { error = "Closed tenants cannot receive AI response top-ups." });
+        if (tenant.MonthlyAiResponseLimit is null)
+            return Results.BadRequest(new { error = "Unlimited tenants do not require AI response top-ups." });
+        if (!await dbContext.HasAiEnabledAsync(tenantId, cancellationToken))
+            return Results.BadRequest(new { error = "AI is not available in this tenant plan." });
+
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = monthStart.AddMonths(1);
+        var sourceId = $"{monthStart:yyyy-MM}:{idempotencyKey}";
+        var added = false;
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (dbContext.Database.IsNpgsql())
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtext({tenantId.ToString()}))",
+                cancellationToken);
+        }
+
+        var alreadyApplied = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .AnyAsync(entry => entry.TenantId == tenantId &&
+                entry.Provider == "platform" &&
+                entry.Metric == UsageMetricNames.AiResponseTopUps &&
+                entry.SourceId == sourceId,
+                cancellationToken);
+
+        if (!alreadyApplied)
+        {
+            await usageRepository.AddAsync(UsageLedger.Create(
+                tenantId,
+                "platform",
+                UsageMetricNames.AiResponseTopUps,
+                sourceId,
+                AiResponseQuotaPolicy.TopUpQuantity,
+                "responses"), cancellationToken);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                tenantId,
+                currentTenant.UserId,
+                "Tenant.AiQuotaTopUpAdded",
+                "AiResponseQuota",
+                sourceId,
+                $"period={monthStart:yyyy-MM};quantity={AiResponseQuotaPolicy.TopUpQuantity}"),
+                cancellationToken);
+            added = true;
+        }
+
+        var topUps = await usageRepository.GetTotalQuantityAsync(
+            tenantId, UsageMetricNames.AiResponseTopUps, monthStart, monthEnd, cancellationToken);
+        var used = await usageRepository.GetTotalQuantityAsync(
+            tenantId, UsageMetricNames.AiResponses, monthStart, monthEnd, cancellationToken);
+        var effectiveLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+            tenant.MonthlyAiResponseLimit, topUps);
+        var status = AiQuotaAlertPolicy.GetStatus(effectiveLimit, used);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            added,
+            quantity = added ? AiResponseQuotaPolicy.TopUpQuantity : 0,
+            baseLimit = tenant.MonthlyAiResponseLimit,
+            topUps,
+            limit = effectiveLimit,
+            used,
+            remaining = effectiveLimit is null ? (long?)null : Math.Max(0, effectiveLimit.Value - used),
+            status = status.ToString().ToLowerInvariant(),
+            aiSuspended = status == AiQuotaStatus.Exhausted
         });
     }
 
@@ -411,6 +524,14 @@ public static class AdminTenantEndpoints
                 usage.Metric == UsageMetricNames.AiResponses &&
                 usage.RecordedAt >= monthStart && usage.RecordedAt < monthEnd)
             .SumAsync(usage => (long?)usage.Quantity) ?? 0;
+        var responseTopUps = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.Metric == UsageMetricNames.AiResponseTopUps &&
+                usage.RecordedAt >= monthStart && usage.RecordedAt < monthEnd)
+            .SumAsync(usage => (long?)usage.Quantity) ?? 0;
+        var effectiveResponseLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
+            tenant.MonthlyAiResponseLimit, responseTopUps);
 
         var activeModel = await dbContext.AiProviderCredentials
             .IgnoreQueryFilters()
@@ -432,13 +553,16 @@ public static class AdminTenantEndpoints
             contractedModel = activeModel,
             responsePackage = new
             {
-                limit = tenant.MonthlyAiResponseLimit,
+                baseLimit = tenant.MonthlyAiResponseLimit,
+                topUps = responseTopUps,
+                limit = effectiveResponseLimit,
                 used = responseUsed,
-                remaining = tenant.MonthlyAiResponseLimit is null
+                remaining = effectiveResponseLimit is null
                     ? (long?)null
-                    : Math.Max(0, tenant.MonthlyAiResponseLimit.Value - responseUsed),
-                status = AiQuotaAlertPolicy.GetStatus(tenant.MonthlyAiResponseLimit, responseUsed)
-                    .ToString().ToLowerInvariant()
+                    : Math.Max(0, effectiveResponseLimit.Value - responseUsed),
+                status = AiQuotaAlertPolicy.GetStatus(effectiveResponseLimit, responseUsed)
+                    .ToString().ToLowerInvariant(),
+                aiSuspended = AiQuotaAlertPolicy.GetStatus(effectiveResponseLimit, responseUsed) == AiQuotaStatus.Exhausted
             },
             tokens = new
             {
@@ -856,11 +980,14 @@ public sealed class TenantResponse
     public int OfficialApiLineCount { get; init; }
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
+    public int? MonthlyAiBaseResponseLimit { get; init; }
+    public long MonthlyAiResponseTopUps { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
     public long MonthlyAiResponsesUsed { get; init; }
     public long MonthlyAiTokensUsed { get; init; }
     public long MonthlyAiEstimatedCostMinorUnits { get; init; }
     public string MonthlyAiResponseStatus { get; init; } = "unlimited";
+    public bool IsAiSuspendedByQuota { get; init; }
     public string? OwnerEmail { get; init; }
     public string? OwnerDisplayName { get; init; }
     public DateTime? SuspendedAt { get; init; }
