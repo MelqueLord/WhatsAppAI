@@ -196,6 +196,14 @@ export function AdminTenantsPage() {
     counts[getQuotaStatus(tenant)]++
     return counts
   }, { normal: 0, warning: 0, exhausted: 0, unlimited: 0 })
+  const quotaSummary = (tenants ?? []).reduce((summary, tenant) => {
+    summary.used += tenant.monthlyAiResponsesUsed ?? 0
+    if (tenant.monthlyAiResponseLimit === null || tenant.monthlyAiResponseLimit === undefined)
+      summary.unlimited++
+    else
+      summary.contracted += tenant.monthlyAiResponseLimit
+    return summary
+  }, { contracted: 0, used: 0, unlimited: 0 })
   const selectablePlans = (plans ?? []).filter((plan) => plan.isSelectable)
   const selectedCreatePlan = plans?.find((plan) => plan.code === createPlanCode)
   const selectedEditPlan = plans?.find((plan) => plan.code === editPlanCode)
@@ -424,6 +432,29 @@ export function AdminTenantsPage() {
             </select>
           </div>
         </div>
+
+        <section className="mb-4 grid gap-3 md:grid-cols-4" aria-label="Resumo das franquias de IA">
+          <article className="rounded-xl border border-white/10 bg-[#0b1222] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Respostas contratadas</p>
+            <p className="mt-1 text-xl font-semibold text-white">{quotaSummary.contracted.toLocaleString('pt-BR')}</p>
+            <p className="mt-1 text-xs text-slate-500">Soma dos limites mensais</p>
+          </article>
+          <article className="rounded-xl border border-white/10 bg-[#0b1222] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Respostas consumidas</p>
+            <p className="mt-1 text-xl font-semibold text-white">{quotaSummary.used.toLocaleString('pt-BR')}</p>
+            <p className="mt-1 text-xs text-slate-500">Período mensal UTC</p>
+          </article>
+          <article className={`rounded-xl border p-4 ${quotaCounts.warning > 0 ? 'border-amber-400/30 bg-amber-500/10' : 'border-white/10 bg-[#0b1222]'}`}>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Em atenção</p>
+            <p className="mt-1 text-xl font-semibold text-white">{quotaCounts.warning}</p>
+            <p className="mt-1 text-xs text-slate-500">A partir de 80%</p>
+          </article>
+          <article className={`rounded-xl border p-4 ${quotaCounts.exhausted > 0 ? 'border-red-400/30 bg-red-500/10' : 'border-white/10 bg-[#0b1222]'}`}>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Esgotadas</p>
+            <p className="mt-1 text-xl font-semibold text-white">{quotaCounts.exhausted}</p>
+            <p className="mt-1 text-xs text-slate-500">{quotaSummary.unlimited} sem limite</p>
+          </article>
+        </section>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">

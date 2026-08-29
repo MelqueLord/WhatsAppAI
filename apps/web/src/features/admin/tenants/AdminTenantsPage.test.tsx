@@ -116,5 +116,7 @@ describe('AdminTenantsPage capacity', () => {
     expect(screen.getByText('Empresa exhausted')).toBeInTheDocument()
     expect(screen.queryByText('Empresa normal')).not.toBeInTheDocument()
     expect(screen.getByText('Esgotadas (1)')).toBeInTheDocument()
+    expect(screen.getByText('4.500')).toBeInTheDocument()
+    expect(screen.getByText('11.800')).toBeInTheDocument()
   })
 })
