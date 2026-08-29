@@ -164,6 +164,8 @@ export interface Tenant {
   operatorLimit: number
   monthlyAiResponseLimit?: number | null
   monthlyAiResponsesUsed: number
+  monthlyAiTokensUsed?: number
+  monthlyAiEstimatedCostMinorUnits?: number
   monthlyAiResponseStatus: 'normal' | 'warning' | 'exhausted' | 'unlimited'
   ownerEmail?: string
   ownerDisplayName?: string
@@ -177,6 +179,36 @@ export interface AiQuotaAlert {
   entityId?: string
   details?: string
   occurredAt: string
+}
+
+export interface TenantAiUsage {
+  periodStart: string
+  periodEnd: string
+  contractedModel?: { provider: string; modelId: string } | null
+  responsePackage: {
+    limit: number | null
+    used: number
+    remaining: number | null
+    status: 'normal' | 'warning' | 'exhausted' | 'unlimited'
+  }
+  tokens: {
+    input: number
+    output: number
+    total: number
+    estimatedCostMinorUnits: number
+  }
+  byProvider: Array<{
+    provider: string
+    metric: string
+    tokens: number
+    estimatedCostMinorUnits: number
+  }>
+  byModel: Array<{
+    modelId: string
+    inputTokens: number
+    outputTokens: number
+    interactions: number
+  }>
 }
 
 export interface Plan {
@@ -608,6 +640,9 @@ export const api = {
 
       quotaAlerts: (id: string) =>
         fetchApi<AiQuotaAlert[]>(`/api/admin/tenants/${id}/quota-alerts`),
+
+      aiUsage: (id: string) =>
+        fetchApi<TenantAiUsage>(`/api/admin/tenants/${id}/ai-usage`),
 
       create: (data: {
         name: string

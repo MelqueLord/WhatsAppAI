@@ -18,6 +18,7 @@ vi.mock('../../../lib/api', () => ({
         registerPayment: vi.fn(),
         updatePlan: vi.fn(),
         quotaAlerts: vi.fn(),
+        aiUsage: vi.fn(),
         resetOwnerPassword: vi.fn(),
       },
     },
@@ -38,6 +39,15 @@ describe('AdminTenantsPage capacity', () => {
     vi.clearAllMocks()
     vi.mocked(api.admin.tenants.list).mockResolvedValue([])
     vi.mocked(api.admin.tenants.quotaAlerts).mockResolvedValue([])
+    vi.mocked(api.admin.tenants.aiUsage).mockResolvedValue({
+      periodStart: '2026-08-01T00:00:00Z',
+      periodEnd: '2026-09-01T00:00:00Z',
+      contractedModel: { provider: 'openai', modelId: 'gpt-4.1-mini' },
+      responsePackage: { limit: 1500, used: 0, remaining: 1500, status: 'normal' },
+      tokens: { input: 0, output: 0, total: 0, estimatedCostMinorUnits: 0 },
+      byProvider: [],
+      byModel: [],
+    })
     vi.mocked(api.plans.list).mockResolvedValue([])
     vi.mocked(api.admin.tenants.capacity).mockResolvedValue({
       customers: { current: 0, limit: 25, utilizationPercentage: 0, status: 'Normal' },
@@ -144,5 +154,33 @@ describe('AdminTenantsPage capacity', () => {
     expect(await screen.findByText('Alertas de franquia')).toBeInTheDocument()
     expect(await screen.findByText('Alerta de 80%')).toBeInTheDocument()
     expect(screen.getByText('period=2026-08;used=1200;limit=1500')).toBeInTheDocument()
+  })
+
+  it('shows real token usage and provider distribution for a tenant', async () => {
+    const tenant: Tenant = {
+      id: 'tenant-usage', name: 'Empresa consumo', slug: 'empresa-consumo', planId: '', status: 'Active', version: 0,
+      createdAt: new Date().toISOString(), dueDate: new Date().toISOString(), officialApiLineCount: 1,
+      qrCodeLineCount: 0, operatorLimit: 2, monthlyAiResponseLimit: 1500,
+      monthlyAiResponsesUsed: 900, monthlyAiResponseStatus: 'warning',
+      monthlyAiTokensUsed: 4200,
+    }
+    vi.mocked(api.admin.tenants.list).mockResolvedValue([tenant])
+    vi.mocked(api.admin.tenants.aiUsage).mockResolvedValue({
+      periodStart: '2026-08-01T00:00:00Z',
+      periodEnd: '2026-09-01T00:00:00Z',
+      contractedModel: { provider: 'openai', modelId: 'gpt-4.1-mini' },
+      responsePackage: { limit: 1500, used: 900, remaining: 600, status: 'warning' },
+      tokens: { input: 3000, output: 1200, total: 4200, estimatedCostMinorUnits: 12 },
+      byProvider: [{ provider: 'openai', metric: 'input_tokens', tokens: 3000, estimatedCostMinorUnits: 8 }],
+      byModel: [{ modelId: 'gpt-4.1-mini', inputTokens: 3000, outputTokens: 1200, interactions: 30 }],
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver consumo de IA de Empresa consumo' }))
+
+    expect(await screen.findByText('Consumo real de IA')).toBeInTheDocument()
+    expect(await screen.findByText('4.200')).toBeInTheDocument()
+    expect(await screen.findByText('openai')).toBeInTheDocument()
+    expect(await screen.findByText('gpt-4.1-mini')).toBeInTheDocument()
   })
 })

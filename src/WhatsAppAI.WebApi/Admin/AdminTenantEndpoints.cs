@@ -35,6 +35,9 @@ public static class AdminTenantEndpoints
         group.MapGet("/{tenantId:guid}/quota-alerts", GetQuotaAlertsAsync)
             .WithName("GetTenantQuotaAlerts");
 
+        group.MapGet("/{tenantId:guid}/ai-usage", GetAiUsageAsync)
+            .WithName("GetTenantAiUsage");
+
         group.MapPut("/{tenantId:guid}", UpdateTenantAsync)
             .WithName("UpdateTenant");
 
@@ -255,29 +258,37 @@ public static class AdminTenantEndpoints
             DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var aiResponsesByTenant = await usageRepository.GetTotalQuantityByTenantAsync(
             UsageMetricNames.AiResponses, monthStart, monthStart.AddMonths(1));
+        var tokenUsageByTenant = await GetMonthlyTokenUsageByTenantAsync(
+            dbContext, monthStart, monthStart.AddMonths(1));
 
-        return Results.Ok(tenants.Select(t => new TenantResponse
+        return Results.Ok(tenants.Select(t =>
         {
-            Id = t.Id,
-            Name = t.Name,
-            Slug = t.Slug,
-            PlanId = t.PlanId,
-            Status = t.Status.ToString(),
-            Version = t.Version,
-            CreatedAt = t.CreatedAt,
-            DueDate = t.DueDate,
-            LastPaymentAt = t.LastPaymentAt,
-            OfficialApiLineCount = t.OfficialApiLineCount,
-            QrCodeLineCount = t.QrCodeLineCount,
-            OperatorLimit = t.OperatorLimit,
-            MonthlyAiResponseLimit = t.MonthlyAiResponseLimit,
-            MonthlyAiResponsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id),
-            MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
-                t.MonthlyAiResponseLimit, aiResponsesByTenant.GetValueOrDefault(t.Id))
-                .ToString().ToLowerInvariant(),
-            OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
-            OwnerDisplayName = owner?.DisplayName,
-            SuspendedAt = t.SuspendedAt
+            var tokenUsage = tokenUsageByTenant.GetValueOrDefault(t.Id);
+            return new TenantResponse
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Slug = t.Slug,
+                PlanId = t.PlanId,
+                Status = t.Status.ToString(),
+                Version = t.Version,
+                CreatedAt = t.CreatedAt,
+                DueDate = t.DueDate,
+                LastPaymentAt = t.LastPaymentAt,
+                OfficialApiLineCount = t.OfficialApiLineCount,
+                QrCodeLineCount = t.QrCodeLineCount,
+                OperatorLimit = t.OperatorLimit,
+                MonthlyAiResponseLimit = t.MonthlyAiResponseLimit,
+                MonthlyAiResponsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id),
+                MonthlyAiTokensUsed = tokenUsage?.TotalTokens ?? 0,
+                MonthlyAiEstimatedCostMinorUnits = tokenUsage?.EstimatedCostMinorUnits ?? 0,
+                MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
+                    t.MonthlyAiResponseLimit, aiResponsesByTenant.GetValueOrDefault(t.Id))
+                    .ToString().ToLowerInvariant(),
+                OwnerEmail = owners.TryGetValue(t.Id, out var owner) ? owner.Email : null,
+                OwnerDisplayName = owner?.DisplayName,
+                SuspendedAt = t.SuspendedAt
+            };
         }));
     }
 
@@ -298,6 +309,9 @@ public static class AdminTenantEndpoints
             UsageMetricNames.AiResponses,
             monthStart,
             monthStart.AddMonths(1));
+        var tokenUsageByTenant = await GetMonthlyTokenUsageByTenantAsync(
+            dbContext, monthStart, monthStart.AddMonths(1));
+        var tokenUsage = tokenUsageByTenant.GetValueOrDefault(tenantId);
 
         return Results.Ok(new TenantResponse
         {
@@ -315,6 +329,8 @@ public static class AdminTenantEndpoints
             OperatorLimit = tenant.OperatorLimit,
             MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
             MonthlyAiResponsesUsed = aiResponsesUsed,
+            MonthlyAiTokensUsed = tokenUsage?.TotalTokens ?? 0,
+            MonthlyAiEstimatedCostMinorUnits = tokenUsage?.EstimatedCostMinorUnits ?? 0,
             MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
                 tenant.MonthlyAiResponseLimit, aiResponsesUsed).ToString().ToLowerInvariant(),
             SuspendedAt = tenant.SuspendedAt,
@@ -344,6 +360,125 @@ public static class AdminTenantEndpoints
                 occurredAt = alert.OccurredAt
             })
             .ToList());
+    }
+
+    private static async Task<IResult> GetAiUsageAsync(
+        Guid tenantId,
+        ITenantRepository tenantRepository,
+        AppDbContext dbContext)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(tenantId);
+        if (tenant is null)
+            return Results.NotFound();
+
+        var monthStart = new DateTime(
+            DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = monthStart.AddMonths(1);
+
+        var tokenRows = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.RecordedAt >= monthStart && usage.RecordedAt < monthEnd &&
+                (usage.Metric == "input_tokens" || usage.Metric == "output_tokens"))
+            .GroupBy(usage => new { usage.Provider, usage.Metric })
+            .Select(group => new
+            {
+                provider = group.Key.Provider,
+                metric = group.Key.Metric,
+                tokens = group.Sum(usage => usage.Quantity),
+                estimatedCostMinorUnits = group.Sum(usage => usage.CostMinorUnits ?? 0)
+            })
+            .ToListAsync();
+
+        var modelRows = await dbContext.AiInteractions
+            .IgnoreQueryFilters()
+            .Where(interaction => interaction.TenantId == tenantId &&
+                interaction.CreatedAt >= monthStart && interaction.CreatedAt < monthEnd)
+            .GroupBy(interaction => interaction.ModelId)
+            .Select(group => new
+            {
+                modelId = group.Key,
+                inputTokens = group.Sum(interaction => interaction.InputTokens),
+                outputTokens = group.Sum(interaction => interaction.OutputTokens),
+                interactions = group.Count()
+            })
+            .OrderByDescending(item => item.inputTokens + item.outputTokens)
+            .ToListAsync();
+
+        var responseUsed = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.Metric == UsageMetricNames.AiResponses &&
+                usage.RecordedAt >= monthStart && usage.RecordedAt < monthEnd)
+            .SumAsync(usage => (long?)usage.Quantity) ?? 0;
+
+        var activeModel = await dbContext.AiProviderCredentials
+            .IgnoreQueryFilters()
+            .Where(credential => credential.TenantId == tenantId && credential.IsActive)
+            .Select(credential => new { credential.Provider, credential.ModelId })
+            .FirstOrDefaultAsync();
+
+        var inputTokens = tokenRows
+            .Where(row => row.metric == "input_tokens")
+            .Sum(row => row.tokens);
+        var outputTokens = tokenRows
+            .Where(row => row.metric == "output_tokens")
+            .Sum(row => row.tokens);
+
+        return Results.Ok(new
+        {
+            periodStart = monthStart,
+            periodEnd = monthEnd,
+            contractedModel = activeModel,
+            responsePackage = new
+            {
+                limit = tenant.MonthlyAiResponseLimit,
+                used = responseUsed,
+                remaining = tenant.MonthlyAiResponseLimit is null
+                    ? (long?)null
+                    : Math.Max(0, tenant.MonthlyAiResponseLimit.Value - responseUsed),
+                status = AiQuotaAlertPolicy.GetStatus(tenant.MonthlyAiResponseLimit, responseUsed)
+                    .ToString().ToLowerInvariant()
+            },
+            tokens = new
+            {
+                input = inputTokens,
+                output = outputTokens,
+                total = inputTokens + outputTokens,
+                estimatedCostMinorUnits = tokenRows.Sum(row => row.estimatedCostMinorUnits)
+            },
+            byProvider = tokenRows.Select(row => new
+            {
+                provider = row.provider,
+                metric = row.metric,
+                tokens = row.tokens,
+                estimatedCostMinorUnits = row.estimatedCostMinorUnits
+            }),
+            byModel = modelRows
+        });
+    }
+
+    private static async Task<IReadOnlyDictionary<Guid, TenantAiTokenUsage>> GetMonthlyTokenUsageByTenantAsync(
+        AppDbContext dbContext,
+        DateTime from,
+        DateTime toExclusive)
+    {
+        var rows = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.RecordedAt >= from && usage.RecordedAt < toExclusive &&
+                (usage.Metric == "input_tokens" || usage.Metric == "output_tokens"))
+            .GroupBy(usage => usage.TenantId)
+            .Select(group => new
+            {
+                tenantId = group.Key,
+                totalTokens = group.Sum(usage => usage.Quantity),
+                estimatedCostMinorUnits = group.Sum(usage => usage.CostMinorUnits ?? 0)
+            })
+            .ToListAsync();
+
+        return rows.ToDictionary(
+            row => row.tenantId,
+            row => new TenantAiTokenUsage(row.totalTokens, row.estimatedCostMinorUnits));
     }
 
     private static async Task<IResult> UpdateTenantAsync(
@@ -723,6 +858,8 @@ public sealed class TenantResponse
     public int OperatorLimit { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
     public long MonthlyAiResponsesUsed { get; init; }
+    public long MonthlyAiTokensUsed { get; init; }
+    public long MonthlyAiEstimatedCostMinorUnits { get; init; }
     public string MonthlyAiResponseStatus { get; init; } = "unlimited";
     public string? OwnerEmail { get; init; }
     public string? OwnerDisplayName { get; init; }
@@ -730,6 +867,8 @@ public sealed class TenantResponse
     public DateTime? ReactivatedAt { get; init; }
     public string? SuspensionReason { get; init; }
 }
+
+public sealed record TenantAiTokenUsage(long TotalTokens, long EstimatedCostMinorUnits);
 
 public sealed class InfrastructureCapacityResponse
 {

@@ -64,6 +64,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **FR-AI-007:** modelos sugeridos devem ser carregados por provedor (lista estática ou configuração).
 - **FR-AI-008:** as diretrizes da IA devem permitir selecionar filas ativas do tenant para encaminhamento automático conforme a escolha ou intenção expressa pelo cliente.
 - **FR-AI-009:** as diretrizes da IA devem permitir selecionar tags ativas do tenant para categorização automática do contato conforme o conteúdo da conversa.
+- **FR-AI-010:** o consumo real de tokens deve ser registrado por tenant, provedor e modelo, separando entrada e saída para permitir estimativa de custo sem expor prompts ou credenciais.
 
 ## 5. Regras de negócio
 
@@ -72,6 +73,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **BR-AI-003:** em modo Manual, as configurações de IA ficam salvas mas inativas.
 - **BR-AI-004:** provedor com credencial inválida ou ausente não bloqueia o modo Manual ou SimpleAutoReply.
 - **BR-AI-005:** o teste de conexão deve usar o adaptador correto conforme o provedor selecionado.
+- **BR-AI-006:** o PlatformAdmin controla a franquia de respostas por empresa; tokens servem para medir e distribuir custo, sem substituir o limite comercial de respostas.
 
 ## 6. Adaptadores por provedor
 

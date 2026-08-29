@@ -117,6 +117,8 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **FR-P015:** Ambos os planos permitem criação de memberships Operator
 - **FR-P016:** Limites de linhas e Operators são provisionados automaticamente pelo plano
 - **FR-P017:** Franquia mensal de respostas de IA é inicializada pelo plano e personalizável por tenant
+- **FR-P018:** PlatformAdmin pode liberar ou renovar a franquia de respostas por tenant; o TenantOwner consulta o saldo no dashboard e recebe alerta a partir de 80%
+- **FR-P019:** PlatformAdmin consulta tokens reais de entrada/saída por tenant, provedor e modelo para estimar o custo da plataforma; tokens não substituem a franquia de respostas
 
 ## 6. Regras de Negócio
 
@@ -129,6 +131,7 @@ Como TenantOwner, quero ver claramente quais funcionalidades meu plano inclui.
 - **BR-P007:** BOT legado não requer configuração de IA
 - **BR-P008:** apenas respostas válidas da IA enfileiradas consomem franquia; entradas, simulações, falhas, fallback e handoff não consomem
 - **BR-P009:** franquia esgotada bloqueia o provedor e aplica handoff/fallback seguro
+- **BR-P010:** recarga e renovação são ações administrativas; a empresa não altera seu próprio limite comercial
 
 ## 7. Modelo de Dados
 
@@ -182,6 +185,13 @@ Nenhuma alteração necessária - ambos os planos permitem operadores.
 - Indicação do plano atual
 - Cards de funcionalidades habilitadas/desabilitadas
 - Guia de configuração obrigatória
+- Consumo do pacote de respostas no mês, saldo e alerta de atenção a partir de 80%
+
+### Painel do PlatformAdmin
+
+- Consumo mensal por empresa, com respostas consumidas e tokens de entrada/saída
+- Distribuição por provedor e modelo contratado para estimativa de custo
+- Ação para liberar ou renovar o pacote de respostas com controle de versão
 
 ### Menu Lateral
 

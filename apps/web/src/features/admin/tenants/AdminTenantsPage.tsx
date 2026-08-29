@@ -17,6 +17,7 @@ import {
   Server,
   TriangleAlert,
   Users,
+  BarChart3,
 } from 'lucide-react'
 import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
 
@@ -39,6 +40,7 @@ export function AdminTenantsPage() {
   const [editAiLimit, setEditAiLimit] = useState(0)
   const [quotaFilter, setQuotaFilter] = useState<'all' | 'normal' | 'warning' | 'exhausted' | 'unlimited'>('all')
   const [quotaAlertsTarget, setQuotaAlertsTarget] = useState<Tenant | null>(null)
+  const [aiUsageTarget, setAiUsageTarget] = useState<Tenant | null>(null)
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -60,6 +62,12 @@ export function AdminTenantsPage() {
     queryKey: ['admin', 'tenant-quota-alerts', quotaAlertsTarget?.id],
     queryFn: () => api.admin.tenants.quotaAlerts(quotaAlertsTarget!.id),
     enabled: quotaAlertsTarget !== null,
+  })
+
+  const { data: aiUsage, isLoading: isAiUsageLoading } = useQuery({
+    queryKey: ['admin', 'tenant-ai-usage', aiUsageTarget?.id],
+    queryFn: () => api.admin.tenants.aiUsage(aiUsageTarget!.id),
+    enabled: aiUsageTarget !== null,
   })
 
   const createMutation = useMutation({
@@ -438,7 +446,7 @@ export function AdminTenantsPage() {
           <article className="rounded-xl border border-white/10 bg-[#0b1222] p-4">
             <p className="text-xs uppercase tracking-wide text-slate-400">Respostas contratadas</p>
             <p className="mt-1 text-xl font-semibold text-white">{quotaSummary.contracted.toLocaleString('pt-BR')}</p>
-            <p className="mt-1 text-xs text-slate-500">Soma dos limites mensais</p>
+            <p className="mt-1 text-xs text-slate-500">Pacotes liberados no mês</p>
           </article>
           <article className="rounded-xl border border-white/10 bg-[#0b1222] p-4">
             <p className="text-xs uppercase tracking-wide text-slate-400">Respostas consumidas</p>
@@ -464,7 +472,7 @@ export function AdminTenantsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#0b1222] shadow-xl shadow-black/20">
-            <table className="min-w-[1250px] w-full">
+            <table className="min-w-[1380px] w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-[#10223f]">
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -486,6 +494,9 @@ export function AdminTenantsPage() {
                     Respostas IA/mês
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Tokens IA/mês
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Vencimento
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -502,7 +513,7 @@ export function AdminTenantsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTenants.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={11} className="px-6 py-12 text-center text-slate-500">
                       {search ? 'Nenhum tenant encontrado com esse filtro.' : 'Nenhum tenant cadastrado.'}
                     </td>
                   </tr>
@@ -538,6 +549,10 @@ export function AdminTenantsPage() {
                         {getQuotaStatus(tenant) === 'exhausted' && (
                           <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">Esgotada</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <span className="font-medium">{(tenant.monthlyAiTokensUsed ?? 0).toLocaleString('pt-BR')}</span>
+                        <div className="text-xs text-slate-400">entrada + saída</div>
                       </td>
                       <td className="px-6 py-4 text-sm">
                         {tenant.dueDate ? (
@@ -596,6 +611,14 @@ export function AdminTenantsPage() {
                             title="Ver alertas de franquia"
                           >
                             <TriangleAlert className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setAiUsageTarget(tenant)}
+                            className="inline-flex shrink-0 items-center text-xs text-violet-700 hover:text-violet-800 font-medium"
+                            aria-label={`Ver consumo de IA de ${tenant.name}`}
+                            title="Ver consumo de tokens e modelo"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => {
@@ -692,6 +715,104 @@ export function AdminTenantsPage() {
                 <p className="py-8 text-center text-sm text-slate-500">Nenhum alerta registrado no período.</p>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {aiUsageTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Consumo real de IA</h2>
+                <p className="mt-1 text-sm text-slate-500">{aiUsageTarget.name} · mês UTC atual</p>
+              </div>
+              <button onClick={() => setAiUsageTarget(null)} className="p-2 hover:bg-slate-100 rounded-lg" title="Fechar">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            {isAiUsageLoading || !aiUsage ? (
+              <div className="flex items-center justify-center py-10 text-sm text-slate-500">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando consumo...
+              </div>
+            ) : (
+              <div className="mt-5 space-y-5">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs text-slate-500">Tokens totais</p>
+                    <p className="mt-1 text-xl font-semibold">{aiUsage.tokens.total.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs text-slate-500">Entrada</p>
+                    <p className="mt-1 text-xl font-semibold">{aiUsage.tokens.input.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs text-slate-500">Saída</p>
+                    <p className="mt-1 text-xl font-semibold">{aiUsage.tokens.output.toLocaleString('pt-BR')}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-4">
+                  <p className="text-sm font-semibold">Modelo contratado</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {aiUsage.contractedModel
+                      ? `${aiUsage.contractedModel.provider} · ${aiUsage.contractedModel.modelId}`
+                      : 'Nenhum provedor ativo'}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Pacote: {aiUsage.responsePackage.used.toLocaleString('pt-BR')} / {aiUsage.responsePackage.limit?.toLocaleString('pt-BR') ?? 'Ilimitado'} respostas
+                  </p>
+                </div>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-sm font-semibold">Distribuição por provedor</p>
+                    {aiUsage.byProvider.length === 0 ? (
+                      <p className="text-sm text-slate-500">Nenhum token registrado no mês.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                            <tr><th className="px-3 py-2">Provedor</th><th className="px-3 py-2">Métrica</th><th className="px-3 py-2 text-right">Tokens</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {aiUsage.byProvider.map((provider) => (
+                              <tr key={`${provider.provider}-${provider.metric}`}>
+                                <td className="px-3 py-2">{provider.provider}</td>
+                                <td className="px-3 py-2 text-xs text-slate-500">{provider.metric === 'input_tokens' ? 'entrada' : 'saída'}</td>
+                                <td className="px-3 py-2 text-right">{provider.tokens.toLocaleString('pt-BR')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold">Distribuição por modelo</p>
+                    {aiUsage.byModel.length === 0 ? (
+                      <p className="text-sm text-slate-500">Nenhuma interação registrada no mês.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                            <tr><th className="px-3 py-2">Modelo</th><th className="px-3 py-2 text-right">Tokens</th><th className="px-3 py-2 text-right">Interações</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {aiUsage.byModel.map((model) => (
+                              <tr key={model.modelId}>
+                                <td className="px-3 py-2">{model.modelId}</td>
+                                <td className="px-3 py-2 text-right">{(model.inputTokens + model.outputTokens).toLocaleString('pt-BR')}</td>
+                                <td className="px-3 py-2 text-right">{model.interactions.toLocaleString('pt-BR')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Os tokens são os valores retornados pelo provedor. O custo monetário só aparece quando houver preço registrado para o uso.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -902,7 +1023,7 @@ export function AdminTenantsPage() {
                   onChange={(event) => setEditAiLimit(Math.max(0, Number(event.target.value)))}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">Consumo atual: {editTarget.monthlyAiResponsesUsed ?? 0} respostas neste mês.</p>
+                <p className="text-xs text-slate-500 mt-1">Consumo atual: {editTarget.monthlyAiResponsesUsed ?? 0} respostas. Altere este valor para liberar ou renovar o pacote da empresa.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setEditTarget(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm hover:bg-slate-50">

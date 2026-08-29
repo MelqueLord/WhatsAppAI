@@ -22,11 +22,9 @@ namespace WhatsAppAI.Infrastructure.Workers;
 
 public sealed class AiOrchestrationWorker(
     IServiceProvider serviceProvider,
-    ILogger<AiOrchestrationWorker> logger,
-    IConfiguration configuration) : BackgroundService
+    ILogger<AiOrchestrationWorker> logger) : BackgroundService
 {
     private const int MaxAiAttempts = 3;
-    private readonly long _monthlyAiTokenBudget = configuration.GetValue("Ai:MonthlyTokenBudget", 100_000L);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -349,28 +347,6 @@ public sealed class AiOrchestrationWorker(
                     .Select(tag => new RoutingTagContext(tag.Name, tag.Description))
                     .ToList(),
                 cancellationToken);
-
-            var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var tokensUsed = await dbContext.UsageLedger
-                .IgnoreQueryFilters()
-                .Where(usage => usage.TenantId == message.TenantId &&
-                    usage.RecordedAt >= monthStart &&
-                    (usage.Metric == "input_tokens" || usage.Metric == "output_tokens"))
-                .Select(usage => (long?)usage.Quantity)
-                .SumAsync(cancellationToken) ?? 0;
-            var estimatedTokens = (long)Math.Ceiling((context.SystemPrompt.Length +
-                context.Messages.Sum(item => item.Content.Length)) / 4d) +
-                Math.Clamp(credential.MaxTokensPerResponse, 80, 300);
-            if (!AiBudgetPolicy.HasAvailableBudget(_monthlyAiTokenBudget, tokensUsed, estimatedTokens))
-            {
-                await RegisterAutomaticHandoffAsync(
-                    message.TenantId, conversation, "ai_budget_exhausted",
-                    conversationRepository, handoffEventRepository, cancellationToken);
-                message.MarkProcessedByAi();
-                await messageRepository.UpdateAsync(message, cancellationToken);
-                logger.LogWarning("AI token budget exhausted for tenant {TenantId}", message.TenantId);
-                return;
-            }
 
             var request = new AiRequest
             {

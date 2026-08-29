@@ -99,13 +99,24 @@ Como TenantOwner, quero cadastrar respostas, políticas e informações do negó
 
 ### US-006 — Acompanhar uso (P2)
 
-Como TenantOwner, quero consultar estimativas de mensagens e tokens para antecipar custos cobrados diretamente pela Meta e OpenAI.
+Como TenantOwner, quero consultar o consumo do meu pacote de respostas e os tokens usados pela IA para antecipar a necessidade de recarga.
 
 **Aceite:**
 
-1. O painel separa consumo por provedor e período.
-2. A interface informa que valores são estimativas, não fatura.
-3. Falta de preço atualizado não impede registrar unidades de consumo.
+1. O dashboard mostra respostas consumidas, saldo do pacote e percentual do mês.
+2. Ao atingir 80% do pacote, a empresa vê um aviso de atenção; ao esgotar, vê a orientação para solicitar recarga.
+3. O painel separa tokens de entrada e saída por provedor e período e informa que custo monetário é estimativo.
+
+### US-013 — Controlar pacotes e custo de IA (P1)
+
+Como PlatformAdmin, quero acompanhar o consumo de cada empresa e liberar ou renovar pacotes de respostas para controlar o custo real da IA da plataforma.
+
+**Aceite:**
+
+1. O administrador visualiza, por empresa e mês UTC, respostas consumidas, tokens de entrada, tokens de saída, total de tokens, provedor e modelo contratado.
+2. O administrador pode alterar o limite de respostas do pacote para liberar uma nova franquia ou renovar a atual, com concorrência otimista e registro de auditoria.
+3. A visão permite comparar a distribuição de tokens entre empresas para estimar o gasto da plataforma.
+4. O consumo é isolado por tenant e não expõe credenciais, prompts ou conteúdo de conversas.
 
 ### US-007 — Auditar operação (P2)
 
@@ -221,8 +232,11 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-041:** sinalizar necessidade de migração da infraestrutura quando qualquer indicador atingir ou ultrapassar seu limite; os padrões são 25 clientes, 40 linhas e 90 operadores e podem ser substituídos por configuração de ambiente.
 - **FR-042:** cadastrar novos tenants somente nos planos comerciais STAR, FLOW e SCALA, aplicando no backend as quantidades padrão de linhas e Operators do plano e preservando BOT/IA_BOT apenas para tenants legados.
 - **FR-043:** expor no login as permissões efetivas de IA, BOT, tags e distribuição/filas para que frontend e backend ocultem ou bloqueiem recursos não contratados.
-- **FR-044:** permitir ao PlatformAdmin definir `monthly_ai_response_limit` por tenant, mostrar o consumo do mês UTC e atualizar plano/franquia com `If-Match`.
+- **FR-044:** permitir ao PlatformAdmin definir, liberar e renovar `monthly_ai_response_limit` por tenant, mostrar o consumo do mês UTC e atualizar plano/franquia com `If-Match`.
 - **FR-045:** contabilizar em `UsageLedger` somente respostas válidas da IA criadas para envio e impedir nova resposta ao atingir a franquia, usando fallback/handoff configurado sem reprocessamento infinito.
+- **FR-046:** disponibilizar ao PlatformAdmin o consumo mensal real de tokens por tenant, separado em entrada/saída e distribuído por provedor e modelo, usando os valores retornados pelo provedor.
+- **FR-047:** exibir no dashboard do TenantOwner o pacote de respostas, saldo, percentual usado e aviso a partir de 80%; recarga permanece uma ação administrativa.
+- **FR-048:** calcular custo somente quando houver preço registrado para o modelo/provedor, preservando tokens como fonte auditável e identificando a estimativa como não faturamento.
 
 ## 6. Regras de negócio
 
@@ -247,7 +261,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
 - **BR-020:** capacidade de clientes inclui tenants `Pending`, `Active` e `Suspended`; linhas incluem `WhatsAppAccount` ativo desses tenants; operadores incluem membership `Operator` ativa desses tenants. Tenant `Closed` e seus recursos ficam fora dos três indicadores.
 - **BR-021:** STAR libera IA e base de conhecimento, com 1 linha oficial e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 linhas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 linhas e 8 Operators.
-- **BR-022:** a franquia mensal persistida no tenant prevalece sobre o padrão do plano; `null` preserva tenants legados sem limite, `0` bloqueia respostas da IA e valores positivos limitam o mês civil UTC.
+- **BR-022:** a franquia mensal persistida no tenant prevalece sobre o padrão do plano; `null` preserva tenants legados sem limite, `0` bloqueia respostas da IA e valores positivos limitam o mês civil UTC. O alerta de atenção começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
 
 ## 7. Requisitos não funcionais
 

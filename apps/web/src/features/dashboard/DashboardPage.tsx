@@ -24,6 +24,11 @@ export function DashboardPage() {
   }
   const planName = user?.planCode ? planNames[user.planCode] ?? user.planCode : '—'
   const aiEnabled = user?.aiEnabled === true
+  const aiPackageLimit = user?.monthlyAiResponseLimit
+  const aiPackageUsed = user?.monthlyAiResponsesUsed ?? 0
+  const aiPackagePercent = aiPackageLimit && aiPackageLimit > 0
+    ? Math.min(100, Math.round((aiPackageUsed * 100) / aiPackageLimit))
+    : null
   const renewalDate = user?.dueDate
     ? new Date(user.dueDate).toLocaleDateString('pt-BR')
     : null
@@ -150,6 +155,40 @@ export function DashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {user?.tenantId && aiEnabled && (
+          <div className={`mb-8 rounded-xl border p-5 ${aiPackagePercent !== null && aiPackagePercent >= 80 ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-slate-900">Pacote de respostas da IA</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {aiPackageLimit === null || aiPackageLimit === undefined
+                    ? `${aiPackageUsed.toLocaleString('pt-BR')} respostas consumidas neste mês.`
+                    : `${aiPackageUsed.toLocaleString('pt-BR')} de ${aiPackageLimit.toLocaleString('pt-BR')} respostas consumidas neste mês.`}
+                </p>
+              </div>
+              {aiPackagePercent !== null && (
+                <span className={`text-sm font-semibold ${aiPackagePercent >= 80 ? 'text-amber-700' : 'text-slate-700'}`}>
+                  {aiPackagePercent}%
+                </span>
+              )}
+            </div>
+            {aiPackagePercent !== null && (
+              <>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div className={`h-full rounded-full ${aiPackagePercent >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${aiPackagePercent}%` }} />
+                </div>
+                <p className={`mt-2 text-xs ${aiPackagePercent >= 80 ? 'text-amber-700' : 'text-slate-500'}`}>
+                  {aiPackagePercent >= 100
+                    ? 'Pacote esgotado. Solicite uma recarga ao administrador.'
+                    : aiPackagePercent >= 80
+                      ? 'Atenção: o pacote está próximo do fim. Solicite uma recarga.'
+                      : `Restam ${Math.max(0, (aiPackageLimit ?? 0) - aiPackageUsed).toLocaleString('pt-BR')} respostas.`}
+                </p>
+              </>
+            )}
           </div>
         )}
 
