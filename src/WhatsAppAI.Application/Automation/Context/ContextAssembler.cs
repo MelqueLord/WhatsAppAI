@@ -1,6 +1,7 @@
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Automation.Policy;
+using WhatsAppAI.Domain.Knowledge;
 
 namespace WhatsAppAI.Application.Automation.Context;
 
@@ -36,9 +37,9 @@ public sealed class ContextAssembler(
             .ToList();
 
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
-        var knowledgeTexts = knowledge
-            .Take(MaxKnowledgeItems)
-            .Select(k => AiContextSanitizer.RedactPersonalData(k.Content))
+        var query = messages.LastOrDefault(message => message.Role == "user")?.Content ?? string.Empty;
+        var knowledgeTexts = RetrieveKnowledge(knowledge, query)
+            .Select(k => $"{AiContextSanitizer.RedactPersonalData(k.Title)}: {AiContextSanitizer.RedactPersonalData(k.Content)}")
             .ToList();
 
         var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
@@ -94,6 +95,47 @@ public sealed class ContextAssembler(
 
         var prompt = string.Join("\n\n", parts);
         return prompt.Length > MaxContextCharacters ? prompt[..MaxContextCharacters] : prompt;
+    }
+
+    private static List<KnowledgeItem> RetrieveKnowledge(
+        IReadOnlyList<KnowledgeItem> knowledge,
+        string query)
+    {
+        var queryTerms = Tokenize(query);
+
+        return knowledge
+            .Select(item => new
+            {
+                Item = item,
+                Score = Score(item, queryTerms)
+            })
+            .OrderByDescending(result => result.Score)
+            .ThenByDescending(result => result.Item.Priority)
+            .ThenByDescending(result => result.Item.CreatedAt)
+            .Take(MaxKnowledgeItems)
+            .Select(result => result.Item)
+            .ToList();
+    }
+
+    private static int Score(KnowledgeItem item, HashSet<string> queryTerms)
+    {
+        if (queryTerms.Count == 0)
+            return 0;
+
+        var titleTerms = Tokenize(item.Title);
+        var contentTerms = Tokenize(item.Content);
+        return queryTerms.Sum(term =>
+            (titleTerms.Contains(term) ? 3 : 0) +
+            (contentTerms.Contains(term) ? 1 : 0));
+    }
+
+    private static HashSet<string> Tokenize(string value)
+    {
+        return value
+            .Split([' ', '\t', '\r', '\n', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '/', '\\', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(token => new string(token.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant())
+            .Where(token => token.Length >= 3)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static string Limit(string? value, int maxCharacters)

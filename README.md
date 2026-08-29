@@ -46,6 +46,7 @@ Atualizacao de readiness (2026-08-21):
 | `docs/architecture/adr/` | Registros de decisões arquiteturais |
 | `docs/security/threat-model.md` | Ameaças, controles e privacidade |
 | `docs/ai/behavior-policy.md` | Limites e comportamento da automação |
+| `docs/runbooks/implemented-flows.md` | Guia consolidado do funcionamento implementado |
 | `docs/testing/strategy.md` | Estratégia de testes e gates |
 | `docs/runbooks/webhook-failures.md` | Operação de falhas de webhook |
 | `docs/sdd-framework.md` | Framework SDD e skills recomendadas |
