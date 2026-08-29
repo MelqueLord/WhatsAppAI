@@ -66,6 +66,37 @@ public sealed class ContextAssemblerTests
         Assert.Contains("Menor prioridade:", context.SystemPrompt);
     }
 
+    [Fact]
+    public async Task BuildAsync_UsesBoundedRecentContextAndPreservesMandatoryInstructions()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Boleto", new string('b', 2_000), 100),
+            KnowledgeItem.Create(tenantId, "Pagamento", new string('p', 2_000), 90),
+            KnowledgeItem.Create(tenantId, "Horário", new string('h', 2_000), 80),
+            KnowledgeItem.Create(tenantId, "Quarto item", new string('q', 2_000), 1)
+        ]);
+        var queries = new FakeConversationQueries(
+            Enumerable.Range(1, 6).Select(index => new MessageDto
+            {
+                Direction = "Inbound",
+                Content = $"mensagem-{index}-" + new string('x', 1_000),
+                CreatedAt = DateTime.UtcNow.AddMinutes(index)
+            }).ToList());
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), new string('d', 5_000), cancellationToken: CancellationToken.None);
+
+        Assert.Equal(4, context.Messages.Count);
+        Assert.DoesNotContain(context.Messages, message => message.Content.Contains("mensagem-1-", StringComparison.Ordinal));
+        Assert.All(context.Messages, message => Assert.True(message.Content.Length <= 280));
+        Assert.True(context.SystemPrompt.Length <= 4_800);
+        Assert.Contains("Boleto:", context.SystemPrompt);
+        Assert.DoesNotContain("Quarto item:", context.SystemPrompt);
+        Assert.Contains("Return only one valid JSON object", context.SystemPrompt);
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(

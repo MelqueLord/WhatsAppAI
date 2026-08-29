@@ -36,4 +36,15 @@ public sealed class AiProviderCredentialTests
         Assert.Equal(180, credential.MaxTokensPerResponse);
         Assert.Equal(currentVersion, credential.Version);
     }
+
+    [Fact]
+    public void UpdateInstructions_EnforcesCostEffectiveOutputTokenRange()
+    {
+        var credential = AiProviderCredential.Create(
+            Guid.NewGuid(), "openai", "gpt-4o-mini", "secret-ref");
+
+        credential.UpdateInstructions("Atenda brevemente", 1_000, credential.Version);
+
+        Assert.Equal(240, credential.MaxTokensPerResponse);
+    }
 }

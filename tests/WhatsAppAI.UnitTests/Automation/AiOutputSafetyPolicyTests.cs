@@ -29,7 +29,7 @@ public sealed class AiOutputSafetyPolicyTests
     [Fact]
     public void SanitizeDecision_HandoffsContentAboveLimit()
     {
-        var result = BehaviorPolicy.SanitizeDecision(Reply(new string('a', 301)), 0.7);
+        var result = BehaviorPolicy.SanitizeDecision(Reply(new string('a', 241)), 0.7);
 
         Assert.Equal(AiAction.Handoff, result.Action);
         Assert.Equal(AiOutputSafetyPolicy.UnsafeContentHandoffReason, result.HandoffReason);

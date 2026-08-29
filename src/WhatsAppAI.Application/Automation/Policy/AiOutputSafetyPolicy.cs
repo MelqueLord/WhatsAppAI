@@ -4,7 +4,7 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class AiOutputSafetyPolicy
 {
-    public const int MaxReplyCharacters = 300;
+    public const int MaxReplyCharacters = 240;
     public const string UnsafeContentHandoffReason = "unsafe_content";
 
     private static readonly string[] SensitiveMarkers =

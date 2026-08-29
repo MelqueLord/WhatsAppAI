@@ -10,7 +10,7 @@ public sealed class AiProviderCredential
     public string? SystemPrompt { get; private set; }
     public string? RoutingQueueIdsJson { get; private set; }
     public string? RoutingTagIdsJson { get; private set; }
-    public int MaxTokensPerResponse { get; private set; } = 500;
+    public int MaxTokensPerResponse { get; private set; } = 180;
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -56,7 +56,7 @@ public sealed class AiProviderCredential
                 $"Version conflict: expected {expectedVersion}, actual {Version}.");
 
         SystemPrompt = systemPrompt?.Trim();
-        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 300);
+        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 240);
         RoutingQueueIdsJson = SerializeGuidList(routingQueueIds);
         RoutingTagIdsJson = SerializeGuidList(routingTagIds);
         UpdatedAt = DateTime.UtcNow;

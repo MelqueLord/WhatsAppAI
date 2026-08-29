@@ -390,7 +390,7 @@ public sealed class AiOrchestrationWorker(
                 ApiKey = apiKey,
                 Messages = context.Messages,
                 SystemPrompt = context.SystemPrompt,
-                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 80, 300)
+                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 80, 240)
             };
 
             var providerBreaker = _providerBreakers.GetOrAdd(

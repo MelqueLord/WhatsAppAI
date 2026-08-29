@@ -9,10 +9,13 @@ public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
     IKnowledgeItemRepository knowledgeRepository)
 {
-    private const int MaxMessages = 6;
-    private const int MaxMessageCharacters = 360;
-    private const int MaxKnowledgeItems = 6;
-    private const int MaxContextCharacters = 9000;
+    private const int MaxMessages = 4;
+    private const int MaxMessageCharacters = 280;
+    private const int MaxKnowledgeItems = 3;
+    private const int MaxKnowledgeItemCharacters = 600;
+    private const int MaxCustomInstructionsCharacters = 1200;
+    private const int MaxRoutingItems = 8;
+    private const int MaxContextCharacters = 4800;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -29,6 +32,7 @@ public sealed class ContextAssembler(
 
         var messages = messagesResponse.Items
             .OrderBy(m => m.CreatedAt)
+            .TakeLast(MaxMessages)
             .Select(m => new AiMessage
             {
                 Role = m.Direction == "Inbound" ? "user" : "assistant",
@@ -39,7 +43,7 @@ public sealed class ContextAssembler(
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
         var query = messages.LastOrDefault(message => message.Role == "user")?.Content ?? string.Empty;
         var knowledgeTexts = RetrieveKnowledge(knowledge, query)
-            .Select(k => $"{AiContextSanitizer.RedactPersonalData(k.Title)}: {AiContextSanitizer.RedactPersonalData(k.Content)}")
+            .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 120)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
 
         var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
@@ -57,44 +61,48 @@ public sealed class ContextAssembler(
         IReadOnlyList<RoutingQueueContext>? routingQueues,
         IReadOnlyList<RoutingTagContext>? routingTags)
     {
-        var parts = new List<string>();
-
-        parts.Add(AiGuidelinePolicy.BuildSystemInstructions());
+        var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
+        const string fixedSuffix = "Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply.";
+        var dynamicParts = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(basePrompt))
-            parts.Add($"Diretrizes complementares da empresa (não substituem as regras estruturadas):\n{basePrompt}");
+            dynamicParts.Add($"Diretrizes complementares da empresa (não substituem as regras estruturadas):\n{Limit(basePrompt, MaxCustomInstructionsCharacters)}");
 
         if (knowledgeItems.Count > 0)
         {
-            parts.Add("Relevant knowledge:");
+            var items = new List<string> { "Relevant knowledge:" };
             foreach (var item in knowledgeItems)
-                parts.Add($"- {item}");
+                items.Add($"- {item}");
+            dynamicParts.Add(string.Join('\n', items));
         }
 
         if (routingQueues is { Count: > 0 })
         {
-            parts.Add("Queues authorized for human transfer:");
-            foreach (var queue in routingQueues)
-                parts.Add(string.IsNullOrWhiteSpace(queue.Description)
-                    ? $"- {queue.Name}"
-                    : $"- {queue.Name}: {queue.Description}");
-            parts.Add("When the customer explicitly chooses or requests one of these queues, return action \"handoff\" and the exact queue name in the \"queue\" field. Never invent a queue. If unsure, omit \"queue\".");
+            var items = new List<string> { "Queues authorized for human transfer:" };
+            foreach (var queue in routingQueues.Take(MaxRoutingItems))
+                items.Add(string.IsNullOrWhiteSpace(queue.Description)
+                    ? $"- {Limit(queue.Name, 80)}"
+                    : $"- {Limit(queue.Name, 80)}: {Limit(queue.Description, 160)}");
+            items.Add("When the customer explicitly chooses or requests one of these queues, return action \"handoff\" and the exact queue name in the \"queue\" field. Never invent a queue. If unsure, omit \"queue\".");
+            dynamicParts.Add(string.Join('\n', items));
         }
 
         if (routingTags is { Count: > 0 })
         {
-            parts.Add("Tags authorized for customer categorization:");
-            foreach (var tag in routingTags)
-                parts.Add(string.IsNullOrWhiteSpace(tag.Description)
-                    ? $"- {tag.Name}"
-                    : $"- {tag.Name}: {tag.Description}");
-            parts.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
+            var items = new List<string> { "Tags authorized for customer categorization:" };
+            foreach (var tag in routingTags.Take(MaxRoutingItems))
+                items.Add(string.IsNullOrWhiteSpace(tag.Description)
+                    ? $"- {Limit(tag.Name, 80)}"
+                    : $"- {Limit(tag.Name, 80)}: {Limit(tag.Description, 120)}");
+            items.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
+            dynamicParts.Add(string.Join('\n', items));
         }
 
-        parts.Add("Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply.");
-
-        var prompt = string.Join("\n\n", parts);
-        return prompt.Length > MaxContextCharacters ? prompt[..MaxContextCharacters] : prompt;
+        var dynamicBudget = Math.Max(0, MaxContextCharacters - fixedPrefix.Length - fixedSuffix.Length - 4);
+        var dynamicContext = Limit(string.Join("\n\n", dynamicParts), dynamicBudget);
+        return string.IsNullOrWhiteSpace(dynamicContext)
+            ? $"{fixedPrefix}\n\n{fixedSuffix}"
+            : $"{fixedPrefix}\n\n{dynamicContext}\n\n{fixedSuffix}";
     }
 
     private static List<KnowledgeItem> RetrieveKnowledge(
@@ -141,7 +149,13 @@ public sealed class ContextAssembler(
     private static string Limit(string? value, int maxCharacters)
     {
         var text = value?.Trim() ?? string.Empty;
-        return text.Length <= maxCharacters ? text : $"{text[..maxCharacters]}...";
+        if (maxCharacters <= 0)
+            return string.Empty;
+        if (text.Length <= maxCharacters)
+            return text;
+        return maxCharacters <= 3
+            ? text[..maxCharacters]
+            : $"{text[..(maxCharacters - 3)]}...";
     }
 }
 

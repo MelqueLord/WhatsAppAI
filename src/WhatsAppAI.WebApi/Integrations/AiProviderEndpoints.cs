@@ -89,7 +89,7 @@ public static class AiProviderEndpoints
             systemPrompt = credential?.SystemPrompt,
             routingQueueIds = credential?.GetRoutingQueueIds() ?? [],
             routingTagIds = credential?.GetRoutingTagIds() ?? [],
-            maxTokensPerResponse = credential?.MaxTokensPerResponse ?? 500,
+            maxTokensPerResponse = credential?.MaxTokensPerResponse ?? 180,
             confidenceThreshold = botConfig?.ConfidenceThreshold ?? 0.5,
             guidelines = AiGuidelinePolicy.Rules,
             isActive = credential?.IsActive,

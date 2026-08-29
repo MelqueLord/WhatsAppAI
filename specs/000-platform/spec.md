@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.20.0
+**Versão:** 0.21.0
 **Data:** 2026-08-29
 
 ## 1. Problema
@@ -243,6 +243,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-052:** exigir avaliação aprovada para ativar o modelo de IA, registrar a decisão de promoção e permitir retorno transacional ao modelo de rollback aprovado.
 - **FR-053:** tratar a quantidade de linhas do plano como limite total e exigir que o PlatformAdmin distribua todas as vagas entre API Oficial e QR Code no cadastro e na edição do tenant, inclusive em planos com uma única linha.
 - **FR-054:** expor tokens de entrada/saída, provedor, modelo e custo estimado somente ao PlatformAdmin, por tenant; endpoints e telas de TenantOwner/Operator retornam apenas a franquia de respostas, saldo e alertas operacionais.
+- **FR-055:** aplicar orçamento determinístico ao contexto de IA: histórico recente limitado, no máximo três itens relevantes de conhecimento com tamanho limitado, diretrizes livres limitadas e teto de saída de 240 tokens; as regras estruturadas e o contrato JSON devem permanecer íntegros mesmo sob contexto extenso.
 
 ## 6. Regras de negócio
 
@@ -270,6 +271,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-022:** a franquia efetiva é o limite mensal persistido no tenant somado às recargas de 500 registradas no mês civil UTC; `null` preserva tenants legados sem limite, `0` sem recarga bloqueia respostas da IA e valores positivos limitam o mês. A suspensão por esgotamento afeta somente respostas da IA, preservando BOT, WhatsApp e atendimento humano. O alerta começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
 - **BR-023:** em planos comerciais, `official_api_line_count + qr_code_line_count` deve ser exatamente igual ao total de linhas do plano; valores negativos, excesso ou soma incompleta são rejeitados pelo backend.
 - **BR-024:** tokens e custos são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator, mesmo quando a credencial de IA pertence ao tenant.
+- **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
 
 ## 7. Requisitos não funcionais
 
