@@ -18,9 +18,9 @@ Invariantes: `slug` único; status `Active|Suspended`; contagens de linhas e `op
 ### User e TenantMembership
 
 `User`: `id`, `email`, `password_hash` anulável até ativação, `status`, `security_stamp`, timestamps.
-`TenantMembership`: `id`, `tenant_id`, `user_id`, `role`, `status`, `assigned_connection_type`, `assigned_line_number`, `version`, `created_at`, `deactivated_at`, `deactivated_by`.
+`TenantMembership`: `id`, `tenant_id`, `user_id`, `role`, `status`, `assigned_connection_type`, `assigned_line_number`, `assigned_lines`, `assigned_queue_id`, `version`, `created_at`, `deactivated_at`, `deactivated_by`.
 
-Status de `User` e membership: `Invited|Active|Disabled`. Papéis: `TenantOwner|Operator`; PlatformAdmin é permissão de plataforma separada. `user_id` é único em `TenantMembership`, garantindo um tenant por usuário no MVP. `assigned_connection_type` e `assigned_line_number` identificam a linha de atendimento do Operator. Desativação rotaciona `security_stamp`; reativação nunca restaura sessão anterior (**FR-026**, **FR-028**, **BR-012**, **BR-015**).
+Status de `User` e membership: `Invited|Active|Disabled`. Papéis: `TenantOwner|Operator`; PlatformAdmin é permissão de plataforma separada. `user_id` é único em `TenantMembership`, garantindo um tenant por usuário no MVP. As atribuições de linha identificam os canais do Operator; `assigned_queue_id` opcional restringe o atendimento a uma fila do mesmo tenant e `null` preserva atendimento geral. Desativação rotaciona `security_stamp`; reativação nunca restaura sessão anterior (**FR-026**, **FR-028**, **FR-038**, **BR-012**, **BR-015**, **BR-018**).
 
 ### Invitation
 
@@ -53,6 +53,8 @@ Não contém chave em claro. Múltiplos provedores podem ser configurados por te
 `id`, `tenant_id`, `wa_contact_id`, `phone_e164_encrypted`, `phone_hash`, `display_name`, `last_seen_at`, timestamps.
 
 Único `(tenant_id, phone_hash)`. Hash permite lookup; valor cifrado permite uso autorizado.
+
+A importação de planilha reutiliza `Contact` e não cria entidade paralela. O arquivo é transitório e não é persistido; cada linha válida é normalizada e submetida à unicidade tenant-scoped, enquanto o relatório retorna apenas número da linha e código de erro (**US-010**, **FR-039**, **BR-019**).
 
 ### Conversation
 
@@ -175,6 +177,7 @@ erDiagram
 | **FR-004, FR-021, BR-008** | `PlatformIntegrationSecret`, `WhatsAppAccount` e `AiProviderCredential` guardam apenas `secret_ref`. |
 | **FR-005, FR-006, FR-007, FR-022, BR-011** | `WebhookEvent` autentica antes da resolução, deduplica, separa envelope sanitizado de payload cifrado e suporta estado `Unknown`. |
 | **FR-008, BR-001, BR-002** | `WhatsAppAccount`, `Contact`, `Conversation` e `Message` têm unicidade/relacionamento tenant-scoped. |
+| **US-010, FR-039, BR-019** | A importação cria somente `Contact` no tenant corrente; arquivo e erros são transitórios, e a unicidade por tenant impede duplicação sem sobrescrever cadastro existente. |
 | **FR-009** | Eventos de domínio/outbox carregam `tenant_id`; isolamento SignalR é controle de aplicação. |
 | **US-003, FR-010, NFR-009** | `Message` e `OutboxMessage` nascem na mesma transação e usam chaves idempotentes. |
 | **FR-011, BR-003, BR-004, BR-010, SC-004** | `Conversation.version` e `HandoffEvent` protegem corridas e registram mudança de modo. |

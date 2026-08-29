@@ -125,4 +125,25 @@ public class TenantMembershipTestsExtended
 
         Assert.Throws<InvalidOperationException>(() => membership.Reactivate());
     }
+
+    [Fact]
+    public void AssignQueue_RestrictsAccessUntilCleared()
+    {
+        var membership = TenantMembership.Create(Guid.NewGuid(), CreateTestUser(), MembershipRole.Operator);
+        var assignedQueueId = Guid.NewGuid();
+
+        Assert.True(membership.CanAccessQueue(Guid.NewGuid()));
+
+        membership.AssignQueue(assignedQueueId);
+
+        Assert.Equal(assignedQueueId, membership.AssignedQueueId);
+        Assert.True(membership.CanAccessQueue(assignedQueueId));
+        Assert.False(membership.CanAccessQueue(Guid.NewGuid()));
+        Assert.False(membership.CanAccessQueue(null));
+
+        membership.AssignQueue(null);
+
+        Assert.Null(membership.AssignedQueueId);
+        Assert.True(membership.CanAccessQueue(Guid.NewGuid()));
+    }
 }

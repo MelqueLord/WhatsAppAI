@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.UnitTests.Identity;
@@ -42,6 +43,24 @@ public sealed class TenantMembershipConfigurationTests
         context.TenantMemberships.Add(TenantMembership.Create(secondTenant.Id, user, MembershipRole.Operator));
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+    }
+
+    [Fact]
+    public void AssignedQueue_UsesNullableRestrictedForeignKey()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+
+        using var context = new AppDbContext(options, new EmptyTenantContext());
+        var membership = context.Model.FindEntityType(typeof(TenantMembership))!;
+        var property = membership.FindProperty(nameof(TenantMembership.AssignedQueueId))!;
+        var foreignKey = membership.GetForeignKeys()
+            .Single(key => key.Properties.Contains(property));
+
+        Assert.True(property.IsNullable);
+        Assert.Equal(typeof(ServiceLine), foreignKey.PrincipalEntityType.ClrType);
+        Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
     }
 
     private sealed class EmptyTenantContext : ICurrentTenant

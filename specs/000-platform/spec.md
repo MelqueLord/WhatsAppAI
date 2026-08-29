@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.13.0
-**Data:** 2026-08-27
+**Versão:** 0.15.0
+**Data:** 2026-08-28
 
 ## 1. Problema
 
@@ -139,6 +139,19 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 3. Desativar um Operator impede novo login e invalida imediatamente suas sessões existentes.
 4. Reativar não restaura sessões antigas; o Operator precisa autenticar novamente.
 5. O mesmo usuário não pode pertencer a mais de um tenant no MVP.
+6. O TenantOwner pode manter o Operator no atendimento geral ou restringi-lo a uma fila ativa específica; a restrição vale para listar, abrir e responder conversas.
+
+### US-010 — Importar contatos por planilha (P2)
+
+Como TenantOwner, quero importar contatos de uma planilha para cadastrar minha base sem digitação individual.
+
+**Aceite:**
+
+1. A importação aceita arquivo `.csv` ou `.xlsx` com cabeçalhos `nome` e `contato`, independentemente de maiúsculas/minúsculas.
+2. Linhas válidas criam contatos somente no tenant corrente; números são normalizados antes da verificação de duplicidade.
+3. Contatos existentes e números repetidos no mesmo arquivo são ignorados sem sobrescrever dados cadastrados.
+4. Linhas inválidas não impedem as demais e o resultado informa quantidades importadas, ignoradas e inválidas, com motivo por linha sem repetir o número na resposta.
+5. Somente TenantOwner pode importar; arquivos maiores que 2 MB ou com mais de 5.000 linhas são rejeitados.
 
 ## 5. Requisitos funcionais
 
@@ -179,6 +192,8 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **FR-035:** suspender automaticamente o tenant ativo após 35 dias de atraso. A empresa suspensa mantém login e leitura, mas não pode enviar mensagens nem executar automações WhatsApp até a reativação por pagamento.
 - **FR-036:** permitir ao TenantOwner selecionar, entre as filas ativas do próprio tenant, quais podem ser usadas pela IA; quando o cliente escolher ou solicitar uma dessas filas, a IA deve retornar seu nome e o backend deve validar, atribuir a conversa à fila e transferi-la para atendimento humano.
 - **FR-037:** permitir ao TenantOwner selecionar tags ativas do próprio tenant para categorização pela IA; após cada decisão válida, o backend deve adicionar ao contato somente as tags autorizadas reconhecidas pela IA, sem remover tags existentes.
+- **FR-038:** permitir ao TenantOwner atribuir ou remover uma fila ativa do próprio tenant em cada Operator; sem fila atribuída o atendimento permanece geral, e com fila atribuída o backend deve limitar o Operator às conversas dessa fila.
+- **FR-039:** permitir ao TenantOwner importar até 5.000 contatos por arquivo `.csv` ou `.xlsx` de até 2 MB, usando as colunas obrigatórias `nome` e `contato`, com resultado parcial e isolamento pelo tenant corrente.
 
 ## 6. Regras de negócio
 
@@ -199,6 +214,8 @@ Como TenantOwner, quero listar, convidar, desativar, reativar e reenviar convite
 - **BR-015:** desativar uma membership rotaciona o marcador de segurança do usuário e invalida sessões; reativar a membership não revalida cookies anteriores.
 - **BR-016:** a IA somente pode encaminhar para filas ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; nome inexistente, fila desativada ou de outro tenant não altera a conversa.
 - **BR-017:** a IA somente pode categorizar com tags ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; atribuições são idempotentes e nunca removem tags automaticamente.
+- **BR-018:** `assigned_queue_id` nulo representa atendimento geral; quando preenchido, uma conversa só pode ser listada, aberta ou respondida pelo Operator se possuir exatamente essa fila, sem aceitar fila inativa, inexistente ou de outro tenant na configuração.
+- **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
 
 ## 7. Requisitos não funcionais
 

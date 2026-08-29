@@ -56,6 +56,7 @@ public static class BotConfigurationEndpoints
         ICurrentTenant currentTenant, IBotConfigurationRepository repo, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
@@ -90,6 +91,7 @@ public static class BotConfigurationEndpoints
         AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
@@ -114,6 +116,7 @@ public static class BotConfigurationEndpoints
         ICurrentTenant currentTenant, IBotConfigurationRepository repo, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
@@ -134,6 +137,7 @@ public static class BotConfigurationEndpoints
         AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });

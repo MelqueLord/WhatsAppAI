@@ -37,6 +37,9 @@ public static class OperatorEndpoints
         group.MapPut("/{operatorId:guid}/line", AssignOperatorLineAsync)
             .WithName("AssignOperatorLine");
 
+        group.MapPut("/{operatorId:guid}/queue", AssignOperatorQueueAsync)
+            .WithName("AssignOperatorQueue");
+
         return app;
     }
 
@@ -68,6 +71,7 @@ public static class OperatorEndpoints
                     ReactivatedAt = m.ReactivatedAt,
                     AssignedConnectionType = m.AssignedConnectionType?.ToString(),
                     AssignedLineNumber = m.AssignedLineNumber,
+                    AssignedQueueId = m.AssignedQueueId,
                     AssignedLines = m.AssignedLines.Select(l => new LineAssignmentResponse
                     {
                         ConnectionType = l.ConnectionType.ToString(),
@@ -216,6 +220,7 @@ public static class OperatorEndpoints
             ReactivatedAt = membership.ReactivatedAt,
             AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
             AssignedLineNumber = membership.AssignedLineNumber,
+            AssignedQueueId = membership.AssignedQueueId,
             AssignedLines = membership.AssignedLines.Select(l => new LineAssignmentResponse
             {
                 ConnectionType = l.ConnectionType.ToString(),
@@ -314,10 +319,59 @@ public static class OperatorEndpoints
             CreatedAt = membership.CreatedAt,
             AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
             AssignedLineNumber = membership.AssignedLineNumber,
+            AssignedQueueId = membership.AssignedQueueId,
             AssignedLines = membership.AssignedLines.Select(l => new LineAssignmentResponse
             {
                 ConnectionType = l.ConnectionType.ToString(),
                 LineNumber = l.LineNumber
+            }).ToList()
+        });
+    }
+
+    private static async Task<IResult> AssignOperatorQueueAsync(
+        Guid operatorId,
+        [FromBody] AssignOperatorQueueRequest request,
+        ICurrentTenant currentTenant,
+        ITenantMembershipRepository membershipRepository,
+        IServiceLineRepository queueRepository)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var membership = await membershipRepository.GetByIdAsync(operatorId);
+        if (membership is null || membership.TenantId != currentTenant.TenantId || membership.Role != MembershipRole.Operator)
+            return Results.NotFound();
+
+        if (request.QueueId.HasValue)
+        {
+            var queue = await queueRepository.GetByIdAsync(request.QueueId.Value);
+            if (queue is null || queue.TenantId != currentTenant.TenantId || !queue.IsActive)
+                return Results.BadRequest(new { error = "Queue not found or inactive." });
+        }
+
+        membership.AssignQueue(request.QueueId);
+        await membershipRepository.UpdateAsync(membership);
+        membership.LoadAssignedLinesFromJson();
+
+        return Results.Ok(new OperatorResponse
+        {
+            Id = membership.Id,
+            UserId = membership.UserId,
+            Email = membership.User.Email,
+            DisplayName = membership.User.DisplayName,
+            Status = membership.Status.ToString(),
+            CreatedAt = membership.CreatedAt,
+            DeactivatedAt = membership.DeactivatedAt,
+            ReactivatedAt = membership.ReactivatedAt,
+            AssignedConnectionType = membership.AssignedConnectionType?.ToString(),
+            AssignedLineNumber = membership.AssignedLineNumber,
+            AssignedQueueId = membership.AssignedQueueId,
+            AssignedLines = membership.AssignedLines.Select(line => new LineAssignmentResponse
+            {
+                ConnectionType = line.ConnectionType.ToString(),
+                LineNumber = line.LineNumber
             }).ToList()
         });
     }
@@ -477,6 +531,7 @@ public sealed class OperatorResponse
     public DateTime? ReactivatedAt { get; init; }
     public string? AssignedConnectionType { get; init; }
     public int? AssignedLineNumber { get; init; }
+    public Guid? AssignedQueueId { get; init; }
     public List<LineAssignmentResponse> AssignedLines { get; init; } = [];
 }
 
@@ -491,6 +546,11 @@ public sealed class AssignOperatorLineRequest
     public string? ConnectionType { get; init; }
     public int? LineNumber { get; init; }
     public List<LineAssignmentItem>? Lines { get; init; }
+}
+
+public sealed class AssignOperatorQueueRequest
+{
+    public Guid? QueueId { get; init; }
 }
 
 public sealed class LineAssignmentItem

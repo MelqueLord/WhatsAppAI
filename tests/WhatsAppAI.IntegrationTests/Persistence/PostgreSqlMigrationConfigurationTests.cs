@@ -26,7 +26,8 @@ public sealed class PostgreSqlMigrationConfigurationTests
                 "20260827120000_RemoveBotTokenLimit",
                 "20260827133343_AddPrivacyControls",
                 "20260827160000_AddAiMessageRetry",
-                "20260827210000_AddBotConfidenceThreshold"
+                "20260827210000_AddBotConfidenceThreshold",
+                "20260828010000_AddOperatorQueueAssignment"
             ],
             context.Database.GetMigrations());
     }

@@ -110,6 +110,8 @@ public sealed class AiOrchestrationWorker(
             {
                 logger.LogWarning("Conversation {ConversationId} not found for message {MessageId}",
                     message.ConversationId, message.Id);
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
                 return;
             }
 
@@ -189,21 +191,21 @@ public sealed class AiOrchestrationWorker(
                         return;
                     }
 
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
-
                     var outboundMsg = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
-                        MessageType.Text, replyContent, Guid.NewGuid().ToString());
+                        MessageType.Text, replyContent, $"simple-auto-reply:{message.Id}");
                     await messageRepository.AddAsync(outboundMsg, cancellationToken);
 
                     var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
                     await outboxRepository.AddAsync(outboxMsg);
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
                     logger.LogInformation("SimpleAutoReply sent for tenant {TenantId}", message.TenantId);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "SimpleAutoReply failed for message {MessageId}", message.Id);
+                    throw new InvalidOperationException($"SimpleAutoReply failed for message {message.Id}.", ex);
                 }
                 return;
             }
@@ -535,9 +537,10 @@ public sealed class AiOrchestrationWorker(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error processing inbound message {MessageId} for AI", message.Id);
+            var errorText = ex.ToString();
 
-            if (ex.Message.Contains("429", StringComparison.Ordinal) ||
-                ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase))
+            if (errorText.Contains("429", StringComparison.Ordinal) ||
+                errorText.Contains("quota", StringComparison.OrdinalIgnoreCase))
             {
                 var botConfig = await botConfigRepository.GetByTenantAsync(message.TenantId, cancellationToken);
                 var currentConversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);

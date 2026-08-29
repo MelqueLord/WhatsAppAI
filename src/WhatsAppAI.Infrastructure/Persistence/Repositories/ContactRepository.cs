@@ -48,6 +48,12 @@ public sealed class ContactRepository(AppDbContext context) : IContactRepository
         }
     }
 
+    public async Task AddRangeAsync(IEnumerable<Contact> contacts, CancellationToken cancellationToken = default)
+    {
+        await context.Set<Contact>().AddRangeAsync(contacts, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpdateAsync(Contact contact, CancellationToken cancellationToken = default)
     {
         context.Set<Contact>().Update(contact);

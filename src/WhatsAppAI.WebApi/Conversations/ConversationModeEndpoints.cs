@@ -25,6 +25,7 @@ public static class ConversationModeEndpoints
         [FromBody] SwitchModeRequest request,
         ICurrentTenant currentTenant,
         IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
         IHandoffEventRepository handoffEventRepository,
         HttpContext httpContext)
     {
@@ -34,6 +35,14 @@ public static class ConversationModeEndpoints
         var conversation = await conversationRepository.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId)
             return Results.NotFound();
+
+        if (currentTenant.UserRole == "Operator")
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            if (membership is null || !membership.CanAccessQueue(conversation.QueueId))
+                return Results.Forbid();
+        }
 
         var ifMatch = httpContext.Request.Headers["If-Match"].FirstOrDefault();
         if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))

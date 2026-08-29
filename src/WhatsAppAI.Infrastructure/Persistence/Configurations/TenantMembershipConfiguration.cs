@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Messaging;
 
 namespace WhatsAppAI.Infrastructure.Persistence.Configurations;
 
@@ -66,6 +67,9 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
             .HasColumnName("assigned_lines")
             .HasColumnType("jsonb");
 
+        builder.Property(m => m.AssignedQueueId)
+            .HasColumnName("assigned_queue_id");
+
         builder.Ignore(m => m.AssignedLines);
 
         builder.HasOne(m => m.Tenant)
@@ -78,6 +82,11 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
             .HasForeignKey(m => m.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<ServiceLine>()
+            .WithMany()
+            .HasForeignKey(m => m.AssignedQueueId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(m => new { m.TenantId, m.UserId })
             .IsUnique();
 
@@ -85,5 +94,7 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
             .IsUnique();
 
         builder.HasIndex(m => m.Status);
+
+        builder.HasIndex(m => m.AssignedQueueId);
     }
 }

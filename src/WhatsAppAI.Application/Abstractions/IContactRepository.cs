@@ -8,5 +8,6 @@ public interface IContactRepository
     Task<Contact?> GetByPhoneAsync(Guid tenantId, string phoneNumber, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Contact>> GetByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task AddAsync(Contact contact, CancellationToken cancellationToken = default);
+    Task AddRangeAsync(IEnumerable<Contact> contacts, CancellationToken cancellationToken = default);
     Task UpdateAsync(Contact contact, CancellationToken cancellationToken = default);
 }

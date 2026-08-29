@@ -603,6 +603,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("assigned_lines");
 
+                    b.Property<Guid?>("AssignedQueueId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_queue_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -643,6 +647,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("version");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedQueueId");
 
                     b.HasIndex("Status");
 
@@ -1864,6 +1870,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
             modelBuilder.Entity("WhatsAppAI.Domain.Identity.TenantMembership", b =>
                 {
+                    b.HasOne("WhatsAppAI.Domain.Messaging.ServiceLine", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedQueueId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WhatsAppAI.Domain.Identity.Tenant", "Tenant")
                         .WithMany("Memberships")
                         .HasForeignKey("TenantId")

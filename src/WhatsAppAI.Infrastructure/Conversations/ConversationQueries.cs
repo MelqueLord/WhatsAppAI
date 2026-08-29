@@ -11,6 +11,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
         Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, List<string>? phoneNumberIds = null,
+        Guid? queueId = null,
         CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
@@ -36,6 +37,9 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 ? query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId) || c.PhoneNumberId == "manual")
                 : query.Where(c => phoneNumberIds.Contains(c.PhoneNumberId));
         }
+
+        if (queueId.HasValue)
+            query = query.Where(c => c.QueueId == queueId.Value);
 
         if (!string.IsNullOrEmpty(request.Cursor))
         {

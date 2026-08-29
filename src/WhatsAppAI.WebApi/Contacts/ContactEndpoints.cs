@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -21,6 +22,10 @@ public static class ContactEndpoints
         group.MapPost("/", CreateContactAsync)
             .WithName("CreateContact");
 
+        group.MapPost("/import", ImportContactsAsync)
+            .WithName("ImportContacts")
+            .DisableAntiforgery(); // Custom middleware validates cookie sessions; bearer requests do not use CSRF.
+
         group.MapGet("/{contactId:guid}", GetContactAsync)
             .WithName("GetContact");
 
@@ -31,6 +36,42 @@ public static class ContactEndpoints
             .WithName("StartConversation");
 
         return app;
+    }
+
+    private static async Task<IResult> ImportContactsAsync(
+        IFormFile file,
+        ICurrentTenant currentTenant,
+        ContactImportService importService,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        if (file.Length == 0)
+            return Results.BadRequest(new { error = "Selecione um arquivo para importar." });
+
+        if (file.Length > 2 * 1024 * 1024)
+            return Results.Problem(
+                statusCode: StatusCodes.Status413PayloadTooLarge,
+                title: "O arquivo deve ter no máximo 2 MB.");
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var result = await importService.ImportAsync(
+                currentTenant.TenantId.Value,
+                stream,
+                file.FileName,
+                cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (ContactImportFileException exception)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
     }
 
     private static async Task<IResult> ListContactsAsync(

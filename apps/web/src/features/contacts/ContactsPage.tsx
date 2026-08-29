@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil } from 'lucide-react'
+import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { useAuth } from '../../lib/auth'
 
 interface Contact {
   id: string
@@ -27,8 +28,11 @@ function normalizeBrazilPhone(value: string) {
 export function ContactsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { isTenantOwner } = useAuth()
   const [search, setSearch] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showImportForm, setShowImportForm] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [editTarget, setEditTarget] = useState<Contact | null>(null)
 
@@ -65,6 +69,19 @@ export function ContactsPage() {
     },
   })
 
+  const importMutation = useMutation({
+    mutationFn: (file: File) => api.contacts.import(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    },
+  })
+
+  const closeImportForm = () => {
+    setShowImportForm(false)
+    setImportFile(null)
+    importMutation.reset()
+  }
+
   const startConversationMutation = useMutation({
     mutationFn: (contactId: string) => api.contacts.startConversation(contactId),
     onSuccess: (data) => {
@@ -97,12 +114,22 @@ export function ContactsPage() {
             <h1 className="text-xl font-semibold text-slate-800">Contatos</h1>
             <p className="text-sm text-slate-500 mt-0.5">Gerencie seus contatos</p>
           </div>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {isTenantOwner && (
+              <button
+                onClick={() => setShowImportForm(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors whitespace-nowrap"
+              >
+                <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Importar</span>
+              </button>
+            )}
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -186,6 +213,87 @@ export function ContactsPage() {
           </div>
         )}
       </div>
+
+      {showImportForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">Importar contatos</h2>
+                <p className="text-sm text-slate-500 mt-1">CSV ou XLSX com as colunas nome e contato.</p>
+              </div>
+              <button onClick={closeImportForm} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600">
+              O contato deve ter de 8 a 15 dígitos, incluindo o código do país. Máximo de 5.000 contatos e 2 MB.{` `}
+              <a
+                href={'data:text/csv;charset=utf-8,nome%2Ccontato%0ACliente%20Exemplo%2C5511999999999'}
+                download="modelo-contatos.csv"
+                className="text-emerald-600 font-medium hover:underline"
+              >
+                Baixar modelo
+              </a>
+            </div>
+
+            {importMutation.isError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                {(importMutation.error as Error).message}
+              </div>
+            )}
+
+            {importMutation.data && (
+              <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-slate-700">
+                <p className="font-medium text-emerald-800">Importação concluída</p>
+                <p className="mt-1">
+                  {importMutation.data.imported} importados, {importMutation.data.skipped} ignorados e {importMutation.data.invalid} inválidos.
+                </p>
+                {importMutation.data.errors.length > 0 && (
+                  <ul className="mt-2 max-h-32 overflow-auto list-disc pl-5 text-red-700">
+                    {importMutation.data.errors.slice(0, 20).map((error) => (
+                      <li key={`${error.row}-${error.code}`}>Linha {error.row}: {error.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (importFile) importMutation.mutate(importFile)
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="contacts-import-file" className="block text-sm font-medium text-slate-700 mb-1.5">Arquivo *</label>
+                <input
+                  id="contacts-import-file"
+                  type="file"
+                  accept=".csv,.xlsx"
+                  required
+                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-700"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={closeImportForm} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!importFile || importMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50"
+                >
+                  {importMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Importando...</> : 'Importar contatos'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Edit contact modal */}
       {editTarget && (

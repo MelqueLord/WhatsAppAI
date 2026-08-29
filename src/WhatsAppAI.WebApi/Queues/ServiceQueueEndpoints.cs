@@ -94,11 +94,14 @@ public static class ServiceLineEndpoints
     private static async Task<IResult> AssignQueueAsync(
         Guid conversationId, [FromBody] AssignQueueRequest request,
         ICurrentTenant currentTenant, IConversationRepository convRepo,
-        IServiceLineRepository queueRepo)
+        IServiceLineRepository queueRepo,
+        ITenantMembershipRepository membershipRepo)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         var conversation = await convRepo.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId) return Results.NotFound();
+        if (!await OperatorCanAccessQueueAsync(currentTenant, membershipRepo, conversation.QueueId))
+            return Results.Forbid();
 
         if (request.QueueId.HasValue)
         {
@@ -116,15 +119,31 @@ public static class ServiceLineEndpoints
 
     private static async Task<IResult> UnassignQueueAsync(
         Guid conversationId,
-        ICurrentTenant currentTenant, IConversationRepository convRepo)
+        ICurrentTenant currentTenant, IConversationRepository convRepo,
+        ITenantMembershipRepository membershipRepo)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         var conversation = await convRepo.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId) return Results.NotFound();
+        if (!await OperatorCanAccessQueueAsync(currentTenant, membershipRepo, conversation.QueueId))
+            return Results.Forbid();
 
         conversation.AssignQueue(null);
         await convRepo.UpdateAsync(conversation);
         return Results.Ok(new { conversationId, queueId = (Guid?)null });
+    }
+
+    private static async Task<bool> OperatorCanAccessQueueAsync(
+        ICurrentTenant currentTenant,
+        ITenantMembershipRepository membershipRepository,
+        Guid? queueId)
+    {
+        if (currentTenant.UserRole != "Operator") return true;
+        if (currentTenant.TenantId is null || currentTenant.UserId is null) return false;
+
+        var membership = await membershipRepository.GetByUserAndTenantAsync(
+            currentTenant.UserId.Value, currentTenant.TenantId.Value);
+        return membership?.CanAccessQueue(queueId) == true;
     }
 }
 

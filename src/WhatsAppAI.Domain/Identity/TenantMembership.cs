@@ -22,6 +22,7 @@ public sealed class TenantMembership
     public WhatsAppConnectionType? AssignedConnectionType { get; private set; }
     public int? AssignedLineNumber { get; private set; }
     public string? AssignedLinesJson { get; private set; }
+    public Guid? AssignedQueueId { get; private set; }
 
     public Tenant Tenant { get; private set; } = null!;
     public User User { get; private set; } = null!;
@@ -125,6 +126,15 @@ public sealed class TenantMembership
         SyncAssignedLinesJson();
         Version++;
     }
+
+    public void AssignQueue(Guid? queueId)
+    {
+        AssignedQueueId = queueId;
+        Version++;
+    }
+
+    public bool CanAccessQueue(Guid? queueId) =>
+        AssignedQueueId is null || AssignedQueueId == queueId;
 
     public void LoadAssignedLinesFromJson()
     {

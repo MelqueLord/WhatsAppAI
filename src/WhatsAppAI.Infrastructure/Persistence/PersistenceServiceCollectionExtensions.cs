@@ -6,7 +6,9 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Audit;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Application.Messaging;
+using WhatsAppAI.Infrastructure.Contacts;
 using WhatsAppAI.Infrastructure.Conversations;
 using WhatsAppAI.Infrastructure.Persistence.Repositories;
 
@@ -41,6 +43,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IWhatsAppAccountRepository, WhatsAppAccountRepository>();
         services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IContactRepository, ContactRepository>();
+        services.AddScoped<IContactImportFileReader, ContactImportFileReader>();
+        services.AddScoped<ContactImportService>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IHandoffEventRepository, HandoffEventRepository>();

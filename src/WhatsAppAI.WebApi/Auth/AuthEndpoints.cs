@@ -136,6 +136,7 @@ public static class AuthEndpoints
         string? tenantStatus = null;
         string? assignedConnectionType = null;
         int? assignedLineNumber = null;
+        Guid? assignedQueueId = null;
         List<LineAssignmentResponse> assignedLines = [];
         if (currentTenant.TenantId is not null)
         {
@@ -144,6 +145,7 @@ public static class AuthEndpoints
                 currentTenant.TenantId.Value);
             assignedConnectionType = membership?.AssignedConnectionType?.ToString();
             assignedLineNumber = membership?.AssignedLineNumber;
+            assignedQueueId = membership?.AssignedQueueId;
             if (membership is not null)
             {
                 membership.LoadAssignedLinesFromJson();
@@ -191,6 +193,7 @@ public static class AuthEndpoints
             TenantStatus = tenantStatus,
             AssignedConnectionType = assignedConnectionType,
             AssignedLineNumber = assignedLineNumber,
+            AssignedQueueId = assignedQueueId,
             AssignedLines = assignedLines
         });
     }
@@ -259,5 +262,6 @@ public sealed class UserResponse
     public string? TenantStatus { get; init; }
     public string? AssignedConnectionType { get; init; }
     public int? AssignedLineNumber { get; init; }
+    public Guid? AssignedQueueId { get; init; }
     public List<LineAssignmentResponse> AssignedLines { get; init; } = [];
 }

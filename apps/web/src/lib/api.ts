@@ -27,7 +27,8 @@ export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestIn
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken()
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {}
+  if (!(options?.body instanceof FormData)) headers['Content-Type'] = 'application/json'
   if (token) headers['Authorization'] = `Bearer ${token}`
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
@@ -120,6 +121,7 @@ export interface User {
   assignedConnectionType?: string
   assignedLineNumber?: number
   assignedLines?: LineAssignment[]
+  assignedQueueId?: string | null
 }
 
 export interface LineAssignment {
@@ -139,6 +141,7 @@ export interface Operator {
   assignedConnectionType?: string
   assignedLineNumber?: number
   assignedLines?: LineAssignment[]
+  assignedQueueId?: string | null
 }
 
 export interface Tenant {
@@ -179,6 +182,14 @@ export interface Contact {
   createdAt: string
   conversationId?: string
   message?: string
+}
+
+export interface ContactImportResult {
+  total: number
+  imported: number
+  skipped: number
+  invalid: number
+  errors: Array<{ row: number; code: string; message: string }>
 }
 
 export interface CreateTenantResponse {
@@ -377,6 +388,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ lines }),
       }),
+    assignQueue: (id: string, queueId: string | null) =>
+      fetchApi<Operator>(`/api/operators/${id}/queue`, {
+        method: 'PUT',
+        body: JSON.stringify({ queueId }),
+      }),
     update: (id: string, data: { email?: string; displayName?: string }) =>
       fetchApi<Operator>(`/api/operators/${id}`, {
         method: 'PUT',
@@ -414,6 +430,15 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+
+    import: (file: File) => {
+      const data = new FormData()
+      data.append('file', file)
+      return fetchApi<ContactImportResult>('/api/contacts/import', {
+        method: 'POST',
+        body: data,
+      })
+    },
 
     startConversation: (id: string) =>
       fetchApi<{ conversationId: string }>(

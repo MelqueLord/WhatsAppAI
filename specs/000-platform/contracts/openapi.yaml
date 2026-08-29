@@ -15,6 +15,8 @@ tags:
     description: Operações exclusivas de PlatformAdmin.
   - name: Operators
     description: Memberships Operator gerenciadas pelo TenantOwner do tenant corrente.
+  - name: Contacts
+    description: Cadastro e importação tenant-scoped de contatos.
   - name: Conversations
     description: Inbox, mensagens, modos e mídia.
   - name: Knowledge
@@ -249,6 +251,62 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /operators/{membershipId}/queue:
+    put:
+      tags: [Operators]
+      operationId: assignOperatorQueue
+      summary: Definir atendimento geral ou fila específica do Operator
+      description: Requer TenantOwner; `queueId` nulo mantém atendimento geral e um UUID restringe o Operator à fila ativa do tenant corrente.
+      x-required-role: TenantOwner
+      x-tenant-scoped: true
+      x-requirements: [US-009, FR-002, FR-038, BR-018]
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignOperatorQueueRequest' }
+      responses:
+        '200':
+          description: Atribuição de fila atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperatorSummary' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /contacts/import:
+    post:
+      tags: [Contacts]
+      operationId: importContacts
+      summary: Importar contatos de CSV ou XLSX
+      description: Requer TenantOwner; usa cabeçalhos `nome` e `contato`, não sobrescreve contatos existentes e processa linhas válidas mesmo quando outras falham.
+      x-required-role: TenantOwner
+      x-tenant-scoped: true
+      x-requirements: [US-010, FR-002, FR-039, BR-019, NFR-006, NFR-008]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Resultado parcial da importação
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactImportResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
   /admin/tenants/{tenantId}/status:
     put:
       tags: [Administration]
@@ -712,6 +770,24 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
   schemas:
+    ContactImportError:
+      type: object
+      required: [row, code, message]
+      properties:
+        row: { type: integer, minimum: 2 }
+        code: { type: string, enum: [invalid_name, invalid_contact] }
+        message: { type: string }
+    ContactImportResult:
+      type: object
+      required: [total, imported, skipped, invalid, errors]
+      properties:
+        total: { type: integer, minimum: 0 }
+        imported: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        invalid: { type: integer, minimum: 0 }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ContactImportError' }
     AntiforgeryToken:
       type: object
       required: [token]
@@ -824,6 +900,12 @@ components:
         status: { type: string, enum: [Invited, Active, Disabled] }
         version: { type: integer, minimum: 0 }
         invitationExpiresAt: { type: [string, 'null'], format: date-time }
+        assignedQueueId: { type: [string, 'null'], format: uuid }
+    AssignOperatorQueueRequest:
+      type: object
+      required: [queueId]
+      properties:
+        queueId: { type: [string, 'null'], format: uuid }
     OperatorPage:
       type: object
       required: [items]

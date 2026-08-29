@@ -116,6 +116,8 @@ public static class AiProviderEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
@@ -151,6 +153,8 @@ public static class AiProviderEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
@@ -218,6 +222,8 @@ public static class AiProviderEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null)
@@ -301,6 +307,8 @@ public static class AiProviderEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         var tenantId = currentTenant.TenantId.Value;
         if (!await dbContext.HasAiEnabledAsync(tenantId))
@@ -336,6 +344,8 @@ public static class AiProviderEndpoints
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
@@ -399,6 +409,7 @@ public static class AiProviderEndpoints
         HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
         if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "AI not available in your plan." });
 

@@ -368,9 +368,16 @@ export function BotConfigPage() {
                     className="border border-slate-200 rounded-lg overflow-hidden"
                   >
                     {/* Step header */}
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setExpandedStep(isOpen ? null : step.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setExpandedStep(isOpen ? null : step.id)
+                        }
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors text-left"
                     >
                       <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
@@ -402,7 +409,7 @@ export function BotConfigPage() {
                           : <ChevronDown className="w-4 h-4 text-slate-400" />
                         }
                       </div>
-                    </button>
+                    </div>
 
                     {/* Step body */}
                     {isOpen && (

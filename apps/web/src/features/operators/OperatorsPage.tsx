@@ -33,6 +33,11 @@ export function OperatorsPage() {
     queryFn: api.operators.list,
   })
 
+  const { data: serviceQueues = [] } = useQuery({
+    queryKey: ['service-queues'],
+    queryFn: api.serviceQueues.list,
+  })
+
   const createMutation = useMutation({
     mutationFn: (data: { email: string; displayName?: string; password: string }) => api.operators.create(data),
     onSuccess: (data) => {
@@ -87,6 +92,16 @@ export function OperatorsPage() {
     mutationFn: ({ operatorId, lines }: { operatorId: string; lines: LineAssignment[] }) =>
       api.operators.assignLines(operatorId, lines),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
+  })
+
+  const assignQueueMutation = useMutation({
+    mutationFn: ({ operatorId, queueId }: { operatorId: string; queueId: string | null }) =>
+      api.operators.assignQueue(operatorId, queueId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Operator[]>(['operators'], (current = []) =>
+        current.map((operator) => operator.id === updated.id ? updated : operator)
+      )
+    },
   })
 
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -243,6 +258,7 @@ export function OperatorsPage() {
                     <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                     <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Linha</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Atendimento</th>
                     <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Criado em</th>
                     <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
                   </tr>
@@ -250,7 +266,7 @@ export function OperatorsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredOperators.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                         {search ? 'Nenhum operador encontrado com esse filtro.' : 'Nenhum operador cadastrado.'}
                       </td>
                     </tr>
@@ -277,6 +293,25 @@ export function OperatorsPage() {
                             isLoading={assignLinesMutation.isPending}
                             onAssign={(lines) => assignLinesMutation.mutate({ operatorId: operator.id, lines })}
                           />
+                        </td>
+                        <td className="px-4 sm:px-6 py-4">
+                          <select
+                            aria-label={`Fila de ${operator.displayName || operator.email}`}
+                            value={operator.assignedQueueId ?? ''}
+                            disabled={assignQueueMutation.isPending}
+                            onChange={(event) => assignQueueMutation.mutate({
+                              operatorId: operator.id,
+                              queueId: event.target.value || null,
+                            })}
+                            className="min-w-[150px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 disabled:opacity-50"
+                          >
+                            <option value="">Atendimento geral</option>
+                            {serviceQueues.map((queue) => (
+                              <option key={queue.id} value={queue.id} disabled={!queue.isActive}>
+                                {queue.name}{queue.isActive ? '' : ' (inativa)'}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="hidden md:table-cell px-6 py-4 text-sm text-slate-500">
                           {new Date(operator.createdAt).toLocaleDateString('pt-BR')}
