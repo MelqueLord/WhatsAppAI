@@ -18,6 +18,7 @@
 - Alertas de 80% e esgotamento são registrados no `AuditLog`, idempotentes por tenant/mês.
 - O backend é a fonte única do status; as telas não recalculam o limiar.
 - Alterações de plano/franquia registram auditoria com versão e valores, sem segredos.
+- Configurações de IA/BOT e mudanças de modo gravam auditoria; mudanças de modo de conversa gravam `HandoffEvent` na mesma transação.
 
 ## Commits do incremento
 
@@ -42,8 +43,6 @@ Não reimplemente a contagem. Use `IUsageLedgerRepository`, `UsageMetricNames.Ai
 
 Próximas melhorias possíveis, ainda fora deste incremento:
 
-- tornar o toggle de IA atomicamente concorrente com `If-Match`;
-- unificar gravação de modo e `HandoffEvent` na mesma transação;
 - adicionar faturamento/overage, se o produto sair do escopo MVP;
 - evoluir o RAG lexical para recuperação vetorial somente com nova decisão de arquitetura.
 

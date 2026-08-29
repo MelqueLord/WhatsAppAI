@@ -71,7 +71,7 @@ Backend: `src/WhatsAppAI.WebApi/Integrations/AiProviderEndpoints.cs`
 - Salvar provedor/credencial exige `If-Match` da configuração de IA.
 - Salvar diretrizes e limiar exige `If-Match`; quando o limiar afeta BOT, exige também `If-Match-Bot`.
 - A API responde conflito/erro de versão sem sobrescrever dados mais novos.
-- O toggle de IA ainda é uma operação separada da gravação de diretrizes e não usa o mesmo `If-Match` transacional.
+- O toggle de IA é uma operação separada da gravação de diretrizes e exige `If-Match-Bot` para proteger a versão do BOT.
 
 ### Simulação
 
@@ -233,7 +233,6 @@ Em deploy, a aplicação deve aplicar as migrations pendentes antes de iniciar o
 
 Estas são lacunas reais do estado atual, não comportamentos prometidos:
 
-- toggle de IA ainda pode concorrer sem `If-Match` atômico;
 - atualização de instruções/credencial e limiar pode falhar parcialmente quando há conflito entre versões distintas;
 - gravação de mudança de modo e `HandoffEvent` ocorre em operações separadas;
 - RAG vetorial, re-ranking semântico e citações de fonte não estão implementados;

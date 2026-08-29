@@ -67,6 +67,7 @@ public sealed class AiOrchestrationWorker(
         var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
         var usageRepository = scope.ServiceProvider.GetRequiredService<IUsageLedgerRepository>();
         var pricingRepository = scope.ServiceProvider.GetRequiredService<IAiModelPricingRepository>();
+        var modelEvaluationRepository = scope.ServiceProvider.GetRequiredService<IModelEvaluationRepository>();
         var auditLogRepository = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -83,7 +84,8 @@ public sealed class AiOrchestrationWorker(
                 messageRepository, conversationRepository,
                 credentialRepository, secretStore, aiProviderResolver,
                 contextAssembler, outboxRepository, interactionRepository,
-                usageRepository, pricingRepository, auditLogRepository, handoffEventRepository, cancellationToken);
+                usageRepository, pricingRepository, modelEvaluationRepository,
+                auditLogRepository, handoffEventRepository, cancellationToken);
         }
     }
 
@@ -104,6 +106,7 @@ public sealed class AiOrchestrationWorker(
         IAiInteractionRepository interactionRepository,
         IUsageLedgerRepository usageRepository,
         IAiModelPricingRepository pricingRepository,
+        IModelEvaluationRepository modelEvaluationRepository,
         IAuditLogRepository auditLogRepository,
         IHandoffEventRepository handoffEventRepository,
         CancellationToken cancellationToken)
@@ -277,6 +280,15 @@ public sealed class AiOrchestrationWorker(
                     message, conversation, botConfig, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, cancellationToken);
                 logger.LogWarning("AI model is not allowed for tenant {TenantId}", message.TenantId);
+                return;
+            }
+            if (await modelEvaluationRepository.GetApprovedForModelAsync(
+                    message.TenantId, credential.ModelId, cancellationToken) is null)
+            {
+                await FinalizeUnavailableAiAsync(
+                    message, conversation, botConfig, messageRepository, conversationRepository,
+                    outboxRepository, handoffEventRepository, cancellationToken);
+                logger.LogWarning("AI model has no approved evaluation for tenant {TenantId}", message.TenantId);
                 return;
             }
 

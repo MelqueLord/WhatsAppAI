@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -54,6 +55,8 @@ public static class BotConfigurationEndpoints
     private static async Task<IResult> SaveAsync(
         [FromBody] SaveBotConfigRequest request,
         ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        IModelEvaluationRepository modelEvaluationRepository,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -62,28 +65,55 @@ public static class BotConfigurationEndpoints
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
+        if (config is null && expectedVersion != 0)
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply or AiPowered" });
         if (mode == BotMode.SimpleAutoReply &&
             !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+        if (mode == BotMode.AiPowered && await modelEvaluationRepository.GetApprovedForModelAsync(
+                currentTenant.TenantId.Value,
+                (await dbContext.AiProviderCredentials.FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive))?.ModelId ?? string.Empty,
+                httpContext.RequestAborted) is null)
+            return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
         if (!TryValidateFlowSteps(request.FlowSteps, out var flowError))
             return Results.BadRequest(new { error = flowError });
 
-        if (config is null)
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
         {
-            config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
-            config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
-            config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
-            await repo.AddAsync(config);
+            if (config is null)
+            {
+                config = BotConfiguration.Create(currentTenant.TenantId.Value, mode);
+                config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
+                config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
+                await repo.AddAsync(config, httpContext.RequestAborted);
+            }
+            else
+            {
+                if (config.Version != expectedVersion)
+                    return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+                if (config.Mode != mode)
+                    config.UpdateMode(mode);
+                config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
+                config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
+                await repo.UpdateAsync(config, httpContext.RequestAborted);
+            }
+
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "BOT.ConfigurationUpdated",
+                "BotConfiguration",
+                config.Id.ToString(),
+                $"mode={config.Mode};version={config.Version}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            if (config.Version != expectedVersion)
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
-            config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
-            config.UpdateFlowSteps(SerializeFlowSteps(request.FlowSteps));
-            await repo.UpdateAsync(config);
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
         }
 
         return Results.Ok(new { saved = true });
@@ -92,6 +122,8 @@ public static class BotConfigurationEndpoints
     private static async Task<IResult> UpdateModeAsync(
         [FromBody] UpdateModeRequest request,
         ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        IModelEvaluationRepository modelEvaluationRepository,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -112,15 +144,42 @@ public static class BotConfigurationEndpoints
         if (mode == BotMode.SimpleAutoReply &&
             !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+        if (mode == BotMode.AiPowered)
+        {
+            var credential = await dbContext.AiProviderCredentials
+                .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
+            if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
+                    currentTenant.TenantId.Value, credential.ModelId, httpContext.RequestAborted) is null)
+                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+        }
 
-        config.UpdateMode(mode);
-        await repo.UpdateAsync(config);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            config.UpdateMode(mode);
+            await repo.UpdateAsync(config, httpContext.RequestAborted);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "BOT.ModeChanged",
+                "BotConfiguration",
+                config.Id.ToString(),
+                $"mode={config.Mode};version={config.Version}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+        }
         return Results.Ok(new { mode = mode.ToString(), version = config.Version });
     }
 
     private static async Task<IResult> UpdateMessagesAsync(
         [FromBody] UpdateMessagesRequest request,
-        ICurrentTenant currentTenant, IBotConfigurationRepository repo, HttpContext httpContext)
+        ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
@@ -132,8 +191,25 @@ public static class BotConfigurationEndpoints
         if (config.Version != expectedVersion)
             return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
 
-        config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
-        await repo.UpdateAsync(config);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            config.UpdateMessages(request.WelcomeMessage, request.ReturningMessage, request.OfflineMessage, request.FallbackMessage, request.HandoffMessage, request.QueueTransferMessage, request.MediaMessage);
+            await repo.UpdateAsync(config, httpContext.RequestAborted);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "BOT.MessagesUpdated",
+                "BotConfiguration",
+                config.Id.ToString(),
+                $"handoff_configured={!string.IsNullOrWhiteSpace(config.HandoffMessage)};version={config.Version}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+        }
         return Results.Ok(new { saved = true, version = config.Version });
     }
 
@@ -141,6 +217,8 @@ public static class BotConfigurationEndpoints
     private static async Task<IResult> ToggleAsync(
         [FromBody] ToggleBotRequest request,
         ICurrentTenant currentTenant, IBotConfigurationRepository repo,
+        IModelEvaluationRepository modelEvaluationRepository,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext, HttpContext httpContext)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -170,9 +248,34 @@ public static class BotConfigurationEndpoints
         if (request.Enabled && config.Mode == BotMode.SimpleAutoReply &&
             !await dbContext.HasBotEnabledAsync(currentTenant.TenantId.Value))
             return Results.BadRequest(new { error = "BOT automation is not available in your plan." });
+        if (request.Enabled && config.Mode == BotMode.AiPowered)
+        {
+            var credential = await dbContext.AiProviderCredentials
+                .FirstOrDefaultAsync(c => c.TenantId == currentTenant.TenantId.Value && c.IsActive, httpContext.RequestAborted);
+            if (credential is null || await modelEvaluationRepository.GetApprovedForModelAsync(
+                    currentTenant.TenantId.Value, credential.ModelId, httpContext.RequestAborted) is null)
+                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+        }
 
-        config.Toggle(request.Enabled);
-        await repo.UpdateAsync(config);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            config.Toggle(request.Enabled);
+            await repo.UpdateAsync(config, httpContext.RequestAborted);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "BOT.Toggled",
+                "BotConfiguration",
+                config.Id.ToString(),
+                $"enabled={config.Enabled};mode={config.Mode};version={config.Version}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+        }
         return Results.Ok(new { enabled = config.Enabled, mode = config.Mode.ToString(), version = config.Version });
     }
 

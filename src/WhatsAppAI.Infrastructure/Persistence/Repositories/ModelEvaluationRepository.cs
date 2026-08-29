@@ -12,10 +12,29 @@ public sealed class ModelEvaluationRepository(AppDbContext context) : IModelEval
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateAsync(ModelEvaluation evaluation, CancellationToken cancellationToken = default)
+    {
+        context.Set<ModelEvaluation>().Update(evaluation);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<ModelEvaluation?> GetLatestApprovedAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await context.Set<ModelEvaluation>()
             .Where(e => e.TenantId == tenantId && e.IsApproved)
+            .OrderByDescending(e => e.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ModelEvaluation?> GetApprovedForModelAsync(
+        Guid tenantId, string modelId, CancellationToken cancellationToken = default)
+    {
+        var normalizedModelId = modelId.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
+            ? modelId["models/".Length..]
+            : modelId;
+        return await context.Set<ModelEvaluation>()
+            .Where(e => e.TenantId == tenantId && e.IsApproved &&
+                (e.ModelId == modelId || e.ModelId == normalizedModelId))
             .OrderByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
     }

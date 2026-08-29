@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
+using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.WebApi.Conversations;
 
@@ -27,6 +29,8 @@ public static class ConversationModeEndpoints
         IConversationRepository conversationRepository,
         ITenantMembershipRepository membershipRepository,
         IHandoffEventRepository handoffEventRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
         HttpContext httpContext)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
@@ -51,27 +55,39 @@ public static class ConversationModeEndpoints
         if (!Enum.TryParse<ConversationMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Automatic, Human, Paused" });
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         ConversationMode previousMode;
         try
         {
             previousMode = conversation.SwitchMode(mode, expectedVersion, currentTenant.UserId.ToString());
+            await conversationRepository.UpdateAsync(conversation, httpContext.RequestAborted);
+
+            var reason = request.Reason ?? "Mode changed by operator";
+            await handoffEventRepository.AddAsync(HandoffEvent.Create(
+                currentTenant.TenantId.Value,
+                conversationId,
+                previousMode,
+                mode,
+                currentTenant.UserId,
+                reason));
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "Conversation.ModeChanged",
+                "Conversation",
+                conversationId.ToString(),
+                $"from={previousMode};to={mode}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
         }
         catch (ConcurrencyException)
         {
             return Results.Conflict(new { error = "Version conflict. Conversation was modified." });
         }
-
-        await conversationRepository.UpdateAsync(conversation);
-
-        var handoffEvent = HandoffEvent.Create(
-            currentTenant.TenantId.Value,
-            conversationId,
-            previousMode,
-            mode,
-            currentTenant.UserId,
-            request.Reason ?? "Mode changed by operator");
-
-        await handoffEventRepository.AddAsync(handoffEvent);
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "Version conflict. Conversation was modified." });
+        }
 
         return Results.Ok(new
         {

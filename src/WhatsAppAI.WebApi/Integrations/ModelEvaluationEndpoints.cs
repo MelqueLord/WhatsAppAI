@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -89,17 +90,33 @@ public static class ModelEvaluationEndpoints
         Guid evaluationId,
         [FromBody] ApproveEvaluationRequest? request,
         ICurrentTenant currentTenant,
-        IModelEvaluationRepository evaluationRepository)
+        IModelEvaluationRepository evaluationRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         var evaluations = await evaluationRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var evaluation = evaluations.FirstOrDefault(e => e.Id == evaluationId);
         if (evaluation is null)
             return Results.NotFound();
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         evaluation.Approve(request?.RollbackModelId);
+        await evaluationRepository.UpdateAsync(evaluation, httpContext.RequestAborted);
+        await auditLogRepository.AddAsync(AuditLog.Create(
+            currentTenant.TenantId.Value,
+            currentTenant.UserId,
+            "AI.ModelEvaluationApproved",
+            "ModelEvaluation",
+            evaluation.Id.ToString(),
+            $"model={evaluation.ModelId};rollback={evaluation.RollbackModelId}"),
+            httpContext.RequestAborted);
+        await transaction.CommitAsync(httpContext.RequestAborted);
         return Results.Ok(new { approved = true });
     }
 
@@ -107,17 +124,33 @@ public static class ModelEvaluationEndpoints
         Guid evaluationId,
         [FromBody] RejectEvaluationRequest request,
         ICurrentTenant currentTenant,
-        IModelEvaluationRepository evaluationRepository)
+        IModelEvaluationRepository evaluationRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
 
         var evaluations = await evaluationRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var evaluation = evaluations.FirstOrDefault(e => e.Id == evaluationId);
         if (evaluation is null)
             return Results.NotFound();
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         evaluation.Reject(request.Reason ?? "Not specified");
+        await evaluationRepository.UpdateAsync(evaluation, httpContext.RequestAborted);
+        await auditLogRepository.AddAsync(AuditLog.Create(
+            currentTenant.TenantId.Value,
+            currentTenant.UserId,
+            "AI.ModelEvaluationRejected",
+            "ModelEvaluation",
+            evaluation.Id.ToString(),
+            "evaluation rejected"),
+            httpContext.RequestAborted);
+        await transaction.CommitAsync(httpContext.RequestAborted);
         return Results.Ok(new { rejected = true });
     }
 }

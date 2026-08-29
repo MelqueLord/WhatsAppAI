@@ -14,48 +14,6 @@ namespace WhatsAppAI.WebApi.Integrations;
 
 public static class AiProviderEndpoints
 {
-    private static readonly HashSet<string> SupportedProviders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "openai", "gemini", "anthropic", "xiaomi", "grok", "groq"
-    };
-
-    private static readonly Dictionary<string, object[]> ProviderModels = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["openai"] =
-        [
-            new { id = "gpt-4o", name = "GPT-4o" },
-            new { id = "gpt-4o-mini", name = "GPT-4o Mini" },
-            new { id = "gpt-4.1-mini", name = "GPT-4.1 Mini" }
-        ],
-        ["gemini"] =
-        [
-            new { id = "gemini-3.1-pro-preview", name = "Gemini 3.1 Pro Preview" },
-            new { id = "gemini-3.6-flash", name = "Gemini 3.6 Flash" }
-        ],
-        ["anthropic"] =
-        [
-            new { id = "claude-sonnet-4-20250514", name = "Claude Sonnet 4" },
-            new { id = "claude-haiku-3-5-20241022", name = "Claude Haiku 3.5" }
-        ],
-        ["xiaomi"] =
-        [
-            new { id = "mimo-v2.5-pro", name = "MiMo v2.5 Pro" },
-            new { id = "mimo-v2.5", name = "MiMo v2.5" }
-        ],
-        ["grok"] =
-        [
-            new { id = "grok-4.6", name = "Grok 4.6" },
-            new { id = "grok-4.5", name = "Grok 4.5" },
-            new { id = "grok-4.3", name = "Grok 4.3" }
-        ],
-        ["groq"] =
-        [
-            new { id = "openai/gpt-oss-120b", name = "GPT-OSS 120B" },
-            new { id = "openai/gpt-oss-20b", name = "GPT-OSS 20B" },
-            new { id = "qwen/qwen3.6-27b", name = "Qwen 3.6 27B" }
-        ]
-    };
-
     public static IEndpointRouteBuilder MapAiProviderEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/integrations/ai")
@@ -83,26 +41,22 @@ public static class AiProviderEndpoints
         group.MapPost("/simulate", SimulateAsync)
             .WithName("SimulateAiDecision");
 
+        group.MapPost("/evaluations/{evaluationId:guid}/rollback", RollbackModelAsync)
+            .WithName("RollbackAiModel");
+
         return app;
     }
 
     private static IResult GetProvidersAsync(IAiProviderResolver resolver)
     {
         var registered = resolver.GetRegisteredProviders();
-        var providers = registered.Select(p => new
+        var providers = AiProviderCatalog.Providers
+            .Where(definition => registered.Contains(definition.Id, StringComparer.OrdinalIgnoreCase))
+            .Select(definition => new
         {
-            id = p.ToLowerInvariant(),
-            name = p.ToLowerInvariant() switch
-            {
-                "openai" => "OpenAI",
-                "gemini" => "Google Gemini",
-                "anthropic" => "Anthropic",
-                "xiaomi" => "Xiaomi MiMo",
-                "grok" => "xAI Grok",
-                "groq" => "Groq",
-                _ => p
-            },
-            models = ProviderModels.GetValueOrDefault(p) ?? []
+            id = definition.Id,
+            name = definition.Name,
+            models = definition.Models
         });
 
         return Results.Ok(providers);
@@ -124,12 +78,14 @@ public static class AiProviderEndpoints
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var provider = AiProviderCatalog.NormalizeProvider(credential?.Provider);
+        var modelId = AiProviderCatalog.NormalizeModelId(credential?.ModelId);
 
         return Results.Ok(new
         {
             configured = credential is not null,
-            provider = credential?.Provider,
-            modelId = credential?.ModelId,
+            provider = credential is null ? null : provider,
+            modelId = credential is null ? null : modelId,
             systemPrompt = credential?.SystemPrompt,
             routingQueueIds = credential?.GetRoutingQueueIds() ?? [],
             routingTagIds = credential?.GetRoutingTagIds() ?? [],
@@ -147,7 +103,10 @@ public static class AiProviderEndpoints
         [FromBody] SaveAiConfigRequest request,
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
+        IModelEvaluationRepository evaluationRepository,
         ISecretStore secretStore,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
         HttpContext httpContext)
     {
@@ -163,19 +122,28 @@ public static class AiProviderEndpoints
         if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
 
-        if (string.IsNullOrWhiteSpace(request.ModelId))
+        var modelId = AiProviderCatalog.NormalizeModelId(request.ModelId);
+        if (string.IsNullOrWhiteSpace(modelId))
             return Results.BadRequest(new { error = "Model ID is required." });
 
-        var provider = request.Provider ?? "openai";
-        if (!SupportedProviders.Contains(provider))
-            return Results.BadRequest(new { error = $"Unsupported provider. Use: {string.Join(", ", SupportedProviders)}" });
+        var provider = AiProviderCatalog.NormalizeProvider(request.Provider ?? "openai");
+        if (!AiProviderCatalog.IsSupported(provider))
+            return Results.BadRequest(new { error = $"Unsupported provider. Use: {string.Join(", ", AiProviderCatalog.Providers.Select(item => item.Id))}" });
 
-        if (!AiModelPolicy.IsAllowed(provider, request.ModelId))
+        if (!AiModelPolicy.IsAllowed(provider, modelId))
             return Results.BadRequest(new { error = "Modelo inválido. Selecione um modelo disponível no catálogo." });
 
         var existing = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (existing is null && expectedVersion != 0)
+            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
         if (existing is not null && existing.Version != expectedVersion)
             return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+
+        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var aiIsActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered;
+        if (aiIsActive && await evaluationRepository.GetApprovedForModelAsync(
+                currentTenant.TenantId.Value, modelId, httpContext.RequestAborted) is null)
+            return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
 
         var selectedCredential = await credentialRepository.GetByTenantAndProviderAsync(currentTenant.TenantId.Value, provider);
         if (string.IsNullOrWhiteSpace(request.ApiKey) &&
@@ -183,29 +151,50 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "API key is required for a new provider configuration." });
 
         var secretKey = selectedCredential?.ApiKeyRef ?? $"ai:{currentTenant.TenantId}:{provider}:apikey";
-        if (!string.IsNullOrWhiteSpace(request.ApiKey))
+        var configuredCredentialId = selectedCredential?.Id;
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
         {
-            secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
-            await secretStore.SetAsync(secretKey, request.ApiKey);
-        }
+            if (!string.IsNullOrWhiteSpace(request.ApiKey))
+            {
+                secretKey = $"ai:{currentTenant.TenantId}:{provider}:apikey";
+                await secretStore.SetAsync(secretKey, request.ApiKey, httpContext.RequestAborted);
+            }
 
-        if (existing is not null && existing.Id != selectedCredential?.Id)
-        {
-            existing.Deactivate();
-            await credentialRepository.UpdateAsync(existing);
-        }
+            if (existing is not null && existing.Id != selectedCredential?.Id)
+            {
+                existing.Deactivate();
+                await credentialRepository.UpdateAsync(existing, httpContext.RequestAborted);
+            }
 
-        if (selectedCredential is not null)
-        {
-            selectedCredential.Update(request.ModelId, secretKey);
-            selectedCredential.Activate();
-            await credentialRepository.UpdateAsync(selectedCredential);
+            if (selectedCredential is not null)
+            {
+                selectedCredential.Update(modelId, secretKey);
+                selectedCredential.Activate();
+                await credentialRepository.UpdateAsync(selectedCredential, httpContext.RequestAborted);
+            }
+            else
+            {
+                var credential = AiProviderCredential.Create(
+                    currentTenant.TenantId.Value, provider, modelId, secretKey);
+                configuredCredentialId = credential.Id;
+                await credentialRepository.AddAsync(credential, httpContext.RequestAborted);
+            }
+
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "AI.ProviderConfigurationUpdated",
+                "AiProviderCredential",
+                configuredCredentialId.ToString(),
+                $"provider={provider};model={modelId}"),
+                httpContext.RequestAborted);
+
+            await transaction.CommitAsync(httpContext.RequestAborted);
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            var credential = AiProviderCredential.Create(
-                currentTenant.TenantId.Value, provider, request.ModelId, secretKey);
-            await credentialRepository.AddAsync(credential);
+            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
         }
 
         return Results.Ok(new { saved = true });
@@ -218,6 +207,7 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         IServiceLineRepository queueRepository,
         IClientTagRepository tagRepository,
+        IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
         HttpContext httpContext)
     {
@@ -258,25 +248,6 @@ public static class AiProviderEndpoints
         if (Array.Exists(requestedTagIds, id => !activeTagIds.Contains(id)))
             return Results.BadRequest(new { error = "Selecione somente tags ativas desta empresa." });
 
-        try
-        {
-            credential.UpdateInstructions(
-                request.SystemPrompt,
-                request.MaxTokensPerResponse,
-                expectedVersion,
-                requestedQueueIds,
-                requestedTagIds);
-            await credentialRepository.UpdateAsync(credential);
-        }
-        catch (ConcurrencyException)
-        {
-            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
-        }
-
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (request.ConfidenceThreshold is not null && botConfig is not null)
         {
@@ -286,16 +257,48 @@ public static class AiProviderEndpoints
             if (botConfig.Version != expectedBotVersion)
                 return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
         }
-        if (botConfig is null)
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
         {
-            botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
-            botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
-            await botConfigRepository.AddAsync(botConfig);
+            credential.UpdateInstructions(
+                request.SystemPrompt,
+                request.MaxTokensPerResponse,
+                expectedVersion,
+                requestedQueueIds,
+                requestedTagIds);
+            await credentialRepository.UpdateAsync(credential, httpContext.RequestAborted);
+
+            if (botConfig is null)
+            {
+                botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
+                botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
+                await botConfigRepository.AddAsync(botConfig, httpContext.RequestAborted);
+            }
+            else
+            {
+                botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
+                await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
+            }
+
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId,
+                "AI.InstructionsUpdated",
+                "AiProviderCredential",
+                credential.Id.ToString(),
+                $"provider={credential.Provider};model={credential.ModelId};confidence={botConfig.ConfidenceThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                httpContext.RequestAborted);
+
+            await transaction.CommitAsync(httpContext.RequestAborted);
         }
-        else
+        catch (ConcurrencyException)
         {
-            botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
-            await botConfigRepository.UpdateAsync(botConfig);
+            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "As diretrizes foram alteradas por outro usuário." });
         }
 
         return Results.Ok(new
@@ -312,7 +315,10 @@ public static class AiProviderEndpoints
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
         IBotConfigurationRepository botConfigRepository,
-        AppDbContext dbContext)
+        IModelEvaluationRepository evaluationRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -323,25 +329,78 @@ public static class AiProviderEndpoints
         if (!await dbContext.HasAiEnabledAsync(tenantId))
             return Results.BadRequest(new { error = "AI not available in your plan." });
 
+        var ifMatch = httpContext.Request.Headers["If-Match-Bot"].FirstOrDefault();
+        if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match-Bot com a versão do BOT é obrigatório." });
+
         if (request.Enabled && await credentialRepository.GetByTenantAsync(tenantId) is null)
             return Results.BadRequest(new { error = "Configure um provedor de IA antes de ativar." });
+
+        if (request.Enabled)
+        {
+            var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
+            if (credential is not null && await evaluationRepository.GetApprovedForModelAsync(
+                    tenantId, credential.ModelId, httpContext.RequestAborted) is null)
+                return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
+        }
 
         var botConfig = await botConfigRepository.GetByTenantAsync(tenantId);
         if (botConfig is null)
         {
-            if (!request.Enabled)
-                return Results.Ok(new { aiActive = false });
+            if (expectedVersion != 0)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
 
-            await botConfigRepository.AddAsync(BotConfiguration.Create(tenantId, BotMode.AiPowered));
+            if (!request.Enabled)
+                return Results.Ok(new { aiActive = false, botVersion = 0U });
+
+            await using var createTransaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+            try
+            {
+                botConfig = BotConfiguration.Create(tenantId, BotMode.AiPowered);
+                await botConfigRepository.AddAsync(botConfig, httpContext.RequestAborted);
+                await auditLogRepository.AddAsync(AuditLog.Create(
+                    tenantId,
+                    currentTenant.UserId,
+                    "AI.ModeChanged",
+                    "BotConfiguration",
+                    botConfig.Id.ToString(),
+                    "mode=AiPowered;enabled=true"),
+                    httpContext.RequestAborted);
+                await createTransaction.CommitAsync(httpContext.RequestAborted);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+            }
         }
         else
         {
+            if (botConfig.Version != expectedVersion)
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+
             botConfig.UpdateMode(request.Enabled ? BotMode.AiPowered : BotMode.Manual);
             botConfig.Toggle(request.Enabled);
-            await botConfigRepository.UpdateAsync(botConfig);
+            await using var updateTransaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+            try
+            {
+                await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
+                await auditLogRepository.AddAsync(AuditLog.Create(
+                    tenantId,
+                    currentTenant.UserId,
+                    "AI.ModeChanged",
+                    "BotConfiguration",
+                    botConfig.Id.ToString(),
+                    $"mode={botConfig.Mode};enabled={botConfig.Enabled}"),
+                    httpContext.RequestAborted);
+                await updateTransaction.CommitAsync(httpContext.RequestAborted);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+            }
         }
 
-        return Results.Ok(new { aiActive = request.Enabled });
+        return Results.Ok(new { aiActive = request.Enabled, botVersion = botConfig!.Version });
     }
 
     private static async Task<IResult> TestConnectionAsync(
@@ -463,6 +522,69 @@ public static class AiProviderEndpoints
             handoffReason = decision.Action == AiAction.Handoff ? decision.HandoffReason : null,
             fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null
         });
+    }
+
+    private static async Task<IResult> RollbackModelAsync(
+        Guid evaluationId,
+        ICurrentTenant currentTenant,
+        IModelEvaluationRepository evaluationRepository,
+        IAiProviderCredentialRepository credentialRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId.Value;
+        if (!await dbContext.HasAiEnabledAsync(tenantId))
+            return Results.BadRequest(new { error = "AI not available in your plan." });
+
+        var evaluation = (await evaluationRepository.GetByTenantAsync(tenantId))
+            .FirstOrDefault(item => item.Id == evaluationId);
+        if (evaluation is null)
+            return Results.NotFound();
+        if (!evaluation.IsApproved || string.IsNullOrWhiteSpace(evaluation.RollbackModelId))
+            return Results.BadRequest(new { error = "A avaliação aprovada não possui modelo de rollback configurado." });
+
+        var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
+        if (credential is null)
+            return Results.BadRequest(new { error = "Configure um provedor de IA antes do rollback." });
+
+        if (!AiModelPolicy.IsAllowed(credential.Provider, evaluation.RollbackModelId) ||
+            await evaluationRepository.GetApprovedForModelAsync(
+                tenantId, evaluation.RollbackModelId, httpContext.RequestAborted) is null)
+            return Results.BadRequest(new { error = "O modelo de rollback não possui avaliação aprovada." });
+
+        if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
+        if (credential.Version != expectedVersion)
+            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            credential.Update(evaluation.RollbackModelId, credential.ApiKeyRef);
+            credential.Activate();
+            await credentialRepository.UpdateAsync(credential, httpContext.RequestAborted);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                tenantId,
+                currentTenant.UserId,
+                "AI.ModelRolledBack",
+                "AiProviderCredential",
+                credential.Id.ToString(),
+                $"provider={credential.Provider};model={credential.ModelId};sourceEvaluation={evaluation.Id}"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "A configuração do provedor foi alterada por outro usuário." });
+        }
+
+        return Results.Ok(new { rolledBack = true, modelId = credential.ModelId, version = credential.Version });
     }
 
 }

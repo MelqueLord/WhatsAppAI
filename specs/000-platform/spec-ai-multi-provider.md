@@ -20,15 +20,17 @@ O TenantOwner precisa de uma tela própria para configurar o atendimento automat
 | Google Gemini | `gemini` | gemini-3.1-pro-preview, gemini-3.6-flash |
 | Anthropic | `anthropic` | claude-sonnet-4, claude-haiku-3.5 |
 | Xiaomi MiMo | `xiaomi` | mimo-v2.5-pro, mimo-v2.5 |
+| xAI Grok | `grok` | grok-4.6, grok-4.5, grok-4.3 |
+| Groq | `groq` | openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.6-27b |
 
 ## 3. Histórias de usuário
 
 ### US-AI-001 — Escolher provedor de IA
 
-Como TenantOwner, quero escolher entre OpenAI, Gemini, Anthropic ou Xiaomi como provedor de IA do meu atendimento, para usar o modelo que melhor atende meu caso e orçamento.
+Como TenantOwner, quero escolher entre os provedores disponíveis no catálogo da plataforma como provedor de IA do meu atendimento, para usar o modelo que melhor atende meu caso e orçamento.
 
 **Aceite:**
-1. A tela exibe um seletor de provedor com as 4 opções.
+1. A tela exibe um seletor com todos os provedores registrados no catálogo.
 2. Ao selecionar um provedor, os campos de modelo sugerem modelos compatíveis.
 3. Cada provedor tem sua própria credencial (API key) armazenada.
 4. Apenas um provedor pode estar ativo por vez.
@@ -55,7 +57,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 
 ## 4. Requisitos funcionais
 
-- **FR-AI-001:** a entidade `AiProviderCredential` já suporta campo `Provider` (string). O sistema deve aceitar os valores `openai`, `gemini`, `anthropic`, `xiaomi`, `grok`.
+- **FR-AI-001:** a entidade `AiProviderCredential` já suporta campo `Provider` (string). O sistema deve aceitar somente os identificadores de provedores registrados no catálogo (`openai`, `gemini`, `anthropic`, `xiaomi`, `grok`, `groq`).
 - **FR-AI-002:** implementar adaptadores `IAiProvider` para Gemini, Anthropic e Xiaomi, além do OpenAI existente.
 - **FR-AI-003:** `AiConfigPage` e `BotConfigPage` permanecem distintas. A primeira exige a capacidade `aiEnabled`; a segunda está disponível nos planos BOT e BOT + IA.
 - **FR-AI-004:** credenciais são armazenadas por provedor no `ISecretStore` com chave `ai:{tenantId}:{provider}:apikey`.
@@ -76,6 +78,9 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **BR-AI-005:** o teste de conexão deve usar o adaptador correto conforme o provedor selecionado.
 - **BR-AI-006:** o PlatformAdmin controla a franquia de respostas por empresa; tokens servem para medir e distribuir custo, sem substituir o limite comercial de respostas.
 - **BR-AI-007:** falhas transitórias têm no máximo três tentativas por mensagem; o circuit breaker é isolado por tenant/provedor e uma abertura impede novas chamadas até a janela de recuperação.
+- **BR-AI-008:** alterações de provedor e diretrizes que também atualizam o BOT validam todas as versões antes da primeira escrita e persistem configuração e auditoria atomicamente.
+- **FR-AI-012:** nenhum modelo pode ser ativado sem avaliação aprovada; uma avaliação aprovada pode indicar modelo de rollback, que só é aplicado após validação e concorrência otimista.
+- **FR-AI-013:** identificadores, nomes e modelos de provedores devem vir de um catálogo único no Application; API, política de modelos, DI e frontend não podem manter listas divergentes.
 
 ## 6. Adaptadores por provedor
 
@@ -88,6 +93,7 @@ Cada provedor implementa `IAiProvider` com sua API específica:
 | Anthropic | `api.anthropic.com/v1/messages` | `x-api-key` header | Messages API |
 | Xiaomi | `api.xiaomi.com/v1/chat/completions` (ou endpoint MiMo) | Bearer token | Chat Completions compatível |
 | Grok | `api.x.ai/v1/chat/completions` | Bearer token | Chat Completions compatível |
+| Groq | `api.groq.com/openai/v1/chat/completions` | Bearer token | Chat Completions compatível |
 
 Todos os adaptadores convertem sua resposta nativa para o formato comum `AiResponse` com `AiDecision`.
 
@@ -137,7 +143,7 @@ BOT / BOT + IA — /bot-config
 
 ## 9. Critérios de sucesso
 
-1. TenantOwner vê 4 provedores na tela e consegue configurar qualquer um.
+1. TenantOwner vê todos os provedores registrados no catálogo na tela e consegue configurar qualquer um.
 2. Teste de conexão funciona para cada provedor.
 3. IA responde corretamente usando qualquer provedor configurado.
 4. A tela de IA não aparece no plano BOT.

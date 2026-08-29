@@ -239,6 +239,8 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-048:** calcular custo somente quando houver preço registrado para o modelo/provedor, preservando tokens como fonte auditável e identificando a estimativa como não faturamento.
 - **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
+- **FR-051:** persistir alterações de configuração, modo, handoff e auditoria na mesma transação, validando todas as versões `If-Match` antes de qualquer escrita para impedir estado parcial.
+- **FR-052:** exigir avaliação aprovada para ativar o modelo de IA, registrar a decisão de promoção e permitir retorno transacional ao modelo de rollback aprovado.
 
 ## 6. Regras de negócio
 

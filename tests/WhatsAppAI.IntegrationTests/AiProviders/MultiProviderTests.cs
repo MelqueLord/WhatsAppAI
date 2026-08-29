@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -44,7 +45,7 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetProviders_ReturnsAllFour()
+    public async Task GetProviders_ReturnsCatalogOrderAndModels()
     {
         var (client, _) = await CreateTenantWithAiPlanAsync();
 
@@ -60,6 +61,9 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains(providers, p => p.Id == "xiaomi");
         Assert.Contains(providers, p => p.Id == "grok");
         Assert.Contains(providers, p => p.Id == "groq");
+        Assert.Equal(["openai", "gemini", "anthropic", "xiaomi", "grok", "groq"], providers.Select(p => p.Id));
+        Assert.Equal(3, providers.Single(p => p.Id == "openai").Models.Length);
+        Assert.Equal(3, providers.Single(p => p.Id == "groq").Models.Length);
     }
 
     [Fact]
@@ -183,6 +187,52 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     }
 
     private sealed record ProviderDto(string Id, string Name, object[] Models);
+
+    [Fact]
+    public async Task ToggleAi_RequiresBotIfMatchAndRejectsStaleVersion()
+    {
+        var (client, tenantId) = await CreateTenantWithAiPlanAsync();
+        var saveResponse = await PostConfigAsync(client, new
+        {
+            provider = "openai", modelId = "gpt-4o-mini", apiKey = "sk-test-openai"
+        });
+        saveResponse.EnsureSuccessStatusCode();
+
+        var db = await _factory.GetDbContextAsync();
+        var evaluation = ModelEvaluation.Create(
+            tenantId, "gpt-4o-mini", "owner", 0.9, 0.1, 0.95, 0.2m, 500);
+        evaluation.Approve();
+        db.ModelEvaluations.Add(evaluation);
+        await db.SaveChangesAsync();
+
+        var missingHeader = await client.PostAsJsonAsync(
+            "/api/integrations/ai/toggle", new { enabled = true });
+        Assert.Equal(HttpStatusCode.BadRequest, missingHeader.StatusCode);
+
+        using var enableRequest = new HttpRequestMessage(
+            HttpMethod.Post, "/api/integrations/ai/toggle")
+        {
+            Content = JsonContent.Create(new { enabled = true })
+        };
+        enableRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(enableRequest)).StatusCode);
+
+        using var disableRequest = new HttpRequestMessage(
+            HttpMethod.Post, "/api/integrations/ai/toggle")
+        {
+            Content = JsonContent.Create(new { enabled = false })
+        };
+        disableRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(disableRequest)).StatusCode);
+
+        using var staleRequest = new HttpRequestMessage(
+            HttpMethod.Post, "/api/integrations/ai/toggle")
+        {
+            Content = JsonContent.Create(new { enabled = true })
+        };
+        staleRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
+        Assert.Equal(HttpStatusCode.Conflict, (await client.SendAsync(staleRequest)).StatusCode);
+    }
 
     private static async Task<HttpResponseMessage> PostConfigAsync(HttpClient client, object payload)
     {

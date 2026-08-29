@@ -58,7 +58,7 @@ O plano é selecionado ao criar um tenant via `/api/admin/tenants`. Funcionalida
 
 ## Provedores de IA
 
-A plataforma suporta 4 provedores de IA. Para usar IA, o tenant precisa ter plano `IA+BOT` e configurar pelo menos um provedor na tela "Atendimento com IA":
+A plataforma suporta os provedores registrados no catálogo de IA (atualmente OpenAI, Gemini, Anthropic, Xiaomi MiMo, xAI Grok e Groq). Para usar IA, o tenant precisa ter plano `IA+BOT` e configurar pelo menos um provedor na tela "Atendimento com IA":
 
 | Provedor | Identificador | Exemplo de modelo |
 |----------|--------------|-------------------|

@@ -59,6 +59,15 @@ public sealed class AiProviderResolverTests
         Assert.Contains("anthropic", providers);
     }
 
+    [Fact]
+    public void GetRegisteredProviders_ExcludesProvidersOutsideCatalog()
+    {
+        var resolver = CreateResolver(("custom", Dummy), ("openai", Dummy));
+
+        Assert.Equal(["openai"], resolver.GetRegisteredProviders());
+        Assert.Throws<InvalidOperationException>(() => resolver.Resolve("custom"));
+    }
+
     private sealed class DummyProvider : IAiProvider
     {
         public Task<AiResponse> GetResponseAsync(AiRequest request, CancellationToken cancellationToken = default)
