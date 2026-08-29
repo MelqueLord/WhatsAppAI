@@ -245,6 +245,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-054:** expor tokens de entrada/saída, provedor, modelo e custo estimado somente ao PlatformAdmin, por tenant; endpoints e telas de TenantOwner/Operator retornam apenas a franquia de respostas, saldo e alertas operacionais.
 - **FR-055:** aplicar orçamento determinístico ao contexto de IA: histórico recente limitado, no máximo três itens relevantes de conhecimento com tamanho limitado, diretrizes livres limitadas e teto de saída de 240 tokens; as regras estruturadas e o contrato JSON devem permanecer íntegros mesmo sob contexto extenso.
 - **FR-056:** usar a base de conhecimento ativa do tenant como fonte prioritária para fatos da empresa; itens sem correspondência com a solicitação não podem ser injetados como contexto e, sem informação relevante, a IA deve evitar invenção e encaminhar quando a pergunta exigir um fato não documentado.
+- **FR-057:** coletar na tela de IA um perfil estruturado do negócio (descrição, público-alvo, produtos/serviços, tom, horário e localização), persistindo-o junto às diretrizes existentes para personalizar a abordagem sem substituir a base de conhecimento para fatos comerciais.
 
 ## 6. Regras de negócio
 
@@ -274,6 +275,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-024:** tokens e custos são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator, mesmo quando a credencial de IA pertence ao tenant.
 - **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura ou handoff, nunca uma afirmação específica inventada.
+- **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 
 ## 7. Requisitos não funcionais
 

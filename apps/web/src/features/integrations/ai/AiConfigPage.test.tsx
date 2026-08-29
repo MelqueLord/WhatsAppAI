@@ -65,6 +65,10 @@ describe('AiConfigPage', () => {
     expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeInTheDocument()
     expect(screen.getByText('Regras estruturadas')).toBeInTheDocument()
     expect(screen.getByText('Limiar de confiança')).toBeInTheDocument()
+    expect(screen.getByText('Descrição do negócio')).toBeInTheDocument()
+    expect(screen.getByText('Público-alvo')).toBeInTheDocument()
+    expect(screen.getByText('Produtos e serviços')).toBeInTheDocument()
+    expect(screen.getByText('Tom de voz')).toBeInTheDocument()
     expect(screen.queryByText('Mensagens automáticas')).not.toBeInTheDocument()
   })
 
