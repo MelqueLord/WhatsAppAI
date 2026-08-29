@@ -20,4 +20,36 @@ public sealed class UsageLedgerRepository(AppDbContext context) : IUsageLedgerRe
             .OrderByDescending(u => u.RecordedAt)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<long> GetTotalQuantityAsync(
+        Guid tenantId,
+        string metric,
+        DateTime from,
+        DateTime toExclusive,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Set<UsageLedger>()
+            .IgnoreQueryFilters()
+            .Where(u => u.TenantId == tenantId &&
+                u.Metric == metric &&
+                u.RecordedAt >= from &&
+                u.RecordedAt < toExclusive)
+            .SumAsync(u => (long?)u.Quantity, cancellationToken) ?? 0;
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, long>> GetTotalQuantityByTenantAsync(
+        string metric,
+        DateTime from,
+        DateTime toExclusive,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Set<UsageLedger>()
+            .IgnoreQueryFilters()
+            .Where(u => u.Metric == metric &&
+                u.RecordedAt >= from &&
+                u.RecordedAt < toExclusive)
+            .GroupBy(u => u.TenantId)
+            .Select(group => new { TenantId = group.Key, Quantity = group.Sum(u => u.Quantity) })
+            .ToDictionaryAsync(item => item.TenantId, item => item.Quantity, cancellationToken);
+    }
 }

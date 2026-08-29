@@ -1,0 +1,6 @@
+namespace WhatsAppAI.Domain.Usage;
+
+public static class UsageMetricNames
+{
+    public const string AiResponses = "ai_responses";
+}

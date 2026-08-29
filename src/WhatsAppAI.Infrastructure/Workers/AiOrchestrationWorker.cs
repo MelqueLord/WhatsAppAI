@@ -231,7 +231,7 @@ public sealed class AiOrchestrationWorker(
             }
 
             var monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
-                dbContext, message.TenantId, cancellationToken);
+                usageRepository, message.TenantId, cancellationToken);
             if (!AiResponseQuotaPolicy.HasAvailableResponse(
                     tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
             {
@@ -522,7 +522,8 @@ public sealed class AiOrchestrationWorker(
                 }
 
                 monthlyAiResponsesUsed = await GetMonthlyAiResponsesUsedAsync(
-                    dbContext, message.TenantId, cancellationToken);
+                    usageRepository, message.TenantId, cancellationToken);
+                await dbContext.Entry(tenant).ReloadAsync(cancellationToken);
                 if (!AiResponseQuotaPolicy.HasAvailableResponse(
                         tenant.MonthlyAiResponseLimit, monthlyAiResponsesUsed))
                 {
@@ -569,7 +570,7 @@ public sealed class AiOrchestrationWorker(
                 var responseUsage = UsageLedger.Create(
                     message.TenantId,
                     credential.Provider,
-                    "ai_responses",
+                    UsageMetricNames.AiResponses,
                     replyMessage.Id.ToString(),
                     1,
                     "responses");
@@ -706,17 +707,18 @@ public sealed class AiOrchestrationWorker(
     }
 
     private static async Task<long> GetMonthlyAiResponsesUsedAsync(
-        AppDbContext dbContext,
+        IUsageLedgerRepository usageRepository,
         Guid tenantId,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return await dbContext.UsageLedger
-            .IgnoreQueryFilters()
-            .Where(usage => usage.TenantId == tenantId &&
-                usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
-            .SumAsync(usage => (long?)usage.Quantity, cancellationToken) ?? 0;
+        return await usageRepository.GetTotalQuantityAsync(
+            tenantId,
+            UsageMetricNames.AiResponses,
+            monthStart,
+            monthStart.AddMonths(1),
+            cancellationToken);
     }
 
     private static async Task FinalizeAiResponseQuotaExceededAsync(

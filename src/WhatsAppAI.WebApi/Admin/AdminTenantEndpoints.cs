@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Administration;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -236,7 +237,8 @@ public static class AdminTenantEndpoints
 
     private static async Task<IResult> GetAllTenantsAsync(
         ITenantRepository tenantRepository,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        IUsageLedgerRepository usageRepository)
     {
         var tenants = await tenantRepository.GetAllAsync();
         var owners = await dbContext.TenantMemberships
@@ -246,12 +248,8 @@ public static class AdminTenantEndpoints
             .ToDictionaryAsync(x => x.TenantId);
         var monthStart = new DateTime(
             DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var aiResponsesByTenant = await dbContext.UsageLedger
-            .IgnoreQueryFilters()
-            .Where(usage => usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
-            .GroupBy(usage => usage.TenantId)
-            .Select(group => new { TenantId = group.Key, Used = group.Sum(usage => usage.Quantity) })
-            .ToDictionaryAsync(item => item.TenantId, item => item.Used);
+        var aiResponsesByTenant = await usageRepository.GetTotalQuantityByTenantAsync(
+            UsageMetricNames.AiResponses, monthStart, monthStart.AddMonths(1));
 
         return Results.Ok(tenants.Select(t => new TenantResponse
         {
@@ -278,7 +276,8 @@ public static class AdminTenantEndpoints
     private static async Task<IResult> GetTenantByIdAsync(
         Guid tenantId,
         ITenantRepository tenantRepository,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        IUsageLedgerRepository usageRepository)
     {
         var tenant = await tenantRepository.GetByIdAsync(tenantId);
         if (tenant is null)
@@ -286,11 +285,11 @@ public static class AdminTenantEndpoints
 
         var monthStart = new DateTime(
             DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var aiResponsesUsed = await dbContext.UsageLedger
-            .IgnoreQueryFilters()
-            .Where(usage => usage.TenantId == tenantId &&
-                usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
-            .SumAsync(usage => (long?)usage.Quantity) ?? 0;
+        var aiResponsesUsed = await usageRepository.GetTotalQuantityAsync(
+            tenantId,
+            UsageMetricNames.AiResponses,
+            monthStart,
+            monthStart.AddMonths(1));
 
         return Results.Ok(new TenantResponse
         {

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 using WhatsAppAI.WebApi.Operators;
@@ -118,7 +119,8 @@ public static class AuthEndpoints
         IUserRepository userRepository,
         ITenantMembershipRepository membershipRepository,
         ICurrentTenant currentTenant,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        IUsageLedgerRepository usageRepository)
     {
         if (!currentTenant.IsAuthenticated || currentTenant.UserId is null)
             return Results.Unauthorized();
@@ -184,9 +186,11 @@ public static class AuthEndpoints
 
                 var monthStart = new DateTime(
                     DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                monthlyAiResponsesUsed = await dbContext.UsageLedger
-                    .Where(usage => usage.Metric == "ai_responses" && usage.RecordedAt >= monthStart)
-                    .SumAsync(usage => (long?)usage.Quantity) ?? 0;
+                monthlyAiResponsesUsed = await usageRepository.GetTotalQuantityAsync(
+                    tenant.Id,
+                    UsageMetricNames.AiResponses,
+                    monthStart,
+                    monthStart.AddMonths(1));
             }
         }
 
