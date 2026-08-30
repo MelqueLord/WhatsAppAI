@@ -36,6 +36,9 @@ export function MessagePanel({
   const queuesEnabled = user?.automaticDistributionEnabled === true
   const tagsEnabled = user?.tagsEnabled === true
   const [message, setMessage] = useState('')
+  const [templateName, setTemplateName] = useState('')
+  const [templateLanguage, setTemplateLanguage] = useState('pt_BR')
+  const [templateParameters, setTemplateParameters] = useState('')
   const [modeOverride, setModeOverride] = useState<string | null>(null)
   const [showSaveContact, setShowSaveContact] = useState(false)
   const [contactName, setContactName] = useState('')
@@ -97,10 +100,11 @@ export function MessagePanel({
   const messages = [...(messagesData?.items ?? [])].reverse()
 
   const sendMutation = useMutation({
-    mutationFn: (content: string) =>
+    mutationFn: (payload: { content: string; template?: { name: string; language: string; parameters?: string[] } }) =>
       api.conversations.sendMessage(
         conversation.id,
-        content
+        payload.content,
+        payload.template
       ),
 
     onSuccess: () => {
@@ -201,9 +205,27 @@ export function MessagePanel({
       return
     }
 
-    sendMutation.mutate(message)
+    sendMutation.mutate({ content: message })
 
     setMessage('')
+  }
+
+  const handleTemplateSend = () => {
+    const name = templateName.trim()
+    const language = templateLanguage.trim()
+    if (!name || !language) return
+
+    sendMutation.mutate({
+      content: '',
+      template: {
+        name,
+        language,
+        parameters: templateParameters
+          .split(',')
+          .map((parameter) => parameter.trim())
+          .filter(Boolean),
+      },
+    })
   }
 
   const handleModeChange = (
@@ -501,6 +523,43 @@ export function MessagePanel({
               Apenas templates são
               permitidos.
             </p>
+          </div>
+        )}
+
+        {!isConversationOpen && !conversation.isQrCode && (
+          <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-[#10223f] p-3">
+            <p className="text-xs font-medium text-slate-200">Enviar template aprovado pela Meta</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder="Nome do template"
+                maxLength={512}
+                className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
+              />
+              <input
+                value={templateLanguage}
+                onChange={(event) => setTemplateLanguage(event.target.value)}
+                placeholder="Idioma (ex.: pt_BR)"
+                maxLength={20}
+                className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={templateParameters}
+                onChange={(event) => setTemplateParameters(event.target.value)}
+                placeholder="Parâmetros do corpo, separados por vírgula (opcional)"
+                className="flex-1 rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
+              />
+              <button
+                onClick={handleTemplateSend}
+                disabled={!templateName.trim() || !templateLanguage.trim() || sendMutation.isPending}
+                className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {sendMutation.isPending ? 'Enviando…' : 'Enviar template'}
+              </button>
+            </div>
           </div>
         )}
 

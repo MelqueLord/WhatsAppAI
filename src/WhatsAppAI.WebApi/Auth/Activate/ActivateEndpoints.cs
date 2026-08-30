@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Infrastructure.Identity;
@@ -14,7 +15,8 @@ public static class ActivateEndpoints
             .AllowAnonymous();
 
         group.MapPost("/", ActivateAccountAsync)
-            .WithName("ActivateAccount");
+            .WithName("ActivateAccount")
+            .RequireRateLimiting("auth");
 
         group.MapGet("/invitation/{invitationId:guid}", GetInvitationInfoAsync)
             .WithName("GetInvitationInfo");

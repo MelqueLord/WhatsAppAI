@@ -15,12 +15,13 @@ public sealed class ContactRepository(AppDbContext context) : IContactRepository
 
     public async Task<Contact?> GetByPhoneAsync(Guid tenantId, string phoneNumber, CancellationToken cancellationToken = default)
     {
-        var contacts = await context.Set<Contact>()
-            .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
         var normalizedPhone = NormalizePhone(phoneNumber);
-        return contacts.Find(contact =>
-            contact.TenantId == tenantId && NormalizePhone(contact.PhoneNumber) == normalizedPhone);
+        return await context.Set<Contact>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(contact =>
+                contact.TenantId == tenantId &&
+                (contact.PhoneNumber == normalizedPhone || contact.PhoneNumber == phoneNumber),
+                cancellationToken);
     }
 
     private static string NormalizePhone(string phoneNumber) =>

@@ -101,17 +101,17 @@ Entre como `PlatformAdmin`, crie uma empresa e use a senha temporaria exibida no
 
 ### Parar a aplicacao
 
-Feche as janelas abertas pelo `run.bat` ou pressione `Ctrl+C` nelas. O banco SQLite fica em `src/WhatsAppAI.WebApi/whatsappai.db`.
+Feche as janelas abertas pelo `run.bat` ou pressione `Ctrl+C` nelas.
 
-### Docker/MySQL
+### Docker/PostgreSQL
 
 Para um ambiente parecido com producao, use o Compose separadamente:
 
 ```powershell
-docker compose up -d mysql
+docker compose up -d postgres
 ```
 
-Esse caminho e opcional e pode exigir Docker Desktop configurado. O desenvolvimento diario recomendado continua sendo SQLite sem administrador.
+Esse caminho e opcional e exige Docker Desktop configurado. O desenvolvimento usa a mesma configuração PostgreSQL da produção.
 
 ### Supabase (PostgreSQL)
 

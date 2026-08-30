@@ -440,12 +440,23 @@ export const api = {
         `/api/conversations/${id}/messages?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
       ),
 
-    sendMessage: (id: string, content: string) =>
+    sendMessage: (id: string, content: string, template?: {
+      name: string
+      language: string
+      parameters?: string[]
+    }) =>
       fetchApi<{ id: string; status: string }>(
         `/api/conversations/${id}/messages`,
         {
           method: 'POST',
-          body: JSON.stringify({ content }),
+          body: JSON.stringify(template
+            ? {
+                content: '',
+                templateName: template.name,
+                templateLanguage: template.language,
+                templateParameters: template.parameters ?? [],
+              }
+            : { content }),
         }
       ),
 

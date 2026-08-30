@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Integrations;
@@ -14,6 +15,7 @@ public sealed class OutboxProcessingWorker(
     IServiceProvider serviceProvider,
     ILogger<OutboxProcessingWorker> logger) : BackgroundService
 {
+    private const int MaxConcurrency = 4;
     private const int MaxRetries = 5;
     private const int BatchSize = 20;
 
@@ -34,8 +36,10 @@ public sealed class OutboxProcessingWorker(
         {
             try
             {
-                await ProcessOutboxAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+                var hadWork = await ProcessOutboxAsync(stoppingToken);
+                await Task.Delay(
+                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(3),
+                    stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -51,50 +55,48 @@ public sealed class OutboxProcessingWorker(
         logger.LogInformation("Outbox Processing Worker stopped");
     }
 
-    private async Task ProcessOutboxAsync(CancellationToken cancellationToken)
+    private async Task<bool> ProcessOutboxAsync(CancellationToken cancellationToken)
     {
         using var scope = serviceProvider.CreateScope();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
-        var messageRepository = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
-        var conversationRepository = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
-        var contactRepository = scope.ServiceProvider.GetRequiredService<IContactRepository>();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var whatsAppAccountRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
-        var whatsAppClient = scope.ServiceProvider.GetRequiredService<IWhatsAppClient>();
-        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-
         var pending = await outboxRepository.GetPendingAsync(BatchSize);
+        if (pending.Count == 0)
+            return false;
 
-        foreach (var outboxMessage in pending)
-        {
-            if (!await outboxRepository.TryClaimAsync(outboxMessage.Id, DateTime.UtcNow, cancellationToken))
-                continue;
-            await ProcessSingleAsync(
-                outboxMessage,
-                outboxRepository,
-                messageRepository,
-                conversationRepository,
-                contactRepository,
-                dbContext,
-                whatsAppAccountRepository,
-                whatsAppClient,
-                secretStore,
-                cancellationToken);
-        }
+        await Parallel.ForEachAsync(
+            pending,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = MaxConcurrency,
+                CancellationToken = cancellationToken
+            },
+            async (outboxMessage, ct) =>
+            {
+                using var itemScope = serviceProvider.CreateScope();
+                var itemOutboxRepository = itemScope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
+                if (!await itemOutboxRepository.TryClaimAsync(outboxMessage.Id, DateTime.UtcNow, ct))
+                    return;
+
+                await ProcessSingleAsync(outboxMessage, itemScope.ServiceProvider, ct);
+            });
+
+        return true;
     }
 
     private async Task ProcessSingleAsync(
         OutboxMessage outboxMessage,
-        IOutboxMessageRepository outboxRepository,
-        IMessageRepository messageRepository,
-        IConversationRepository conversationRepository,
-        IContactRepository contactRepository,
-        AppDbContext dbContext,
-        IWhatsAppAccountRepository whatsAppAccountRepository,
-        IWhatsAppClient whatsAppClient,
-        ISecretStore secretStore,
+        IServiceProvider scopedServices,
         CancellationToken cancellationToken)
     {
+        var outboxRepository = scopedServices.GetRequiredService<IOutboxMessageRepository>();
+        var messageRepository = scopedServices.GetRequiredService<IMessageRepository>();
+        var conversationRepository = scopedServices.GetRequiredService<IConversationRepository>();
+        var contactRepository = scopedServices.GetRequiredService<IContactRepository>();
+        var dbContext = scopedServices.GetRequiredService<AppDbContext>();
+        var whatsAppAccountRepository = scopedServices.GetRequiredService<IWhatsAppAccountRepository>();
+        var whatsAppClient = scopedServices.GetRequiredService<IWhatsAppClient>();
+        var secretStore = scopedServices.GetRequiredService<ISecretStore>();
+
         try
         {
             outboxMessage.MarkProcessing();
@@ -199,12 +201,64 @@ public sealed class OutboxProcessingWorker(
                 }
             }
 
-            var result = await whatsAppClient.SendTextMessageAsync(
-                outboundPhoneNumberId,
-                token,
-                contact.PhoneNumber,
-                message.Content ?? string.Empty,
-                cancellationToken);
+            SendMessageResult result;
+            if (message.Type == MessageType.Template)
+            {
+                if (isQrSession || account?.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+                    string.IsNullOrWhiteSpace(message.TemplateName) ||
+                    string.IsNullOrWhiteSpace(message.TemplateLanguage))
+                {
+                    message.MarkFailed("Templates are available only for the official WhatsApp API");
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    outboxMessage.MarkDead("Invalid template channel or configuration");
+                    await outboxRepository.UpdateAsync(outboxMessage);
+                    return;
+                }
+
+                List<string> parameters;
+                try
+                {
+                    parameters = string.IsNullOrWhiteSpace(message.TemplateParametersJson)
+                        ? []
+                        : JsonSerializer.Deserialize<List<string>>(message.TemplateParametersJson) ?? [];
+                }
+                catch (JsonException)
+                {
+                    message.MarkFailed("Invalid template parameters");
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    outboxMessage.MarkDead("Invalid template parameters");
+                    await outboxRepository.UpdateAsync(outboxMessage);
+                    return;
+                }
+
+                if (parameters.Count > 10 || parameters.Exists(parameter =>
+                    parameter is null || parameter.Length > 1024))
+                {
+                    message.MarkFailed("Invalid template parameters");
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    outboxMessage.MarkDead("Invalid template parameters");
+                    await outboxRepository.UpdateAsync(outboxMessage);
+                    return;
+                }
+
+                result = await whatsAppClient.SendTemplateMessageAsync(
+                    outboundPhoneNumberId,
+                    token,
+                    contact.PhoneNumber,
+                    message.TemplateName,
+                    message.TemplateLanguage,
+                    parameters,
+                    cancellationToken);
+            }
+            else
+            {
+                result = await whatsAppClient.SendTextMessageAsync(
+                    outboundPhoneNumberId,
+                    token,
+                    contact.PhoneNumber,
+                    message.Content ?? string.Empty,
+                    cancellationToken);
+            }
 
             if (result.IsSuccess)
             {

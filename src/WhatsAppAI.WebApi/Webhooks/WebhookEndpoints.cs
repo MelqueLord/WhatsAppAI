@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
@@ -30,11 +31,13 @@ public static class WebhookEndpoints
         group.MapPost("/", ReceiveEventAsync)
             .WithName("ReceiveWebhookEvent")
             .AllowAnonymous()
+            .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
         app.MapPost("/api/webhooks/whatsapp-web", ReceiveWhatsAppWebEventAsync)
             .WithTags("Webhooks - WhatsApp Web")
             .AllowAnonymous()
+            .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
         app.MapGet("/api/webhooks/whatsapp-web/session/{sessionId}", GetWhatsAppWebSessionAsync)
@@ -44,11 +47,13 @@ public static class WebhookEndpoints
         app.MapPut("/api/webhooks/whatsapp-web/session/{sessionId}", SaveWhatsAppWebSessionAsync)
             .WithTags("Webhooks - WhatsApp Web")
             .AllowAnonymous()
+            .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
         app.MapDelete("/api/webhooks/whatsapp-web/session/{sessionId}", DeleteWhatsAppWebSessionAsync)
             .WithTags("Webhooks - WhatsApp Web")
             .AllowAnonymous()
+            .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
         return app;

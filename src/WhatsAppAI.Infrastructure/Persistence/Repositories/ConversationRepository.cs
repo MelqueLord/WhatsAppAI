@@ -8,11 +8,10 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
 {
     public async Task<Conversation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var conversations = await context.Set<Conversation>()
+        return await context.Set<Conversation>()
             .IgnoreQueryFilters()
             .Include(c => c.Contact)
-            .ToListAsync(cancellationToken);
-        return conversations.Find(conversation => conversation.Id == id);
+            .FirstOrDefaultAsync(conversation => conversation.Id == id, cancellationToken);
     }
 
     public async Task<Conversation?> GetByContactAndPhoneAsync(
@@ -21,14 +20,14 @@ public sealed class ConversationRepository(AppDbContext context) : IConversation
         string phoneNumberId,
         CancellationToken cancellationToken = default)
     {
-        var conversations = await context.Set<Conversation>()
+        return await context.Set<Conversation>()
             .IgnoreQueryFilters()
             .Include(c => c.Contact)
-            .ToListAsync(cancellationToken);
-        return conversations.Find(conversation =>
-            conversation.TenantId == tenantId &&
-            conversation.ContactId == contactId &&
-            string.Equals(conversation.PhoneNumberId, phoneNumberId, StringComparison.Ordinal));
+            .FirstOrDefaultAsync(conversation =>
+                conversation.TenantId == tenantId &&
+                conversation.ContactId == contactId &&
+                conversation.PhoneNumberId == phoneNumberId,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Conversation>> GetByTenantAsync(

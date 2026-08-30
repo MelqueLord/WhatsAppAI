@@ -29,6 +29,8 @@ Copie `.env.example` para um `.env` local ignorado, substitua a senha de exemplo
 docker compose up -d postgres
 docker compose ps postgres
 dotnet user-secrets --project src/WhatsAppAI.WebApi set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=<senha-local>"
+dotnet user-secrets --project src/WhatsAppAI.WebApi set "BootstrapAdmin:Email" "admin@seu-dominio.com"
+dotnet user-secrets --project src/WhatsAppAI.WebApi set "BootstrapAdmin:Password" "<senha-forte-com-12-ou-mais-caracteres>"
 dotnet restore
 dotnet run --project src/WhatsAppAI.WebApi
 ```

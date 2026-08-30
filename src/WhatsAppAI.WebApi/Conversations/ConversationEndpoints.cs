@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Identity;
@@ -207,7 +208,30 @@ public static class ConversationEndpoints
                 1);
         var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
             conversationAccount?.ConnectionType == WhatsAppConnectionType.QrCode;
-        if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
+        var templateRequested = request.TemplateName is not null ||
+            request.TemplateLanguage is not null ||
+            request.TemplateParameters is not null;
+        if (templateRequested && isQrConversation)
+            return Results.BadRequest(new { error = "Templates are available only for the official WhatsApp API." });
+
+        if (templateRequested && string.IsNullOrWhiteSpace(request.TemplateName))
+            return Results.BadRequest(new { error = "Template name is required." });
+
+        if (templateRequested && string.IsNullOrWhiteSpace(request.TemplateLanguage))
+            return Results.BadRequest(new { error = "Template language is required." });
+
+        if (templateRequested && request.TemplateName!.Trim().Length > 512)
+            return Results.BadRequest(new { error = "Template name is too long." });
+
+        if (templateRequested && request.TemplateLanguage!.Trim().Length > 20)
+            return Results.BadRequest(new { error = "Template language is too long." });
+
+        var templateParameters = request.TemplateParameters ?? [];
+        if (templateRequested && (templateParameters.Count > 10 ||
+            templateParameters.Any(parameter => parameter is null || parameter.Length > 1024)))
+            return Results.BadRequest(new { error = "A template may contain up to 10 parameters of 1024 characters." });
+
+        if (!templateRequested && !isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
 
         var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString();
@@ -216,13 +240,22 @@ public static class ConversationEndpoints
         if (existing is not null)
             return Results.Ok(new { id = existing.Id, status = existing.Status.ToString() });
 
-        var message = Message.CreateOutbound(
-            currentTenant.TenantId.Value,
-            conversationId,
-            conversation.ContactId,
-            MessageType.Text,
-            request.Content,
-            idempotencyKey);
+        var message = templateRequested
+            ? Message.CreateOutboundTemplate(
+                currentTenant.TenantId.Value,
+                conversationId,
+                conversation.ContactId,
+                request.TemplateName!.Trim(),
+                request.TemplateLanguage!.Trim(),
+                JsonSerializer.Serialize(templateParameters),
+                idempotencyKey)
+            : Message.CreateOutbound(
+                currentTenant.TenantId.Value,
+                conversationId,
+                conversation.ContactId,
+                MessageType.Text,
+                request.Content,
+                idempotencyKey);
 
         await messageRepository.AddAsync(message);
 
@@ -320,4 +353,7 @@ public sealed record SendMessageRequest
 {
     public string Content { get; init; } = string.Empty;
     public string? IdempotencyKey { get; init; }
+    public string? TemplateName { get; init; }
+    public string? TemplateLanguage { get; init; }
+    public IReadOnlyList<string>? TemplateParameters { get; init; }
 }

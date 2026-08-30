@@ -24,6 +24,7 @@
 
 - [ ] Copy `deploy/.env.production.example` to `.env`
 - [ ] Generate encryption key: `openssl rand -base64 32`
+- [ ] Set `BootstrapAdmin__Email` and a unique `BootstrapAdmin__Password` (at least 12 characters with upper/lowercase, number and symbol); do not commit either value
 - [ ] Set PostgreSQL password (strong, unique)
 - [ ] Set Meta Verify Token and App Secret
 - [ ] Set DOMAIN for Nginx template rendering

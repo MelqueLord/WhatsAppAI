@@ -33,7 +33,7 @@ public sealed class AiResponseTopUpTests(TestWebApplicationFactory factory)
         (await client.PostAsJsonAsync("/api/auth/login", new
         {
             Email = "admin@test.com",
-            Password = "Admin@123"
+            Password = "Admin@12345!"
         })).EnsureSuccessStatusCode();
 
         const string idempotencyKey = "topup-regression-500";

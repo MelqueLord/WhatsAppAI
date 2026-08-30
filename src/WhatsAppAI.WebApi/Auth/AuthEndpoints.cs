@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
@@ -20,6 +21,7 @@ public static class AuthEndpoints
 
         group.MapPost("/login", LoginAsync)
             .WithName("Login")
+            .RequireRateLimiting("auth")
             .AllowAnonymous()
             ;
 

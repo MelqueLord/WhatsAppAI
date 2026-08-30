@@ -50,6 +50,32 @@ public sealed class AiOrchestrationWorkerTests
         Assert.Equal("Vou encaminhar voce para um atendente.", message);
     }
 
+    [Fact]
+    public void ResolveQueueTransferMessage_UsesTenantConfiguration()
+    {
+        var botConfig = BotConfiguration.Create(Guid.NewGuid(), BotMode.SimpleAutoReply);
+        botConfig.UpdateMessages(null, null, null, null, null, "Transferência configurada", null);
+
+        Assert.Equal("Transferência configurada", AiOrchestrationWorker.ResolveQueueTransferMessage(botConfig));
+    }
+
+    [Fact]
+    public void SelectBotRoutingQueue_UsesKeywordQueueAndPreservesExistingAssignment()
+    {
+        var tenantId = Guid.NewGuid();
+        var matchingQueue = ServiceLine.Create(tenantId, "Financeiro");
+        matchingQueue.SetKeywords("boleto, cobrança");
+        var otherQueue = ServiceLine.Create(tenantId, "Vendas");
+        otherQueue.SetKeywords("preço");
+
+        Assert.Equal(matchingQueue.Id, AiOrchestrationWorker
+            .SelectBotRoutingQueue(null, [matchingQueue, otherQueue], "Preciso da segunda via do boleto")?.Id);
+        Assert.Equal(matchingQueue.Id, AiOrchestrationWorker
+            .SelectBotRoutingQueue(matchingQueue.Id, [matchingQueue, otherQueue], "Quero saber sobre cobrança")?.Id);
+        Assert.Null(AiOrchestrationWorker
+            .SelectBotRoutingQueue(otherQueue.Id, [matchingQueue, otherQueue], "Preciso da segunda via do boleto"));
+    }
+
     [Theory]
     [InlineData("low_confidence")]
     [InlineData("customer_request")]
@@ -138,6 +164,39 @@ public sealed class AiOrchestrationWorkerTests
         Assert.Single(await db.HandoffEvents.IgnoreQueryFilters().ToListAsync());
         Assert.Single(await db.Messages.IgnoreQueryFilters().Where(message => message.Direction == MessageDirection.Outbound).ToListAsync());
         Assert.Single(await db.OutboxMessages.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
+    public async Task PersistAutomaticHandoffAsync_AssignsQueueAndRecordsTransfer()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var tenantId = Guid.NewGuid();
+        var queueId = Guid.NewGuid();
+        var currentTenant = new TestCurrentTenant(tenantId);
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        await using var db = new AppDbContext(options, currentTenant);
+        await db.Database.EnsureCreatedAsync();
+
+        var contact = Contact.Create(tenantId, "+5511999999999");
+        var conversation = Conversation.Create(tenantId, contact.Id, "manual");
+        var inbound = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "inbound-queue", MessageType.Text, "financeiro");
+        db.Contacts.Add(contact);
+        db.Conversations.Add(conversation);
+        db.Messages.Add(inbound);
+        await db.SaveChangesAsync();
+
+        var registered = await AiOrchestrationWorker.PersistAutomaticHandoffAsync(
+            tenantId, inbound, conversation, "queue_selection", "Fila financeira", "bot-queue-transfer", db,
+            new MessageRepository(db), new ConversationRepository(db), new OutboxMessageRepository(db),
+            new HandoffEventRepository(db), CancellationToken.None, queueId);
+
+        Assert.True(registered);
+        Assert.Equal(queueId, conversation.QueueId);
+        Assert.Equal(ConversationMode.Human, conversation.Mode);
+        Assert.Equal("Fila financeira", (await db.Messages.IgnoreQueryFilters()
+            .SingleAsync(message => message.Direction == MessageDirection.Outbound)).Content);
+        Assert.Single(await db.HandoffEvents.IgnoreQueryFilters().ToListAsync());
     }
 
     private sealed class FakeConversationRepository : IConversationRepository

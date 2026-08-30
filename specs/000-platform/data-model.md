@@ -146,7 +146,7 @@ Gate de promoção de modelo IA. Status: `Pending|Approved|Rejected`. Aprovaçã
 
 `id`, `tenant_id` anulável para segredos globais, `kind`, `encrypted_value`, `key_ref`, `status`, `rotated_at`, timestamps.
 
-Segredos criptografados com AES-256 via `IEncryptionService`. `kind` identifica o tipo (MetaAppSecret, MetaVerifyToken, WhatsAppAccessToken, OpenAIKey). Global quando `tenant_id` é nulo; tenant-owned caso contrário. Nunca armazena valor em claro (**FR-004**, **BR-008**).
+Segredos criptografados com AES-256-CBC e autenticados com Encrypt-then-MAC (HMAC-SHA256) via `IEncryptionService`; ciphertext adulterado é rejeitado antes da descriptografia. `kind` identifica o tipo (MetaAppSecret, MetaVerifyToken, WhatsAppAccessToken, OpenAIKey). Global quando `tenant_id` é nulo; tenant-owned caso contrário. Nunca armazena valor em claro (**FR-004**, **BR-008**).
 
 ## Relacionamentos principais
 
@@ -185,7 +185,7 @@ erDiagram
 | **FR-009** | Eventos de domínio/outbox carregam `tenant_id`; isolamento SignalR é controle de aplicação. |
 | **US-003, FR-010, NFR-009** | `Message` e `OutboxMessage` nascem na mesma transação e usam chaves idempotentes. |
 | **FR-011, BR-003, BR-004, BR-010, SC-004** | `Conversation.version` e `HandoffEvent` protegem corridas e registram mudança de modo. |
-| **FR-012, BR-005, BR-006** | `Conversation.service_window_expires_at`, modo e Outbox sustentam bloqueio de texto/template. |
+| **FR-012, FR-059, BR-005, BR-006, BR-029** | `Conversation.service_window_expires_at`, `Message.template_*`, modo e Outbox sustentam bloqueio de texto e envio de template transacional somente pela API Oficial. |
 | **FR-013, FR-014, FR-015, US-004** | `KnowledgeItem`, `Conversation`, `Message` e `AiInteraction` registram apenas decisão/metadados necessários. |
 | **FR-016, NFR-003, NFR-008** | `AiInteraction` guarda modelo, tokens, latência, decisão e códigos sanitizados; nunca prompt completo. |
 | **FR-017, US-005** | `KnowledgeItem.version/is_active/deactivated_*` implementa edição concorrente e desativação auditável. |

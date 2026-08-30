@@ -123,7 +123,7 @@ public sealed class TenantLineDistributionTests(TestWebApplicationFactory factor
         (await client.PostAsJsonAsync("/api/auth/login", new
         {
             Email = "admin@test.com",
-            Password = "Admin@123"
+            Password = "Admin@12345!"
         })).EnsureSuccessStatusCode();
         return client;
     }

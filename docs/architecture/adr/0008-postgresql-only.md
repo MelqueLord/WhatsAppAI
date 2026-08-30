@@ -4,7 +4,7 @@
 
 ## Contexto
 
-O suporte simultâneo a MySQL, PostgreSQL e SQLite criou divergência entre código, migrations, CI e produção. O ambiente gerenciado atual usa Supabase e a produção própria será executada na Hostinger com Docker.
+O suporte simultâneo a múltiplos provedores criou divergência entre código, migrations, CI e produção. O ambiente gerenciado atual usa Supabase e a produção própria será executada na Hostinger com Docker.
 
 ## Decisão
 
@@ -12,9 +12,9 @@ PostgreSQL via Npgsql é o único banco da aplicação. Supabase fornece Postgre
 
 ## Consequências
 
-- MySQL e seu provider são removidos do runtime, CI e deploy.
+- PostgreSQL é o único provider usado no runtime, CI e deploy.
 - Testes de integração usam PostgreSQL real.
 - Banco e porta PostgreSQL não são expostos publicamente em produção.
 - Backups usam `pg_dump` e restaurações usam `pg_restore`.
-- ADR-0006 permanece válido para hosting e segredos, mas sua decisão de banco é substituída.
-- ADR-0007 é substituído porque PostgreSQL deixa de ser opcional.
+- ADR-0006 fica superseded para decisões de banco e hosting; segredos continuam externos.
+- ADR-0007 fica superseded porque PostgreSQL é obrigatório.

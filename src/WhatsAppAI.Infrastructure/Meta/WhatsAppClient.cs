@@ -119,6 +119,73 @@ internal sealed class WhatsAppClient(
         }
     }
 
+    public async Task<SendMessageResult> SendTemplateMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string templateName,
+        string templateLanguage,
+        IReadOnlyList<string> parameters,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var payload = new SendTemplateMessageRequest
+            {
+                MessagingProduct = "whatsapp",
+                To = recipientPhone,
+                Type = "template",
+                Template = new TemplateBody
+                {
+                    Name = templateName,
+                    Language = new TemplateLanguage { Code = templateLanguage },
+                    Components = parameters.Count == 0
+                        ? null
+                        :
+                        [new TemplateComponent
+                        {
+                            Type = "body",
+                            Parameters = parameters.Select(value => new TemplateParameter
+                            {
+                                Type = "text",
+                                Text = value
+                            }).ToList()
+                        }]
+                }
+            };
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{BaseUrl}/{phoneNumberId}/messages")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadFromJsonAsync<SendMessageResponse>(
+                    cancellationToken: cancellationToken);
+                return new SendMessageResult
+                {
+                    IsSuccess = true,
+                    MessageId = content?.Messages?.FirstOrDefault()?.Id
+                };
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogWarning("WhatsApp template API returned {StatusCode}: {Error}",
+                response.StatusCode, SanitizeError(errorContent));
+            return new SendMessageResult { IsSuccess = false, ErrorMessage = "Failed to send template message." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send WhatsApp template message");
+            return new SendMessageResult { IsSuccess = false, ErrorMessage = "Failed to send template message." };
+        }
+    }
+
     public Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
         int lineNumber = 1,
@@ -200,6 +267,58 @@ internal sealed class SendMessageRequest
 
     [JsonPropertyName("text")]
     public TextBody Text { get; init; } = new();
+}
+
+internal sealed class SendTemplateMessageRequest
+{
+    [JsonPropertyName("messaging_product")]
+    public string MessagingProduct { get; init; } = "whatsapp";
+
+    [JsonPropertyName("to")]
+    public string To { get; init; } = string.Empty;
+
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "template";
+
+    [JsonPropertyName("template")]
+    public TemplateBody Template { get; init; } = new();
+}
+
+internal sealed class TemplateBody
+{
+    [JsonPropertyName("name")]
+    public string Name { get; init; } = string.Empty;
+
+    [JsonPropertyName("language")]
+    public TemplateLanguage Language { get; init; } = new();
+
+    [JsonPropertyName("components")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TemplateComponent>? Components { get; init; }
+}
+
+internal sealed class TemplateLanguage
+{
+    [JsonPropertyName("code")]
+    public string Code { get; init; } = string.Empty;
+}
+
+internal sealed class TemplateComponent
+{
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = string.Empty;
+
+    [JsonPropertyName("parameters")]
+    public List<TemplateParameter> Parameters { get; init; } = [];
+}
+
+internal sealed class TemplateParameter
+{
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "text";
+
+    [JsonPropertyName("text")]
+    public string Text { get; init; } = string.Empty;
 }
 
 internal sealed class TextBody

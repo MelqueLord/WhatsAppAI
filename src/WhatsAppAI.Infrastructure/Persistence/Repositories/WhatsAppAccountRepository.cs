@@ -24,14 +24,14 @@ public sealed class WhatsAppAccountRepository(AppDbContext context) : IWhatsAppA
         int lineNumber,
         CancellationToken cancellationToken = default)
     {
-        var accounts = await context.Set<WhatsAppAccount>()
+        return await context.Set<WhatsAppAccount>()
             .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
-        return accounts.Find(account =>
-            account.TenantId == tenantId &&
-            account.ConnectionType == connectionType &&
-            account.LineNumber == lineNumber &&
-            account.IsActive);
+            .FirstOrDefaultAsync(account =>
+                account.TenantId == tenantId &&
+                account.ConnectionType == connectionType &&
+                account.LineNumber == lineNumber &&
+                account.IsActive,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<WhatsAppAccount>> GetAllByTenantAsync(

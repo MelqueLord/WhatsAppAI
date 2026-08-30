@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.22.0
+**Versão:** 0.23.0
 **Data:** 2026-08-29
 
 ## 1. Problema
@@ -27,6 +27,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - Webhook de mensagens e status com processamento idempotente.
 - Inbox em tempo real, histórico, texto e mídia básica.
 - Resposta humana e resposta automática textual por IA.
+- Templates transacionais aprovados pela Meta para conversas na API Oficial fora da janela de 24 horas.
 - Modos `Automatic`, `Human` e `Paused` por conversa.
 - Base de conhecimento textual simples.
 - Indicadores estimados de consumo; faturas oficiais continuam nos provedores.
@@ -34,7 +35,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 
 ### Fora do escopo
 
-- Campanhas, listas, disparos, templates de marketing e mensagens proativas.
+- Campanhas, listas, templates de marketing e mensagens proativas.
 - CRM, funil comercial, agenda, catálogo e integrações externas. O PlatformAdmin registra pagamentos manualmente; não há cobrança online integrada.
 - Construtor visual de fluxos, n8n no caminho crítico e múltiplos canais.
 - IA para áudio/imagem, treinamento de modelos e RAG vetorial no MVP.
@@ -200,7 +201,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-009:** publicar atualizações de inbox via SignalR somente ao grupo do tenant.
 - **FR-010:** enviar mensagens humanas por fila durável e registrar status.
 - **FR-011:** controlar modo e responsável da conversa com concorrência otimista.
-- **FR-012:** impedir texto livre fora da janela de atendimento no MVP.
+- **FR-012:** impedir texto livre fora da janela de atendimento no MVP e permitir somente templates aprovados pela Meta quando a conversa usa a API Oficial; conexões QR Code não aceitam templates.
 - **FR-013:** montar contexto de IA com política, conhecimento ativo e histórico limitado.
 - **FR-014:** solicitar resposta estruturada contendo ação, texto, confiança e razão de handoff.
 - **FR-015:** validar conteúdo, janela e modo novamente antes de enfileirar resposta de IA.
@@ -247,6 +248,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-056:** usar a base de conhecimento ativa do tenant como fonte prioritária para fatos da empresa; itens sem correspondência com a solicitação não podem ser injetados como contexto e, sem informação relevante, a IA deve evitar invenção e encaminhar quando a pergunta exigir um fato não documentado.
 - **FR-057:** coletar na tela de IA um perfil estruturado do negócio (descrição, público-alvo, produtos/serviços, tom, horário e localização), persistindo-o junto às diretrizes existentes para personalizar a abordagem sem substituir a base de conhecimento para fatos comerciais.
 - **FR-058:** permitir ao TenantOwner configurar expediente do BOT por dia da semana e fuso horário; quando habilitado, mensagens recebidas fora de um período aberto não podem seguir o fluxo automático e devem usar a mensagem configurada de fora do horário.
+- **FR-059:** permitir ao operador enviar template transacional aprovado pela Meta com idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas; o backend deve rejeitar templates em conexões QR Code e persistir a intenção na Outbox.
 
 ## 6. Regras de negócio
 
@@ -255,7 +257,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-003:** uma conversa em `Human` ou `Paused` nunca gera envio automático.
 - **BR-004:** a mudança para `Human` vence uma resposta de IA concorrente ainda não enviada.
 - **BR-005:** somente mensagem recebida do cliente abre/renova a janela de 24 horas.
-- **BR-006:** marketing, promoção ou template proativo não é enviado pelo MVP.
+- **BR-006:** marketing, promoção ou template proativo não é enviado pelo MVP; template transacional aprovado somente é permitido pela API Oficial.
 - **BR-007:** preço exibido é estimativo e versionado; unidades originais são a fonte auditável.
 - **BR-008:** credenciais pertencem ao tenant; o PlatformAdmin pode substituí-las, nunca recuperá-las em claro.
 - **BR-009:** após limite controlado de tentativas, o job vai para estado morto e gera alerta.
@@ -278,6 +280,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura ou handoff, nunca uma afirmação específica inventada.
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 - **BR-028:** agenda desabilitada mantém compatibilidade 24 horas; agenda habilitada exige sete dias válidos, horários de abertura/fechamento coerentes e fuso permitido. Sem mensagem de fora do horário, o BOT finaliza a entrada sem criar resposta automática.
+- **BR-029:** template transacional exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres, e só pode ser despachado por uma conta `OfficialApi`; QR Code deve finalizar a Outbox sem chamada externa.
 
 ## 7. Requisitos não funcionais
 

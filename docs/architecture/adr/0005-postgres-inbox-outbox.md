@@ -2,7 +2,7 @@
 
 **Status:** Aceito — 2026-08-03
 
-**Nota:** o padrão Inbox/Outbox permanece vigente. O banco concreto mudou de PostgreSQL para MySQL 8.4 LTS conforme ADR-0006.
+O padrão Inbox/Outbox permanece vigente sobre PostgreSQL conforme ADR-0008.
 
 ## Decisão
 

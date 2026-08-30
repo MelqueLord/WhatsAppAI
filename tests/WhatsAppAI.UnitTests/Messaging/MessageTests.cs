@@ -28,6 +28,33 @@ public class MessageTests
     }
 
     [Fact]
+    public void CreateOutboundTemplate_SetsTemplateMetadata()
+    {
+        var message = Message.CreateOutboundTemplate(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "welcome_customer", "pt_BR", "[\"Maria\"]", "idem-template");
+
+        Assert.Equal(MessageType.Template, message.Type);
+        Assert.Equal("welcome_customer", message.TemplateName);
+        Assert.Equal("pt_BR", message.TemplateLanguage);
+        Assert.Equal("[\"Maria\"]", message.TemplateParametersJson);
+    }
+
+    [Fact]
+    public void RedactPersonalData_ClearsTemplateMetadata()
+    {
+        var message = Message.CreateOutboundTemplate(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "welcome_customer", "pt_BR", "[\"Maria\"]", "idem-template");
+
+        message.RedactPersonalData();
+
+        Assert.Null(message.TemplateName);
+        Assert.Null(message.TemplateLanguage);
+        Assert.Null(message.TemplateParametersJson);
+    }
+
+    [Fact]
     public void CreateInbound_SetsContent()
     {
         var message = Message.CreateInbound(

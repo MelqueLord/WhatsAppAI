@@ -14,6 +14,9 @@ public sealed class Message
     public string? MediaId { get; private set; }
     public string? MediaUrl { get; private set; }
     public string? Caption { get; private set; }
+    public string? TemplateName { get; private set; }
+    public string? TemplateLanguage { get; private set; }
+    public string? TemplateParametersJson { get; private set; }
     public string? QuotedMessageId { get; private set; }
     public string? IdempotencyKey { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -85,6 +88,38 @@ public sealed class Message
         };
     }
 
+    public static Message CreateOutboundTemplate(
+        Guid tenantId,
+        Guid conversationId,
+        Guid contactId,
+        string templateName,
+        string templateLanguage,
+        string? templateParametersJson,
+        string? idempotencyKey)
+    {
+        if (string.IsNullOrWhiteSpace(templateName))
+            throw new ArgumentException("Template name is required.", nameof(templateName));
+        if (string.IsNullOrWhiteSpace(templateLanguage))
+            throw new ArgumentException("Template language is required.", nameof(templateLanguage));
+
+        return new Message
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ConversationId = conversationId,
+            ContactId = contactId,
+            Direction = MessageDirection.Outbound,
+            Status = MessageStatus.Queued,
+            Type = MessageType.Template,
+            Content = $"Template: {templateName}",
+            TemplateName = templateName.Trim(),
+            TemplateLanguage = templateLanguage.Trim(),
+            TemplateParametersJson = templateParametersJson,
+            IdempotencyKey = idempotencyKey,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
     public void MarkSent(string externalId)
     {
         ExternalId = externalId;
@@ -139,6 +174,9 @@ public sealed class Message
         MediaId = null;
         MediaUrl = null;
         Caption = null;
+        TemplateName = null;
+        TemplateLanguage = null;
+        TemplateParametersJson = null;
         QuotedMessageId = null;
         IdempotencyKey = null;
         FailureReason = null;
@@ -172,5 +210,6 @@ public enum MessageType
     Location = 6,
     Contacts = 7,
     Interactive = 8,
-    Reaction = 9
+    Reaction = 9,
+    Template = 10
 }

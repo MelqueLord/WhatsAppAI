@@ -55,7 +55,7 @@ public sealed class AiUsageVisibilityTests(TestWebApplicationFactory factory)
         (await adminClient.PostAsJsonAsync("/api/auth/login", new
         {
             Email = "admin@test.com",
-            Password = "Admin@123"
+            Password = "Admin@12345!"
         })).EnsureSuccessStatusCode();
         var adminResponse = await adminClient.GetAsync($"/api/admin/tenants/{tenantId}/ai-usage");
 

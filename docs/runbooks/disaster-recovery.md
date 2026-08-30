@@ -7,7 +7,7 @@
 
 - **Database:** Automated daily PostgreSQL backups via `deploy/backup.sh`
 - **Retention:** 7 days (configurable via RETENTION_DAYS)
-- **Secrets:** AES-256 encrypted in database; encryption key in environment variable
+- **Secrets:** AES-256-CBC encrypted and HMAC-authenticated in database; encryption key in environment variable
 - **Backup location:** `/var/backups/whatsappai/`
 
 ## Recovery Procedures

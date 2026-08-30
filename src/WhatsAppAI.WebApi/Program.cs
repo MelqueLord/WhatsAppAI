@@ -132,6 +132,17 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode =
         StatusCodes.Status429TooManyRequests;
 
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 10
+            }));
+
     options.AddFixedWindowLimiter(
         "fixed",
         limiterOptions =>
@@ -218,64 +229,25 @@ using (var scope = app.Services.CreateScope())
         await secretStore.SetAsync("meta:app_secret", metaAppSecret);
     }
 
-    // Optional bootstrap account.
-    // Credentials must come from configuration/user-secrets.
-    var bootstrapAdminEmail =
-        builder.Configuration[
-            "BootstrapAdmin:Email"];
-
-    var bootstrapAdminPassword =
-        builder.Configuration[
-            "BootstrapAdmin:Password"];
-
-    if (
-        !string.IsNullOrWhiteSpace(
-            bootstrapAdminEmail)
-        &&
-        !string.IsNullOrWhiteSpace(
-            bootstrapAdminPassword))
+    // Bootstrap credentials must come from environment variables or user-secrets.
+    // Production must never start without a known PlatformAdmin. A database-only
+    // initialization run does not start the application and needs no account.
+    if (!builder.Configuration.GetValue<bool>("DatabaseInitialization:Only"))
     {
-        try
+        var bootstrapAdminEmail = builder.Configuration["BootstrapAdmin:Email"];
+        var bootstrapAdminPassword = builder.Configuration["BootstrapAdmin:Password"];
+        if (string.IsNullOrWhiteSpace(bootstrapAdminEmail) ||
+            string.IsNullOrWhiteSpace(bootstrapAdminPassword))
         {
-            var platformAdminExists =
-                await context.Users
-                    .IgnoreQueryFilters()
-                    .AnyAsync(
-                        u => u.IsPlatformAdmin);
-
-            if (!platformAdminExists)
-            {
-                var adminUser =
-                    WhatsAppAI.Domain.Identity.User.Create(
-                        bootstrapAdminEmail,
-                        "Platform Admin");
-
-                adminUser.Activate(
-                    BCrypt.Net.BCrypt.HashPassword(
-                        bootstrapAdminPassword));
-
-                adminUser.GrantPlatformAdmin();
-
-                context.Users.Add(adminUser);
-
-                await context.SaveChangesAsync();
-
-                Log.Information(
-                    "Bootstrap Platform Admin created successfully for {Email}.",
-                    bootstrapAdminEmail);
-            }
-            else
-            {
-                Log.Information(
-                    "A Platform Admin already exists. Bootstrap creation skipped.");
-            }
+            throw new InvalidOperationException(
+                "BootstrapAdmin:Email and BootstrapAdmin:Password are required to initialize the PlatformAdmin.");
         }
-        catch (Exception ex)
-        {
-            Log.Error(
-                ex,
-                "Failed to create Bootstrap Platform Admin. Application startup will continue.");
-        }
+
+        await PlatformAdminBootstrap.EnsureAsync(
+            context,
+            builder.Configuration,
+            BCrypt.Net.BCrypt.HashPassword);
+        Log.Information("Platform Admin bootstrap verification completed.");
     }
 }
 
@@ -309,6 +281,35 @@ app.UseRateLimiter();
 
 app.UseObservability();
 
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append(
+        "X-Content-Type-Options",
+        "nosniff");
+
+    context.Response.Headers.Append(
+        "X-Frame-Options",
+        "DENY");
+
+    context.Response.Headers.Append(
+        "X-XSS-Protection",
+        "1; mode=block");
+
+    context.Response.Headers.Append(
+        "Referrer-Policy",
+        "strict-origin-when-cross-origin");
+
+    context.Response.Headers.Append(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()");
+
+    await next();
+});
+
+app.UseIdentityServices();
+
+// Cookie-authenticated API mutations require an antiforgery token after authentication.
 if (app.Environment.IsProduction())
 {
     app.Use(async (context, next) =>
@@ -359,47 +360,28 @@ if (app.Environment.IsProduction())
             &&
             requiresCsrf)
         {
-            var antiforgery =
-                context.RequestServices
-                    .GetRequiredService<
-                        IAntiforgery>();
+            try
+            {
+                var antiforgery =
+                    context.RequestServices
+                        .GetRequiredService<
+                            IAntiforgery>();
 
-            await antiforgery
-                .ValidateRequestAsync(
-                    context);
+                await antiforgery
+                    .ValidateRequestAsync(
+                        context);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                context.Response.StatusCode =
+                    StatusCodes.Status400BadRequest;
+                return;
+            }
         }
 
         await next();
     });
 }
-
-// Security headers
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.Append(
-        "X-Content-Type-Options",
-        "nosniff");
-
-    context.Response.Headers.Append(
-        "X-Frame-Options",
-        "DENY");
-
-    context.Response.Headers.Append(
-        "X-XSS-Protection",
-        "1; mode=block");
-
-    context.Response.Headers.Append(
-        "Referrer-Policy",
-        "strict-origin-when-cross-origin");
-
-    context.Response.Headers.Append(
-        "Permissions-Policy",
-        "camera=(), microphone=(), geolocation=()");
-
-    await next();
-});
-
-app.UseIdentityServices();
 
 app.MapGet(
     "/",

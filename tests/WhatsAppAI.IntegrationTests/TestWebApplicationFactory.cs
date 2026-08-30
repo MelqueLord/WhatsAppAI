@@ -34,7 +34,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
                 ["Meta:VerifyToken"] = "test-verify-token",
                 ["Meta:AppSecret"] = "test-app-secret",
                 ["BootstrapAdmin:Email"] = "admin@test.com",
-                ["BootstrapAdmin:Password"] = "Admin@123"
+                ["BootstrapAdmin:Password"] = "Admin@12345!"
             });
         });
 

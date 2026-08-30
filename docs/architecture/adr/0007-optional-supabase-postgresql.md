@@ -4,7 +4,7 @@
 
 ## Contexto
 
-Uma implantação gerenciada no Supabase foi solicitada, enquanto MySQL 8.4 permanece suportado.
+Uma implantação gerenciada no Supabase foi solicitada para os ambientes gerenciados.
 
 ## Decisão
 
@@ -12,7 +12,7 @@ Adicionar PostgreSQL via Npgsql como provedor explícito `SUPABASE`. A conexão 
 
 ## Consequências
 
-- MySQL e SQLite continuam disponíveis.
-- Configurações de tipos específicas de MySQL são neutralizadas no modelo PostgreSQL.
+- PostgreSQL é o único banco suportado.
+- Configurações específicas do provedor são mantidas no adaptador PostgreSQL.
 - Segredos nunca ficam em scripts ou `appsettings` versionados.
 - Alterações futuras de schema no Supabase exigem baseline/migrations PostgreSQL e teste de isolamento.

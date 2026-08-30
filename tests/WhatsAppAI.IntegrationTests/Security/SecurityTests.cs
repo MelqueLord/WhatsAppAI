@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -73,6 +74,38 @@ public class SecurityTests : IClassFixture<TestWebApplicationFactory>
         Assert.True(
             response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Found or HttpStatusCode.OK,
             $"Expected BadRequest, Unauthorized, Found or OK, got {response.StatusCode}");
+    }
+
+    [Fact]
+    public async Task AuthenticatedCookieMutation_WithoutCsrf_ReturnsBadRequest()
+    {
+        using var productionClient = _factory
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Production"))
+            .CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+        var login = await productionClient.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = "admin@test.com",
+            Password = "Admin@12345!"
+        });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        var sessionCookie = login.Headers.GetValues("Set-Cookie")
+            .Single(value => value.StartsWith("whatsappai.session.v2=", StringComparison.Ordinal))
+            .Split(';', 2)[0];
+        productionClient.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+
+        var response = await productionClient.PostAsJsonAsync("/api/admin/tenants", new
+        {
+            Name = "CSRF test tenant",
+            Slug = $"csrf-{Guid.NewGuid():N}",
+            OwnerEmail = $"csrf-{Guid.NewGuid():N}@test.com"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

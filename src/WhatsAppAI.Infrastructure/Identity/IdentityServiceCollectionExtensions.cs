@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -69,6 +70,22 @@ public static class IdentityServiceCollectionExtensions
 
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    var authenticationService = context.HttpContext.RequestServices
+                        .GetRequiredService<IAuthenticationService>();
+
+                    if (context.Principal is null ||
+                        !await authenticationService.ValidatePrincipalAsync(
+                            context.Principal,
+                            context.HttpContext.RequestAborted))
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(
+                            CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                };
             })
             .AddJwtBearer(options =>
             {
@@ -178,7 +195,7 @@ public static class IdentityServiceCollectionExtensions
 
                     return Results.Problem(
                         title: "Failed to generate CSRF token",
-                        detail: ex.Message,
+                        detail: "Unable to generate CSRF token.",
                         statusCode: StatusCodes.Status500InternalServerError);
                 }
             })

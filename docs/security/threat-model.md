@@ -24,7 +24,7 @@
 
 ### T2: Credential Exposure
 - **Risk:** Critical
-- **Mitigation:** `ISecretStore` with AES-256 encryption; tokens never returned to browser; `SanitizingEnricher` masks PII in logs.
+- **Mitigation:** `ISecretStore` with AES-256-CBC and Encrypt-then-MAC (HMAC-SHA256); tampered ciphertext is rejected before decryption, tokens are never returned to the browser, and `SanitizingEnricher` masks PII in logs.
 - **Verification:** Security tests, log scanning.
 
 ### T3: Webhook Spoofing

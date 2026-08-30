@@ -14,6 +14,9 @@ public interface IAuthenticationService
         Guid? supportTenantId = null, string? supportReason = null);
     Task SignOutAsync(HttpContext httpContext);
     Task<ClaimsPrincipal?> ValidateAsync(HttpContext httpContext);
+    Task<bool> ValidatePrincipalAsync(
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default);
 }
 
 internal sealed class AuthenticationService(
@@ -88,34 +91,46 @@ internal sealed class AuthenticationService(
         if (!authenticateResult.Succeeded || authenticateResult.Principal is null)
             return null;
 
-        var userId = authenticateResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        var securityStamp = authenticateResult.Principal.FindFirstValue("security_stamp");
+        return await ValidatePrincipalAsync(authenticateResult.Principal, httpContext.RequestAborted)
+            ? authenticateResult.Principal
+            : null;
+    }
 
-        if (userId is null || securityStamp is null)
-            return null;
+    public async Task<bool> ValidatePrincipalAsync(
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default)
+    {
+        var userIdValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var securityStamp = principal.FindFirstValue("security_stamp");
 
-        var user = await userRepository.GetByIdAsync(Guid.Parse(userId));
+        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(securityStamp))
+            return false;
+
+        var user = await userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null || !user.IsActive)
-            return null;
+            return false;
 
         if (user.SecurityStamp != securityStamp)
-            return null;
+            return false;
 
-        var isPlatformAdmin = authenticateResult.Principal.HasClaim("platform_admin", "true");
+        var isPlatformAdmin = principal.HasClaim("platform_admin", "true");
         if (isPlatformAdmin != user.IsPlatformAdmin)
-            return null;
+            return false;
 
         if (isPlatformAdmin)
-            return authenticateResult.Principal;
+            return true;
 
-        var membershipId = authenticateResult.Principal.FindFirstValue("membership_id");
-        if (membershipId is null)
-            return null;
+        var membershipIdValue = principal.FindFirstValue("membership_id");
+        var tenantIdValue = principal.FindFirstValue("tenant_id");
+        if (!Guid.TryParse(membershipIdValue, out var membershipId) ||
+            !Guid.TryParse(tenantIdValue, out var tenantId))
+            return false;
 
-        var membership = await membershipRepository.GetByIdAsync(Guid.Parse(membershipId));
-        if (membership is null || membership.Status != MembershipStatus.Active)
-            return null;
-
-        return authenticateResult.Principal;
+        var membership = await membershipRepository.GetByIdAsync(membershipId, cancellationToken);
+        return membership is not null &&
+            membership.Status == MembershipStatus.Active &&
+            membership.UserId == userId &&
+            membership.TenantId == tenantId;
     }
+
 }

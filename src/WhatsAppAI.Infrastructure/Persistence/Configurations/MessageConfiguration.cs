@@ -66,6 +66,18 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("caption")
             .HasMaxLength(4000);
 
+        builder.Property(m => m.TemplateName)
+            .HasColumnName("template_name")
+            .HasMaxLength(512);
+
+        builder.Property(m => m.TemplateLanguage)
+            .HasColumnName("template_language")
+            .HasMaxLength(20);
+
+        builder.Property(m => m.TemplateParametersJson)
+            .HasColumnName("template_parameters_json")
+            .HasMaxLength(12000);
+
         builder.Property(m => m.QuotedMessageId)
             .HasColumnName("quoted_message_id")
             .HasMaxLength(100);

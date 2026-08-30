@@ -57,7 +57,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 ## 4. Interfaces de borda
 
-- `IWhatsAppClient`: enviar mensagem, baixar metadados de mídia e verificar conexão.
+- `IWhatsAppClient`: enviar texto e templates transacionais, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud.
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
 - `ISecretStore`: gravar, recuperar para uso interno, rotacionar e remover segredo.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.

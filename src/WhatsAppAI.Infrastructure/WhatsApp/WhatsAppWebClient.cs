@@ -50,6 +50,20 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         return SendWhatsAppWebMessageAsync(parts[1], parts[2], recipientPhone, text, cancellationToken);
     }
 
+    public Task<SendMessageResult> SendTemplateMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string templateName,
+        string templateLanguage,
+        IReadOnlyList<string> parameters,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SendMessageResult
+        {
+            IsSuccess = false,
+            ErrorMessage = "Templates are available only for the official WhatsApp API."
+        });
+
     private async Task<SendMessageResult> SendWhatsAppWebMessageAsync(
         string tenantId,
         string lineNumber,

@@ -12,9 +12,9 @@ O .NET 10 é a linha LTS ativa e tem horizonte de suporte maior que versões STS
 
 React 19.2 é a linha estável atual. O produto precisa de uma SPA operacional, não de renderização pública orientada a SEO; Vite reduz configuração e evita adotar um framework full-stack desnecessário.
 
-## R-003 — MySQL 8.4 LTS
+## R-003 — PostgreSQL 17
 
-~~PostgreSQL cobre transações, JSONB, índices, auditoria e a carga inicial de Inbox/Outbox.~~ **Atualizado via ADR-0006 (2026-08-14):** MySQL 8.4 LTS na Hostinger VPS cobre transações, JSON, índices, auditoria e a carga inicial de Inbox/Outbox. MySql.EntityFrameworkCore substitui Npgsql. Redis e broker só serão avaliados quando métricas demonstrarem contenção, latência ou volume incompatível.
+PostgreSQL cobre transações, JSONB, índices, auditoria e a carga inicial de Inbox/Outbox. Supabase atende aos ambientes gerenciados e a imagem oficial PostgreSQL atende à produção própria. Redis e broker só serão avaliados quando métricas demonstrarem contenção, latência ou volume incompatível.
 
 ## R-004 — OpenAI Responses API e modelo configurável
 
@@ -40,7 +40,7 @@ BYOK separa consumo do SaaS e torna as faturas oficiais verificáveis. A platafo
 
 ## R-009 — Janela de serviço e marketing
 
-O MVP responde somente a mensagens iniciadas pelo consumidor e bloqueia texto livre após a janela de 24 horas. Templates proativos, campanhas e classificação comercial ficam fora do produto inicial, reduzindo risco de política e complexidade de cobrança.
+O MVP responde somente a mensagens iniciadas pelo consumidor e bloqueia texto livre após a janela de 24 horas. Templates transacionais aprovados pela Meta podem ser enviados pelo operador somente na API Oficial; templates proativos, campanhas e classificação comercial ficam fora do produto inicial.
 
 ## R-010 — Meta App compartilhado e contas dos tenants
 
@@ -53,15 +53,15 @@ A plataforma utiliza um único Meta App para linhas Cloud. Seu `app_secret` e ve
 - `docs/architecture/adr/0009-baileys-production-qr.md` — ponte Baileys para conexões QR em produção.
 - `docs/architecture/adr/0003-customer-owned-provider-billing.md` — contas e faturamento dos tenants.
 - `docs/architecture/adr/0004-no-n8n-core.md` — n8n fora do núcleo.
-- `docs/architecture/adr/0005-postgres-inbox-outbox.md` — filas duráveis (conceito; implementação usa MySQL conforme ADR-0006).
-- `docs/architecture/adr/0006-hosting-and-secrets.md` — Hostinger VPS, MySQL 8.4 LTS, segredos.
+- `docs/architecture/adr/0005-postgres-inbox-outbox.md` — filas duráveis em PostgreSQL.
+- `docs/architecture/adr/0008-postgresql-only.md` — PostgreSQL único, Supabase e Docker.
 
 ## Critérios para reavaliar arquitetura
 
 Abrir ADR, com métricas, antes de introduzir:
 
 - Redis: fan-out/estado em tempo real não atendido pela implantação atual.
-- Broker: backlog ou vazão não suportados com segurança pelo worker/MySQL.
+- Broker: backlog ou vazão não suportados com segurança pelo worker/PostgreSQL.
 - Microsserviço: necessidade independente de escala, segurança, equipe ou deploy.
 - RAG vetorial: conhecimento excede contexto controlado ou avaliação mostra ganho material.
 - n8n: integração periférica solicitada por múltiplos clientes e sem regra transacional central.
@@ -70,6 +70,6 @@ Abrir ADR, com métricas, antes de introduzir:
 
 - Política de suporte .NET: <https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core>
 - Versões do React: <https://react.dev/versions>
-- Política de versões MySQL: <https://www.mysql.com/support/>
+- Documentação PostgreSQL: <https://www.postgresql.org/docs/>
 - GitHub Spec Kit: <https://github.com/github/spec-kit>
 - Skills no Codex: <https://learn.chatgpt.com/docs/build-skills>

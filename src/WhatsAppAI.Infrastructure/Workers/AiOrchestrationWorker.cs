@@ -25,6 +25,8 @@ public sealed class AiOrchestrationWorker(
     IServiceProvider serviceProvider,
     ILogger<AiOrchestrationWorker> logger) : BackgroundService
 {
+    private const int BatchSize = 20;
+    private const int MaxConcurrency = 4;
     private const int MaxAiAttempts = 3;
     private static readonly TimeSpan AiClaimLease = TimeSpan.FromMinutes(5);
     private readonly ConcurrentDictionary<string, CircuitBreaker> _providerBreakers = new(StringComparer.OrdinalIgnoreCase);
@@ -37,8 +39,10 @@ public sealed class AiOrchestrationWorker(
         {
             try
             {
-                await ProcessInboundAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                var hadWork = await ProcessInboundAsync(stoppingToken);
+                await Task.Delay(
+                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(2),
+                    stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -54,73 +58,67 @@ public sealed class AiOrchestrationWorker(
         logger.LogInformation("AI Orchestration Worker stopped");
     }
 
-    private async Task ProcessInboundAsync(CancellationToken cancellationToken)
+    private async Task<bool> ProcessInboundAsync(CancellationToken cancellationToken)
     {
         using var scope = serviceProvider.CreateScope();
         var messageRepository = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
-        var conversationRepository = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
-        var credentialRepository = scope.ServiceProvider.GetRequiredService<IAiProviderCredentialRepository>();
-        var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
-        var aiProviderResolver = scope.ServiceProvider.GetRequiredService<IAiProviderResolver>();
-        var contextAssembler = scope.ServiceProvider.GetRequiredService<ContextAssembler>();
-        var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
-        var handoffEventRepository = scope.ServiceProvider.GetRequiredService<IHandoffEventRepository>();
-        var interactionRepository = scope.ServiceProvider.GetRequiredService<IAiInteractionRepository>();
-        var usageRepository = scope.ServiceProvider.GetRequiredService<IUsageLedgerRepository>();
-        var pricingRepository = scope.ServiceProvider.GetRequiredService<IAiModelPricingRepository>();
-        var modelEvaluationRepository = scope.ServiceProvider.GetRequiredService<IModelEvaluationRepository>();
-        var auditLogRepository = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
+        var pendingInbound = await messageRepository.GetUnprocessedInboundAsync(BatchSize, cancellationToken);
+        if (pendingInbound.Count == 0)
+            return false;
 
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var botConfigRepository = scope.ServiceProvider.GetRequiredService<IBotConfigurationRepository>();
-        var queueRepository = scope.ServiceProvider.GetRequiredService<IServiceLineRepository>();
-        var tagRepository = scope.ServiceProvider.GetRequiredService<IClientTagRepository>();
-        var contactTagRepository = scope.ServiceProvider.GetRequiredService<IContactTagRepository>();
-        var pendingInbound = await messageRepository.GetUnprocessedInboundAsync(20, cancellationToken);
-
-        foreach (var message in pendingInbound)
-        {
-            if (!await messageRepository.TryClaimInboundForAiAsync(
-                    message.TenantId,
-                    message.Id,
-                    DateTime.UtcNow.Add(AiClaimLease),
-                    cancellationToken))
+        await Parallel.ForEachAsync(
+            pendingInbound.GroupBy(message => message.ConversationId),
+            new ParallelOptions
             {
-                continue;
-            }
+                MaxDegreeOfParallelism = MaxConcurrency,
+                CancellationToken = cancellationToken
+            },
+            async (conversationMessages, ct) =>
+            {
+                foreach (var message in conversationMessages)
+                {
+                    using var itemScope = serviceProvider.CreateScope();
+                    var itemMessageRepository = itemScope.ServiceProvider.GetRequiredService<IMessageRepository>();
+                    if (!await itemMessageRepository.TryClaimInboundForAiAsync(
+                            message.TenantId,
+                            message.Id,
+                            DateTime.UtcNow.Add(AiClaimLease),
+                            ct))
+                    {
+                        continue;
+                    }
 
-            await ProcessSingleInboundAsync(
-                message, dbContext, botConfigRepository, queueRepository, tagRepository, contactTagRepository,
-                messageRepository, conversationRepository,
-                credentialRepository, secretStore, aiProviderResolver,
-                contextAssembler, outboxRepository, interactionRepository,
-                usageRepository, pricingRepository, modelEvaluationRepository,
-                auditLogRepository, handoffEventRepository, cancellationToken);
-        }
+                    await ProcessSingleInboundAsync(message, itemScope.ServiceProvider, ct);
+                }
+            });
+
+        return true;
     }
 
     private async Task ProcessSingleInboundAsync(
         Message message,
-        AppDbContext dbContext,
-        IBotConfigurationRepository botConfigRepository,
-        IServiceLineRepository queueRepository,
-        IClientTagRepository tagRepository,
-        IContactTagRepository contactTagRepository,
-        IMessageRepository messageRepository,
-        IConversationRepository conversationRepository,
-        IAiProviderCredentialRepository credentialRepository,
-        ISecretStore secretStore,
-        IAiProviderResolver aiProviderResolver,
-        ContextAssembler contextAssembler,
-        IOutboxMessageRepository outboxRepository,
-        IAiInteractionRepository interactionRepository,
-        IUsageLedgerRepository usageRepository,
-        IAiModelPricingRepository pricingRepository,
-        IModelEvaluationRepository modelEvaluationRepository,
-        IAuditLogRepository auditLogRepository,
-        IHandoffEventRepository handoffEventRepository,
+        IServiceProvider scopedServices,
         CancellationToken cancellationToken)
     {
+        var dbContext = scopedServices.GetRequiredService<AppDbContext>();
+        var botConfigRepository = scopedServices.GetRequiredService<IBotConfigurationRepository>();
+        var queueRepository = scopedServices.GetRequiredService<IServiceLineRepository>();
+        var tagRepository = scopedServices.GetRequiredService<IClientTagRepository>();
+        var contactTagRepository = scopedServices.GetRequiredService<IContactTagRepository>();
+        var messageRepository = scopedServices.GetRequiredService<IMessageRepository>();
+        var conversationRepository = scopedServices.GetRequiredService<IConversationRepository>();
+        var credentialRepository = scopedServices.GetRequiredService<IAiProviderCredentialRepository>();
+        var secretStore = scopedServices.GetRequiredService<ISecretStore>();
+        var aiProviderResolver = scopedServices.GetRequiredService<IAiProviderResolver>();
+        var contextAssembler = scopedServices.GetRequiredService<ContextAssembler>();
+        var outboxRepository = scopedServices.GetRequiredService<IOutboxMessageRepository>();
+        var interactionRepository = scopedServices.GetRequiredService<IAiInteractionRepository>();
+        var usageRepository = scopedServices.GetRequiredService<IUsageLedgerRepository>();
+        var pricingRepository = scopedServices.GetRequiredService<IAiModelPricingRepository>();
+        var modelEvaluationRepository = scopedServices.GetRequiredService<IModelEvaluationRepository>();
+        var auditLogRepository = scopedServices.GetRequiredService<IAuditLogRepository>();
+        var handoffEventRepository = scopedServices.GetRequiredService<IHandoffEventRepository>();
+
         try
         {
             var conversation = await conversationRepository.GetByIdAsync(message.ConversationId, cancellationToken);
@@ -229,6 +227,7 @@ public sealed class AiOrchestrationWorker(
                             ?? (previousInboundCount > 0 ? botConfig.ReturningMessage : botConfig.WelcomeMessage)
                             ?? botConfig.FallbackMessage;
                     }
+
                     if (string.IsNullOrWhiteSpace(replyContent))
                         replyContent = "Obrigado pela sua mensagem. Em breve retornaremos o contato.";
 
@@ -240,6 +239,39 @@ public sealed class AiOrchestrationWorker(
                         message.MarkProcessedByAi();
                         await messageRepository.UpdateAsync(message, cancellationToken);
                         logger.LogInformation("SimpleAutoReply discarded after conversation {ConversationId} changed", message.ConversationId);
+                        return;
+                    }
+
+                    ServiceLine? routingQueue = null;
+                    if (withinBusinessHours &&
+                        await dbContext.HasAutomaticDistributionEnabledAsync(message.TenantId, cancellationToken))
+                    {
+                        var activeQueues = await queueRepository.GetActiveByTenantAsync(
+                            message.TenantId, cancellationToken);
+                        routingQueue = SelectBotRoutingQueue(
+                            conversation.QueueId, activeQueues, message.Content);
+                    }
+
+                    if (routingQueue is not null)
+                    {
+                        await PersistAutomaticHandoffAsync(
+                            message.TenantId,
+                            message,
+                            conversation,
+                            "queue_selection",
+                            ResolveQueueTransferMessage(botConfig),
+                            "bot-queue-transfer",
+                            dbContext,
+                            messageRepository,
+                            conversationRepository,
+                            outboxRepository,
+                            handoffEventRepository,
+                            cancellationToken,
+                            routingQueue.Id);
+                        logger.LogInformation(
+                            "SimpleAutoReply routed conversation {ConversationId} to queue {QueueName}",
+                            conversation.Id,
+                            routingQueue.Name);
                         return;
                     }
 
@@ -936,6 +968,25 @@ public sealed class AiOrchestrationWorker(
         return "Vou encaminhar voce para um atendente.";
     }
 
+    internal static string ResolveQueueTransferMessage(BotConfiguration? botConfig)
+    {
+        if (!string.IsNullOrWhiteSpace(botConfig?.QueueTransferMessage))
+            return botConfig.QueueTransferMessage;
+
+        return "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
+    }
+
+    internal static ServiceLine? SelectBotRoutingQueue(
+        Guid? assignedQueueId,
+        IReadOnlyList<ServiceLine> activeQueues,
+        string? messageContent)
+    {
+        var text = messageContent ?? string.Empty;
+        return assignedQueueId is Guid queueId
+            ? activeQueues.FirstOrDefault(queue => queue.Id == queueId && queue.MatchesKeywords(text))
+            : activeQueues.FirstOrDefault(queue => queue.MatchesKeywords(text));
+    }
+
     internal static async Task<bool> RegisterAutomaticHandoffAsync(
         Guid tenantId,
         Conversation conversation,
@@ -966,7 +1017,8 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? queueId = null)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -974,7 +1026,7 @@ public sealed class AiOrchestrationWorker(
             var registered = await PersistAutomaticHandoffInTransactionAsync(
                 tenantId, inboundMessage, conversation, reason, handoffText, idempotencyPrefix,
                 messageRepository, conversationRepository, outboxRepository, handoffEventRepository,
-                cancellationToken);
+                cancellationToken, queueId);
             await transaction.CommitAsync(cancellationToken);
             return registered;
         }
@@ -996,10 +1048,17 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? queueId = null)
     {
         var registered = await RegisterAutomaticHandoffAsync(
             tenantId, conversation, reason, conversationRepository, handoffEventRepository, cancellationToken);
+
+        if (registered && queueId is Guid selectedQueueId && conversation.QueueId is null)
+        {
+            conversation.AssignQueue(selectedQueueId);
+            await conversationRepository.UpdateAsync(conversation, cancellationToken);
+        }
 
         if (registered && !string.IsNullOrWhiteSpace(handoffText))
         {

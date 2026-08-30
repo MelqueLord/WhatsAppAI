@@ -14,6 +14,15 @@ public interface IWhatsAppClient
         string text,
         CancellationToken cancellationToken = default);
 
+    Task<SendMessageResult> SendTemplateMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string templateName,
+        string templateLanguage,
+        IReadOnlyList<string> parameters,
+        CancellationToken cancellationToken = default);
+
     // QR Code connection for development/unofficial API
     Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,

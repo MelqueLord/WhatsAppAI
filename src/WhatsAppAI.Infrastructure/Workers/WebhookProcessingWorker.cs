@@ -13,6 +13,7 @@ public sealed class WebhookProcessingWorker(
     IServiceProvider serviceProvider,
     ILogger<WebhookProcessingWorker> logger) : BackgroundService
 {
+    private const int MaxConcurrency = 4;
     private static readonly SemaphoreSlim ProcessingLock = new(1, 1);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -27,8 +28,10 @@ public sealed class WebhookProcessingWorker(
         {
             try
             {
-                await ProcessEventsAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                var hadWork = await ProcessEventsAsync(stoppingToken);
+                await Task.Delay(
+                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(5),
+                    stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -44,11 +47,11 @@ public sealed class WebhookProcessingWorker(
         logger.LogInformation("Webhook Processing Worker stopped");
     }
 
-    private async Task ProcessEventsAsync(CancellationToken cancellationToken)
+    private async Task<bool> ProcessEventsAsync(CancellationToken cancellationToken)
     {
         if (!await ProcessingLock.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken))
         {
-            return;
+            return false;
         }
 
         try
@@ -58,17 +61,26 @@ public sealed class WebhookProcessingWorker(
 
             // Process pending events
             var pendingEvents = await webhookEventRepository.GetPendingEventsAsync(10, cancellationToken);
-            foreach (var webhookEvent in pendingEvents)
-            {
-                await ProcessSingleEventAsync(webhookEvent, webhookEventRepository, cancellationToken);
-            }
-
             // Process retryable events
             var retryableEvents = await webhookEventRepository.GetRetryableEventsAsync(10, cancellationToken);
-            foreach (var webhookEvent in retryableEvents)
-            {
-                await ProcessSingleEventAsync(webhookEvent, webhookEventRepository, cancellationToken);
-            }
+            var events = pendingEvents.Concat(retryableEvents).ToArray();
+            if (events.Length == 0)
+                return false;
+
+            await Parallel.ForEachAsync(
+                events.GroupBy(webhookEvent => webhookEvent.PhoneNumberId),
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = MaxConcurrency,
+                    CancellationToken = cancellationToken
+                },
+                async (lineEvents, ct) =>
+                {
+                    foreach (var webhookEvent in lineEvents)
+                        await ProcessSingleEventAsync(webhookEvent, ct);
+                });
+
+            return true;
         }
         finally
         {
@@ -78,16 +90,17 @@ public sealed class WebhookProcessingWorker(
 
     private async Task ProcessSingleEventAsync(
         WebhookEvent webhookEvent,
-        IWebhookEventRepository webhookEventRepository,
         CancellationToken cancellationToken)
     {
+        using var scope = serviceProvider.CreateScope();
+        var webhookEventRepository = scope.ServiceProvider.GetRequiredService<IWebhookEventRepository>();
+
         try
         {
             webhookEvent.MarkProcessing();
             await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
 
             // Resolve tenant from phone_number_id
-            using var scope = serviceProvider.CreateScope();
             var whatsAppAccountRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
 
             var account = await whatsAppAccountRepository.GetByPhoneNumberIdAsync(
