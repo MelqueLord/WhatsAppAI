@@ -121,6 +121,31 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         Assert.Equal(HttpStatusCode.Conflict, webhook.StatusCode);
     }
 
+    [Fact]
+    public async Task Multiple_qr_channels_of_the_same_tenant_have_independent_leases()
+    {
+        var tenantId = Guid.NewGuid();
+        using var bridge = CreateBridgeClient("bridge-a");
+
+        var lineOne = await bridge.PutAsJsonAsync(
+            $"/api/webhooks/whatsapp-web/session/{tenantId:D}-qr-1/lease",
+            new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
+        var lineTwo = await bridge.PutAsJsonAsync(
+            $"/api/webhooks/whatsapp-web/session/{tenantId:D}-qr-2/lease",
+            new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
+
+        Assert.Equal(HttpStatusCode.OK, lineOne.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, lineTwo.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var leases = await context.WhatsAppWebSessionLeases
+            .Where(item => item.TenantId == tenantId)
+            .ToListAsync();
+        Assert.Equal(2, leases.Count);
+        Assert.Equal([1, 2], leases.Select(item => item.LineNumber).OrderBy(line => line).ToArray());
+    }
+
     private HttpClient CreateBridgeClient(string instanceId)
     {
         var client = _factory.CreateClient();
