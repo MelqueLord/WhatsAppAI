@@ -60,6 +60,14 @@ public static class ObservabilityExtensions
     public static IApplicationBuilder UseObservability(this IApplicationBuilder app)
     {
         app.UseCorrelationId();
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+                diagnosticContext.Set("RequestPath", httpContext.Request.Path.Value ?? string.Empty);
+            };
+        });
         app.UseExceptionHandler();
 
         return app;

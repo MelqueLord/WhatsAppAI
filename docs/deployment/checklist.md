@@ -76,6 +76,18 @@ docker compose --profile production up -d
 - [ ] Test WhatsApp integration (if configured)
 - [ ] Test AI integration (if configured)
 
+For a reproducible validation against real staging integrations, run the manual
+GitHub Actions workflow `Staging smoke` with the `staging` environment configured:
+
+- `STAGING_BASE_URL` and `STAGING_QR_LINE_NUMBER` as environment variables;
+- `STAGING_EMAIL` and `STAGING_PASSWORD` as environment secrets.
+
+The workflow validates liveness/readiness, authenticated tenant context, the AI
+provider connection, WhatsApp Cloud API, an existing QR session, and a real
+SignalR WebSocket connection. It prints only pass/fail checks and never logs
+credentials or message content. Attach the workflow run URL to the release
+evidence before approving the production gate.
+
 ## Post-Deployment
 
 ### Monitoring
@@ -84,6 +96,10 @@ docker compose --profile production up -d
 - [ ] Logs being collected
 - [ ] Error tracking configured
 - [ ] Backup script scheduled (cron)
+- [ ] Configure `STAGING_BASE_URL` and enable the scheduled `Staging availability monitor` workflow
+- [ ] Configure `STAGING_ALERT_WEBHOOK_URL` (optional) and verify a test alert reaches the incident channel
+- [ ] Define `ONCALL_PRIMARY`, `ONCALL_SECONDARY` and `INCIDENT_CHANNEL` in the staging environment
+- [ ] Configure `OpenTelemetry__Endpoint` for the centralized metrics/traces/error collector
 
 ### Documentation
 

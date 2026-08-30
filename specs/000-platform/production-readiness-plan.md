@@ -26,6 +26,11 @@
 - Validar `nginx -t` e smoke HTTPS/SignalR por domínio.
 - Fechar P1 aberto: 3 falhas de testes .NET, 23 erros de lint frontend e 1 teste frontend falhando.
 
+Foi adicionado o workflow manual `Staging smoke` (`.github/workflows/staging-smoke.yml`)
+com o script `apps/web/scripts/staging-smoke.mjs`. Ele gera a evidência reproduzível
+dos testes reais de Cloud API, QR Code, provedor de IA e SignalR; a execução deve ser
+feita no ambiente `staging` com suas credenciais armazenadas como secrets.
+
 ## Ordem de execução
 
 | ID | Prioridade | Correção | Responsável sugerido | Aceite obrigatório |

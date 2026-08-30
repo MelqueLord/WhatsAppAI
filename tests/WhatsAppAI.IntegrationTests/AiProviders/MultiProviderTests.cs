@@ -179,6 +179,7 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
             Content = JsonContent.Create(payload with { systemPrompt = "Versão obsoleta" })
         };
         staleRequest.Headers.TryAddWithoutValidation("If-Match", "0");
+        staleRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "1");
         var staleUpdate = await client.SendAsync(staleRequest);
         Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
 

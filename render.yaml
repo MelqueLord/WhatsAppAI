@@ -40,6 +40,8 @@ services:
         value: "true"
       - key: ForwardedHeaders__TrustAll
         value: "true"
+      - key: OpenTelemetry__Endpoint
+        sync: false
 
   - type: web
     name: whatsappai-whatsapp-web

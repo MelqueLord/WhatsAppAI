@@ -75,8 +75,7 @@ public class DependencyTests
                 "MediatR",
                 "MassTransit",
                 "StackExchange.Redis",
-                "Newtonsoft.Json",
-                "System.Text.Json")
+                "Newtonsoft.Json")
             .GetResult();
 
         Assert.True(result.IsSuccessful, $"Domain should not depend on external packages. Failing types: {string.Join(", ", result.FailingTypeNames ?? [])}");

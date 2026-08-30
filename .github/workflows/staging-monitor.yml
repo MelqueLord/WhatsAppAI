@@ -1,0 +1,37 @@
+name: Staging availability monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    name: Health and availability
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 2
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      STAGING_ALERT_WEBHOOK_URL: ${{ secrets.STAGING_ALERT_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check staging health
+        run: node scripts/staging-monitor.mjs
+
+      - name: Record on-call owner
+        if: failure()
+        run: |
+          echo "Primary on-call: ${{ vars.ONCALL_PRIMARY }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Secondary on-call: ${{ vars.ONCALL_SECONDARY }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Incident channel: ${{ vars.INCIDENT_CHANNEL }}" >> "$GITHUB_STEP_SUMMARY"
