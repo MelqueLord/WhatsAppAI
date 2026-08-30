@@ -102,17 +102,6 @@ function TagIcon({ size = 24 }: IconProps) {
   );
 }
 
-function PipelineIcon({ size = 24 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="5" cy="18" r="2" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="19" cy="6" r="2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="m7 16 3.5-2.8M13.5 10.8 17 8" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
 function ZapIcon({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -184,12 +173,6 @@ const features = [
     title: "Etiquetas",
     description:
       "Classifique contatos e organize as conversas de acordo com sua operação.",
-  },
-  {
-    icon: <PipelineIcon />,
-    title: "Pipeline",
-    description:
-      "Visualize em qual etapa cada oportunidade está e acompanhe sua evolução.",
   },
   {
     icon: <ChartIcon />,
@@ -492,31 +475,33 @@ export default function LandingPage() {
               </div>
               <div className="dashboard-stats">
                 <div>
-                  <span>Atendimentos</span>
-                  <strong>128</strong>
-                  <small>↑ 18% este mês</small>
-                </div>
-                <div>
-                  <span>Em andamento</span>
-                  <strong>23</strong>
+                  <span>Conversas Ativas</span>
+                  <strong>40</strong>
                   <small>agora</small>
                 </div>
                 <div>
-                  <span>Tempo médio</span>
-                  <strong>3m</strong>
-                  <small>↓ 24%</small>
+                  <span>Operadores</span>
+                  <strong>2</strong>
+                  <small>na equipe</small>
+                </div>
+                <div>
+                  <span>Mensagens Hoje</span>
+                  <strong>0</strong>
+                  <small>atualizado agora</small>
+                </div>
+                <div>
+                  <span>IA Respondendo</span>
+                  <strong>Ativo</strong>
+                  <small>online</small>
                 </div>
               </div>
               <div className="dashboard-chart">
-                <div className="chart-title"><span>Atendimentos nos últimos dias</span></div>
-                <div className="bars">
-                  <span style={{ height: "28%" }} />
-                  <span style={{ height: "44%" }} />
-                  <span style={{ height: "39%" }} />
-                  <span style={{ height: "63%" }} />
-                  <span style={{ height: "54%" }} />
-                  <span style={{ height: "78%" }} />
-                  <span style={{ height: "90%" }} />
+                <div className="chart-title"><span>Conversas Recentes</span></div>
+                <div className="dashboard-people">
+                  <span><strong>TesteAA</strong><small>Humano · Aberta</small></span>
+                  <span><strong>Lordelo</strong><small>Automático · Aberta</small></span>
+                  <span><strong>rOSE</strong><small>Automático · Aberta</small></span>
+                  <span><strong>Filha de Deus</strong><small>Automático · Aberta</small></span>
                 </div>
               </div>
             </div>
@@ -684,7 +669,6 @@ export default function LandingPage() {
                   <li><CheckIcon /> Bot integrado</li>
                   <li><CheckIcon /> Etiquetas</li>
                   <li><CheckIcon /> Distribuição automática</li>
-                  <li><CheckIcon /> Pipeline</li>
                 </ul>
                 <button className="btn btn-primary btn-plan" onClick={() => scrollTo("contato")}>Quero o FLOW</button>
               </article>
@@ -708,7 +692,6 @@ export default function LandingPage() {
                   <li><CheckIcon /> Etiquetas de qualificação</li>
                   <li><CheckIcon /> Relatório de performance</li>
                   <li><CheckIcon /> Respostas rápidas</li>
-                  <li><CheckIcon /> Pipeline completo</li>
                 </ul>
                 <button className="btn btn-plan" onClick={() => scrollTo("contato")}>Quero o SCALA</button>
               </article>
