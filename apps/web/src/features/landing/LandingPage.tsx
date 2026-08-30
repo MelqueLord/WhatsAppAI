@@ -783,7 +783,7 @@ export default function LandingPage() {
             </p>
             <a
               className="btn btn-primary btn-large"
-              href="https://wa.me/5500000000000"
+              href="https://wa.me/5571993294825"
               target="_blank"
               rel="noreferrer"
             >
@@ -821,8 +821,8 @@ export default function LandingPage() {
           </div>
           <div className="footer-column">
             <strong>CONTATO</strong>
-            <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer">WhatsApp</a>
-            <a href="mailto:contato@atenz.com.br">contato@atenz.com.br</a>
+            <a href="https://wa.me/5571993294825" target="_blank" rel="noreferrer">WhatsApp: (71) 99329-4825</a>
+            <a href="mailto:contato@atenzapp.com.br">contato@atenzapp.com.br</a>
           </div>
         </div>
         <div className="container footer-bottom">
