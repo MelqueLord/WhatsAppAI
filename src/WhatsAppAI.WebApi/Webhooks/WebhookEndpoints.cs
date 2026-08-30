@@ -287,10 +287,7 @@ public static class WebhookEndpoints
         AppDbContext dbContext,
         ILogger<Program> logger)
     {
-        var expectedSecret = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
-            ?? configuration["WhatsAppWeb:WebhookSecret"];
-        var receivedSecret = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(expectedSecret) || receivedSecret != expectedSecret)
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
             return Results.Unauthorized();
 
         using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8);
@@ -312,6 +309,9 @@ public static class WebhookEndpoints
             phoneNumberId, value?.Messages?.Count ?? 0);
         if (string.IsNullOrWhiteSpace(phoneNumberId) || string.IsNullOrWhiteSpace(messageId))
             return Results.BadRequest("Missing WhatsApp Web event identifiers");
+        if (TryGetQrSessionId(phoneNumberId, out var sessionId) &&
+            !await HasCurrentLeaseOwnershipAsync(sessionId, httpContext, dbContext))
+            return Results.Conflict();
 
         var idempotencyKey = $"whatsapp-web:{phoneNumberId}:{messageId}";
         if (await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey) is not null)
@@ -377,6 +377,21 @@ public static class WebhookEndpoints
             // Another concurrent event may have created this unique slot first.
             dbContext.Entry(account).State = EntityState.Detached;
         }
+    }
+
+    private static bool TryGetQrSessionId(string phoneNumberId, out string sessionId)
+    {
+        sessionId = string.Empty;
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3 || !Guid.TryParse(parts[1], out var tenantId) ||
+            !int.TryParse(parts[2], out var lineNumber) || lineNumber is < 1 or > 100)
+            return false;
+
+        sessionId = $"{tenantId:D}-qr-{lineNumber}";
+        return true;
     }
 
     private static async Task<IResult> VerifyChallengeAsync(

@@ -83,6 +83,44 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
             transferredLease.OwnerInstanceId);
     }
 
+    [Fact]
+    public async Task Webhook_from_bridge_without_current_lease_is_rejected()
+    {
+        var tenantId = Guid.NewGuid();
+        var sessionId = $"{tenantId:D}-qr-1";
+        using var ownerBridge = CreateBridgeClient("bridge-a");
+        using var formerBridge = CreateBridgeClient("bridge-b");
+
+        var lease = await ownerBridge.PutAsJsonAsync(
+            $"/api/webhooks/whatsapp-web/session/{sessionId}/lease",
+            new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
+        Assert.Equal(HttpStatusCode.OK, lease.StatusCode);
+
+        var webhook = await formerBridge.PostAsJsonAsync("/api/webhooks/whatsapp-web", new
+        {
+            entry = new[]
+            {
+                new
+                {
+                    id = "bridge-event",
+                    changes = new[]
+                    {
+                        new
+                        {
+                            value = new
+                            {
+                                metadata = new { phone_number_id = $"qr:{tenantId:D}:1" },
+                                messages = new[] { new { id = "message-from-former-owner" } }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, webhook.StatusCode);
+    }
+
     private HttpClient CreateBridgeClient(string instanceId)
     {
         var client = _factory.CreateClient();

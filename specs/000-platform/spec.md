@@ -282,7 +282,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 - **BR-028:** agenda desabilitada mantém compatibilidade 24 horas; agenda habilitada exige sete dias válidos, horários de abertura/fechamento coerentes e fuso permitido. Sem mensagem de fora do horário, o BOT finaliza a entrada sem criar resposta automática.
 - **BR-029:** template transacional exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres, e só pode ser despachado por uma conta `OfficialApi`; QR Code deve finalizar a Outbox sem chamada externa.
-- **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
+- **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem, publicar webhook de entrada ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
 
 ## 7. Requisitos não funcionais
 

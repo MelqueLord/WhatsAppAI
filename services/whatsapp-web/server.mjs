@@ -402,6 +402,7 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
         console.log(`Inbound message forwarded for ${session.tenantId}: HTTP ${response.status}`)
         return
       }
+      if (response.status === 409) return
       throw new Error(`Webhook returned HTTP ${response.status}`)
     } catch (error) {
       if (attempt === 5) {
