@@ -49,6 +49,8 @@ assíncrono.
 ## Operação e rollback
 
 - Faça backup diário com `./deploy/backup.sh` e mantenha cópias fora do KVM.
+- O volume `whatsapp-web-sessions` mantém as sessões QR durante recriações do
+  container; inclua esse volume na rotina de backup antes de remover o stack.
 - Antes de atualizar, execute o backup e registre a imagem/commit atual.
 - Para atualizar: `git pull`, `docker compose build`, execute `migrate` e
   depois `docker compose --profile production up -d`.

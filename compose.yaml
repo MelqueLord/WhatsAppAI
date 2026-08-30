@@ -43,6 +43,9 @@ services:
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
+      WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
+      WhatsAppWeb__BaseUrl: http://whatsapp-web:3020
+      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
       Workers__Enabled: "false"
     depends_on:
       postgres:
@@ -64,6 +67,9 @@ services:
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
+      WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
+      WhatsAppWeb__BaseUrl: http://whatsapp-web:3020
+      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
       Workers__Enabled: "true"
     depends_on:
       postgres:
@@ -73,6 +79,26 @@ services:
     entrypoint: ["dotnet", "WhatsAppAI.WebApi.dll", "--urls", "http://+:5001"]
     profiles:
       - worker
+      - production
+
+  whatsapp-web:
+    build:
+      context: ./services/whatsapp-web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${ASPNETCORE_ENVIRONMENT:-Production}
+      PORT: "3020"
+      WHATSAPP_WEB_API_URL: http://api:5000/api/webhooks/whatsapp-web
+      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+    expose:
+      - "3020"
+    volumes:
+      - whatsapp-web-sessions:/app/sessions
+    depends_on:
+      api:
+        condition: service_started
+    profiles:
       - production
 
   frontend:
@@ -105,3 +131,4 @@ services:
 
 volumes:
   postgres-data:
+  whatsapp-web-sessions:
