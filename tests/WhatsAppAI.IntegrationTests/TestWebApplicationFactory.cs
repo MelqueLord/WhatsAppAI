@@ -22,20 +22,27 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     {
         builder.UseEnvironment("Testing");
 
+        var testSettings = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
+            ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
+            ["Jwt:Secret"] = "integration-test-jwt-secret-at-least-32-bytes",
+            ["Jwt:Issuer"] = "whatsappai-tests",
+            ["Jwt:Audience"] = "whatsappai-tests",
+            ["Meta:VerifyToken"] = "test-verify-token",
+            ["Meta:AppSecret"] = "test-app-secret",
+            ["BootstrapAdmin:Email"] = "admin@test.com",
+            ["BootstrapAdmin:Password"] = "Admin@12345!"
+        };
+
+        // UseSetting also flows to derived hosts created by WithWebHostBuilder,
+        // including the production-mode CSRF test host.
+        foreach (var (key, value) in testSettings)
+            builder.UseSetting(key, value);
+
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
-                ["Encryption:Key"] = Convert.ToBase64String(new byte[32]),
-                ["Jwt:Secret"] = "integration-test-jwt-secret-at-least-32-bytes",
-                ["Jwt:Issuer"] = "whatsappai-tests",
-                ["Jwt:Audience"] = "whatsappai-tests",
-                ["Meta:VerifyToken"] = "test-verify-token",
-                ["Meta:AppSecret"] = "test-app-secret",
-                ["BootstrapAdmin:Email"] = "admin@test.com",
-                ["BootstrapAdmin:Password"] = "Admin@12345!"
-            });
+            config.AddInMemoryCollection(testSettings);
         });
 
         builder.ConfigureServices(services =>

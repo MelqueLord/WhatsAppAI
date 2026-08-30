@@ -70,52 +70,50 @@ public sealed class AppDbContext : DbContext
             modelBuilder.HasDefaultSchema("whatsappai");
         }
 
-        var tenantId = _currentTenant.TenantId;
-
         modelBuilder.Entity<Contact>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Conversation>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Message>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OutboxMessage>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<HandoffEvent>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<WhatsAppAccount>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<AiProviderCredential>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<AiInteraction>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<UsageLedger>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ModelEvaluation>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<KnowledgeItem>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ClientTag>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ContactTag>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<BotConfiguration>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ServiceLine>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<BroadcastList>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<BroadcastRecipient>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Invitation>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<TenantMembership>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ProcessingPurpose>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ConsentEvidence>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<DataSubjectRequest>()
-            .HasQueryFilter(e => e.TenantId == tenantId);
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

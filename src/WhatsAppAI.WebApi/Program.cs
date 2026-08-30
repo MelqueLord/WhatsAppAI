@@ -362,6 +362,12 @@ if (app.Environment.IsProduction())
             &&
             requiresCsrf)
         {
+            if (!context.Request.IsHttps)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
             try
             {
                 var antiforgery =

@@ -126,8 +126,14 @@ internal sealed class AuthenticationService(
             !Guid.TryParse(tenantIdValue, out var tenantId))
             return false;
 
-        var membership = await membershipRepository.GetByIdAsync(membershipId, cancellationToken);
+        // Cookie validation runs before CurrentTenantMiddleware establishes the
+        // tenant context, so avoid the tenant-scoped query filter here.
+        var membership = await membershipRepository.GetByUserAndTenantAsync(
+            userId,
+            tenantId,
+            cancellationToken);
         return membership is not null &&
+            membership.Id == membershipId &&
             membership.Status == MembershipStatus.Active &&
             membership.UserId == userId &&
             membership.TenantId == tenantId;
