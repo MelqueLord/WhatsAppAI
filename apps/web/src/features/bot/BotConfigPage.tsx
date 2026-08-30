@@ -271,7 +271,7 @@ export function BotConfigPage() {
         {!isBotActive && config?.configured && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Info className="w-4 h-4 flex-shrink-0 text-amber-500" />
-            O bot está <strong>inativo</strong>. As mensagens automáticas não serão enviadas.
+            <p className="leading-5">O bot está <strong className="font-semibold">inativo</strong>. As mensagens automáticas não serão enviadas.</p>
           </div>
         )}
         {user?.aiEnabled && (

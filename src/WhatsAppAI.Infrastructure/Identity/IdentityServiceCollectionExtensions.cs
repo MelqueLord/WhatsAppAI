@@ -1,3 +1,5 @@
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.DataProtection;
 using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -24,6 +26,51 @@ public static class IdentityServiceCollectionExtensions
         IConfiguration configuration)
     {
         var requireSecureCookies = environment.IsProduction();
+
+        var keysPath = configuration["DataProtection:KeysPath"];
+        if (string.IsNullOrWhiteSpace(keysPath))
+        {
+            keysPath = environment.IsProduction()
+                ? "/home/app/.aspnet/DataProtection-Keys"
+                : Path.Combine(AppContext.BaseDirectory, "DataProtection-Keys");
+        }
+
+        var dataProtection = services
+            .AddDataProtection()
+            .SetApplicationName("WhatsAppAI")
+            .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+
+        if (environment.IsProduction())
+        {
+            var certificatePath = configuration["DataProtection:CertificatePath"];
+            var certificatePassword = configuration["DataProtection:CertificatePassword"];
+
+            if (string.IsNullOrWhiteSpace(certificatePath) ||
+                string.IsNullOrWhiteSpace(certificatePassword))
+            {
+                throw new InvalidOperationException(
+                    "DataProtection:CertificatePath and DataProtection:CertificatePassword are required in production.");
+            }
+
+            if (!File.Exists(certificatePath))
+            {
+                throw new InvalidOperationException(
+                    "DataProtection certificate file was not found at the configured path.");
+            }
+
+            var certificate = X509CertificateLoader.LoadPkcs12FromFile(
+                certificatePath,
+                certificatePassword,
+                X509KeyStorageFlags.EphemeralKeySet);
+
+            if (!certificate.HasPrivateKey)
+            {
+                throw new InvalidOperationException(
+                    "DataProtection certificate must include a private key.");
+            }
+
+            dataProtection.ProtectKeysWithCertificate(certificate);
+        }
 
         services.AddScoped<ICurrentTenant, CurrentTenant>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();

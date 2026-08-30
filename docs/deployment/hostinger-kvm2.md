@@ -21,12 +21,20 @@ chmod 600 .env
 ```
 
 Preencha o `.env` com valores únicos para banco, `Encryption__Key`, Meta,
-`BootstrapAdmin__Email` e `BootstrapAdmin__Password`. Configure também
-`DOMAIN` e mantenha `Persistence__MaxPoolSize` em 50 inicialmente; ajuste após
-observar o uso de conexões do PostgreSQL.
+`BootstrapAdmin__Email` e `BootstrapAdmin__Password`. Gere ou receba um PFX
+exclusivo para o Data Protection, protegido por senha, coloque-o no caminho
+indicado por `DATAPROTECTION_CERTIFICATE_FILE` e preencha
+`DataProtection__CertificatePassword`. O PFX e os certificados não devem ser
+versionados. Configure também `DOMAIN` e mantenha `Persistence__MaxPoolSize`
+em 50 inicialmente; ajuste após observar o uso de conexões do PostgreSQL.
 
 Para TLS, coloque `fullchain.pem` e `privkey.pem` em
 `deploy/nginx/certs/` antes de iniciar o perfil `production`.
+
+O Compose cria e compartilha o volume `dataprotection-keys` entre API e worker.
+Não remova esse volume durante uma atualização: ele contém as chaves que
+validam cookies e tokens antiforgery existentes. Faça backup dele junto com o
+PFX correspondente.
 
 ## Primeiro deploy
 
@@ -51,6 +59,9 @@ assíncrono.
 - Faça backup diário com `./deploy/backup.sh` e mantenha cópias fora do KVM.
 - O volume `whatsapp-web-sessions` mantém as sessões QR durante recriações do
   container; inclua esse volume na rotina de backup antes de remover o stack.
+- O volume `dataprotection-keys` mantém o key ring compartilhado entre API e
+  worker; inclua-o na rotina de backup e preserve também o PFX usado para
+  cifrá-lo.
 - Antes de atualizar, execute o backup e registre a imagem/commit atual.
 - Para atualizar: `git pull`, `docker compose build`, execute `migrate` e
   depois `docker compose --profile production up -d`.

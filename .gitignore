@@ -22,6 +22,8 @@ Thumbs.db
 .env.*
 !.env.example
 !deploy/.env.production.example
+deploy/secrets/
+deploy/nginx/certs/
 *.db
 *.db-shm
 *.db-wal

@@ -45,7 +45,7 @@
 ## Phase 6: Database and release validation
 
 - [X] T012 Generate reversible PostgreSQL migration and snapshot updates in `src/WhatsAppAI.Infrastructure.PostgreSqlMigrations/Migrations/`
-- [ ] T013 Register endpoints, build Release, run privacy/unit/integration tests, validate no pending Npgsql model changes, review diff, and record remaining deployment inputs in `specs/002-lgpd-production-readiness/quickstart.md`
+- [ ] T013 Register endpoints, build Release, run privacy/unit/integration tests, validate no pending Npgsql model changes, review diff, and record remaining deployment inputs in `specs/002-lgpd-production-readiness/quickstart.md`. Partial validation completed on 2026-08-30: Release build, unit/architecture tests, frontend checks, EF model check, 67 integration tests, Docker migration bundle/idempotency, and Production API/worker startup passed; Data Protection persistence/encryption was validated with a temporary PFX; rollback/restore and operational release gates remain open.
 
 ## Dependencies & Execution Order
 

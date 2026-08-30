@@ -127,7 +127,7 @@
 |---|---|---|---|
 | ~~G1~~ | ~~**Dockerfiles ausentes**~~ | ~~Deploy impossível~~ | Resolvido (T117-T118) |
 | ~~G2~~ | ~~**CI usa PostgreSQL**~~ | ~~CI não reflete produção~~ | Resolvido (T119) |
-| G3 | **16 integration tests falhando** | Qualidade comprometida | Pendente |
+| ~~G3~~ | ~~**16 integration tests falhando**~~ | ~~Qualidade comprometida~~ | Resolvido no ciclo de readiness de 2026-08-30 (67/67 aprovados) |
 | ~~G4~~ | ~~**Debug code pendente**~~ | ~~Segurança/limpeza~~ | Resolvido (T120) |
 | ~~G5~~ | ~~**BotConfiguration não integrado**~~ | ~~Modo Manual/SimpleAutoReply inoperante~~ | Resolvido (T121) |
 | G6 | **Test coverage** (~187 testes: 185 unit + 2 frontend) | Regressões não detectadas | Melhorado (T125-T144, T158-T161, T165) |

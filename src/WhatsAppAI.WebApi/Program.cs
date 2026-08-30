@@ -18,6 +18,7 @@ using WhatsAppAI.WebApi.Broadcast;
 using WhatsAppAI.WebApi.Auth;
 using WhatsAppAI.WebApi.Auth.Activate;
 using WhatsAppAI.WebApi.Bot;
+using WhatsAppAI.WebApi.Configuration;
 using WhatsAppAI.WebApi.Contacts;
 using WhatsAppAI.WebApi.Conversations;
 using WhatsAppAI.WebApi.Dashboard;
@@ -206,6 +207,10 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+var applyMigrationsOnStartup = MigrationStartupPolicy.ShouldApply(
+    builder.Environment,
+    builder.Configuration);
+
 // IMPORTANTE:
 // deve executar antes de qualquer middleware que dependa
 // de Request.IsHttps, cookies Secure ou antiforgery.
@@ -219,7 +224,14 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
-    await context.Database.MigrateAsync();
+    if (applyMigrationsOnStartup)
+    {
+        await context.Database.MigrateAsync();
+    }
+    else
+    {
+        Log.Information("Skipping database migrations on application startup; migration job is responsible for schema changes.");
+    }
 
     var metaVerifyToken = builder.Configuration["Meta:VerifyToken"];
     var metaAppSecret = builder.Configuration["Meta:AppSecret"];

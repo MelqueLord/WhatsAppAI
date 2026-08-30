@@ -18,6 +18,9 @@ namespace WhatsAppAI.Infrastructure.Persistence;
 
 public static class PersistenceServiceCollectionExtensions
 {
+    private const string MigrationsHistoryTableName = "__EFMigrationsHistory";
+    private const string MigrationsHistorySchema = "public";
+
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
         string connectionString,
@@ -34,7 +37,11 @@ public static class PersistenceServiceCollectionExtensions
             options.AddInterceptors(sp.GetRequiredService<TenantSaveChangesInterceptor>());
             options.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
 
-            options.UseNpgsql(pooledConnectionString);
+            options.UseNpgsql(
+                pooledConnectionString,
+                npgsqlOptions => npgsqlOptions.MigrationsHistoryTable(
+                    MigrationsHistoryTableName,
+                    MigrationsHistorySchema));
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();

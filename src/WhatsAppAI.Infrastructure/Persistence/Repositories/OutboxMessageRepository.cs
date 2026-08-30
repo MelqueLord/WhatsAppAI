@@ -55,6 +55,8 @@ public sealed class OutboxMessageRepository(AppDbContext context) : IOutboxMessa
     {
         var toDelete = await context.Set<OutboxMessage>()
             .Where(o => o.Status == OutboxStatus.Completed && o.ProcessedAt < cutoff)
+            .OrderBy(o => o.ProcessedAt)
+            .ThenBy(o => o.Id)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
 

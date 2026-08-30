@@ -13,6 +13,7 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
   const connectionRef = useRef<HubConnection | null>(null)
   // null = still connecting (initial), true = connected, false = lost connection
   const [isConnected, setIsConnected] = useState<boolean | null>(null)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const callbacksRef = useRef({ onMessage, onStatusUpdate, onConversationUpdate })
 
   useEffect(() => {
@@ -40,9 +41,18 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
       callbacksRef.current.onConversationUpdate?.(conversation)
     })
 
-    newConnection.onreconnected(() => setIsConnected(true))
-    newConnection.onclose(() => setIsConnected(false))
-    newConnection.onreconnecting(() => setIsConnected(false))
+    newConnection.onreconnected(() => {
+      setIsConnected(true)
+      setIsReconnecting(false)
+    })
+    newConnection.onclose(() => {
+      setIsConnected(false)
+      setIsReconnecting(false)
+    })
+    newConnection.onreconnecting(() => {
+      setIsConnected(false)
+      setIsReconnecting(true)
+    })
 
     connectionRef.current = newConnection
 
@@ -58,9 +68,11 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
       try {
         await connection.start()
         setIsConnected(true)
+        setIsReconnecting(false)
       } catch {
         // Hub unavailable — mark as disconnected (not just unknown)
         setIsConnected(false)
+        setIsReconnecting(false)
       }
     }
   }, [])
@@ -87,5 +99,5 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
     }
   }, [isConnected])
 
-  return { isConnected, start, joinConversation, leaveConversation }
+  return { isConnected, isReconnecting, start, joinConversation, leaveConversation }
 }

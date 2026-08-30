@@ -2,14 +2,21 @@
 
 > Antes deste checklist, concluir `specs/000-platform/production-readiness-plan.md` e obter `GO` em `specs/000-platform/contracts/production-readiness-gates.md`.
 
-**Version:** 1.0  
-**Date:** 2026-08-16
+**Version:** 1.1
+**Date:** 2026-08-30
 
-## Atualização de status (2026-08-21)
+## Atualização de status (2026-08-30)
 
 - [x] P0 de hardening implementado em código/configuração (cookies/CSRF, segredos/versionamento, Compose/Nginx, migration bundle).
-- [ ] Validação operacional P0 pendente em host com Docker/TLS (`docker compose config`, `nginx -t`, smoke HTTPS).
-- [ ] P1 de qualidade pendente (3 testes .NET, 23 erros de lint, 1 teste frontend).
+- [x] Build .NET Release, unitários, arquitetura, lint, testes e build frontend executados localmente.
+- [x] `docker compose --profile production config` validado com valores de teste.
+- [x] Modelo EF/Npgsql validado sem alterações pendentes.
+- [x] Suíte completa de integração encerrada com relatório final e exit code 0 (67/67, 0 falhas, 0 ignorados).
+- [ ] Validação operacional P0 em ambiente com Docker/TLS (`nginx -t`, smoke HTTPS e SignalR).
+- [x] Migration do zero validada com o bundle Docker; segunda execução idempotente e startup da API/worker com migrations externas.
+- [ ] Atualização de uma versão anterior, rollback de migration e restauração ensaiados.
+- [x] Persistência e criptografia das chaves de Data Protection validadas localmente com PFX temporário, volume compartilhado e reinício de API/worker.
+- [ ] Smoke das integrações reais Meta, QR e IA executado no staging.
 
 ## Pre-Deployment
 
@@ -26,6 +33,7 @@
 - [ ] Generate encryption key: `openssl rand -base64 32`
 - [ ] Set `BootstrapAdmin__Email` and a unique `BootstrapAdmin__Password` (at least 12 characters with upper/lowercase, number and symbol); do not commit either value
 - [ ] Set PostgreSQL password (strong, unique)
+- [ ] Provision a password-protected PFX for Data Protection at `DATAPROTECTION_CERTIFICATE_FILE`; keep the file outside version control and set `DataProtection__CertificatePassword`
 - [ ] Set Meta Verify Token and App Secret
 - [ ] Set DOMAIN for Nginx template rendering
 
@@ -142,6 +150,8 @@ evidence before approving the production gate.
 - [ ] Backup/restore tested
 - [ ] Monitoring configured
 - [ ] Documentation updated
+
+**Current decision:** NO-GO until all unchecked P0/P1 gates above have attached evidence.
 
 **Deployed by:** _________________  
 **Date:** _________________  

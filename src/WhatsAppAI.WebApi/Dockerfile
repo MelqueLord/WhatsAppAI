@@ -34,9 +34,10 @@ RUN dotnet publish "WhatsAppAI.WebApi.csproj" -c Release -o /app/publish /p:UseA
 
 WORKDIR /src
 
-RUN dotnet tool install --global dotnet-ef --version 10.0.0
+RUN dotnet tool install --global dotnet-ef --version 10.0.4
 
 ENV PATH="${PATH}:/root/.dotnet/tools"
+ENV ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=design-time-only"
 
 RUN dotnet ef migrations bundle \
     --project src/WhatsAppAI.Infrastructure/WhatsAppAI.Infrastructure.csproj \
@@ -48,6 +49,9 @@ FROM base AS final
 WORKDIR /app
 
 COPY --from=publish /app/publish .
+
+RUN mkdir -p /home/app/.aspnet/DataProtection-Keys \
+    && chown -R app:app /home/app/.aspnet
 
 USER app
 

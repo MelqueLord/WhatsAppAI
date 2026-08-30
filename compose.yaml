@@ -38,9 +38,15 @@ services:
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-whatsappai};Username=${POSTGRES_USER:-whatsappai};Password=${POSTGRES_PASSWORD}"
+      Persistence__ApplyMigrationsOnStartup: "false"
+      DataProtection__KeysPath: /home/app/.aspnet/DataProtection-Keys
+      DataProtection__CertificatePath: ${DataProtection__CertificatePath:?DataProtection__CertificatePath is required}
+      DataProtection__CertificatePassword: ${DataProtection__CertificatePassword:?DataProtection__CertificatePassword is required}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: "http://+:5000"
+      ASPNETCORE_HTTP_PORTS: "5000"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
+      BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
+      BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
       WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
@@ -54,6 +60,9 @@ services:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:5000:5000"
+    volumes:
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+      - ${DATAPROTECTION_CERTIFICATE_FILE:?DATAPROTECTION_CERTIFICATE_FILE is required}:/run/secrets/dataprotection.pfx:ro
 
   worker:
     build:
@@ -62,9 +71,15 @@ services:
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-whatsappai};Username=${POSTGRES_USER:-whatsappai};Password=${POSTGRES_PASSWORD}"
+      Persistence__ApplyMigrationsOnStartup: "false"
+      DataProtection__KeysPath: /home/app/.aspnet/DataProtection-Keys
+      DataProtection__CertificatePath: ${DataProtection__CertificatePath:?DataProtection__CertificatePath is required}
+      DataProtection__CertificatePassword: ${DataProtection__CertificatePassword:?DataProtection__CertificatePassword is required}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: "http://+:5001"
+      ASPNETCORE_HTTP_PORTS: "5001"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
+      BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
+      BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
       WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
@@ -76,7 +91,10 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    entrypoint: ["dotnet", "WhatsAppAI.WebApi.dll", "--urls", "http://+:5001"]
+    entrypoint: ["dotnet", "WhatsAppAI.WebApi.dll"]
+    volumes:
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+      - ${DATAPROTECTION_CERTIFICATE_FILE:?DATAPROTECTION_CERTIFICATE_FILE is required}:/run/secrets/dataprotection.pfx:ro
     profiles:
       - worker
       - production
@@ -132,3 +150,4 @@ services:
 volumes:
   postgres-data:
   whatsapp-web-sessions:
+  dataprotection-keys:

@@ -43,4 +43,15 @@ describe('BotConfigPage', () => {
     expect(screen.getByText('Envio o boleto.')).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.anything())
   })
+
+  it('formats the inactive status as a single message with emphasized status', async () => {
+    renderPage()
+
+    const message = await screen.findByText((_, element) =>
+      element?.tagName === 'P' &&
+      element.textContent === 'O bot está inativo. As mensagens automáticas não serão enviadas.')
+
+    expect(message).toBeInTheDocument()
+    expect(screen.getByText('inativo', { selector: 'strong' })).toBeInTheDocument()
+  })
 })

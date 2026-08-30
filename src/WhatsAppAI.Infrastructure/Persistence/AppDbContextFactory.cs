@@ -20,7 +20,11 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         }
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(PersistenceServiceCollectionExtensions.LimitConnectionPool(connectionString))
+            .UseNpgsql(
+                PersistenceServiceCollectionExtensions.LimitConnectionPool(connectionString),
+                npgsqlOptions => npgsqlOptions.MigrationsHistoryTable(
+                    "__EFMigrationsHistory",
+                    "public"))
             .Options;
 
         return new AppDbContext(options, new CurrentTenant());

@@ -62,6 +62,8 @@ public sealed class WebhookEventRepository(
     {
         var toDelete = await context.Set<WebhookEvent>()
             .Where(e => e.CreatedAt < cutoff && e.Status == WebhookEventStatus.Processed)
+            .OrderBy(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
 

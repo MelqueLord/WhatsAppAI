@@ -1,16 +1,46 @@
 # Plano de correção para produção
 
-**Status:** Em andamento (P0 implementado em código; validações operacionais pendentes)  
-**Base da auditoria:** 2026-08-21  
+**Status:** NO-GO — correções de código principais validadas; gates operacionais e de release ainda pendentes
+**Base da auditoria:** 2026-08-30
 **Objetivo:** levar a plataforma a um deploy reproduzível e seguro em PostgreSQL, sem alterar o escopo do MVP.
 
 ## Estado atual
 
-- Backend e frontend compilam em `Release`.
-- Testes .NET: 226 aprovados, 3 falhando e 8 testes de webhook ignorados.
-- Frontend: 1 teste falhando e 23 erros de lint.
-- Existem alterações e migrations ainda não versionadas.
-- Itens P0 de segurança/deploy foram implementados no código e configuração; falta validar em ambiente com Docker/TLS.
+- Build .NET `Release`: aprovado em 2026-08-30, com 0 warnings e 0 errors.
+- Testes unitários: 340 aprovados; testes de arquitetura: 7 aprovados.
+- Frontend: lint, 24 testes e build aprovados. O build ainda emite avisos de chunk grande e de anotação `PURE` de dependência; devem ser avaliados antes de exigir “zero warning” no pipeline.
+- `docker compose --profile production config`: aprovado com variáveis de teste preenchidas; isso não substitui validação com secrets e domínio reais.
+- Migrations: `has-pending-model-changes` aprovado com conexão PostgreSQL de teste; bundle Docker gerado sem warnings de restore, aplicado em banco vazio e repetido com sucesso (12 migrations e segunda execução sem alterações).
+- Startup de produção: API e worker iniciaram contra a base migrada com `Persistence__ApplyMigrationsOnStartup=false`; liveness/readiness da API retornaram HTTP 200. O Compose agora repassa também as credenciais obrigatórias de bootstrap do PlatformAdmin.
+- Integração: após a correção do fixture de HTTP e da configuração PFX temporária do host de testes, a suíte completa passou: 67/67, 0 falhas e 0 ignorados, em 1m40s.
+- Ainda não há evidência de `nginx -t`, HTTPS, SignalR por domínio, smoke test das integrações reais, backup/restore ou aprovação formal de Go/No-Go. O smoke local com PFX temporário eliminou os avisos de Data Protection; as duas consultas do worker e o binding HTTP explícito foram corrigidos no código/configuração e precisam de novo smoke para confirmação operacional.
+- A tarefa `T013` da frente LGPD permanece aberta até fechar esses gates em `specs/002-lgpd-production-readiness/tasks.md`.
+
+## Plano local de correção — 2026-08-30
+
+Executar os pacotes abaixo nesta ordem. Cada pacote só pode ser encerrado com a evidência indicada; nenhum item deve ser marcado como concluído apenas por inspeção documental.
+
+| Ordem | Prioridade | Pacote | Ação local | Critério de conclusão | Evidência |
+|---|---|---|---|---|---|
+| 1 | P0 | Suíte integrada determinística | Investigar o teste que impede a conclusão da suíte; executar unitários, arquitetura e integração em processos separados, com timeout e relatório TRX/JUnit | Todas as suítes terminam com exit code 0, sem teste crítico ignorado ou processo pendente | Logs do comando e relatório de testes |
+| 2 | P0 | Migrations e startup | Aplicar migrations em PostgreSQL vazio e em cópia da versão anterior; validar `Up`/rollback; decidir se o `MigrateAsync` do WebApi permanece ou se somente o serviço `migrate` aplica schema | Banco novo e banco atualizado chegam ao mesmo snapshot; estratégia de concorrência documentada | Saída do migration bundle, diff do schema e decisão registrada |
+| 3 | P0 | Deploy local equivalente | Preencher `.env` de teste, executar `docker compose --profile production config`, subir stack, validar health, frontend, API, WebSocket SignalR e `nginx -t` | Stack inicia reproduzivelmente e não expõe API/PostgreSQL diretamente | Logs do Compose, `nginx -t` e smoke HTTPS |
+| 4 | P1 | Segurança e privacidade | Rodar scanner de segredos; revisar logs de webhook/IA/exportação; executar isolamento entre dois tenants e fluxo LGPD completo | Nenhum segredo/PII indevido em logs e zero acesso cruzado | Relatório do scanner, testes de isolamento e evidência LGPD |
+| 5 | P1 | Integrações reais | Executar o workflow `Staging smoke` com Cloud API, QR, provedor de IA e SignalR configurados | Login, recebimento, envio, status, handoff e conexão real passam sem segredo no output | URL do workflow e logs sanitizados |
+| 6 | P1 | Recuperação operacional | Criar backup, restaurar em staging isolado e medir RPO/RTO; testar rollback de imagem | RPO ≤ 24h, RTO ≤ 4h e rollback executável por pessoa designada | Backup, restore, timestamps e checklist assinado |
+| 7 | P2 | Observabilidade e capacidade | Configurar OTLP, alertas, monitoramento de readiness e teste de carga somente leitura | Alertas chegam ao canal definido e limites de capacidade são conhecidos | Dashboard, alerta de teste e relatório de carga |
+| 8 | P0 | Aprovação final | Revisar diff/tag, checklist, RIPD, responsáveis e plano de rollback | Todos os gates do contrato têm evidência e aprovação explícita | Registro de Go/No-Go e tag candidata |
+
+### Critério de decisão
+
+O resultado permanece **NO-GO** enquanto qualquer pacote P0/P1 estiver aberto, a integração completa não terminar com sucesso, houver teste crítico ignorado, ou backup/restore e HTTPS não tiverem sido ensaiados. Exceção somente mediante ADR com risco, responsável, prazo e aprovação, conforme a constituição.
+
+### Progresso do plano
+
+- **Pacote 1 — Suíte integrada determinística:** concluído em 2026-08-30. O fixture de HTTP passou a desabilitar hosted workers; o processamento dos workers continua coberto separadamente, enquanto os testes de endpoint não geram retries artificiais.
+- **Pacote 2 — Migrations e startup:** concluído na validação local. O histórico EF foi fixado explicitamente em `public` para evitar a mudança de resolução causada pelo `search_path`; o bundle foi executado duas vezes na mesma base, e API/worker passaram a não aplicar migrations em Production. Rollback de banco, restore e validação em cópia de versão anterior continuam no pacote operacional.
+- **Pacote 3 — Deploy local equivalente:** em andamento. Persistência e criptografia das chaves de Data Protection foram concluídas e validadas com reinício da API/worker; as consultas em lote do worker foram ordenadas e o binding foi alinhado a `ASPNETCORE_HTTP_PORTS`; faltam a validação do frontend atrás do proxy, Nginx, HTTPS e SignalR por domínio.
+- **Próximo incremento:** validar o proxy completo e corrigir os avisos operacionais relevantes antes do staging.
 
 ## Progresso aplicado (2026-08-21)
 
@@ -22,9 +52,11 @@
 
 ## Pendências imediatas após implementação P0
 
-- Validar `docker compose --profile production config` em ambiente com Docker.
+- Provisionar o PFX definitivo e registrar a rotação das chaves de Data Protection no runbook.
 - Validar `nginx -t` e smoke HTTPS/SignalR por domínio.
-- Fechar P1 aberto: 3 falhas de testes .NET, 23 erros de lint frontend e 1 teste frontend falhando.
+- Ensaiar migration em cópia de versão anterior, rollback e restauração.
+- Executar scanner de segredos e smoke com integrações reais.
+- Atualizar checklist e obter aprovação formal de segurança, LGPD e operação.
 
 Foi adicionado o workflow manual `Staging smoke` (`.github/workflows/staging-smoke.yml`)
 com o script `apps/web/scripts/staging-smoke.mjs`. Ele gera a evidência reproduzível

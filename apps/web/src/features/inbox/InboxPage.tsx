@@ -31,7 +31,7 @@ export function InboxPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openConversationId])
 
-  const { isConnected, start: startSignalR } = useSignalR({
+  const { isConnected, isReconnecting, start: startSignalR } = useSignalR({
     hubUrl: '/hubs/inbox',
     onMessage: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -69,8 +69,8 @@ export function InboxPage() {
 
   return (
     <div className="inbox-page h-screen flex flex-col bg-[#070b16] text-white">
-      {/* Connection status bar — only shown after a confirmed disconnection, not during initial connect */}
-      {isConnected === false && (
+      {/* Connection status bar — only shown while SignalR is actively reconnecting. */}
+      {isReconnecting && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-center gap-2">
           <WifiOff className="w-3.5 h-3.5 text-amber-600" />
           <span className="text-xs text-amber-700">Reconectando ao servidor...</span>
