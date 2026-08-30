@@ -24,7 +24,6 @@ services:
     build:
       context: .
       dockerfile: src/WhatsAppAI.WebApi/Dockerfile
-    restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-whatsappai};Username=${POSTGRES_USER:-whatsappai};Password=${POSTGRES_PASSWORD}"
     depends_on:
@@ -44,6 +43,7 @@ services:
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
+      Workers__Enabled: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +64,7 @@ services:
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
+      Workers__Enabled: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +73,7 @@ services:
     entrypoint: ["dotnet", "WhatsAppAI.WebApi.dll", "--urls", "http://+:5001"]
     profiles:
       - worker
+      - production
 
   frontend:
     build:

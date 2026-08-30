@@ -1,0 +1,51 @@
+name: Staging performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Read-only endpoint to exercise
+        required: true
+        default: health
+        type: choice
+        options:
+          - health
+          - inbox
+      requests:
+        description: Total requests
+        required: true
+        default: '200'
+        type: string
+      concurrency:
+        description: Maximum concurrent requests
+        required: true
+        default: '20'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Read-only load test
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 10
+    env:
+      PERF_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      PERF_SCENARIO: ${{ inputs.scenario }}
+      PERF_REQUESTS: ${{ inputs.requests }}
+      PERF_CONCURRENCY: ${{ inputs.concurrency }}
+      STAGING_EMAIL: ${{ secrets.STAGING_EMAIL }}
+      STAGING_PASSWORD: ${{ secrets.STAGING_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run performance scenario
+        run: node scripts/load-test.mjs

@@ -4,10 +4,13 @@
 
 set -e
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
+
 # Configuration
 BACKUP_DIR="/var/backups/whatsappai"
 RETENTION_DAYS=7
-POSTGRES_CONTAINER="whatsapp-ai-postgres-1"
 POSTGRES_DB="${POSTGRES_DB:-whatsappai}"
 POSTGRES_USER="${POSTGRES_USER:-whatsappai}"
 
@@ -20,7 +23,7 @@ BACKUP_FILE="$BACKUP_DIR/backup_${TIMESTAMP}.dump"
 
 # Create backup
 echo "[$(date)] Starting backup..."
-docker exec "$POSTGRES_CONTAINER" pg_dump \
+docker compose exec -T postgres pg_dump \
     --username "$POSTGRES_USER" \
     --dbname "$POSTGRES_DB" \
     --format=custom > "$BACKUP_FILE"

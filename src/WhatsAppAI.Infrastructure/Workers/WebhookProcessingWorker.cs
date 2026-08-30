@@ -283,7 +283,6 @@ public sealed class WebhookProcessingWorker(
         {
             contact.UpdateName(webhookContact?.Profile?.Name);
             contact.RecordMessage();
-            await contactRepository.UpdateAsync(contact, cancellationToken);
         }
 
         // Get or create conversation
@@ -299,7 +298,6 @@ public sealed class WebhookProcessingWorker(
                 conversation.SetPhoneNumberId(phoneNumberId);
                 conversation.RenewWindow();
                 conversation.RecordMessage();
-                await conversationRepository.UpdateAsync(conversation, cancellationToken);
             }
             else
             {
@@ -316,7 +314,6 @@ public sealed class WebhookProcessingWorker(
             // Only renew window for inbound customer messages
             conversation.RenewWindow();
             conversation.RecordMessage();
-            await conversationRepository.UpdateAsync(conversation, cancellationToken);
         }
 
         // Parse message type

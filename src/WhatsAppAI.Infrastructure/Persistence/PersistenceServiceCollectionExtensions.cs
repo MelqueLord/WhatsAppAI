@@ -20,10 +20,11 @@ public static class PersistenceServiceCollectionExtensions
 {
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        int? maxPoolSize = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        var pooledConnectionString = LimitConnectionPool(connectionString);
+        var pooledConnectionString = LimitConnectionPool(connectionString, maxPoolSize);
 
         services.AddSingleton<TenantSaveChangesInterceptor>();
         services.AddSingleton<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
@@ -72,11 +73,18 @@ public static class PersistenceServiceCollectionExtensions
         return services;
     }
 
-    internal static string LimitConnectionPool(string connectionString)
+    internal static string LimitConnectionPool(string connectionString, int? maxPoolSize = null)
     {
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
         builder.Pooling = true;
-        builder.MaxPoolSize = Math.Min(builder.MaxPoolSize, 10);
+
+        if (maxPoolSize is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxPoolSize), "Maximum pool size must be greater than zero.");
+
+        // An application-level value is an explicit operational setting and
+        // therefore takes precedence over the connection-string default.
+        if (maxPoolSize is int configuredMaxPoolSize)
+            builder.MaxPoolSize = configuredMaxPoolSize;
 
         return builder.ConnectionString;
     }

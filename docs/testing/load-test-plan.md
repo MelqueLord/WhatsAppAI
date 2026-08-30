@@ -89,6 +89,24 @@
 - **SignalR:** Custom WebSocket client
 - **Monitoring:** Grafana + Prometheus
 
+## Reproducible runner
+
+The read-only HTTP scenarios can be executed without additional dependencies:
+
+```bash
+PERF_BASE_URL=https://staging.example.com \
+PERF_SCENARIO=health \
+PERF_REQUESTS=1000 \
+PERF_CONCURRENCY=50 \
+node scripts/load-test.mjs
+```
+
+Use `PERF_SCENARIO=inbox` with `STAGING_EMAIL` and `STAGING_PASSWORD` to exercise
+authenticated inbox reads. The workflow `.github/workflows/staging-performance.yml`
+provides the same run manually in the staging environment and publishes p50/p95/p99,
+throughput and HTTP errors to the job summary. It does not send WhatsApp or AI
+messages.
+
 ## Test Data
 
 ```json

@@ -4,8 +4,11 @@ namespace WhatsAppAI.Infrastructure.Workers;
 
 public static class WorkerServiceCollectionExtensions
 {
-    public static IServiceCollection AddWorkers(this IServiceCollection services)
+    public static IServiceCollection AddWorkers(this IServiceCollection services, bool enabled = true)
     {
+        if (!enabled)
+            return services;
+
         services.AddHostedService<WebhookProcessingWorker>();
         services.AddHostedService<OutboxProcessingWorker>();
         services.AddHostedService<AiOrchestrationWorker>();

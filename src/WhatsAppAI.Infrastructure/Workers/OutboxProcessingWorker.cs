@@ -99,9 +99,6 @@ public sealed class OutboxProcessingWorker(
 
         try
         {
-            outboxMessage.MarkProcessing();
-            await outboxRepository.UpdateAsync(outboxMessage);
-
             var message = await messageRepository.GetByIdAsync(outboxMessage.MessageId, cancellationToken);
             if (message is null)
             {
@@ -115,9 +112,8 @@ public sealed class OutboxProcessingWorker(
             if (tenant?.Status != TenantStatus.Active)
             {
                 message.MarkFailed("Tenant suspended");
-                await messageRepository.UpdateAsync(message, cancellationToken);
                 outboxMessage.MarkDead("Tenant suspended");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 logger.LogInformation("Outbox {OutboxId} blocked for suspended tenant {TenantId}", outboxMessage.Id, outboxMessage.TenantId);
                 return;
             }
@@ -191,9 +187,8 @@ public sealed class OutboxProcessingWorker(
                         : !AiReplyDeliveryGuard.CanSendAutomatedNotice(conversation, expectedVersion, DateTime.UtcNow)))
                 {
                     message.MarkFailed("Automated reply invalidated by conversation state");
-                    await messageRepository.UpdateAsync(message, cancellationToken);
                     outboxMessage.MarkDead("Automated reply invalidated by conversation state");
-                    await outboxRepository.UpdateAsync(outboxMessage);
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                     logger.LogInformation(
                         "Automated reply {MessageId} discarded because conversation state changed",
                         message.Id);
@@ -209,9 +204,8 @@ public sealed class OutboxProcessingWorker(
                     string.IsNullOrWhiteSpace(message.TemplateLanguage))
                 {
                     message.MarkFailed("Templates are available only for the official WhatsApp API");
-                    await messageRepository.UpdateAsync(message, cancellationToken);
                     outboxMessage.MarkDead("Invalid template channel or configuration");
-                    await outboxRepository.UpdateAsync(outboxMessage);
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                     return;
                 }
 
@@ -225,9 +219,8 @@ public sealed class OutboxProcessingWorker(
                 catch (JsonException)
                 {
                     message.MarkFailed("Invalid template parameters");
-                    await messageRepository.UpdateAsync(message, cancellationToken);
                     outboxMessage.MarkDead("Invalid template parameters");
-                    await outboxRepository.UpdateAsync(outboxMessage);
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                     return;
                 }
 
@@ -235,9 +228,8 @@ public sealed class OutboxProcessingWorker(
                     parameter is null || parameter.Length > 1024))
                 {
                     message.MarkFailed("Invalid template parameters");
-                    await messageRepository.UpdateAsync(message, cancellationToken);
                     outboxMessage.MarkDead("Invalid template parameters");
-                    await outboxRepository.UpdateAsync(outboxMessage);
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                     return;
                 }
 
@@ -263,18 +255,16 @@ public sealed class OutboxProcessingWorker(
             if (result.IsSuccess)
             {
                 message.MarkSent(result.MessageId ?? string.Empty);
-                await messageRepository.UpdateAsync(message, cancellationToken);
-
                 outboxMessage.MarkCompleted();
-                await outboxRepository.UpdateAsync(outboxMessage);
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
 
                 logger.LogInformation("Outbox {OutboxId} completed, message {MessageId} sent", outboxMessage.Id, message.Id);
             }
             else
             {
                 HandleFailure(outboxMessage, result.ErrorMessage ?? "Send failed");
-                await outboxRepository.UpdateAsync(outboxMessage);
-                await messageRepository.UpdateAsync(message, cancellationToken);
+                message.MarkFailed(result.ErrorMessage ?? "Send failed");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
 
                 logger.LogWarning("Outbox {OutboxId} failed: {Error}", outboxMessage.Id, outboxMessage.LastError);
             }
@@ -285,6 +275,19 @@ public sealed class OutboxProcessingWorker(
             await outboxRepository.UpdateAsync(outboxMessage);
             logger.LogError(ex, "Error processing outbox {OutboxId}", outboxMessage.Id);
         }
+    }
+
+    private static async Task SaveMessageAndOutboxAsync(
+        AppDbContext dbContext,
+        Message message,
+        OutboxMessage outboxMessage,
+        CancellationToken cancellationToken)
+    {
+        // Both state transitions use the same scoped context. Persist them in one
+        // EF batch to avoid two round-trips while keeping the outbox claim durable.
+        dbContext.Set<Message>().Update(message);
+        dbContext.Set<OutboxMessage>().Update(outboxMessage);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private void HandleFailure(OutboxMessage outboxMessage, string error)

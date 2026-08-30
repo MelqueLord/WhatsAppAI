@@ -112,7 +112,6 @@ public sealed class AiOrchestrationWorker(
         var aiProviderResolver = scopedServices.GetRequiredService<IAiProviderResolver>();
         var contextAssembler = scopedServices.GetRequiredService<ContextAssembler>();
         var outboxRepository = scopedServices.GetRequiredService<IOutboxMessageRepository>();
-        var interactionRepository = scopedServices.GetRequiredService<IAiInteractionRepository>();
         var usageRepository = scopedServices.GetRequiredService<IUsageLedgerRepository>();
         var pricingRepository = scopedServices.GetRequiredService<IAiModelPricingRepository>();
         var modelEvaluationRepository = scopedServices.GetRequiredService<IModelEvaluationRepository>();
@@ -281,12 +280,12 @@ public sealed class AiOrchestrationWorker(
                         replyContent,
                         AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
                             "simple-auto-reply", message.Id, expectedConversationVersion));
-                    await messageRepository.AddAsync(outboundMsg, cancellationToken);
-
                     var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
-                    await outboxRepository.AddAsync(outboxMsg);
                     message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    dbContext.Set<Message>().Add(outboundMsg);
+                    dbContext.Set<OutboxMessage>().Add(outboxMsg);
+                    dbContext.Set<Message>().Update(message);
+                    await dbContext.SaveChangesAsync(cancellationToken);
                     logger.LogInformation("SimpleAutoReply sent for tenant {TenantId}", message.TenantId);
                 }
                 catch (Exception ex)
@@ -491,7 +490,7 @@ public sealed class AiOrchestrationWorker(
                 credential.ModelId, response.Decision.Action.ToString(),
                 response.Decision.HandoffReason, response.Decision.Confidence,
                 response.InputTokens, response.OutputTokens, 0, response.RawResponseId);
-            await interactionRepository.AddAsync(interaction, cancellationToken);
+            dbContext.Set<AiInteraction>().Add(interaction);
 
             // Persist usage ledger with actual provider name
             if (response.InputTokens > 0)
@@ -503,7 +502,7 @@ public sealed class AiOrchestrationWorker(
                     pricing?.CalculateCostMinorUnits(response.InputTokens, input: true),
                     pricing?.Currency,
                     pricing?.Version);
-                await usageRepository.AddAsync(usage, cancellationToken);
+                dbContext.Set<UsageLedger>().Add(usage);
             }
             if (response.OutputTokens > 0)
             {
@@ -514,8 +513,12 @@ public sealed class AiOrchestrationWorker(
                     pricing?.CalculateCostMinorUnits(response.OutputTokens, input: false),
                     pricing?.Currency,
                     pricing?.Version);
-                await usageRepository.AddAsync(usage, cancellationToken);
+                dbContext.Set<UsageLedger>().Add(usage);
             }
+
+            // Interaction and token usage are independent rows but share this
+            // context; flush them together before delivery revalidation.
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             // Revalidate persisted state after the AI call.
             await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
@@ -660,10 +663,7 @@ public sealed class AiOrchestrationWorker(
                     AiReplyDeliveryGuard.CreateIdempotencyKey(
                         message.Id, expectedConversationVersion));
 
-                await messageRepository.AddAsync(replyMessage, cancellationToken);
-
                 var outboxMessage = OutboxMessage.Create(message.TenantId, replyMessage.Id);
-                await outboxRepository.AddAsync(outboxMessage);
 
                 var responseUsage = UsageLedger.Create(
                     message.TenantId,
@@ -672,7 +672,9 @@ public sealed class AiOrchestrationWorker(
                     replyMessage.Id.ToString(),
                     1,
                     "responses");
-                await usageRepository.AddAsync(responseUsage, cancellationToken);
+                dbContext.Set<Message>().Add(replyMessage);
+                dbContext.Set<OutboxMessage>().Add(outboxMessage);
+                dbContext.Set<UsageLedger>().Add(responseUsage);
                 await RegisterAiQuotaAuditAsync(
                     dbContext,
                     auditLogRepository,
@@ -683,10 +685,14 @@ public sealed class AiOrchestrationWorker(
                     cancellationToken);
 
                 conversation.RecordMessage();
-                await conversationRepository.UpdateAsync(conversation, cancellationToken);
+                dbContext.Set<Conversation>().Update(conversation);
 
                 message.MarkProcessedByAi();
-                await messageRepository.UpdateAsync(message, cancellationToken);
+                dbContext.Set<Message>().Update(message);
+
+                // RegisterAiQuotaAuditAsync saves pending entities when it needs
+                // to create the audit row; save explicitly when no audit was due.
+                await dbContext.SaveChangesAsync(cancellationToken);
 
                 await quotaTransaction.CommitAsync(cancellationToken);
 

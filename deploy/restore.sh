@@ -4,6 +4,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
+
 if [ -z "$1" ]; then
     echo "Usage: $0 <backup_file.dump>"
     echo "Available backups:"
@@ -12,7 +16,6 @@ if [ -z "$1" ]; then
 fi
 
 BACKUP_FILE="$1"
-POSTGRES_CONTAINER="whatsapp-ai-postgres-1"
 POSTGRES_DB="${POSTGRES_DB:-whatsappai}"
 POSTGRES_USER="${POSTGRES_USER:-whatsappai}"
 
@@ -34,9 +37,9 @@ fi
 
 echo "[$(date)] Starting restore..."
 
-docker exec "$POSTGRES_CONTAINER" dropdb --if-exists --force --username "$POSTGRES_USER" "$POSTGRES_DB"
-docker exec "$POSTGRES_CONTAINER" createdb --username "$POSTGRES_USER" "$POSTGRES_DB"
-docker exec -i "$POSTGRES_CONTAINER" pg_restore \
+docker compose exec -T postgres dropdb --if-exists --force --username "$POSTGRES_USER" "$POSTGRES_DB"
+docker compose exec -T postgres createdb --username "$POSTGRES_USER" "$POSTGRES_DB"
+docker compose exec -T postgres pg_restore \
     --username "$POSTGRES_USER" \
     --dbname "$POSTGRES_DB" \
     --clean --if-exists < "$BACKUP_FILE"

@@ -57,6 +57,9 @@ docker compose up -d api
 
 # Start all services
 docker compose --profile production up -d
+
+# For an API-only/local setup with the worker profile
+# docker compose --profile worker up -d
 ```
 
 ### 2. Verify Services

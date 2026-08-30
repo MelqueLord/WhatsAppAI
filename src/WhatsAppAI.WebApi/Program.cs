@@ -103,7 +103,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
     connectionString = "Host=localhost;Port=5432;Database=whatsappai;Username=whatsappai;Password=postgres";
 }
 
-builder.Services.AddPersistence(connectionString);
+var maxPoolSize = builder.Configuration.GetValue<int?>("Persistence:MaxPoolSize");
+builder.Services.AddPersistence(connectionString, maxPoolSize);
 
 builder.Services.AddObservability(
     builder.Configuration);
@@ -120,7 +121,8 @@ builder.Services.AddMetaServices(
 
 builder.Services.AddAiProviderServices();
 
-builder.Services.AddWorkers();
+builder.Services.AddWorkers(
+    builder.Configuration.GetValue("Workers:Enabled", true));
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<WhatsAppAI.Application.Abstractions.IRealtimeNotifier,
