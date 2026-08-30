@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Conversation } from '../../lib/api'
+import { formatConversationMode } from '../../lib/utils'
 
 export function DashboardPage() {
   const { user, isPlatformAdmin, isTenantOwner } = useAuth()
@@ -225,7 +226,7 @@ export function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-slate-400">
-                      {conv.mode}
+                      {formatConversationMode(conv.mode)}
                     </span>
                     {conv.isWindowOpen && (
                       <div className="flex items-center gap-1 mt-0.5">

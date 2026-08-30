@@ -46,7 +46,15 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
       throw new Error(isLoginEndpoint ? 'INVALID_CREDENTIALS' : 'UNAUTHORIZED')
     }
     const error = await response.text()
-    throw new Error(error || `HTTP ${response.status}`)
+    let message = error
+    try {
+      const payload = JSON.parse(error) as { error?: unknown; message?: unknown }
+      if (typeof payload.error === 'string') message = payload.error
+      else if (typeof payload.message === 'string') message = payload.message
+    } catch {
+      // Keep plain-text responses unchanged.
+    }
+    throw new Error(message || `HTTP ${response.status}`)
   }
   return response.json()
 }

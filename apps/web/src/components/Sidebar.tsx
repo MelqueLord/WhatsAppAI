@@ -20,6 +20,7 @@ import {
   Settings,
 } from 'lucide-react'
 import atenzLogo from '../assets/atenz-logo-a.png'
+import { formatUserRole } from '../lib/utils'
 
 interface SidebarProps {
   collapsed: boolean
@@ -214,7 +215,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
                 {user?.displayName || user?.email}
               </p>
               <p className="text-[10px] text-slate-400 uppercase tracking-wider">
-                {user?.role || 'Usuário'}
+                {formatUserRole(user?.role)}
               </p>
             </div>
           )}
