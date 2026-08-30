@@ -140,7 +140,8 @@ public sealed class PostgreSqlMigrationConfigurationTests
                 "20260829193641_BindModelEvaluationToProvider",
                 "20260829203110_RenamePlanLineQuotaToTotal",
                 "20260829212302_AddBotBusinessHoursSchedule",
-                "20260830124123_AddWhatsAppTemplateMessages"
+                "20260830124123_AddWhatsAppTemplateMessages",
+                "20260830202456_AddWhatsAppWebSessionLeases"
             ],
             context.Database.GetMigrations());
     }

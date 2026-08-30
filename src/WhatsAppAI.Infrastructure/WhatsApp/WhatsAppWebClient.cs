@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using WhatsAppAI.Application.Integrations;
 
@@ -73,9 +74,13 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
     {
         try
         {
-            var response = await httpClient.PostAsJsonAsync(
-                $"{BaseUrl}/sessions/{tenantId}-qr-{lineNumber}/send-message",
-                new { recipientPhone, text },
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"{baseUrl}/sessions/{tenantId}-qr-{lineNumber}/send-message")
+                {
+                    Content = JsonContent.Create(new { recipientPhone, text })
+                },
                 cancellationToken);
             var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
             return new SendMessageResult
@@ -102,9 +107,14 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
     {
         try
         {
-            var result = await httpClient.GetFromJsonAsync<BridgeQrResponse>(
-                $"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/qr",
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"{baseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/qr"),
                 cancellationToken);
+            var result = response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<BridgeQrResponse>(cancellationToken: cancellationToken)
+                : null;
 
             return new WhatsAppQrCodeResult
             {
@@ -131,9 +141,14 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
     {
         try
         {
-            var result = await httpClient.GetFromJsonAsync<BridgeStatusResponse>(
-                $"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/status",
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"{baseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/status"),
                 cancellationToken);
+            var result = response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<BridgeStatusResponse>(cancellationToken: cancellationToken)
+                : null;
 
             return new WhatsAppSessionStatus
             {
@@ -153,7 +168,44 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         int lineNumber = 1,
         CancellationToken cancellationToken = default)
     {
-        await httpClient.PostAsync($"{BaseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/logout", null, cancellationToken);
+        using var _ = await SendToSessionOwnerAsync(
+            baseUrl => new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{baseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/logout"),
+            cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendToSessionOwnerAsync(
+        Func<string, HttpRequestMessage> requestFactory,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = BaseUrl.TrimEnd('/');
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var request = requestFactory(baseUrl);
+            var response = await httpClient.SendAsync(request, cancellationToken);
+            if (response.StatusCode != HttpStatusCode.Conflict)
+                return response;
+
+            var owner = await response.Content.ReadFromJsonAsync<BridgeOwnershipResponse>(cancellationToken: cancellationToken);
+            response.Dispose();
+            if (!TryGetOwnerBaseUrl(owner?.OwnerUrl, out baseUrl))
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+    }
+
+    private static bool TryGetOwnerBaseUrl(string? value, out string baseUrl)
+    {
+        baseUrl = string.Empty;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+            return false;
+
+        baseUrl = uri.GetLeftPart(UriPartial.Authority);
+        return true;
     }
 
     private sealed record BridgeQrResponse
@@ -175,5 +227,10 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         public bool Success { get; init; }
         public string? MessageId { get; init; }
         public string? Error { get; init; }
+    }
+
+    private sealed record BridgeOwnershipResponse
+    {
+        public string? OwnerUrl { get; init; }
     }
 }

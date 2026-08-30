@@ -249,6 +249,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-057:** coletar na tela de IA um perfil estruturado do negócio (descrição, público-alvo, produtos/serviços, tom, horário e localização), persistindo-o junto às diretrizes existentes para personalizar a abordagem sem substituir a base de conhecimento para fatos comerciais.
 - **FR-058:** permitir ao TenantOwner configurar expediente do BOT por dia da semana e fuso horário; quando habilitado, mensagens recebidas fora de um período aberto não podem seguir o fluxo automático e devem usar a mensagem configurada de fora do horário.
 - **FR-059:** permitir ao operador enviar template transacional aprovado pela Meta com idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas; o backend deve rejeitar templates em conexões QR Code e persistir a intenção na Outbox.
+- **FR-060:** permitir executar múltiplas instâncias da ponte QR sem que duas instâncias controlem a mesma sessão; cada sessão deve ter lease exclusivo e renovável no PostgreSQL, e chamadas devem ser roteadas para a instância dona.
 
 ## 6. Regras de negócio
 
@@ -281,6 +282,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 - **BR-028:** agenda desabilitada mantém compatibilidade 24 horas; agenda habilitada exige sete dias válidos, horários de abertura/fechamento coerentes e fuso permitido. Sem mensagem de fora do horário, o BOT finaliza a entrada sem criar resposta automática.
 - **BR-029:** template transacional exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres, e só pode ser despachado por uma conta `OfficialApi`; QR Code deve finalizar a Outbox sem chamada externa.
+- **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
 
 ## 7. Requisitos não funcionais
 

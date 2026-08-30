@@ -57,6 +57,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
             ["Jwt:Audience"] = "whatsappai-tests",
             ["Meta:VerifyToken"] = "test-verify-token",
             ["Meta:AppSecret"] = "test-app-secret",
+            ["WHATSAPP_WEB_WEBHOOK_SECRET"] = "integration-test-whatsapp-web-secret-at-least-32-bytes",
             ["DataProtection:KeysPath"] = _dataProtectionKeysPath,
             ["DataProtection:CertificatePath"] = _dataProtectionCertificatePath,
             ["DataProtection:CertificatePassword"] = DataProtectionCertificatePassword,

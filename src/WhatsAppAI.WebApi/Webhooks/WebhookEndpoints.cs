@@ -56,6 +56,18 @@ public static class WebhookEndpoints
             .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
+        app.MapPut("/api/webhooks/whatsapp-web/session/{sessionId}/lease", AcquireWhatsAppWebSessionLeaseAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous()
+            .RequireRateLimiting("webhook")
+            .DisableAntiforgery();
+
+        app.MapDelete("/api/webhooks/whatsapp-web/session/{sessionId}/lease", ReleaseWhatsAppWebSessionLeaseAsync)
+            .WithTags("Webhooks - WhatsApp Web")
+            .AllowAnonymous()
+            .RequireRateLimiting("webhook")
+            .DisableAntiforgery();
+
         return app;
     }
 
@@ -63,11 +75,12 @@ public static class WebhookEndpoints
         string sessionId,
         HttpContext httpContext,
         IConfiguration configuration,
-        ISecretStore secretStore)
+        ISecretStore secretStore,
+        AppDbContext dbContext)
     {
         if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
             return Results.Unauthorized();
-        if (!IsValidSessionId(sessionId))
+        if (!IsValidSessionId(sessionId) || !await HasCurrentLeaseOwnershipAsync(sessionId, httpContext, dbContext))
             return Results.BadRequest();
 
         var payload = await secretStore.GetAsync($"whatsapp-web:auth:{sessionId}");
@@ -79,11 +92,13 @@ public static class WebhookEndpoints
         [FromBody] WhatsAppWebSessionRequest request,
         HttpContext httpContext,
         IConfiguration configuration,
-        ISecretStore secretStore)
+        ISecretStore secretStore,
+        AppDbContext dbContext)
     {
         if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
             return Results.Unauthorized();
-        if (!IsValidSessionId(sessionId) || string.IsNullOrWhiteSpace(request.Payload) || request.Payload.Length > 1_000_000)
+        if (!IsValidSessionId(sessionId) || string.IsNullOrWhiteSpace(request.Payload) || request.Payload.Length > 1_000_000 ||
+            !await HasCurrentLeaseOwnershipAsync(sessionId, httpContext, dbContext))
             return Results.BadRequest();
 
         await secretStore.SetAsync($"whatsapp-web:auth:{sessionId}", request.Payload);
@@ -94,14 +109,113 @@ public static class WebhookEndpoints
         string sessionId,
         HttpContext httpContext,
         IConfiguration configuration,
-        ISecretStore secretStore)
+        ISecretStore secretStore,
+        AppDbContext dbContext)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!IsValidSessionId(sessionId) || !await HasCurrentLeaseOwnershipAsync(sessionId, httpContext, dbContext))
+            return Results.BadRequest();
+
+        await secretStore.DeleteAsync($"whatsapp-web:auth:{sessionId}");
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> AcquireWhatsAppWebSessionLeaseAsync(
+        string sessionId,
+        [FromBody] WhatsAppWebSessionLeaseRequest request,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!TryParseSessionId(sessionId, out var tenantId, out var lineNumber) ||
+            !TryNormalizeInstanceUrl(request.InstanceUrl, out var instanceUrl) ||
+            string.IsNullOrWhiteSpace(request.InstanceId) || request.InstanceId.Length > 160)
+            return Results.BadRequest();
+
+        var now = DateTime.UtcNow;
+        var expiresAt = now.AddSeconds(45);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (dbContext.Database.IsNpgsql())
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtext({sessionId}))",
+                cancellationToken);
+        }
+
+        var lease = await dbContext.WhatsAppWebSessionLeases
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.SessionId == sessionId, cancellationToken);
+
+        if (lease is not null && !lease.IsExpired(now) && !lease.IsOwnedBy(request.InstanceId))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Conflict(new { ownerUrl = lease.OwnerBaseUrl, expiresAt = lease.ExpiresAt });
+        }
+
+        if (lease is null)
+        {
+            lease = WhatsAppWebSessionLease.Create(
+                sessionId,
+                tenantId,
+                lineNumber,
+                request.InstanceId,
+                instanceUrl,
+                expiresAt,
+                now);
+            dbContext.WhatsAppWebSessionLeases.Add(lease);
+        }
+        else if (lease.IsOwnedBy(request.InstanceId))
+        {
+            lease.Renew(instanceUrl, expiresAt, now);
+        }
+        else
+        {
+            lease.TransferTo(request.InstanceId, instanceUrl, expiresAt, now);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Results.Ok(new { ownerUrl = instanceUrl, expiresAt });
+    }
+
+    private static async Task<IResult> ReleaseWhatsAppWebSessionLeaseAsync(
+        string sessionId,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
     {
         if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
             return Results.Unauthorized();
         if (!IsValidSessionId(sessionId))
             return Results.BadRequest();
 
-        await secretStore.DeleteAsync($"whatsapp-web:auth:{sessionId}");
+        var instanceId = httpContext.Request.Headers["X-WhatsApp-Web-Instance"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return Results.BadRequest();
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (dbContext.Database.IsNpgsql())
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtext({sessionId}))",
+                cancellationToken);
+        }
+
+        var lease = await dbContext.WhatsAppWebSessionLeases
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.SessionId == sessionId, cancellationToken);
+        if (lease is not null && lease.IsOwnedBy(instanceId))
+        {
+            dbContext.WhatsAppWebSessionLeases.Remove(lease);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
     }
 
@@ -121,11 +235,48 @@ public static class WebhookEndpoints
 
     private static bool IsValidSessionId(string sessionId)
     {
+        return TryParseSessionId(sessionId, out _, out _);
+    }
+
+    private static bool TryParseSessionId(string sessionId, out Guid tenantId, out int lineNumber)
+    {
+        tenantId = Guid.Empty;
+        lineNumber = 0;
         var separatorIndex = sessionId.LastIndexOf("-qr-", StringComparison.OrdinalIgnoreCase);
         return separatorIndex > 0 &&
-            Guid.TryParse(sessionId[..separatorIndex], out _) &&
-            int.TryParse(sessionId[(separatorIndex + 4)..], out var lineNumber) &&
+            Guid.TryParse(sessionId[..separatorIndex], out tenantId) &&
+            int.TryParse(sessionId[(separatorIndex + 4)..], out lineNumber) &&
             lineNumber is > 0 and <= 100;
+    }
+
+    private static bool TryNormalizeInstanceUrl(string? value, out string instanceUrl)
+    {
+        instanceUrl = string.Empty;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment))
+            return false;
+
+        instanceUrl = uri.GetLeftPart(UriPartial.Authority);
+        return true;
+    }
+
+    private static async Task<bool> HasCurrentLeaseOwnershipAsync(
+        string sessionId,
+        HttpContext httpContext,
+        AppDbContext dbContext)
+    {
+        var instanceId = httpContext.Request.Headers["X-WhatsApp-Web-Instance"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return false;
+
+        var lease = await dbContext.WhatsAppWebSessionLeases
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.SessionId == sessionId, httpContext.RequestAborted);
+        return lease is not null && lease.IsOwnedBy(instanceId) && !lease.IsExpired(DateTime.UtcNow);
     }
 
     private static async Task<IResult> ReceiveWhatsAppWebEventAsync(
@@ -497,4 +648,10 @@ public sealed class WebhookError
 public sealed record WhatsAppWebSessionRequest
 {
     public string Payload { get; init; } = string.Empty;
+}
+
+public sealed record WhatsAppWebSessionLeaseRequest
+{
+    public string InstanceId { get; init; } = string.Empty;
+    public string InstanceUrl { get; init; } = string.Empty;
 }

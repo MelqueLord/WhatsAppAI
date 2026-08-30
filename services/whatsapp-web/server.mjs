@@ -1,5 +1,5 @@
 import express from 'express'
-import { timingSafeEqual } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
@@ -11,6 +11,9 @@ const port = Number(process.env.PORT ?? 3020)
 const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
 const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
 const isProduction = process.env.NODE_ENV === 'production'
+const configuredInstanceId = process.env.WHATSAPP_WEB_INSTANCE_ID
+const instanceId = `${configuredInstanceId ?? 'local'}-${randomUUID()}`
+const instanceUrl = normalizeInstanceUrl(process.env.WHATSAPP_WEB_INSTANCE_URL ?? `http://localhost:${port}`)
 const sessions = new Map()
 const botConfigs = new Map()
 const reconnectTimers = new Map()
@@ -18,6 +21,7 @@ const authBackupTimers = new Map()
 const authBackupPromises = new Map()
 const lastAuthPayloads = new Map()
 const reconnectAttempts = new Map()
+const leaseRenewTimers = new Map()
 const gzipAsync = promisify(gzip)
 const gunzipAsync = promisify(gunzip)
 const sessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-qr-(?:[1-9]\d?|100)$/i
@@ -26,6 +30,10 @@ let isShuttingDown = false
 
 if (isProduction && (apiWebhookSecret === 'development-whatsapp-web-secret' || apiWebhookSecret.length < 32)) {
   throw new Error('WHATSAPP_WEB_WEBHOOK_SECRET must be a production secret with at least 32 characters.')
+}
+
+if (isProduction && (!configuredInstanceId || !process.env.WHATSAPP_WEB_INSTANCE_URL)) {
+  throw new Error('WHATSAPP_WEB_INSTANCE_ID and WHATSAPP_WEB_INSTANCE_URL are required in production.')
 }
 
 const defaultBotConfig = {
@@ -65,8 +73,6 @@ app.param('tenantId', (req, res, next, tenantId) => {
 
 async function getSession(tenantId) {
   const existing = sessions.get(tenantId)
-  if (existing?.sock) return existing
-
   const session = existing ?? {
     tenantId,
     status: 'connecting',
@@ -78,6 +84,10 @@ async function getSession(tenantId) {
     seenMessageIds: new Set(),
     connecting: null,
   }
+
+  await ensureSessionLease(tenantId, session)
+
+  if (existing?.sock) return existing
 
   if (!existing) {
     await loadSnapshot(tenantId, session)
@@ -173,6 +183,7 @@ async function handleConnectionUpdate(tenantId, session, sock, connection, lastD
 
         if (code === DisconnectReason.loggedOut) {
           clearReconnect(tenantId)
+          await releaseSessionLease(tenantId)
           sessions.delete(tenantId)
           await rm(sessionDirectory(tenantId), { recursive: true, force: true })
           await deleteRemoteAuthState(tenantId)
@@ -183,7 +194,7 @@ async function handleConnectionUpdate(tenantId, session, sock, connection, lastD
       }
 }
 
-app.get('/sessions/:tenantId/qr', async (req, res) => {
+app.get('/sessions/:tenantId/qr', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
   if (!session.qr) return res.status(202).json({ status: session.status })
 
@@ -193,9 +204,9 @@ app.get('/sessions/:tenantId/qr', async (req, res) => {
     qrCode: dataUrl.replace(/^data:image\/png;base64,/, ''),
     qrCodeData: session.qr,
   })
-})
+}))
 
-app.get('/sessions/:tenantId/status', async (req, res) => {
+app.get('/sessions/:tenantId/status', withSessionOwnership(async (req, res) => {
   let session = sessions.get(req.params.tenantId)
   // If no in-memory session exists, trigger reconnect so creds are reused on restart
   if (!session) {
@@ -206,16 +217,16 @@ app.get('/sessions/:tenantId/status', async (req, res) => {
     status: session?.status ?? 'disconnected',
     phoneNumber: session?.phoneNumber ?? null,
   })
-})
+}))
 
-app.get('/sessions/:tenantId/conversations', async (req, res) => {
+app.get('/sessions/:tenantId/conversations', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
   const items = Array.from(session.conversations.values())
     .sort((a, b) => new Date(b.lastMessageAt ?? 0) - new Date(a.lastMessageAt ?? 0))
   res.json({ items, nextCursor: null, hasMore: false })
-})
+}))
 
-app.get('/sessions/:tenantId/conversations/:id/messages', async (req, res) => {
+app.get('/sessions/:tenantId/conversations/:id/messages', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
   const key = req.params.id.includes('@') ? encodeURIComponent(req.params.id) : req.params.id
   res.json({
@@ -223,10 +234,10 @@ app.get('/sessions/:tenantId/conversations/:id/messages', async (req, res) => {
     nextCursor: null,
     hasMore: false,
   })
-})
+}))
 
-app.post('/sessions/:tenantId/logout', async (req, res) => {
-  const session = sessions.get(req.params.tenantId)
+app.post('/sessions/:tenantId/logout', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
   clearReconnect(req.params.tenantId)
   try {
     await session?.sock?.logout?.()
@@ -236,11 +247,12 @@ app.post('/sessions/:tenantId/logout', async (req, res) => {
   sessions.delete(req.params.tenantId)
   await rm(sessionDirectory(req.params.tenantId), { recursive: true, force: true })
   await deleteRemoteAuthState(req.params.tenantId)
+  await releaseSessionLease(req.params.tenantId)
   res.json({ ok: true })
-})
+}))
 
-app.post('/sessions/:tenantId/send-message', async (req, res) => {
-  const session = sessions.get(req.params.tenantId)
+app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
   const { recipientPhone, text } = req.body ?? {}
   if (!session?.sock || !isValidRecipient(recipientPhone) || !isValidMessageText(text)) {
     return res.status(400).json({ success: false, error: 'Session, recipientPhone and text are required.' })
@@ -255,7 +267,7 @@ app.post('/sessions/:tenantId/send-message', async (req, res) => {
   } catch {
     res.status(502).json({ success: false, error: 'WhatsApp Web message could not be sent.' })
   }
-})
+}))
 
 app.get('/sessions/:tenantId/bot-config', async (req, res) => {
   res.json(await getBotConfig(req.params.tenantId))
@@ -497,6 +509,96 @@ function sessionStateUrl(tenantId) {
   return `${apiWebhookUrl}/session/${encodeURIComponent(tenantId)}`
 }
 
+class SessionOwnedElsewhereError extends Error {
+  constructor(ownerUrl) {
+    super('WhatsApp session is owned by another bridge instance.')
+    this.ownerUrl = ownerUrl
+  }
+}
+
+function normalizeInstanceUrl(value) {
+  const url = new URL(value)
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+    throw new Error('WHATSAPP_WEB_INSTANCE_URL must be an absolute HTTP(S) base URL.')
+  }
+  return url.origin
+}
+
+async function ensureSessionLease(tenantId, session) {
+  const response = await fetchWithTimeout(`${sessionStateUrl(tenantId)}/lease`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instanceId, instanceUrl }),
+  })
+
+  if (response.status === 409) {
+    const body = await response.json().catch(() => ({}))
+    throw new SessionOwnedElsewhereError(typeof body.ownerUrl === 'string' ? body.ownerUrl : null)
+  }
+  if (!response.ok) throw new Error(`Could not acquire WhatsApp session lease: HTTP ${response.status}`)
+
+  const body = await response.json()
+  const expiresAt = new Date(body.expiresAt).getTime()
+  if (!Number.isFinite(expiresAt)) throw new Error('Bridge lease response is invalid.')
+
+  session.leaseExpiresAt = expiresAt
+  scheduleLeaseRenewal(tenantId, session)
+}
+
+function scheduleLeaseRenewal(tenantId, session) {
+  const current = leaseRenewTimers.get(tenantId)
+  if (current) clearTimeout(current)
+
+  const delay = Math.max(1_000, session.leaseExpiresAt - Date.now() - 15_000)
+  const timer = setTimeout(() => {
+    leaseRenewTimers.delete(tenantId)
+    void ensureSessionLease(tenantId, session).catch((error) => {
+      stopSessionAfterLeaseLoss(tenantId, session, error)
+    })
+  }, delay)
+  leaseRenewTimers.set(tenantId, timer)
+}
+
+function clearLeaseRenewal(tenantId) {
+  const timer = leaseRenewTimers.get(tenantId)
+  if (timer) clearTimeout(timer)
+  leaseRenewTimers.delete(tenantId)
+}
+
+function stopSessionAfterLeaseLoss(tenantId, session, error) {
+  clearLeaseRenewal(tenantId)
+  session.status = 'disconnected'
+  session.sock?.end?.(new Error('QR session lease was lost.'))
+  session.sock = null
+  if (!(error instanceof SessionOwnedElsewhereError)) {
+    logError('Failed to renew WhatsApp session lease', tenantId, error)
+  }
+}
+
+async function releaseSessionLease(tenantId) {
+  clearLeaseRenewal(tenantId)
+  try {
+    const response = await fetchWithTimeout(`${sessionStateUrl(tenantId)}/lease`, { method: 'DELETE' })
+    if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`)
+  } catch (error) {
+    logError('Failed to release WhatsApp session lease', tenantId, error)
+  }
+}
+
+function withSessionOwnership(handler) {
+  return async (req, res) => {
+    try {
+      await handler(req, res)
+    } catch (error) {
+      if (error instanceof SessionOwnedElsewhereError) {
+        return res.status(409).json({ ownerUrl: error.ownerUrl })
+      }
+      logError('WhatsApp session request failed', req.params.tenantId ?? 'unknown', error)
+      return res.status(503).json({ error: 'WhatsApp Web session is unavailable.' })
+    }
+  }
+}
+
 function scheduleAuthBackup(tenantId) {
   const existing = authBackupTimers.get(tenantId)
   if (existing) clearTimeout(existing)
@@ -601,7 +703,10 @@ function isValidMessageText(text) {
 }
 
 function fetchWithTimeout(url, options = {}) {
-  return fetch(url, { ...options, signal: AbortSignal.timeout(15_000) })
+  const headers = new Headers(options.headers)
+  headers.set('X-WhatsApp-Web-Secret', apiWebhookSecret)
+  headers.set('X-WhatsApp-Web-Instance', instanceId)
+  return fetch(url, { ...options, headers, signal: AbortSignal.timeout(15_000) })
 }
 
 function clearReconnect(tenantId) {
@@ -642,6 +747,7 @@ async function shutdown(signal, exitCode = 0) {
   for (const tenantId of [...reconnectTimers.keys()]) clearReconnect(tenantId)
   await flushAuthBackups()
   for (const session of sessions.values()) session.sock?.end?.(new Error('Service shutdown'))
+  await Promise.all([...sessions.keys()].map((tenantId) => releaseSessionLease(tenantId)))
   await new Promise((resolve) => server.close(resolve))
   process.exitCode = exitCode
 }

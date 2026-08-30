@@ -36,6 +36,14 @@ Não remova esse volume durante uma atualização: ele contém as chaves que
 validam cookies e tokens antiforgery existentes. Faça backup dele junto com o
 PFX correspondente.
 
+## Escala da ponte QR
+
+Cada instância da ponte QR precisa de um endereço interno estável e exclusivo,
+configurado em `WHATSAPP_WEB_INSTANCE_URL`. Não use `docker compose --scale`
+com a mesma URL para todas as réplicas. Para cada instância adicional, crie um
+serviço com nome/DNS e volume de sessões próprios; a ponte usa um lease no
+PostgreSQL para garantir que somente uma instância controla cada linha QR.
+
 ## Primeiro deploy
 
 ```bash
