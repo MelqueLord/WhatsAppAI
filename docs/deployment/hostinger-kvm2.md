@@ -44,6 +44,23 @@ com a mesma URL para todas as réplicas. Para cada instância adicional, crie um
 serviço com nome/DNS e volume de sessões próprios; a ponte usa um lease no
 PostgreSQL para garantir que somente uma instância controla cada linha QR.
 
+O Compose declara a segunda ponte como `whatsapp-web-2`, isolada no volume
+`whatsapp-web-sessions-2`. Para ativá-la, configure
+`WHATSAPP_WEB_INSTANCE_2_ID=whatsapp-web-2` e
+`WHATSAPP_WEB_INSTANCE_2_URL=http://whatsapp-web-2:3020` no `.env` e inicie
+o perfil adicional:
+
+```bash
+docker compose --profile production --profile qr-scale up -d
+docker compose ps whatsapp-web whatsapp-web-2
+```
+
+API e worker entram primeiro por `whatsapp-web`; se a sessão pertencer à
+segunda ponte, seguem uma única vez o endereço retornado pelo lease. Não
+publique portas das pontes QR nem compartilhe seus volumes. Para uma terceira
+instância, replique o padrão com novo nome DNS, ID, URL e volume, em vez de
+escalar o mesmo serviço.
+
 ## Primeiro deploy
 
 ```bash
@@ -67,6 +84,8 @@ assíncrono.
 - Faça backup diário com `./deploy/backup.sh` e mantenha cópias fora do KVM.
 - O volume `whatsapp-web-sessions` mantém as sessões QR durante recriações do
   container; inclua esse volume na rotina de backup antes de remover o stack.
+- Se o perfil `qr-scale` estiver ativo, inclua também
+  `whatsapp-web-sessions-2`; esses volumes nunca devem ser compartilhados.
 - O volume `dataprotection-keys` mantém o key ring compartilhado entre API e
   worker; inclua-o na rotina de backup e preserve também o PFX usado para
   cifrá-lo.

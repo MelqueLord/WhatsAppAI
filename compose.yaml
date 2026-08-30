@@ -121,6 +121,28 @@ services:
     profiles:
       - production
 
+  whatsapp-web-2:
+    build:
+      context: ./services/whatsapp-web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${ASPNETCORE_ENVIRONMENT:-Production}
+      PORT: "3020"
+      WHATSAPP_WEB_API_URL: http://api:5000/api/webhooks/whatsapp-web
+      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+      WHATSAPP_WEB_INSTANCE_ID: ${WHATSAPP_WEB_INSTANCE_2_ID:-whatsapp-web-2}
+      WHATSAPP_WEB_INSTANCE_URL: ${WHATSAPP_WEB_INSTANCE_2_URL:-http://whatsapp-web-2:3020}
+    expose:
+      - "3020"
+    volumes:
+      - whatsapp-web-sessions-2:/app/sessions
+    depends_on:
+      api:
+        condition: service_started
+    profiles:
+      - qr-scale
+
   frontend:
     build:
       context: ./apps/web
@@ -152,4 +174,5 @@ services:
 volumes:
   postgres-data:
   whatsapp-web-sessions:
+  whatsapp-web-sessions-2:
   dataprotection-keys:

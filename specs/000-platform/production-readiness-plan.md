@@ -37,6 +37,7 @@ O resultado permanece **NO-GO** enquanto qualquer pacote P0/P1 estiver aberto, a
 
 ### Progresso do plano
 
+- **Pacote 4 — Segurança e privacidade:** em andamento. Em 2026-08-30, a varredura local somente-leitura com Gitleaks não apresentou achados e os testes direcionados de privacidade, sanitização de logs, segurança e isolamento passaram (10 unitários e 28 integrações). A execução do scanner no CI, a revisão operacional de logs e a evidência externa de LGPD continuam obrigatórias para encerrar o pacote.
 - **Pacote 1 — Suíte integrada determinística:** concluído em 2026-08-30. O fixture de HTTP passou a desabilitar hosted workers; o processamento dos workers continua coberto separadamente, enquanto os testes de endpoint não geram retries artificiais.
 - **Pacote 2 — Migrations e startup:** concluído na validação local. O histórico EF foi fixado explicitamente em `public` para evitar a mudança de resolução causada pelo `search_path`; o bundle foi executado duas vezes na mesma base, e API/worker passaram a não aplicar migrations em Production. Rollback de banco, restore e validação em cópia de versão anterior continuam no pacote operacional.
 - **Pacote 3 — Deploy local equivalente:** em andamento. Persistência e criptografia das chaves de Data Protection foram concluídas e validadas com reinício da API/worker; as consultas em lote do worker foram ordenadas e o binding foi alinhado a `ASPNETCORE_HTTP_PORTS`; faltam a validação do frontend atrás do proxy, Nginx, HTTPS e SignalR por domínio.
