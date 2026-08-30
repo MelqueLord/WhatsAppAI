@@ -46,7 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.auth.logout()
     } catch {
-      // eslint-disable-next-line no-empty
       // Ignore errors - still redirect
     }
     clearStoredToken()

@@ -44,9 +44,6 @@ export function useSignalR({ hubUrl, onMessage, onStatusUpdate, onConversationUp
     newConnection.onclose(() => setIsConnected(false))
     newConnection.onreconnecting(() => setIsConnected(false))
 
-    // Reset to "connecting" state whenever the effect re-runs (page navigation)
-    setIsConnected(null)
-
     connectionRef.current = newConnection
 
     return () => {

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Audit;
@@ -51,6 +52,14 @@ public sealed class AppDbContext : DbContext
     public DbSet<ProcessingPurpose> ProcessingPurposes => Set<ProcessingPurpose>();
     public DbSet<ConsentEvidence> ConsentEvidence => Set<ConsentEvidence>();
     public DbSet<DataSubjectRequest> DataSubjectRequests => Set<DataSubjectRequest>();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // Keep tenant query filters isolated even when the context is created
+        // directly (for example by tests or background infrastructure).
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, TenantModelCacheKeyFactory>();
+        base.OnConfiguring(optionsBuilder);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

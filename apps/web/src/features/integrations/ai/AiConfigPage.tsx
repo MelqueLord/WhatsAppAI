@@ -19,7 +19,29 @@ export function AiConfigPage() {
   const { data: config, isLoading } = useQuery({ queryKey: ['ai-config'], queryFn: async () => (await fetchWithCsrf('/api/integrations/ai')).json() as Promise<AiConfigResponse>, enabled: aiEnabled })
   const { data: queues = [] } = useQuery({ queryKey: ['service-queues'], queryFn: async () => (await fetchWithCsrf('/api/service-queues')).json() as Promise<Array<{ id: string; name: string; isActive: boolean }>>, enabled: aiEnabled && queuesEnabled })
   const { data: tags = [] } = useQuery({ queryKey: ['client-tags'], queryFn: async () => (await fetchWithCsrf('/api/client-tags')).json() as Promise<Array<{ id: string; name: string; isActive: boolean }>>, enabled: aiEnabled && tagsEnabled })
-  useEffect(() => { if (!config || loadedVersion === (config.version ?? 0)) return; setLoadedVersion(config.version ?? 0); setLoadedBotVersion(config.botVersion ?? null); const stored = config.systemPrompt || ''; const block = stored.match(/^\[PERFIL_EMPRESA\]\n([\s\S]*?)\n\[\/PERFIL_EMPRESA\]\n\n?/); const profile = block?.[1] || stored; setBusinessType(profileField(profile, 'Tipo de negócio')); setBusinessDescription(profileField(profile, 'Descrição do negócio')); setTargetAudience(profileField(profile, 'Público-alvo')); setServiceCatalog(profileField(profile, 'Produtos e serviços')); setToneOfVoice(profileField(profile, 'Tom de voz')); setServiceHours(profileField(profile, 'Horário de atendimento')); setLocation(profileField(profile, 'Localização')); setSystemPrompt(block ? stored.slice(block[0].length) : stored.replace(/^Tipo de negócio: .+\n\n/, '')); setMaxTokens(config.maxTokensPerResponse ?? 180); setConfidenceThreshold(config.confidenceThreshold ?? 0.5); setRoutingQueueIds(config.routingQueueIds || []); setRoutingTagIds(config.routingTagIds || []) }, [config, loadedVersion])
+  useEffect(() => {
+    if (!config || loadedVersion === (config.version ?? 0)) return
+    const timer = window.setTimeout(() => {
+      setLoadedVersion(config.version ?? 0)
+      setLoadedBotVersion(config.botVersion ?? null)
+      const stored = config.systemPrompt || ''
+      const block = stored.match(/^\[PERFIL_EMPRESA\]\n([\s\S]*?)\n\[\/PERFIL_EMPRESA\]\n\n?/)
+      const profile = block?.[1] || stored
+      setBusinessType(profileField(profile, 'Tipo de negócio'))
+      setBusinessDescription(profileField(profile, 'Descrição do negócio'))
+      setTargetAudience(profileField(profile, 'Público-alvo'))
+      setServiceCatalog(profileField(profile, 'Produtos e serviços'))
+      setToneOfVoice(profileField(profile, 'Tom de voz'))
+      setServiceHours(profileField(profile, 'Horário de atendimento'))
+      setLocation(profileField(profile, 'Localização'))
+      setSystemPrompt(block ? stored.slice(block[0].length) : stored.replace(/^Tipo de negócio: .+\n\n/, ''))
+      setMaxTokens(config.maxTokensPerResponse ?? 180)
+      setConfidenceThreshold(config.confidenceThreshold ?? 0.5)
+      setRoutingQueueIds(config.routingQueueIds || [])
+      setRoutingTagIds(config.routingTagIds || [])
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [config, loadedVersion])
   const provider = selectedProvider ?? config?.provider ?? providers[0]?.id ?? 'openai'; const modelId = selectedModel ?? config?.modelId ?? ''; const models = providers.find((x) => x.id === provider)?.models ?? []; const isAiActive = config?.aiActive === true
   const saveProvider = useMutation({ mutationFn: async () => { const r = await fetchWithCsrf('/api/integrations/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', 'If-Match': String(loadedVersion ?? 0) }, credentials: 'include', body: JSON.stringify({ provider, modelId, apiKey: apiKey || undefined }) }); if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || 'Erro ao salvar configuração de IA'); return r.json() }, onSuccess: () => { setApiKey(''); setSuccess('provider'); queryClient.invalidateQueries({ queryKey: ['ai-config'] }) } })
   const toggleAi = useMutation({ mutationFn: async (enabled: boolean) => { const r = await fetchWithCsrf('/api/integrations/ai/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json', 'If-Match-Bot': String(loadedBotVersion ?? 0) }, credentials: 'include', body: JSON.stringify({ enabled }) }); if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || 'Erro ao alterar IA'); return r.json() }, onSuccess: () => { setSuccess('toggle'); queryClient.invalidateQueries({ queryKey: ['ai-config'] }); queryClient.invalidateQueries({ queryKey: ['bot-config'] }) } })

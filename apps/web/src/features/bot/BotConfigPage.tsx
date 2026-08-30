@@ -130,10 +130,13 @@ export function BotConfigPage() {
 
   useEffect(() => {
     if (!config) return
-    setBusinessHoursEnabled(config.businessHoursEnabled === true)
-    setTimeZoneId(config.timeZoneId ?? 'America/Sao_Paulo')
-    setBusinessHours(config.businessHours?.length === 7 ? config.businessHours : defaultBusinessHours())
-    setFlowSteps(config.flowSteps ?? [])
+    const timer = window.setTimeout(() => {
+      setBusinessHoursEnabled(config.businessHoursEnabled === true)
+      setTimeZoneId(config.timeZoneId ?? 'America/Sao_Paulo')
+      setBusinessHours(config.businessHours?.length === 7 ? config.businessHours : defaultBusinessHours())
+      setFlowSteps(config.flowSteps ?? [])
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [config])
 
   const version = config?.version ?? 0

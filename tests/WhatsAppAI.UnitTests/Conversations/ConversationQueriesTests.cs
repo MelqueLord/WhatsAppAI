@@ -7,6 +7,7 @@ using WhatsAppAI.Infrastructure.Persistence;
 
 namespace WhatsAppAI.UnitTests.Conversations;
 
+[Collection("Persistence")]
 public sealed class ConversationQueriesTests
 {
     [Fact]
@@ -31,6 +32,11 @@ public sealed class ConversationQueriesTests
         otherConversation.AssignQueue(otherQueueId);
         context.AddRange(firstContact, secondContact, assignedConversation, otherConversation);
         await context.SaveChangesAsync();
+        Assert.Equal(2, await context.Conversations.CountAsync());
+        Assert.Equal(assignedQueueId, await context.Conversations
+            .Where(conversation => conversation.Id == assignedConversation.Id)
+            .Select(conversation => conversation.QueueId)
+            .SingleAsync());
 
         var queries = new ConversationQueries(context);
         var result = await queries.GetConversationsAsync(

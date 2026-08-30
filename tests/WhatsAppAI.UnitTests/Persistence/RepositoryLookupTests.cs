@@ -8,6 +8,7 @@ using WhatsAppAI.Infrastructure.Persistence.Repositories;
 
 namespace WhatsAppAI.UnitTests.Persistence;
 
+[Collection("Persistence")]
 public sealed class RepositoryLookupTests
 {
     [Fact]
