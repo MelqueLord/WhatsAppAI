@@ -19,7 +19,6 @@ public static class PlatformAdminBootstrap
 
         var email = configuration["BootstrapAdmin:Email"];
         var password = configuration["BootstrapAdmin:Password"];
-        ValidateCredentials(email, password);
 
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
@@ -34,6 +33,8 @@ public static class PlatformAdminBootstrap
             await transaction.CommitAsync(cancellationToken);
             return;
         }
+
+        ValidateCredentials(email, password);
 
         var normalizedEmail = email!.Trim().ToLowerInvariant();
         var existingUser = await context.Users

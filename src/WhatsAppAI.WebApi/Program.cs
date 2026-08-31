@@ -243,20 +243,11 @@ using (var scope = app.Services.CreateScope())
         await secretStore.SetAsync("meta:app_secret", metaAppSecret);
     }
 
-    // Bootstrap credentials must come from environment variables or user-secrets.
-    // Production must never start without a known PlatformAdmin. A database-only
+    // Bootstrap credentials must come from environment variables or user-secrets
+    // only when the database still has no PlatformAdmin. A database-only
     // initialization run does not start the application and needs no account.
     if (!builder.Configuration.GetValue<bool>("DatabaseInitialization:Only"))
     {
-        var bootstrapAdminEmail = builder.Configuration["BootstrapAdmin:Email"];
-        var bootstrapAdminPassword = builder.Configuration["BootstrapAdmin:Password"];
-        if (string.IsNullOrWhiteSpace(bootstrapAdminEmail) ||
-            string.IsNullOrWhiteSpace(bootstrapAdminPassword))
-        {
-            throw new InvalidOperationException(
-                "BootstrapAdmin:Email and BootstrapAdmin:Password are required to initialize the PlatformAdmin.");
-        }
-
         await PlatformAdminBootstrap.EnsureAsync(
             context,
             builder.Configuration,

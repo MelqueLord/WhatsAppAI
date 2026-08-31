@@ -31,7 +31,10 @@ public sealed class PlatformAdminBootstrapTests
         static string HashPassword(string password) => $"hashed:{password}";
 
         await PlatformAdminBootstrap.EnsureAsync(context, configuration, HashPassword);
-        await PlatformAdminBootstrap.EnsureAsync(context, configuration, HashPassword);
+        await PlatformAdminBootstrap.EnsureAsync(
+            context,
+            new ConfigurationBuilder().Build(),
+            HashPassword);
 
         var admins = await context.Users.Where(u => u.IsPlatformAdmin).ToListAsync();
         var admin = Assert.Single(admins);
