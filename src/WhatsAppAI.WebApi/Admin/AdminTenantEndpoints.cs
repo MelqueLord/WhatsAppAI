@@ -538,6 +538,27 @@ public static class AdminTenantEndpoints
             .OrderByDescending(item => item.inputTokens + item.outputTokens)
             .ToListAsync();
 
+        var packageRows = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(usage => usage.TenantId == tenantId &&
+                usage.RecordedAt >= monthStart && usage.RecordedAt < monthEnd &&
+                usage.AiResponseQuotaPackageType != null &&
+                usage.AiResponseQuotaPackageReference != null &&
+                (usage.Metric == "input_tokens" || usage.Metric == "output_tokens" ||
+                    usage.Metric == UsageMetricNames.AiResponses))
+            .GroupBy(usage => new { usage.AiResponseQuotaPackageType, usage.AiResponseQuotaPackageReference })
+            .Select(group => new
+            {
+                packageType = group.Key.AiResponseQuotaPackageType,
+                packageReference = group.Key.AiResponseQuotaPackageReference,
+                inputTokens = group.Where(usage => usage.Metric == "input_tokens").Sum(usage => (long?)usage.Quantity) ?? 0,
+                outputTokens = group.Where(usage => usage.Metric == "output_tokens").Sum(usage => (long?)usage.Quantity) ?? 0,
+                responses = group.Where(usage => usage.Metric == UsageMetricNames.AiResponses).Sum(usage => (long?)usage.Quantity) ?? 0,
+                estimatedCostMinorUnits = group.Sum(usage => usage.CostMinorUnits ?? 0)
+            })
+            .OrderByDescending(item => item.inputTokens + item.outputTokens)
+            .ToListAsync();
+
         var responseUsed = await dbContext.UsageLedger
             .IgnoreQueryFilters()
             .Where(usage => usage.TenantId == tenantId &&
@@ -617,7 +638,17 @@ public static class AdminTenantEndpoints
                 tokens = row.tokens,
                 estimatedCostMinorUnits = row.estimatedCostMinorUnits
             }),
-            byModel = modelRows
+            byModel = modelRows,
+            byPackage = packageRows.Select(row => new
+            {
+                packageType = row.packageType == AiResponseQuotaPackageType.BasePackage ? "base" : "top_up",
+                packageReference = row.packageReference,
+                inputTokens = row.inputTokens,
+                outputTokens = row.outputTokens,
+                totalTokens = row.inputTokens + row.outputTokens,
+                responses = row.responses,
+                estimatedCostMinorUnits = row.estimatedCostMinorUnits
+            })
         });
     }
 

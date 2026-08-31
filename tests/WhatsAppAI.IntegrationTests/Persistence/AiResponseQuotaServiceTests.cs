@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -95,6 +96,41 @@ public sealed class AiResponseQuotaServiceTests(TestWebApplicationFactory factor
                 .IgnoreQueryFilters()
                 .Where(reservation => reservation.Id == recent.ReservationId)
                 .Select(reservation => reservation.Status)
-                .SingleAsync());
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task Reservation_uses_top_up_package_after_base_package_is_reserved()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync();
+        var plan = await dbContext.SubscriptionPlans.FirstAsync();
+        var tenant = Tenant.Create(
+            $"Package attribution {Guid.NewGuid():N}",
+            $"package-attribution-{Guid.NewGuid():N}",
+            plan.Id,
+            monthlyAiResponseLimit: 1);
+        tenant.Activate();
+        dbContext.Tenants.Add(tenant);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.UsageLedger.Add(UsageLedger.Create(
+            tenant.Id,
+            "platform",
+            UsageMetricNames.AiResponseTopUps,
+            $"topup:{Guid.NewGuid():N}",
+            AiResponseQuotaPolicy.TopUpQuantity,
+            "responses"));
+        await dbContext.SaveChangesAsync();
+
+        var service = scope.ServiceProvider.GetRequiredService<IAiResponseQuotaService>();
+        var baseReservation = await service.TryReserveAsync(tenant.Id, Guid.NewGuid(), "package:base");
+        var topUpReservation = await service.TryReserveAsync(tenant.Id, Guid.NewGuid(), "package:topup");
+
+        Assert.Equal(AiResponseQuotaPackageType.BasePackage, baseReservation.PackageType);
+        Assert.StartsWith("base:", baseReservation.PackageReference);
+        Assert.Equal(AiResponseQuotaPackageType.TopUpPackage, topUpReservation.PackageType);
+        Assert.StartsWith("topup:", topUpReservation.PackageReference);
     }
 }

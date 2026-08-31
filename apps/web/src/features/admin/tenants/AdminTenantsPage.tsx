@@ -907,6 +907,30 @@ export function AdminTenantsPage() {
                     )}
                   </div>
                 </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Consumo por pacote de respostas</p>
+                  {(aiUsage.byPackage?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-slate-500">Nenhum consumo com atribuição de pacote registrado. Consumos anteriores à implantação aparecem apenas nos totais gerais.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                          <tr><th className="px-3 py-2">Pacote</th><th className="px-3 py-2 text-right">Respostas</th><th className="px-3 py-2 text-right">Tokens</th><th className="px-3 py-2 text-right">Custo</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {aiUsage.byPackage?.map((pkg) => (
+                            <tr key={`${pkg.packageType}-${pkg.packageReference}`}>
+                              <td className="px-3 py-2"><div className="font-medium">{pkg.packageType === 'base' ? 'Pacote contratado' : 'Recarga de 500 respostas'}</div><div className="text-xs text-slate-500">{pkg.packageReference}</div></td>
+                              <td className="px-3 py-2 text-right">{pkg.responses.toLocaleString('pt-BR')}</td>
+                              <td className="px-3 py-2 text-right">{pkg.totalTokens.toLocaleString('pt-BR')}</td>
+                              <td className="px-3 py-2 text-right">R$ {(pkg.estimatedCostMinorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500">Os tokens são os valores retornados pelo provedor. O custo monetário só aparece quando houver preço registrado para o uso.</p>
               </div>
             )}

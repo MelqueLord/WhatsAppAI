@@ -36,7 +36,9 @@ public sealed class AiResponseQuotaService(AppDbContext dbContext) : IAiResponse
                 true,
                 existing.Id,
                 existing.Status,
-                existingSnapshot);
+                existingSnapshot,
+                existing.PackageType,
+                existing.PackageReference);
         }
 
         var snapshot = await BuildSnapshotAsync(tenantId, cancellationToken);
@@ -50,11 +52,55 @@ public sealed class AiResponseQuotaService(AppDbContext dbContext) : IAiResponse
         }
 
         var (periodStartUtc, _) = AiResponseQuotaContract.GetCurrentPeriod(DateTime.UtcNow);
+        var tenantLimit = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .Where(tenant => tenant.Id == tenantId)
+            .Select(tenant => tenant.MonthlyAiResponseLimit)
+            .SingleOrDefaultAsync(cancellationToken);
+        var topUpPackages = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .Where(entry => entry.TenantId == tenantId &&
+                entry.Metric == UsageMetricNames.AiResponseTopUps &&
+                entry.RecordedAt >= periodStartUtc && entry.RecordedAt < periodStartUtc.AddMonths(1))
+            .OrderBy(entry => entry.RecordedAt)
+            .Select(entry => new { entry.SourceId, entry.Quantity })
+            .ToListAsync(cancellationToken);
+        var packageAllocations = await dbContext.AiResponseQuotaReservations
+            .IgnoreQueryFilters()
+            .Where(reservation => reservation.TenantId == tenantId &&
+                reservation.PeriodStartUtc == periodStartUtc &&
+                reservation.Status != AiResponseQuotaReservationStatus.Released)
+            .GroupBy(reservation => new { reservation.PackageType, reservation.PackageReference })
+            .Select(group => new { group.Key.PackageType, group.Key.PackageReference, Count = group.LongCount() })
+            .ToListAsync(cancellationToken);
+        var baseReference = $"base:{periodStartUtc:yyyy-MM}";
+        var baseAllocated = packageAllocations
+            .Where(item => item.PackageType == AiResponseQuotaPackageType.BasePackage)
+            .Sum(item => item.Count);
+        var packageType = tenantLimit is null || baseAllocated < tenantLimit
+            ? AiResponseQuotaPackageType.BasePackage
+            : AiResponseQuotaPackageType.TopUpPackage;
+        var packageReference = packageType == AiResponseQuotaPackageType.BasePackage
+            ? baseReference
+            : topUpPackages
+                .Find(package => packageAllocations
+                    .Where(item => item.PackageType == AiResponseQuotaPackageType.TopUpPackage &&
+                        item.PackageReference == package.SourceId)
+                    .Sum(item => item.Count) < package.Quantity)?.SourceId;
+
+        if (packageReference is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new AiResponseQuotaReservationResult(false, false, null, null, snapshot);
+        }
+
         var reservation = AiResponseQuotaReservation.Create(
             tenantId,
             periodStartUtc,
             sourceMessageId,
-            idempotencyKey);
+            idempotencyKey,
+            packageType,
+            packageReference);
         dbContext.AiResponseQuotaReservations.Add(reservation);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -68,7 +114,9 @@ public sealed class AiResponseQuotaService(AppDbContext dbContext) : IAiResponse
             false,
             reservation.Id,
             reservation.Status,
-            reservedSnapshot);
+            reservedSnapshot,
+            reservation.PackageType,
+            reservation.PackageReference);
     }
 
     public async Task CommitAsync(

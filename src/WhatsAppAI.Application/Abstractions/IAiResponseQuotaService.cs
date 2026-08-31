@@ -32,4 +32,6 @@ public sealed record AiResponseQuotaReservationResult(
     bool IsExisting,
     Guid? ReservationId,
     AiResponseQuotaReservationStatus? ReservationStatus,
-    AiResponseQuotaSnapshot Snapshot);
+    AiResponseQuotaSnapshot Snapshot,
+    AiResponseQuotaPackageType? PackageType = null,
+    string? PackageReference = null);

@@ -18,6 +18,10 @@ public sealed class AiResponseQuotaReservationConfiguration
         builder.Property(x => x.SourceMessageId).HasColumnName("source_message_id").IsRequired();
         builder.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key")
             .HasMaxLength(200).IsRequired();
+        builder.Property(x => x.PackageType).HasColumnName("package_type")
+            .HasConversion<string>().HasMaxLength(30).IsRequired();
+        builder.Property(x => x.PackageReference).HasColumnName("package_reference")
+            .HasMaxLength(200).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status")
             .HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at")

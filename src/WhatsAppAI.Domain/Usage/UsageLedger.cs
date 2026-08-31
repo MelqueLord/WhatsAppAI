@@ -12,6 +12,8 @@ public sealed class UsageLedger
     public long? CostMinorUnits { get; private set; }
     public string? Currency { get; private set; }
     public int? PriceVersion { get; private set; }
+    public AiResponseQuotaPackageType? AiResponseQuotaPackageType { get; private set; }
+    public string? AiResponseQuotaPackageReference { get; private set; }
     public DateTime RecordedAt { get; private set; }
 
     private UsageLedger() { }
@@ -25,7 +27,9 @@ public sealed class UsageLedger
         string? unit,
         long? costMinorUnits = null,
         string? currency = null,
-        int? priceVersion = null)
+        int? priceVersion = null,
+        AiResponseQuotaPackageType? aiResponseQuotaPackageType = null,
+        string? aiResponseQuotaPackageReference = null)
     {
         return new UsageLedger
         {
@@ -39,6 +43,8 @@ public sealed class UsageLedger
             CostMinorUnits = costMinorUnits,
             Currency = currency,
             PriceVersion = priceVersion,
+            AiResponseQuotaPackageType = aiResponseQuotaPackageType,
+            AiResponseQuotaPackageReference = aiResponseQuotaPackageReference?.Trim(),
             RecordedAt = DateTime.UtcNow
         };
     }

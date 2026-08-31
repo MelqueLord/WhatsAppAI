@@ -7,6 +7,8 @@ public sealed class AiResponseQuotaReservation
     public DateTime PeriodStartUtc { get; private set; }
     public Guid SourceMessageId { get; private set; }
     public string IdempotencyKey { get; private set; } = string.Empty;
+    public AiResponseQuotaPackageType PackageType { get; private set; }
+    public string PackageReference { get; private set; } = string.Empty;
     public AiResponseQuotaReservationStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? CommittedAt { get; private set; }
@@ -19,9 +21,12 @@ public sealed class AiResponseQuotaReservation
         Guid tenantId,
         DateTime periodStartUtc,
         Guid sourceMessageId,
-        string idempotencyKey)
+        string idempotencyKey,
+        AiResponseQuotaPackageType packageType = AiResponseQuotaPackageType.BasePackage,
+        string packageReference = "legacy")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageReference);
 
         return new AiResponseQuotaReservation
         {
@@ -30,6 +35,8 @@ public sealed class AiResponseQuotaReservation
             PeriodStartUtc = periodStartUtc,
             SourceMessageId = sourceMessageId,
             IdempotencyKey = idempotencyKey.Trim(),
+            PackageType = packageType,
+            PackageReference = packageReference.Trim(),
             Status = AiResponseQuotaReservationStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
@@ -67,4 +74,10 @@ public enum AiResponseQuotaReservationStatus
     Pending = 0,
     Committed = 1,
     Released = 2
+}
+
+public enum AiResponseQuotaPackageType
+{
+    BasePackage = 0,
+    TopUpPackage = 1
 }

@@ -251,6 +251,15 @@ export interface TenantAiUsage {
     outputTokens: number
     interactions: number
   }>
+  byPackage?: Array<{
+    packageType: 'base' | 'top_up'
+    packageReference: string
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    responses: number
+    estimatedCostMinorUnits: number
+  }>
 }
 
 export interface AiProviderInfo {

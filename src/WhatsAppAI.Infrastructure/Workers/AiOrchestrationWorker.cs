@@ -105,6 +105,8 @@ public sealed class AiOrchestrationWorker(
         var budgetReservationReleased = false;
         var budgetProvider = "unknown";
         Guid? responseQuotaReservation = null;
+        AiResponseQuotaPackageType? responseQuotaPackageType = null;
+        string? responseQuotaPackageReference = null;
         var responseQuotaFinalized = false;
         var botConfigRepository = scopedServices.GetRequiredService<IBotConfigurationRepository>();
         var queueRepository = scopedServices.GetRequiredService<IServiceLineRepository>();
@@ -468,6 +470,8 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
             responseQuotaReservation = quotaResult.ReservationId;
+            responseQuotaPackageType = quotaResult.PackageType;
+            responseQuotaPackageReference = quotaResult.PackageReference;
 
             budgetReservation = await TryReserveAiBudgetAsync(
                 dbContext, message.TenantId, credential.Provider, estimatedTokens, estimatedCost,
@@ -543,7 +547,9 @@ public sealed class AiOrchestrationWorker(
                     response.InputTokens, "tokens",
                     pricing?.CalculateCostMinorUnits(response.InputTokens, input: true),
                     pricing?.Currency,
-                    pricing?.Version);
+                    pricing?.Version,
+                    responseQuotaPackageType,
+                    responseQuotaPackageReference);
                 dbContext.Set<UsageLedger>().Add(usage);
             }
             if (response.OutputTokens > 0)
@@ -554,7 +560,9 @@ public sealed class AiOrchestrationWorker(
                     response.OutputTokens, "tokens",
                     pricing?.CalculateCostMinorUnits(response.OutputTokens, input: false),
                     pricing?.Currency,
-                    pricing?.Version);
+                    pricing?.Version,
+                    responseQuotaPackageType,
+                    responseQuotaPackageReference);
                 dbContext.Set<UsageLedger>().Add(usage);
             }
 
@@ -708,7 +716,9 @@ public sealed class AiOrchestrationWorker(
                     UsageMetricNames.AiResponses,
                     replyMessage.Id.ToString(),
                     1,
-                    "responses");
+                    "responses",
+                    aiResponseQuotaPackageType: responseQuotaPackageType,
+                    aiResponseQuotaPackageReference: responseQuotaPackageReference);
                 dbContext.Set<Message>().Add(replyMessage);
                 dbContext.Set<OutboxMessage>().Add(outboxMessage);
                 dbContext.Set<UsageLedger>().Add(responseUsage);
