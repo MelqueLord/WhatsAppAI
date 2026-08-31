@@ -101,9 +101,6 @@ public sealed class AiOrchestrationWorker(
         CancellationToken cancellationToken)
     {
         var dbContext = scopedServices.GetRequiredService<AppDbContext>();
-        Guid? budgetReservation = null;
-        var budgetReservationReleased = false;
-        var budgetProvider = "unknown";
         Guid? responseQuotaReservation = null;
         AiResponseQuotaPackageType? responseQuotaPackageType = null;
         string? responseQuotaPackageReference = null;
@@ -324,7 +321,6 @@ public sealed class AiOrchestrationWorker(
                 logger.LogWarning("No active AI credential for tenant {TenantId}", message.TenantId);
                 return;
             }
-            budgetProvider = credential.Provider;
 
             var apiKey = string.IsNullOrWhiteSpace(credential.ApiKeyRef)
                 ? null
@@ -432,17 +428,11 @@ public sealed class AiOrchestrationWorker(
                 ApiKey = apiKey,
                 Messages = context.Messages,
                 SystemPrompt = context.SystemPrompt,
-                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 80, 240)
+                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120)
             };
 
             var pricing = await pricingRepository.GetActiveAsync(
                 credential.Provider, credential.ModelId, DateTime.UtcNow, cancellationToken);
-            var estimatedTokens = AiBudgetPolicy.EstimateInputTokens(
-                request.Messages.Select(message => message.Content), request.SystemPrompt, request.MaxTokens);
-            var estimatedCost = pricing is null
-                ? 0L
-                : pricing.CalculateCostMinorUnits(estimatedTokens - request.MaxTokens, input: true) +
-                    pricing.CalculateCostMinorUnits(request.MaxTokens, input: false);
             var quotaResult = await responseQuotaService.TryReserveAsync(
                 message.TenantId,
                 message.Id,
@@ -472,23 +462,6 @@ public sealed class AiOrchestrationWorker(
             responseQuotaReservation = quotaResult.ReservationId;
             responseQuotaPackageType = quotaResult.PackageType;
             responseQuotaPackageReference = quotaResult.PackageReference;
-
-            budgetReservation = await TryReserveAiBudgetAsync(
-                dbContext, message.TenantId, credential.Provider, estimatedTokens, estimatedCost,
-                tenant.MonthlyAiTokenLimit, tenant.MonthlyAiCostLimitMinorUnits, cancellationToken);
-            if (budgetReservation is null)
-            {
-                await responseQuotaService.ReleaseAsync(
-                    message.TenantId, responseQuotaReservation!.Value, "ai-budget-exhausted", cancellationToken);
-                responseQuotaFinalized = true;
-                await FinalizeAiBudgetExceededAsync(
-                    message, conversation, expectedConversationVersion, botConfig, dbContext,
-                    messageRepository, conversationRepository, outboxRepository, auditLogRepository,
-                    handoffEventRepository, tenant.MonthlyAiTokenLimit, tenant.MonthlyAiCostLimitMinorUnits,
-                    cancellationToken);
-                logger.LogWarning("AI budget exhausted for tenant {TenantId}", message.TenantId);
-                return;
-            }
 
             var providerBreaker = _providerBreakers.GetOrAdd(
                 $"{message.TenantId:N}:{credential.Provider}",
@@ -566,12 +539,9 @@ public sealed class AiOrchestrationWorker(
                 dbContext.Set<UsageLedger>().Add(usage);
             }
 
-            AddAiBudgetReservationRelease(dbContext, message.TenantId, credential.Provider, budgetReservation.Value);
-
             // Interaction and token usage are independent rows but share this
             // context; flush them together before delivery revalidation.
             await dbContext.SaveChangesAsync(cancellationToken);
-            budgetReservationReleased = true;
 
             // Revalidate persisted state after the AI call.
             await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
@@ -789,11 +759,6 @@ public sealed class AiOrchestrationWorker(
                 await responseQuotaService.ReleaseAsync(
                     message.TenantId, responseQuotaReservation.Value, "processing-failed", cancellationToken);
             }
-            if (budgetReservation is not null && !budgetReservationReleased)
-            {
-                await ReleaseAiBudgetReservationAsync(
-                    dbContext, message.TenantId, budgetProvider, budgetReservation.Value, cancellationToken);
-            }
             logger.LogError(ex, "Error processing inbound message {MessageId} for AI", message.Id);
             var errorText = ex.ToString();
 
@@ -842,127 +807,6 @@ public sealed class AiOrchestrationWorker(
             }
             logger.LogWarning("AI retries exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
         }
-    }
-
-    private static async Task<Guid?> TryReserveAiBudgetAsync(
-        AppDbContext dbContext,
-        Guid tenantId,
-        string provider,
-        long estimatedTokens,
-        long estimatedCost,
-        long? tokenLimit,
-        long? costLimit,
-        CancellationToken cancellationToken)
-    {
-        var (monthStart, monthEnd) = GetCurrentMonth();
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        if (dbContext.Database.IsNpgsql())
-        {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtext({tenantId.ToString()}))", cancellationToken);
-        }
-
-        var tokenUsage = await dbContext.Set<UsageLedger>().IgnoreQueryFilters()
-            .Where(entry => entry.TenantId == tenantId &&
-                (entry.Metric == "input_tokens" || entry.Metric == "output_tokens") &&
-                entry.RecordedAt >= monthStart && entry.RecordedAt < monthEnd)
-            .SumAsync(entry => (long?)entry.Quantity, cancellationToken) ?? 0;
-        var tokenReservations = await dbContext.Set<UsageLedger>().IgnoreQueryFilters()
-            .Where(entry => entry.TenantId == tenantId && entry.Metric == UsageMetricNames.AiTokenReservation &&
-                entry.RecordedAt >= monthStart && entry.RecordedAt < monthEnd)
-            .SumAsync(entry => (long?)entry.Quantity, cancellationToken) ?? 0;
-        var costUsage = await dbContext.Set<UsageLedger>().IgnoreQueryFilters()
-            .Where(entry => entry.TenantId == tenantId &&
-                (entry.Metric == "input_tokens" || entry.Metric == "output_tokens") &&
-                entry.RecordedAt >= monthStart && entry.RecordedAt < monthEnd)
-            .SumAsync(entry => (long?)(entry.CostMinorUnits ?? 0), cancellationToken) ?? 0;
-        var costReservations = await dbContext.Set<UsageLedger>().IgnoreQueryFilters()
-            .Where(entry => entry.TenantId == tenantId && entry.Metric == UsageMetricNames.AiCostReservation &&
-                entry.RecordedAt >= monthStart && entry.RecordedAt < monthEnd)
-            .SumAsync(entry => (long?)entry.Quantity, cancellationToken) ?? 0;
-
-        if (!AiBudgetPolicy.HasAvailableBudget(tokenLimit, tokenUsage, tokenReservations, estimatedTokens) ||
-            !AiBudgetPolicy.HasAvailableBudget(costLimit, costUsage, costReservations, estimatedCost))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return null;
-        }
-
-        var reservationId = Guid.NewGuid();
-        dbContext.Set<UsageLedger>().Add(UsageLedger.Create(
-            tenantId, provider, UsageMetricNames.AiTokenReservation, reservationId.ToString(), estimatedTokens, "tokens"));
-        dbContext.Set<UsageLedger>().Add(UsageLedger.Create(
-            tenantId, provider, UsageMetricNames.AiCostReservation, reservationId.ToString(), estimatedCost, "minor_units"));
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return reservationId;
-    }
-
-    private static void AddAiBudgetReservationRelease(
-        AppDbContext dbContext, Guid tenantId, string provider, Guid reservationId)
-    {
-        var reservationKey = reservationId.ToString();
-        var tokenReservation = dbContext.Set<UsageLedger>().Local.FirstOrDefault(entry =>
-            entry.TenantId == tenantId && entry.Metric == UsageMetricNames.AiTokenReservation && entry.SourceId == reservationKey);
-        var costReservation = dbContext.Set<UsageLedger>().Local.FirstOrDefault(entry =>
-            entry.TenantId == tenantId && entry.Metric == UsageMetricNames.AiCostReservation && entry.SourceId == reservationKey);
-        if (tokenReservation is not null)
-            dbContext.Set<UsageLedger>().Add(UsageLedger.Create(tenantId, provider, UsageMetricNames.AiTokenReservation, reservationKey, -tokenReservation.Quantity, "tokens"));
-        if (costReservation is not null)
-            dbContext.Set<UsageLedger>().Add(UsageLedger.Create(tenantId, provider, UsageMetricNames.AiCostReservation, reservationKey, -costReservation.Quantity, "minor_units"));
-    }
-
-    private static async Task ReleaseAiBudgetReservationAsync(
-        AppDbContext dbContext, Guid tenantId, string provider, Guid reservationId, CancellationToken cancellationToken)
-    {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        if (dbContext.Database.IsNpgsql())
-        {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtext({tenantId.ToString()}))", cancellationToken);
-        }
-
-        var reservationKey = reservationId.ToString();
-        var reservations = await dbContext.Set<UsageLedger>().IgnoreQueryFilters()
-            .Where(entry => entry.TenantId == tenantId && entry.SourceId == reservationKey &&
-                (entry.Metric == UsageMetricNames.AiTokenReservation || entry.Metric == UsageMetricNames.AiCostReservation))
-            .ToListAsync(cancellationToken);
-        foreach (var reservation in reservations.Where(entry => entry.Quantity > 0))
-            dbContext.Set<UsageLedger>().Add(UsageLedger.Create(
-                tenantId, provider, reservation.Metric, reservationKey, -reservation.Quantity, reservation.Unit));
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-    }
-
-    private static (DateTime Start, DateTime End) GetCurrentMonth()
-    {
-        var now = DateTime.UtcNow;
-        var start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return (start, start.AddMonths(1));
-    }
-
-    private static async Task FinalizeAiBudgetExceededAsync(
-        Message message, Conversation conversation, uint expectedConversationVersion,
-        BotConfiguration? botConfig, AppDbContext dbContext, IMessageRepository messageRepository,
-        IConversationRepository conversationRepository, IOutboxMessageRepository outboxRepository,
-        IAuditLogRepository auditLogRepository, IHandoffEventRepository handoffEventRepository,
-        long? tokenLimit, long? costLimit, CancellationToken cancellationToken)
-    {
-        await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
-        if (!AiReplyDeliveryGuard.CanSend(conversation, expectedConversationVersion, DateTime.UtcNow))
-        {
-            message.MarkProcessedByAi();
-            await messageRepository.UpdateAsync(message, cancellationToken);
-            return;
-        }
-
-        await auditLogRepository.AddAsync(AuditLog.Create(
-            message.TenantId, null, "AI.BudgetExceeded", "Tenant", message.TenantId.ToString(),
-            $"token_limit={tokenLimit?.ToString() ?? "unlimited"};cost_limit_minor_units={costLimit?.ToString() ?? "unlimited"}"), cancellationToken);
-        await PersistAutomaticHandoffAsync(
-            message.TenantId, message, conversation, "ai_budget_exhausted",
-            ResolveHandoffMessage(botConfig), "ai-budget", dbContext, messageRepository,
-            conversationRepository, outboxRepository, handoffEventRepository, cancellationToken);
     }
 
     private static async Task FinalizeUnavailableAiAsync(

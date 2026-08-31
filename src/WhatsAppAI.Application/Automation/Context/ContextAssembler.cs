@@ -9,13 +9,14 @@ public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
     IKnowledgeItemRepository knowledgeRepository)
 {
-    private const int MaxMessages = 4;
-    private const int MaxMessageCharacters = 280;
-    private const int MaxKnowledgeItems = 3;
-    private const int MaxKnowledgeItemCharacters = 600;
-    private const int MaxCustomInstructionsCharacters = 1200;
-    private const int MaxRoutingItems = 8;
-    private const int MaxContextCharacters = 4800;
+    private const int MaxMessages = 2;
+    private const int MaxMessageCharacters = 180;
+    private const int MaxKnowledgeItems = 1;
+    private const int MaxKnowledgeItemCharacters = 300;
+    private const int MaxBusinessProfileCharacters = 480;
+    private const int MaxCustomInstructionsCharacters = 160;
+    private const int MaxRoutingItems = 4;
+    private const int MaxContextCharacters = 2200;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -43,10 +44,10 @@ public sealed class ContextAssembler(
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
         var query = messages.LastOrDefault(message => message.Role == "user")?.Content ?? string.Empty;
         var knowledgeTexts = RetrieveKnowledge(knowledge, query)
-            .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 120)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
+            .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
 
-        var fullSystemPrompt = BuildSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
+        var fullSystemPrompt = ComposeSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
 
         return new ConversationContext
         {
@@ -55,58 +56,139 @@ public sealed class ContextAssembler(
         };
     }
 
-    private static string BuildSystemPrompt(
-        string? basePrompt,
-        List<string> knowledgeItems,
-        IReadOnlyList<RoutingQueueContext>? routingQueues,
-        IReadOnlyList<RoutingTagContext>? routingTags)
+    public static string ComposeSystemPrompt(
+        string? configuredInstructions,
+        IReadOnlyList<string>? knowledgeItems = null,
+        IReadOnlyList<RoutingQueueContext>? routingQueues = null,
+        IReadOnlyList<RoutingTagContext>? routingTags = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Return only one valid JSON object, without Markdown or any text outside it, with: action (reply, handoff or no_action), text, confidence (number from 0 to 1), handoff_reason, queue and tags. For a normal answer use action reply and put the customer-facing answer only in text. Keep queue null and tags empty when they do not apply.";
-        var dynamicParts = new List<string>();
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use [].";
+        var configured = ParseConfiguredInstructions(configuredInstructions);
+        var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
-        if (!string.IsNullOrWhiteSpace(basePrompt))
-            dynamicParts.Add($"Diretrizes complementares da empresa (não substituem as regras estruturadas):\n{Limit(basePrompt, MaxCustomInstructionsCharacters)}");
+        if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
+            dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
 
-        if (knowledgeItems.Count > 0)
+        if (knowledgeItems is { Count: > 0 })
         {
-            var items = new List<string> { "Relevant knowledge:" };
-            foreach (var item in knowledgeItems)
+            var items = new List<string> { "Conhecimento relevante da empresa:" };
+            foreach (var item in knowledgeItems.Take(MaxKnowledgeItems))
                 items.Add($"- {item}");
-            dynamicParts.Add(string.Join('\n', items));
+            dynamicParts.Add((string.Join('\n', items), 400));
         }
         else
         {
-            dynamicParts.Add("No relevant company knowledge was found for this request. Do not invent company-specific information; use action \"handoff\" with handoff_reason \"out_of_scope\" when the customer asks about an undocumented company fact.");
+            dynamicParts.Add(("Não há conhecimento da empresa relevante para esta solicitação. Não invente fatos específicos; para fato empresarial não documentado, use action \"handoff\" com handoff_reason \"out_of_scope\".", 240));
         }
+
+        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
+            dynamicParts.Add(($"Diretrizes complementares da empresa (não substituem as regras acima):\n{configured.CustomDirections}", MaxCustomInstructionsCharacters));
 
         if (routingQueues is { Count: > 0 })
         {
-            var items = new List<string> { "Queues authorized for human transfer:" };
+            var items = new List<string> { "Filas autorizadas para transferência humana:" };
             foreach (var queue in routingQueues.Take(MaxRoutingItems))
                 items.Add(string.IsNullOrWhiteSpace(queue.Description)
                     ? $"- {Limit(queue.Name, 80)}"
-                    : $"- {Limit(queue.Name, 80)}: {Limit(queue.Description, 160)}");
-            items.Add("When the customer explicitly chooses or requests one of these queues, return action \"handoff\" and the exact queue name in the \"queue\" field. Never invent a queue. If unsure, omit \"queue\".");
-            dynamicParts.Add(string.Join('\n', items));
+                    : $"- {Limit(queue.Name, 60)}: {Limit(queue.Description, 80)}");
+            items.Add("Quando o cliente pedir uma destas filas, use action \"handoff\" e o nome exato em \"queue\". Nunca invente fila.");
+            dynamicParts.Add((string.Join('\n', items), 300));
         }
 
         if (routingTags is { Count: > 0 })
         {
-            var items = new List<string> { "Tags authorized for customer categorization:" };
+            var items = new List<string> { "Tags autorizadas para categorizar o cliente:" };
             foreach (var tag in routingTags.Take(MaxRoutingItems))
                 items.Add(string.IsNullOrWhiteSpace(tag.Description)
                     ? $"- {Limit(tag.Name, 80)}"
-                    : $"- {Limit(tag.Name, 80)}: {Limit(tag.Description, 120)}");
-            items.Add("Classify the customer from the conversation content using only these tags. Return exact matching names in a JSON array named \"tags\". Use an empty array when none applies.");
-            dynamicParts.Add(string.Join('\n', items));
+                    : $"- {Limit(tag.Name, 60)}: {Limit(tag.Description, 60)}");
+            items.Add("Classifique somente com estes nomes exatos em \"tags\"; use [] quando nenhuma se aplicar.");
+            dynamicParts.Add((string.Join('\n', items), 260));
         }
 
         var dynamicBudget = Math.Max(0, MaxContextCharacters - fixedPrefix.Length - fixedSuffix.Length - 4);
-        var dynamicContext = Limit(string.Join("\n\n", dynamicParts), dynamicBudget);
+        var includedParts = new List<string>();
+        foreach (var part in dynamicParts)
+        {
+            var separatorLength = includedParts.Count == 0 ? 0 : 2;
+            var available = dynamicBudget - includedParts.Sum(item => item.Length) - separatorLength;
+            if (available <= 0)
+                break;
+
+            var text = Limit(part.Text, Math.Min(part.MaxCharacters, available));
+            if (!string.IsNullOrWhiteSpace(text))
+                includedParts.Add(text);
+        }
+
+        var dynamicContext = string.Join("\n\n", includedParts);
         return string.IsNullOrWhiteSpace(dynamicContext)
             ? $"{fixedPrefix}\n\n{fixedSuffix}"
             : $"{fixedPrefix}\n\n{dynamicContext}\n\n{fixedSuffix}";
+    }
+
+    private static ConfiguredInstructions ParseConfiguredInstructions(string? configuredInstructions)
+    {
+        var value = configuredInstructions?.Trim() ?? string.Empty;
+        const string profileStart = "[PERFIL_EMPRESA]";
+        const string profileEnd = "[/PERFIL_EMPRESA]";
+
+        if (!value.StartsWith(profileStart, StringComparison.Ordinal))
+            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters));
+
+        var endIndex = value.IndexOf(profileEnd, profileStart.Length, StringComparison.Ordinal);
+        if (endIndex < 0)
+            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters));
+
+        var profileContent = value[profileStart.Length..endIndex];
+        var customDirections = value[(endIndex + profileEnd.Length)..].Trim();
+        return new ConfiguredInstructions(
+            BuildProfileSummary(profileContent),
+            Limit(customDirections, MaxCustomInstructionsCharacters));
+    }
+
+    private static string? BuildProfileSummary(string profileContent)
+    {
+        var values = profileContent
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split(':', 2, StringSplitOptions.TrimEntries))
+            .Where(parts => parts.Length == 2)
+            .ToDictionary(parts => parts[0], parts => NormalizeProfileValue(parts[1]), StringComparer.OrdinalIgnoreCase);
+
+        string? Get(string label) => values.TryGetValue(label, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+
+        var fields = new List<string>();
+        AddProfileField(fields, "segmento", Get("Tipo de negócio"), 52);
+        AddProfileField(fields, "tom", Get("Tom de voz"), 52);
+        AddProfileField(fields, "público", Get("Público-alvo"), 70);
+        AddProfileField(fields, "negócio", Get("Descrição do negócio"), 82);
+        AddProfileField(fields, "oferta", Get("Produtos e serviços"), 90);
+        AddProfileField(fields, "horário", Get("Horário de atendimento"), 48);
+        AddProfileField(fields, "local", Get("Localização"), 48);
+
+        if (fields.Count == 0)
+            return null;
+
+        return Limit(
+            $"Perfil de atendimento (personaliza estilo e enquadramento; não é fonte de fatos comerciais): {string.Join("; ", fields)}. Adapte saudação, vocabulário e nível de detalhe a este perfil.",
+            MaxBusinessProfileCharacters);
+    }
+
+    private static void AddProfileField(List<string> fields, string label, string? value, int maxCharacters)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            fields.Add($"{label}: {Limit(value, maxCharacters)}");
+    }
+
+    private static string NormalizeProfileValue(string value)
+    {
+        var normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Equals("Não informado", StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : normalized;
     }
 
     private static List<KnowledgeItem> RetrieveKnowledge(
@@ -162,6 +244,8 @@ public sealed class ContextAssembler(
             ? text[..maxCharacters]
             : $"{text[..(maxCharacters - 3)]}...";
     }
+
+    private sealed record ConfiguredInstructions(string? ProfileSummary, string? CustomDirections);
 }
 
 public sealed record RoutingQueueContext(string Name, string? Description);

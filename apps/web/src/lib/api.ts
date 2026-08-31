@@ -237,7 +237,7 @@ export interface TenantAiUsage {
     costLimitMinorUnits: number | null
     costUsedMinorUnits: number
     costRemainingMinorUnits: number | null
-    status: 'available' | 'exhausted'
+    status: 'available' | 'exhausted' | 'monitoring'
   }
   byProvider: Array<{
     provider: string

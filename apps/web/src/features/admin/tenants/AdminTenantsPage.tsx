@@ -832,14 +832,14 @@ export function AdminTenantsPage() {
                     <p className="mt-1 text-xl font-semibold">{aiUsage.tokens.output.toLocaleString('pt-BR')}</p>
                   </div>
                 </div>
-                <div className={`rounded-lg border p-4 ${aiUsage.budget?.status === 'exhausted' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold">Orçamento operacional</p>
-                    {aiUsage.budget?.status === 'exhausted' && <span className="text-xs font-semibold text-red-700">Limite atingido</span>}
+                    <p className="text-sm font-semibold">Consumo operacional</p>
+                    <span className="text-xs font-semibold text-slate-600">Não bloqueia a IA</span>
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
-                    <div><p className="text-xs text-slate-500">Tokens</p><p className="font-semibold">{aiUsage.budget?.tokenUsed.toLocaleString('pt-BR') ?? aiUsage.tokens.total.toLocaleString('pt-BR')} / {aiUsage.budget?.tokenLimit?.toLocaleString('pt-BR') ?? 'Ilimitado'}</p><p className="text-xs text-slate-500">Saldo: {aiUsage.budget?.tokenRemaining?.toLocaleString('pt-BR') ?? 'Ilimitado'}</p></div>
-                    <div><p className="text-xs text-slate-500">Custo operacional</p><p className="font-semibold">R$ {((aiUsage.budget?.costUsedMinorUnits ?? aiUsage.tokens.estimatedCostMinorUnits) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {aiUsage.budget?.costLimitMinorUnits === null || aiUsage.budget?.costLimitMinorUnits === undefined ? 'Ilimitado' : `R$ ${(aiUsage.budget.costLimitMinorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p><p className="text-xs text-slate-500">Margem: {aiUsage.budget?.costRemainingMinorUnits === null || aiUsage.budget?.costRemainingMinorUnits === undefined ? 'Ilimitada' : `R$ ${(aiUsage.budget.costRemainingMinorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p></div>
+                    <div><p className="text-xs text-slate-500">Tokens consumidos</p><p className="font-semibold">{aiUsage.budget?.tokenUsed.toLocaleString('pt-BR') ?? aiUsage.tokens.total.toLocaleString('pt-BR')}</p><p className="text-xs text-slate-500">Registrado para acompanhamento.</p></div>
+                    <div><p className="text-xs text-slate-500">Custo operacional</p><p className="font-semibold">R$ {((aiUsage.budget?.costUsedMinorUnits ?? aiUsage.tokens.estimatedCostMinorUnits) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="text-xs text-slate-500">Registrado para acompanhamento.</p></div>
                   </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 p-4">
@@ -1105,10 +1105,10 @@ export function AdminTenantsPage() {
                 <p className="text-xs text-slate-500 mt-1">Personalize a franquia desta empresa. Mensagens recebidas não contam.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-sm font-medium text-slate-700">Tokens por mês
+                <label className="block text-sm font-medium text-slate-700">Referência de tokens por mês (não bloqueia)
                   <input type="number" min="0" value={editAiTokenLimit ?? ''} onChange={(event) => setEditAiTokenLimit(event.target.value === '' ? null : Math.max(0, Number(event.target.value)))} placeholder="Ilimitado" className="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                 </label>
-                <label className="block text-sm font-medium text-slate-700">Custo máximo (centavos)
+                <label className="block text-sm font-medium text-slate-700">Referência de custo (centavos, não bloqueia)
                   <input type="number" min="0" value={editAiCostLimit ?? ''} onChange={(event) => setEditAiCostLimit(event.target.value === '' ? null : Math.max(0, Number(event.target.value)))} placeholder="Ilimitado" className="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                 </label>
               </div>

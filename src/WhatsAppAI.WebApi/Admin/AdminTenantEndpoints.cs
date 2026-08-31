@@ -626,10 +626,7 @@ public static class AdminTenantEndpoints
                 costRemainingMinorUnits = tenant.MonthlyAiCostLimitMinorUnits is null
                     ? (long?)null
                     : Math.Max(0, tenant.MonthlyAiCostLimitMinorUnits.Value - totalCost),
-                status = (tenant.MonthlyAiTokenLimit is not null && totalTokens >= tenant.MonthlyAiTokenLimit.Value) ||
-                    (tenant.MonthlyAiCostLimitMinorUnits is not null && totalCost >= tenant.MonthlyAiCostLimitMinorUnits.Value)
-                    ? "exhausted"
-                    : "available"
+                status = "monitoring"
             },
             byProvider = tokenRows.Select(row => new
             {

@@ -33,7 +33,7 @@ describe('UsagePage AI quota', () => {
 
     renderPage()
 
-    expect(await screen.findByText('Restam 300 respostas.')).toBeInTheDocument()
+    expect(await screen.findByText(/Você atingiu 80% da franquia/)).toBeInTheDocument()
     expect(screen.getByText('80%')).toBeInTheDocument()
     expect(screen.getByText('Histórico recente da franquia')).toBeInTheDocument()
     expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument()

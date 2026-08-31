@@ -73,6 +73,8 @@ export function UsagePage() {
                 <p className={`text-xs mt-2 ${quotaExhausted ? 'text-red-700' : quotaWarning ? 'text-amber-700' : 'text-slate-500'}`}>
                   {quotaExhausted
                     ? 'IA suspensa automaticamente por franquia esgotada. Solicite uma recarga de 500 respostas; o atendimento humano e o BOT continuam disponíveis.'
+                    : quotaWarning
+                      ? 'Você atingiu 80% da franquia. Solicite uma recarga de 500 respostas para evitar a suspensão da IA.'
                     : `Restam ${quota.remaining?.toLocaleString('pt-BR') ?? 0} respostas.`}
                 </p>
               </>

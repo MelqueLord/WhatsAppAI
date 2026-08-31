@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
+using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Audit;
@@ -484,8 +485,8 @@ public static class AiProviderEndpoints
         {
             ModelId = credential.ModelId,
             ApiKey = apiKey,
-            SystemPrompt = credential.SystemPrompt,
-            MaxTokens = credential.MaxTokensPerResponse,
+            SystemPrompt = ContextAssembler.ComposeSystemPrompt(credential.SystemPrompt),
+            MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
             Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
         });
         response = BehaviorPolicy.SanitizeResponse(response, botConfig?.ConfidenceThreshold ?? 0.5);
