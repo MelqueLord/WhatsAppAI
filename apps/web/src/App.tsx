@@ -18,6 +18,7 @@ import { QueueInboxPage } from './features/queues/QueueInboxPage'
 import { UsagePage } from './features/usage/UsagePage'
 import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { AdminAiUsagePage } from './features/admin/usage/AdminAiUsagePage'
+import { AdminAiPricingPage } from './features/admin/pricing/AdminAiPricingPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
 import { ContactsPage } from './features/contacts/ContactsPage'
 import { BroadcastPage } from './features/broadcast/BroadcastPage'
@@ -128,6 +129,7 @@ function App() {
               <Route path="/usage" element={<OperatorRoute><UsagePage /></OperatorRoute>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/ai-usage" element={<AdminRoute><AdminAiUsagePage /></AdminRoute>} />
+              <Route path="/admin/ai-pricing" element={<AdminRoute><AdminAiPricingPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
             </Route>
             <Route path="/app" element={<NavigateToHome />} />

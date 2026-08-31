@@ -198,6 +198,19 @@ export interface AiQuotaAlert {
   occurredAt: string
 }
 
+export interface AiModelPricing {
+  id: string
+  provider: string
+  modelId: string
+  inputCostPer1KMinorUnits: number
+  outputCostPer1KMinorUnits: number
+  currency: string
+  version: number
+  effectiveFrom: string
+  effectiveTo?: string | null
+  createdAt: string
+}
+
 export interface TenantAiUsage {
   periodStart: string
   periodEnd: string
@@ -796,6 +809,20 @@ export const api = {
           `/api/admin/tenants/${id}/owner/reset-password`,
           { method: 'POST' }
         ),
+      },
+    aiPricing: {
+      list: () => fetchApi<AiModelPricing[]>('/api/admin/ai-pricing'),
+      create: (data: {
+        provider: string
+        modelId: string
+        inputCostPer1KMinorUnits: number
+        outputCostPer1KMinorUnits: number
+        currency: string
+        effectiveFrom?: string
+      }) => fetchApi<AiModelPricing>('/api/admin/ai-pricing', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     },
-  },
+    },
 }
