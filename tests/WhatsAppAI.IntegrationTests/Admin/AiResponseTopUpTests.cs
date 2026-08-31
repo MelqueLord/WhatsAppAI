@@ -36,10 +36,10 @@ public sealed class AiResponseTopUpTests(TestWebApplicationFactory factory)
             Password = "Admin@12345!"
         })).EnsureSuccessStatusCode();
 
-        const string idempotencyKey = "topup-regression-500";
+        const string testRequestId = "topup-regression-500";
         using var firstRequest = new HttpRequestMessage(
             HttpMethod.Post, $"/api/admin/tenants/{tenantId}/ai-response-topups");
-        firstRequest.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+        firstRequest.Headers.TryAddWithoutValidation("Idempotency-Key", testRequestId);
         var firstResponse = await client.SendAsync(firstRequest);
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
         var firstResult = await firstResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -50,7 +50,7 @@ public sealed class AiResponseTopUpTests(TestWebApplicationFactory factory)
 
         using var repeatedRequest = new HttpRequestMessage(
             HttpMethod.Post, $"/api/admin/tenants/{tenantId}/ai-response-topups");
-        repeatedRequest.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+        repeatedRequest.Headers.TryAddWithoutValidation("Idempotency-Key", testRequestId);
         var repeatedResponse = await client.SendAsync(repeatedRequest);
         Assert.Equal(HttpStatusCode.OK, repeatedResponse.StatusCode);
         var repeatedResult = await repeatedResponse.Content.ReadFromJsonAsync<JsonElement>();
