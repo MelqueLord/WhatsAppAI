@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Building2, Loader2, Search, Wallet } from 'lucide-react'
-import { api, type Tenant } from '../../../lib/api'
+import { api, type AiProviderInfo, type Tenant } from '../../../lib/api'
 
 const money = (minorUnits: number) =>
   `R$ ${(minorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
@@ -12,6 +12,10 @@ export function AdminAiUsagePage() {
     queryKey: ['admin', 'ai-usage-overview'],
     queryFn: () => api.admin.tenants.list(),
     refetchInterval: 30_000,
+  })
+  const { data: providers = [], isLoading: isProvidersLoading } = useQuery<AiProviderInfo[]>({
+    queryKey: ['admin', 'ai-providers'],
+    queryFn: () => api.admin.tenants.aiProviders(),
   })
 
   const filteredTenants = useMemo(() => {
@@ -43,6 +47,17 @@ export function AdminAiUsagePage() {
           <SummaryCard label="Mensagens IA" value={totals.responses.toLocaleString('pt-BR')} hint="Respostas geradas no mês" icon={<BarChart3 className="h-4 w-4" />} />
           <SummaryCard label="Tokens consumidos" value={totals.tokens.toLocaleString('pt-BR')} hint="Entrada + saída" icon={<Building2 className="h-4 w-4" />} />
           <SummaryCard label="Custo operacional" value={money(totals.cost)} hint="Soma dos custos registrados" icon={<Wallet className="h-4 w-4" />} />
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h2 className="text-sm font-semibold text-slate-900">Provedores e modelos disponíveis</h2><p className="mt-1 text-xs text-slate-500">Catálogo completo autorizado pela plataforma para provisionamento das empresas.</p></div>
+            {!isProvidersLoading && <span className="rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">{providers.length} provedores</span>}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {providers.map((provider) => <div key={provider.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-800">{provider.name}</p><p className="mt-1 text-xs leading-5 text-slate-500">{provider.models.map((model) => model.name).join(' · ')}</p></div>)}
+            {!isProvidersLoading && providers.length === 0 && <p className="text-sm text-amber-700">Nenhum provedor registrado no serviço.</p>}
+          </div>
         </section>
 
         {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">Não foi possível carregar o uso das empresas.</div>}

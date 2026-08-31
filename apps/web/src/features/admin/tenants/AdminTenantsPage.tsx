@@ -943,13 +943,13 @@ export function AdminTenantsPage() {
                 <label className="block text-sm font-medium text-slate-700">API Key do provedor
                   <input type="password" value={aiApiKey} onChange={(event) => setAiApiKey(event.target.value)} placeholder="Informe para cadastrar ou rotacionar" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" />
                 </label>
-                <label className="block text-sm font-medium text-slate-700">Escopo da credencial
+                <label className="block text-sm font-medium text-slate-700">Uso da credencial
                   <select value={aiCredentialScope} onChange={(event) => setAiCredentialScope(event.target.value as 'TenantProject' | 'SharedPlatform')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="TenantProject">Exclusiva desta empresa</option>
-                    <option value="SharedPlatform">Compartilhada pela plataforma</option>
+                    <option value="TenantProject">Chave exclusiva desta empresa (recomendado)</option>
+                    <option value="SharedPlatform">Chave interna compartilhada pela plataforma</option>
                   </select>
                 </label>
-                <p className="text-xs text-slate-500">A chave não será exibida novamente. Use o escopo compartilhado somente quando a plataforma administrar uma credencial interna comum.</p>
+                <p className="text-xs text-slate-500">Escolha quem utiliza esta chave. No modo exclusivo, a empresa usa uma referência de segredo própria. O modo compartilhado só deve ser usado para uma chave interna comum administrada por você. A chave nunca é exibida novamente.</p>
                 <div className="flex flex-wrap justify-end gap-3">
                   <button onClick={() => testAiConnectionMutation.mutate()} disabled={testAiConnectionMutation.isPending || !aiConfig?.configured} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{testAiConnectionMutation.isPending ? 'Testando...' : 'Testar conexão atual'}</button>
                   <button onClick={() => saveAiConfigMutation.mutate()} disabled={saveAiConfigMutation.isPending || !aiProvider || !aiModel || !aiApiKey.trim()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saveAiConfigMutation.isPending ? 'Salvando...' : 'Salvar credencial'}</button>
