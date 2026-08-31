@@ -461,6 +461,7 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         ISecretStore secretStore,
         IAiProviderResolver aiProviderResolver,
+        IAiResponseExampleRepository responseExampleRepository,
         IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
         HttpContext httpContext)
@@ -481,11 +482,18 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "Credencial do provedor não disponível." });
 
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var relevantExample = ContextAssembler.SelectRelevantResponseExample(
+            await responseExampleRepository.GetActiveByTenantAsync(currentTenant.TenantId.Value, httpContext.RequestAborted),
+            request.Message);
         var response = await aiProviderResolver.Resolve(credential.Provider).GetResponseAsync(new AiRequest
         {
             ModelId = credential.ModelId,
             ApiKey = apiKey,
-            SystemPrompt = ContextAssembler.ComposeSystemPrompt(credential.SystemPrompt),
+            SystemPrompt = ContextAssembler.ComposeSystemPrompt(
+                credential.SystemPrompt,
+                responseExample: relevantExample is null
+                    ? null
+                    : new ResponseExampleContext(relevantExample.CustomerMessage, relevantExample.IdealResponse)),
             MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
             Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
         });

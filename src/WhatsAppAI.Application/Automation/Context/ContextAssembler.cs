@@ -1,19 +1,22 @@
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Automation.Policy;
+using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Knowledge;
 
 namespace WhatsAppAI.Application.Automation.Context;
 
 public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
-    IKnowledgeItemRepository knowledgeRepository)
+    IKnowledgeItemRepository knowledgeRepository,
+    IAiResponseExampleRepository? responseExampleRepository = null)
 {
     private const int MaxMessages = 2;
     private const int MaxMessageCharacters = 180;
     private const int MaxKnowledgeItems = 1;
     private const int MaxKnowledgeItemCharacters = 300;
     private const int MaxBusinessProfileCharacters = 480;
+    private const int MaxResponseExampleCharacters = 260;
     private const int MaxCustomInstructionsCharacters = 160;
     private const int MaxRoutingItems = 4;
     private const int MaxContextCharacters = 2200;
@@ -46,8 +49,20 @@ public sealed class ContextAssembler(
         var knowledgeTexts = RetrieveKnowledge(knowledge, query)
             .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
+        var responseExample = responseExampleRepository is null
+            ? null
+            : SelectRelevantResponseExample(
+                await responseExampleRepository.GetActiveByTenantAsync(tenantId, cancellationToken),
+                query);
 
-        var fullSystemPrompt = ComposeSystemPrompt(systemPrompt, knowledgeTexts, routingQueues, routingTags);
+        var fullSystemPrompt = ComposeSystemPrompt(
+            systemPrompt,
+            knowledgeTexts,
+            routingQueues,
+            routingTags,
+            responseExample is null
+                ? null
+                : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse));
 
         return new ConversationContext
         {
@@ -60,7 +75,8 @@ public sealed class ContextAssembler(
         string? configuredInstructions,
         IReadOnlyList<string>? knowledgeItems = null,
         IReadOnlyList<RoutingQueueContext>? routingQueues = null,
-        IReadOnlyList<RoutingTagContext>? routingTags = null)
+        IReadOnlyList<RoutingTagContext>? routingTags = null,
+        ResponseExampleContext? responseExample = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
         const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use [].";
@@ -80,6 +96,11 @@ public sealed class ContextAssembler(
         else
         {
             dynamicParts.Add(("Não há conhecimento da empresa relevante para esta solicitação. Não invente fatos específicos; para fato empresarial não documentado, use action \"handoff\" com handoff_reason \"out_of_scope\".", 240));
+        }
+
+        if (responseExample is not null)
+        {
+            dynamicParts.Add(($"Exemplo de atendimento semelhante (copie apenas estilo e abordagem; não use como prova de fatos):\nCliente: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.CustomerMessage), 100)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.IdealResponse), 140)}", MaxResponseExampleCharacters));
         }
 
         if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
@@ -212,6 +233,27 @@ public sealed class ContextAssembler(
             .ToList();
     }
 
+    public static AiResponseExample? SelectRelevantResponseExample(
+        IReadOnlyList<AiResponseExample> examples,
+        string query)
+    {
+        var queryTerms = Tokenize(query);
+        if (queryTerms.Count == 0)
+            return null;
+
+        return examples
+            .Select(example => new
+            {
+                Example = example,
+                Score = queryTerms.Count(term => Tokenize(example.CustomerMessage).Contains(term))
+            })
+            .Where(result => result.Score > 0)
+            .OrderByDescending(result => result.Score)
+            .ThenByDescending(result => result.Example.UpdatedAt ?? result.Example.CreatedAt)
+            .Select(result => result.Example)
+            .FirstOrDefault();
+    }
+
     private static int Score(KnowledgeItem item, HashSet<string> queryTerms)
     {
         if (queryTerms.Count == 0)
@@ -250,6 +292,7 @@ public sealed class ContextAssembler(
 
 public sealed record RoutingQueueContext(string Name, string? Description);
 public sealed record RoutingTagContext(string Name, string? Description);
+public sealed record ResponseExampleContext(string CustomerMessage, string IdealResponse);
 
 public sealed record ConversationContext
 {

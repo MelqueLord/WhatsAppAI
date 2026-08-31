@@ -39,6 +39,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AiProviderCredential> AiProviderCredentials => Set<AiProviderCredential>();
     public DbSet<AiInteraction> AiInteractions => Set<AiInteraction>();
+    public DbSet<AiResponseExample> AiResponseExamples => Set<AiResponseExample>();
     public DbSet<UsageLedger> UsageLedger => Set<UsageLedger>();
     public DbSet<AiResponseQuotaReservation> AiResponseQuotaReservations => Set<AiResponseQuotaReservation>();
     public DbSet<AiResponseTopUpRequest> AiResponseTopUpRequests => Set<AiResponseTopUpRequest>();
@@ -88,6 +89,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<AiProviderCredential>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<AiInteraction>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AiResponseExample>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<UsageLedger>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);

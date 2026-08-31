@@ -142,6 +142,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
           ...(botEnabled ? [{ to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' }] : []),
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
+          ...(aiEnabled ? [{ to: '/integrations/ai/examples', icon: MessageSquare, label: 'Exemplos IA' }] : []),
           { to: '/knowledge', icon: BookOpen, label: 'Conhecimento' },
           // Queue and tag management remains available to the tenant owner.
           // Plan flags only gate their operational use (routing/assignment).

@@ -2,6 +2,7 @@ using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Knowledge;
+using WhatsAppAI.Domain.Automation;
 
 namespace WhatsAppAI.UnitTests.Automation;
 
@@ -163,6 +164,37 @@ public sealed class ContextAssemblerTests
         Assert.Contains("tom: Profissional e objetivo", context.SystemPrompt);
         Assert.Contains("Boleto: A segunda via é solicitada pelo portal do cliente.", context.SystemPrompt);
         Assert.True(context.SystemPrompt.Length <= 2_200);
+    }
+
+    [Fact]
+    public void SelectRelevantResponseExample_UsesOnlyTheClosestCustomerMessage()
+    {
+        var tenantId = Guid.NewGuid();
+        var scheduling = AiResponseExample.Create(tenantId, "Quero agendar uma consulta", "Claro! Vou ajudar com o agendamento.");
+        var pricing = AiResponseExample.Create(tenantId, "Qual é o preço da consulta?", "O valor está na informação oficial vigente.");
+
+        var selected = ContextAssembler.SelectRelevantResponseExample(
+            [scheduling, pricing],
+            "Gostaria de agendar minha consulta");
+
+        Assert.Same(scheduling, selected);
+    }
+
+    [Fact]
+    public void ComposeSystemPrompt_MarksResponseExampleAsStyleOnly()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            null,
+            ["Agenda: O atendimento ocorre de segunda a sexta."],
+            responseExample: new ResponseExampleContext(
+                "Quero agendar uma consulta",
+                "Claro! Vou ajudar com o agendamento."));
+
+        Assert.Contains("Exemplo de atendimento semelhante", prompt);
+        Assert.Contains("copie apenas estilo e abordagem", prompt);
+        Assert.Contains("não use como prova de fatos", prompt);
+        Assert.Contains("Conhecimento relevante da empresa", prompt);
+        Assert.True(prompt.Length <= 2_200);
     }
 
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
