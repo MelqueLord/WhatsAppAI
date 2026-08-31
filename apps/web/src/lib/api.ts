@@ -832,6 +832,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+      update: (id: string, data: {
+        provider: string
+        modelId: string
+        inputCostPer1KMinorUnits: number
+        outputCostPer1KMinorUnits: number
+        currency: string
+        effectiveFrom?: string
+      }) => fetchApi<AiModelPricing>(`/api/admin/ai-pricing/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+      delete: (id: string) => fetchApi<void>(`/api/admin/ai-pricing/${id}`, { method: 'DELETE' }),
     },
     },
 }

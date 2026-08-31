@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleDollarSign, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { CircleDollarSign, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { api, type AiModelPricing, type AiProviderInfo } from '../../../lib/api'
 
 const money = (minorUnits: number, currency: string) =>
-  `${currency} ${(minorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  `${currency} ${(minorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
+
+const minor = (minorUnits: number) =>
+  `${minorUnits.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} centavos`
 
 export function AdminAiPricingPage() {
   const queryClient = useQueryClient()
@@ -14,6 +17,7 @@ export function AdminAiPricingPage() {
   const [outputCost, setOutputCost] = useState('')
   const [currency, setCurrency] = useState('BRL')
   const [effectiveFrom, setEffectiveFrom] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const prices = useQuery({
     queryKey: ['admin', 'ai-pricing'],
@@ -28,21 +32,45 @@ export function AdminAiPricingPage() {
   const models = selectedProvider?.models ?? []
 
   const save = useMutation({
-    mutationFn: () => api.admin.aiPricing.create({
+    mutationFn: () => (editingId ? api.admin.aiPricing.update(editingId, {
       provider,
       modelId,
       inputCostPer1KMinorUnits: Number(inputCost),
       outputCostPer1KMinorUnits: Number(outputCost),
       currency: currency.trim().toUpperCase(),
       ...(effectiveFrom ? { effectiveFrom: new Date(effectiveFrom).toISOString() } : {}),
-    }),
+    }) : api.admin.aiPricing.create({
+      provider,
+      modelId,
+      inputCostPer1KMinorUnits: Number(inputCost),
+      outputCostPer1KMinorUnits: Number(outputCost),
+      currency: currency.trim().toUpperCase(),
+      ...(effectiveFrom ? { effectiveFrom: new Date(effectiveFrom).toISOString() } : {}),
+    })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'ai-pricing'] })
       setInputCost('')
       setOutputCost('')
       setEffectiveFrom('')
+      setEditingId(null)
     },
   })
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.admin.aiPricing.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'ai-pricing'] }),
+  })
+
+  const startEditing = (price: AiModelPricing) => {
+    setEditingId(price.id)
+    setProvider(price.provider)
+    setModelId(price.modelId)
+    setInputCost(String(price.inputCostPer1KMinorUnits))
+    setOutputCost(String(price.outputCostPer1KMinorUnits))
+    setCurrency(price.currency)
+    setEffectiveFrom('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const groupedPrices = useMemo(() => {
     const grouped = new Map<string, AiModelPricing[]>()
@@ -65,8 +93,8 @@ export function AdminAiPricingPage() {
         </header>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2"><Plus className="h-4 w-4 text-emerald-600" /><h2 className="text-sm font-semibold text-slate-900">Cadastrar nova versão de preço</h2></div>
-          <p className="mt-1 text-xs text-slate-500">Informe os valores em centavos por 1.000 tokens. Uma nova versão não altera o histórico já registrado.</p>
+          <div className="flex items-center gap-2">{editingId ? <Pencil className="h-4 w-4 text-amber-600" /> : <Plus className="h-4 w-4 text-emerald-600" />}<h2 className="text-sm font-semibold text-slate-900">{editingId ? 'Editar preço (criar nova versão)' : 'Cadastrar nova versão de preço'}</h2></div>
+          <p className="mt-1 text-xs text-slate-500">Informe os valores em centavos por 1.000 tokens. Exemplo: 15 centavos = R$ 0,15. O histórico já registrado não é alterado.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm font-medium text-slate-700">Provedor<select value={provider} onChange={(event) => { setProvider(event.target.value); setModelId('') }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"><option value="">Selecione</option>{(providers.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="text-sm font-medium text-slate-700">Modelo<select value={modelId} onChange={(event) => setModelId(event.target.value)} disabled={!provider} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"><option value="">Selecione</option>{models.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -77,12 +105,12 @@ export function AdminAiPricingPage() {
           </div>
           {save.error && <p className="mt-3 text-sm text-red-600">{save.error.message}</p>}
           {save.isSuccess && <p className="mt-3 text-sm text-emerald-700">Preço cadastrado com sucesso.</p>}
-          <button onClick={() => save.mutate()} disabled={!canSave || save.isPending} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">{save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Salvar preço</button>
+          <button onClick={() => save.mutate()} disabled={!canSave || save.isPending} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">{save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}{editingId ? 'Criar nova versão' : 'Salvar preço'}</button>{editingId && <button onClick={() => { setEditingId(null); setInputCost(''); setOutputCost(''); setEffectiveFrom('') }} className="ml-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancelar</button>}
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-slate-900">Preços cadastrados</h2><p className="mt-1 text-xs text-slate-500">As versões são preservadas para auditoria e cálculo histórico.</p></div><RefreshCw className="h-4 w-4 text-slate-400" /></div>
-          {prices.isLoading ? <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-emerald-500" /></div> : prices.error ? <p className="p-5 text-sm text-red-600">Não foi possível carregar os preços.</p> : groupedPrices.length === 0 ? <p className="p-5 text-sm text-slate-500">Nenhum preço cadastrado.</p> : <div className="overflow-x-auto"><table className="min-w-[850px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Provedor / modelo</th><th className="px-5 py-3">Entrada</th><th className="px-5 py-3">Saída</th><th className="px-5 py-3">Versão</th><th className="px-5 py-3">Vigência</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{groupedPrices.map((versions) => versions.map((price) => <tr key={price.id}><td className="px-5 py-4"><div className="font-medium text-slate-800">{price.provider}</div><div className="text-xs text-slate-500">{price.modelId}</div></td><td className="px-5 py-4">{money(price.inputCostPer1KMinorUnits, price.currency)} <span className="text-xs text-slate-400">/ 1k</span></td><td className="px-5 py-4">{money(price.outputCostPer1KMinorUnits, price.currency)} <span className="text-xs text-slate-400">/ 1k</span></td><td className="px-5 py-4">v{price.version}</td><td className="px-5 py-4 text-xs text-slate-600">{new Date(price.effectiveFrom).toLocaleString('pt-BR')}</td><td className="px-5 py-4">{price.effectiveTo ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">Encerrado</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Vigente</span>}</td></tr>))}</tbody></table></div>}
+          {prices.isLoading ? <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-emerald-500" /></div> : prices.error ? <p className="p-5 text-sm text-red-600">Não foi possível carregar os preços.</p> : groupedPrices.length === 0 ? <p className="p-5 text-sm text-slate-500">Nenhum preço cadastrado.</p> : <div className="overflow-x-auto"><table className="min-w-[1100px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Provedor / modelo</th><th className="px-5 py-3">Entrada</th><th className="px-5 py-3">Saída</th><th className="px-5 py-3">Versão</th><th className="px-5 py-3">Vigência</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">{groupedPrices.map((versions) => versions.map((price) => <tr key={price.id}><td className="px-5 py-4"><div className="font-medium text-slate-800">{price.provider}</div><div className="text-xs text-slate-500">{price.modelId}</div></td><td className="px-5 py-4"><div>{minor(price.inputCostPer1KMinorUnits)}</div><span className="text-xs text-slate-500">{money(price.inputCostPer1KMinorUnits, price.currency)} / 1k</span></td><td className="px-5 py-4"><div>{minor(price.outputCostPer1KMinorUnits)}</div><span className="text-xs text-slate-500">{money(price.outputCostPer1KMinorUnits, price.currency)} / 1k</span></td><td className="px-5 py-4">v{price.version}</td><td className="px-5 py-4 text-xs text-slate-600">{new Date(price.effectiveFrom).toLocaleString('pt-BR')}</td><td className="px-5 py-4">{price.effectiveTo ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">Encerrado</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Vigente</span>}</td><td className="px-5 py-4"><button title="Editar criando nova versão" onClick={() => startEditing(price)} className="mr-2 text-amber-600 hover:text-amber-800"><Pencil className="h-4 w-4" /></button><button title="Excluir preço" onClick={() => { if (window.confirm('Excluir este preço? O histórico usado não poderá ser excluído.')) remove.mutate(price.id) }} className="text-red-600 hover:text-red-800"><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table></div>}
         </section>
       </div>
     </div>

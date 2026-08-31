@@ -62,6 +62,11 @@ public sealed class AiModelPricing
         EffectiveTo = utc;
     }
 
+    public void Reopen()
+    {
+        EffectiveTo = null;
+    }
+
     public long CalculateCostMinorUnits(long tokens, bool input)
     {
         if (tokens <= 0)

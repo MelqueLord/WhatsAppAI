@@ -15,6 +15,8 @@ public static class AdminAiPricingEndpoints
 
         group.MapGet("/", ListAsync).WithName("ListAiModelPricing");
         group.MapPost("/", CreateVersionAsync).WithName("CreateAiModelPricingVersion");
+        group.MapPut("/{id:guid}", UpdateVersionAsync).WithName("UpdateAiModelPricingVersion");
+        group.MapDelete("/{id:guid}", DeleteAsync).WithName("DeleteAiModelPricing");
 
         return app;
     }
@@ -80,6 +82,52 @@ public static class AdminAiPricingEndpoints
         }
 
         return Results.Created($"/api/admin/ai-pricing/{pricing.Provider}/{pricing.ModelId}", ToResponse(pricing));
+    }
+
+    private static async Task<IResult> UpdateVersionAsync(
+        Guid id,
+        [FromBody] CreateAiModelPricingRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var current = await dbContext.AiModelPricing
+            .SingleOrDefaultAsync(price => price.Id == id, cancellationToken);
+        if (current is null)
+            return Results.NotFound();
+        if (!string.Equals(request.Provider?.Trim(), current.Provider, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(request.ModelId?.Trim(), current.ModelId, StringComparison.Ordinal))
+            return Results.BadRequest(new { error = "Provider and model cannot change when editing a price version." });
+
+        return await CreateVersionAsync(request, dbContext, cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        Guid id,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var pricing = await dbContext.AiModelPricing
+            .SingleOrDefaultAsync(price => price.Id == id, cancellationToken);
+        if (pricing is null)
+            return Results.NotFound();
+
+        var wasUsed = await dbContext.UsageLedger
+            .IgnoreQueryFilters()
+            .AnyAsync(entry => entry.Provider == pricing.Provider && entry.PriceVersion == pricing.Version &&
+                (entry.Metric == "input_tokens" || entry.Metric == "output_tokens"), cancellationToken);
+        if (wasUsed)
+            return Results.Conflict(new { error = "This price cannot be deleted because it is referenced by recorded usage." });
+
+        var previous = await dbContext.AiModelPricing
+            .Where(price => price.Provider == pricing.Provider && price.ModelId == pricing.ModelId && price.Version < pricing.Version)
+            .OrderByDescending(price => price.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (previous is not null && pricing.EffectiveTo is null)
+            previous.Reopen();
+
+        dbContext.AiModelPricing.Remove(pricing);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static object ToResponse(AiModelPricing pricing) => new
