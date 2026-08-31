@@ -687,7 +687,7 @@ export function AdminTenantsPage() {
                             aria-label={`Ver consumo de IA de ${tenant.name}`}
                             title="Ver consumo de tokens e modelo"
                           >
-                            <BarChart3 className="w-3.5 h-3.5" />
+                            <BarChart3 className="w-3.5 h-3.5" /><span>Uso IA</span>
                           </button>
                           <button
                             onClick={() => {
@@ -699,7 +699,7 @@ export function AdminTenantsPage() {
                             aria-label={`Configurar IA de ${tenant.name}`}
                             title="Configurar provedor e credencial de IA"
                           >
-                            <Bot className="w-3.5 h-3.5" />
+                            <Bot className="w-3.5 h-3.5" /><span>Configurar IA</span>
                           </button>
                           <button
                             onClick={() => {

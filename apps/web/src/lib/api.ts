@@ -180,6 +180,8 @@ export interface Tenant {
   monthlyAiResponsesUsed: number
   monthlyAiTokensUsed?: number
   monthlyAiEstimatedCostMinorUnits?: number
+  aiProvider?: string | null
+  aiModelId?: string | null
   monthlyAiResponseStatus: 'normal' | 'warning' | 'exhausted' | 'unlimited'
   isAiSuspendedByQuota?: boolean
   ownerEmail?: string

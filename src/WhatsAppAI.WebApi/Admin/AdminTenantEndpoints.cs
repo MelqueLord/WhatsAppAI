@@ -277,6 +277,11 @@ public static class AdminTenantEndpoints
             UsageMetricNames.AiResponseTopUps, monthStart, monthStart.AddMonths(1));
         var tokenUsageByTenant = await GetMonthlyTokenUsageByTenantAsync(
             dbContext, monthStart, monthStart.AddMonths(1));
+        var activeModelsByTenant = await dbContext.AiProviderCredentials
+            .IgnoreQueryFilters()
+            .Where(credential => credential.IsActive)
+            .Select(credential => new { credential.TenantId, credential.Provider, credential.ModelId })
+            .ToDictionaryAsync(item => item.TenantId);
 
         return Results.Ok(tenants.Select(t =>
         {
@@ -285,6 +290,7 @@ public static class AdminTenantEndpoints
             var effectiveLimit = AiResponseQuotaPolicy.GetEffectiveMonthlyLimit(
                 t.MonthlyAiResponseLimit, topUps);
             var responsesUsed = aiResponsesByTenant.GetValueOrDefault(t.Id);
+            activeModelsByTenant.TryGetValue(t.Id, out var activeModel);
             return new TenantResponse
             {
                 Id = t.Id,
@@ -305,6 +311,8 @@ public static class AdminTenantEndpoints
                 MonthlyAiResponsesUsed = responsesUsed,
                 MonthlyAiTokensUsed = tokenUsage?.TotalTokens ?? 0,
                 MonthlyAiEstimatedCostMinorUnits = tokenUsage?.EstimatedCostMinorUnits ?? 0,
+                AiProvider = activeModel?.Provider,
+                AiModelId = activeModel?.ModelId,
                 MonthlyAiResponseStatus = AiQuotaAlertPolicy.GetStatus(
                     effectiveLimit, responsesUsed)
                     .ToString().ToLowerInvariant(),
@@ -1057,6 +1065,8 @@ public sealed class TenantResponse
     public long MonthlyAiResponsesUsed { get; init; }
     public long MonthlyAiTokensUsed { get; init; }
     public long MonthlyAiEstimatedCostMinorUnits { get; init; }
+    public string? AiProvider { get; init; }
+    public string? AiModelId { get; init; }
     public string MonthlyAiResponseStatus { get; init; } = "unlimited";
     public bool IsAiSuspendedByQuota { get; init; }
     public string? OwnerEmail { get; init; }

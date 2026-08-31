@@ -153,6 +153,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
     ...(isPlatformAdmin
       ? [
           { to: '/admin/tenants', icon: Building2, label: 'Empresas' },
+          { to: '/admin/ai-usage', icon: BarChart3, label: 'Uso de IA' },
           { to: '/admin/webhooks', icon: Shield, label: 'Webhooks' },
         ]
       : []),
