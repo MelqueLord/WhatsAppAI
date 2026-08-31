@@ -30,11 +30,9 @@ public static class AdminAiProviderEndpoints
         return app;
     }
 
-    private static IResult GetProvidersAsync(IAiProviderResolver resolver)
+    private static IResult GetProvidersAsync()
     {
-        var registered = resolver.GetRegisteredProviders();
         return Results.Ok(AiProviderCatalog.Providers
-            .Where(definition => registered.Contains(definition.Id, StringComparer.OrdinalIgnoreCase))
             .Select(definition => new { id = definition.Id, name = definition.Name, models = definition.Models }));
     }
 

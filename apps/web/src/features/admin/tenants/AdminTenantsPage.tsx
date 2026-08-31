@@ -81,7 +81,7 @@ export function AdminTenantsPage() {
     enabled: aiUsageTarget !== null,
   })
 
-  const { data: aiProviders = [] } = useQuery<AiProviderInfo[]>({
+  const { data: aiProviders = [], error: aiProvidersError } = useQuery<AiProviderInfo[]>({
     queryKey: ['admin', 'ai-providers'],
     queryFn: () => api.admin.tenants.aiProviders(),
   })
@@ -934,6 +934,7 @@ export function AdminTenantsPage() {
                     {aiProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                 </label>
+                {aiProvidersError && <p className="text-sm text-red-600">Não foi possível carregar o catálogo de provedores. Verifique a sessão de administrador e atualize a tela.</p>}
                 <label className="block text-sm font-medium text-slate-700">Modelo
                   <select value={aiModel} onChange={(event) => setAiModel(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
                     <option value="">Selecione...</option>
