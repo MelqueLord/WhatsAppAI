@@ -33,14 +33,38 @@ public class KnowledgeItemTests
     }
 
     [Fact]
+    public void Create_UsesSpecifiedGuidedCategory()
+    {
+        var item = KnowledgeItem.Create(Guid.NewGuid(), "PIX", "Aceitamos PIX.", category: KnowledgeCategories.Payment);
+
+        Assert.Equal(KnowledgeCategories.Payment, item.Category);
+    }
+
+    [Fact]
+    public void Create_DefaultsLegacyItemsToGeneralCategory()
+    {
+        var item = KnowledgeItem.Create(Guid.NewGuid(), "Title", "Content");
+
+        Assert.Equal(KnowledgeCategories.General, item.Category);
+    }
+
+    [Fact]
+    public void Create_RejectsUnsupportedCategory()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            KnowledgeItem.Create(Guid.NewGuid(), "Title", "Content", category: "Unknown"));
+    }
+
+    [Fact]
     public void Update_ChangesProperties()
     {
         var item = KnowledgeItem.Create(Guid.NewGuid(), "Title", "Content");
-        item.Update("New Title", "New Content", 10, 1);
+        item.Update("New Title", "New Content", 10, 1, KnowledgeCategories.Pricing);
 
         Assert.Equal("New Title", item.Title);
         Assert.Equal("New Content", item.Content);
         Assert.Equal(10, item.Priority);
+        Assert.Equal(KnowledgeCategories.Pricing, item.Category);
     }
 
     [Fact]

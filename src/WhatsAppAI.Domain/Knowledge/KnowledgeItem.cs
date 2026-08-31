@@ -6,6 +6,7 @@ public sealed class KnowledgeItem
     public Guid TenantId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string Content { get; private set; } = string.Empty;
+    public string Category { get; private set; } = KnowledgeCategories.General;
     public int Priority { get; private set; }
     public bool IsActive { get; private set; }
     public uint Version { get; private set; }
@@ -20,7 +21,8 @@ public sealed class KnowledgeItem
         Guid tenantId,
         string title,
         string content,
-        int priority = 0)
+        int priority = 0,
+        string? category = null)
     {
         return new KnowledgeItem
         {
@@ -28,6 +30,7 @@ public sealed class KnowledgeItem
             TenantId = tenantId,
             Title = title.Trim(),
             Content = content.Trim(),
+            Category = KnowledgeCategories.Normalize(category),
             Priority = priority,
             IsActive = true,
             Version = 1,
@@ -35,13 +38,14 @@ public sealed class KnowledgeItem
         };
     }
 
-    public void Update(string title, string content, int priority, uint expectedVersion)
+    public void Update(string title, string content, int priority, uint expectedVersion, string? category = null)
     {
         if (Version != expectedVersion)
             throw new ConcurrencyException($"Version conflict: expected {expectedVersion}, actual {Version}.");
 
         Title = title.Trim();
         Content = content.Trim();
+        Category = category is null ? Category : KnowledgeCategories.Normalize(category);
         Priority = priority;
         Version++;
         UpdatedAt = DateTime.UtcNow;

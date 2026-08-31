@@ -45,6 +45,7 @@ public static class KnowledgeEndpoints
             id = k.Id,
             title = k.Title,
             content = k.Content,
+            category = k.Category,
             priority = k.Priority,
             isActive = k.IsActive,
             version = k.Version,
@@ -66,12 +67,15 @@ public static class KnowledgeEndpoints
 
         if (string.IsNullOrWhiteSpace(request.Content))
             return Results.BadRequest(new { error = "Content is required." });
+        if (!KnowledgeCategories.IsSupported(request.Category))
+            return Results.BadRequest(new { error = "Categoria de conhecimento inválida." });
 
         var item = KnowledgeItem.Create(
             currentTenant.TenantId.Value,
             request.Title,
             request.Content,
-            request.Priority);
+            request.Priority,
+            request.Category);
 
         await repository.AddAsync(item);
 
@@ -95,10 +99,12 @@ public static class KnowledgeEndpoints
         var ifMatch = httpContext.Request.Headers["If-Match"].FirstOrDefault();
         if (ifMatch is null || !uint.TryParse(ifMatch, out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header with version is required." });
+        if (!KnowledgeCategories.IsSupported(request.Category))
+            return Results.BadRequest(new { error = "Categoria de conhecimento inválida." });
 
         try
         {
-            item.Update(request.Title, request.Content, request.Priority, expectedVersion);
+            item.Update(request.Title, request.Content, request.Priority, expectedVersion, request.Category);
         }
         catch (ConcurrencyException)
         {
@@ -183,6 +189,7 @@ public sealed record CreateKnowledgeRequest
     public string Title { get; init; } = string.Empty;
     public string Content { get; init; } = string.Empty;
     public int Priority { get; init; }
+    public string? Category { get; init; }
 }
 
 public sealed record UpdateKnowledgeRequest
@@ -190,4 +197,5 @@ public sealed record UpdateKnowledgeRequest
     public string Title { get; init; } = string.Empty;
     public string Content { get; init; } = string.Empty;
     public int Priority { get; init; }
+    public string? Category { get; init; }
 }

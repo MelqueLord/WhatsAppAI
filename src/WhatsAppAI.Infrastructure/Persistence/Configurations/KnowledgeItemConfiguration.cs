@@ -16,6 +16,7 @@ public sealed class KnowledgeItemConfiguration : IEntityTypeConfiguration<Knowle
         builder.Property(k => k.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(k => k.Title).HasColumnName("title").HasMaxLength(200).IsRequired();
         builder.Property(k => k.Content).HasColumnName("content").HasMaxLength(4000).IsRequired();
+        builder.Property(k => k.Category).HasColumnName("category").HasMaxLength(32).HasDefaultValue(KnowledgeCategories.General).IsRequired();
         builder.Property(k => k.Priority).HasColumnName("priority").IsRequired();
         builder.Property(k => k.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(k => k.Version).HasColumnName("version").IsConcurrencyToken().IsRequired();
@@ -25,6 +26,7 @@ public sealed class KnowledgeItemConfiguration : IEntityTypeConfiguration<Knowle
         builder.Property(k => k.ReactivatedAt).HasColumnName("reactivated_at").HasColumnType("timestamp with time zone");
 
         builder.HasIndex(k => new { k.TenantId, k.IsActive });
+        builder.HasIndex(k => new { k.TenantId, k.Category, k.IsActive });
         builder.HasIndex(k => k.TenantId);
     }
 }

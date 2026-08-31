@@ -16,6 +16,7 @@ public sealed record KnowledgeItemDto
     public Guid Id { get; init; }
     public string Title { get; init; } = string.Empty;
     public string Content { get; init; } = string.Empty;
+    public string Category { get; init; } = KnowledgeCategories.General;
     public int Priority { get; init; }
     public bool IsActive { get; init; }
     public uint Version { get; init; }
