@@ -18,6 +18,10 @@
 - [x] Persistência e criptografia das chaves de Data Protection validadas localmente com PFX temporário, volume compartilhado e reinício de API/worker.
 - [ ] Smoke das integrações reais Meta, QR e IA executado no staging.
 
+### Render
+
+O serviço web do Render deve manter `Persistence__ApplyMigrationsOnStartup=true` para aplicar migrations antes de atender requisições. Em ambientes com job externo de migrations, essa variável pode ser desativada somente após validar que o job executa antes do web service.
+
 ## Pre-Deployment
 
 ### Environment Setup
