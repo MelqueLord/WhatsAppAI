@@ -44,24 +44,44 @@ public static class IdentityServiceCollectionExtensions
         {
             var certificatePath = configuration["DataProtection:CertificatePath"];
             var certificatePassword = configuration["DataProtection:CertificatePassword"];
+            var certificateBase64 = configuration["DataProtection:CertificateBase64"];
 
-            if (string.IsNullOrWhiteSpace(certificatePath) ||
-                string.IsNullOrWhiteSpace(certificatePassword))
+            if (string.IsNullOrWhiteSpace(certificatePassword) ||
+                (string.IsNullOrWhiteSpace(certificatePath) && string.IsNullOrWhiteSpace(certificateBase64)))
             {
                 throw new InvalidOperationException(
-                    "DataProtection:CertificatePath and DataProtection:CertificatePassword are required in production.");
+                    "DataProtection:CertificatePassword and either DataProtection:CertificatePath or DataProtection:CertificateBase64 are required in production.");
             }
 
-            if (!File.Exists(certificatePath))
+            X509Certificate2 certificate;
+            if (!string.IsNullOrWhiteSpace(certificateBase64))
             {
-                throw new InvalidOperationException(
-                    "DataProtection certificate file was not found at the configured path.");
+                try
+                {
+                    certificate = X509CertificateLoader.LoadPkcs12(
+                        Convert.FromBase64String(certificateBase64),
+                        certificatePassword,
+                        X509KeyStorageFlags.EphemeralKeySet);
+                }
+                catch (FormatException ex)
+                {
+                    throw new InvalidOperationException(
+                        "DataProtection:CertificateBase64 is not valid Base64.", ex);
+                }
             }
+            else
+            {
+                if (!File.Exists(certificatePath))
+                {
+                    throw new InvalidOperationException(
+                        "DataProtection certificate file was not found at the configured path.");
+                }
 
-            var certificate = X509CertificateLoader.LoadPkcs12FromFile(
-                certificatePath,
-                certificatePassword,
-                X509KeyStorageFlags.EphemeralKeySet);
+                certificate = X509CertificateLoader.LoadPkcs12FromFile(
+                    certificatePath,
+                    certificatePassword,
+                    X509KeyStorageFlags.EphemeralKeySet);
+            }
 
             if (!certificate.HasPrivateKey)
             {
