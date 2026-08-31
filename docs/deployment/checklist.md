@@ -34,6 +34,7 @@
 - [ ] Set `BootstrapAdmin__Email` and a unique `BootstrapAdmin__Password` (at least 12 characters with upper/lowercase, number and symbol); do not commit either value
 - [ ] Set PostgreSQL password (strong, unique)
 - [ ] Provision a password-protected PFX for Data Protection at `DATAPROTECTION_CERTIFICATE_FILE`; keep the file outside version control and set `DataProtection__CertificatePassword`. On Render, provide the PFX as the secret `DataProtection__CertificateBase64` instead of `DataProtection__CertificatePath`.
+- [ ] Temporary testing fallback only: `DataProtection__AllowUnencryptedKeys=true` may be used without a PFX; remove it or set it to `false` before production.
 - [ ] Set Meta Verify Token and App Secret
 - [ ] Set DOMAIN for Nginx template rendering
 

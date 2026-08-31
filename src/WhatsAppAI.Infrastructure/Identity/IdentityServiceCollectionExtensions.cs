@@ -45,51 +45,63 @@ public static class IdentityServiceCollectionExtensions
             var certificatePath = configuration["DataProtection:CertificatePath"];
             var certificatePassword = configuration["DataProtection:CertificatePassword"];
             var certificateBase64 = configuration["DataProtection:CertificateBase64"];
+            var allowUnencryptedKeys = configuration.GetValue<bool>(
+                "DataProtection:AllowUnencryptedKeys");
 
             if (string.IsNullOrWhiteSpace(certificatePassword) ||
                 (string.IsNullOrWhiteSpace(certificatePath) && string.IsNullOrWhiteSpace(certificateBase64)))
             {
+                if (allowUnencryptedKeys)
+                {
+                    Console.Error.WriteLine(
+                        "WARNING: Data Protection keys are not encrypted with a certificate. This mode is for temporary testing only.");
+                }
+                else
+                {
                 throw new InvalidOperationException(
                     "DataProtection:CertificatePassword and either DataProtection:CertificatePath or DataProtection:CertificateBase64 are required in production.");
-            }
-
-            X509Certificate2 certificate;
-            if (!string.IsNullOrWhiteSpace(certificateBase64))
-            {
-                try
-                {
-                    certificate = X509CertificateLoader.LoadPkcs12(
-                        Convert.FromBase64String(certificateBase64),
-                        certificatePassword,
-                        X509KeyStorageFlags.EphemeralKeySet);
-                }
-                catch (FormatException ex)
-                {
-                    throw new InvalidOperationException(
-                        "DataProtection:CertificateBase64 is not valid Base64.", ex);
                 }
             }
             else
             {
-                if (!File.Exists(certificatePath))
+                X509Certificate2 certificate;
+                if (!string.IsNullOrWhiteSpace(certificateBase64))
                 {
-                    throw new InvalidOperationException(
-                        "DataProtection certificate file was not found at the configured path.");
+                    try
+                    {
+                        certificate = X509CertificateLoader.LoadPkcs12(
+                            Convert.FromBase64String(certificateBase64),
+                            certificatePassword,
+                            X509KeyStorageFlags.EphemeralKeySet);
+                    }
+                    catch (FormatException ex)
+                    {
+                        throw new InvalidOperationException(
+                            "DataProtection:CertificateBase64 is not valid Base64.", ex);
+                    }
+                }
+                else
+                {
+                    if (!File.Exists(certificatePath))
+                    {
+                        throw new InvalidOperationException(
+                            "DataProtection certificate file was not found at the configured path.");
+                    }
+
+                    certificate = X509CertificateLoader.LoadPkcs12FromFile(
+                        certificatePath,
+                        certificatePassword,
+                        X509KeyStorageFlags.EphemeralKeySet);
                 }
 
-                certificate = X509CertificateLoader.LoadPkcs12FromFile(
-                    certificatePath,
-                    certificatePassword,
-                    X509KeyStorageFlags.EphemeralKeySet);
-            }
+                if (!certificate.HasPrivateKey)
+                {
+                    throw new InvalidOperationException(
+                        "DataProtection certificate must include a private key.");
+                }
 
-            if (!certificate.HasPrivateKey)
-            {
-                throw new InvalidOperationException(
-                    "DataProtection certificate must include a private key.");
+                dataProtection.ProtectKeysWithCertificate(certificate);
             }
-
-            dataProtection.ProtectKeysWithCertificate(certificate);
         }
 
         services.AddScoped<ICurrentTenant, CurrentTenant>();
