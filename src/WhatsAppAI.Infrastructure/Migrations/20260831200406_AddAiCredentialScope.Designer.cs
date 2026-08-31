@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using WhatsAppAI.Infrastructure.Persistence;
 namespace WhatsAppAI.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831200406_AddAiCredentialScope")]
+    partial class AddAiCredentialScope
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -545,17 +548,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_payment_at");
 
-                    b.Property<long?>("MonthlyAiCostLimitMinorUnits")
-                        .HasColumnType("bigint")
-                        .HasColumnName("monthly_ai_cost_limit_minor_units");
-
                     b.Property<int?>("MonthlyAiResponseLimit")
                         .HasColumnType("integer")
                         .HasColumnName("monthly_ai_response_limit");
-
-                    b.Property<long?>("MonthlyAiTokenLimit")
-                        .HasColumnType("bigint")
-                        .HasColumnName("monthly_ai_token_limit");
 
                     b.Property<string>("Name")
                         .IsRequired()

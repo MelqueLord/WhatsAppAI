@@ -1,12 +1,12 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.23.0
-**Data:** 2026-08-29
+**Versão:** 0.24.0
+**Data:** 2026-08-31
 
 ## 1. Problema
 
-Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implantar CRM ou automações complexas. O proprietário da plataforma configura uma conexão Cloud da Meta ou uma sessão WhatsApp Web via QR/Baileys, além da conta de IA do cliente, e entrega uma caixa de entrada pronta, na qual a IA responde dúvidas rotineiras e uma pessoa assume exceções.
+Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implantar CRM ou automações complexas. O proprietário da plataforma configura uma conexão Cloud da Meta ou uma sessão WhatsApp Web via QR/Baileys e administra a capacidade dos provedores de IA. Cada tenant recebe uma caixa de entrada pronta, na qual a IA responde dúvidas rotineiras usando as diretrizes e o conhecimento daquela empresa, enquanto uma pessoa assume exceções.
 
 ## 2. Atores
 
@@ -23,14 +23,14 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - SaaS multi-tenant com um número de WhatsApp por tenant.
 - Autenticação de TenantOwner/Operator, ambos presentes no primeiro piloto, e administração mínima da plataforma.
 - Frontend e backend publicados no mesmo site, com sessão baseada em cookie e proteção antiforgery.
-- Conexão guiada à WhatsApp Cloud API ou WhatsApp Web via QR/Baileys, e à OpenAI com credenciais do cliente.
+- Conexão guiada à WhatsApp Cloud API ou WhatsApp Web via QR/Baileys, e aos provedores de IA com credenciais administradas pela plataforma.
 - Webhook de mensagens e status com processamento idempotente.
 - Inbox em tempo real, histórico, texto e mídia básica.
 - Resposta humana e resposta automática textual por IA.
 - Templates transacionais aprovados pela Meta para conversas na API Oficial fora da janela de 24 horas.
 - Modos `Automatic`, `Human` e `Paused` por conversa.
 - Base de conhecimento textual simples.
-- Indicadores estimados de consumo; faturas oficiais continuam nos provedores.
+- Consumo real de tokens, custo operacional estimado e controle de franquia/orçamento por tenant; o faturamento comercial é administrado pela plataforma.
 - Logs de auditoria, métricas operacionais, exclusão e retenção básica.
 
 ### Fora do escopo
@@ -46,7 +46,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 
 ### US-001 — Provisionar um cliente (P1)
 
-Como PlatformAdmin, quero criar um tenant e orientar a conexão das contas do cliente para entregar o ambiente funcionando sem assumir a titularidade delas.
+Como PlatformAdmin, quero criar um tenant, configurar as integrações e provisionar a capacidade de IA administrada pela plataforma para entregar o ambiente funcionando.
 
 **Aceite:**
 
@@ -193,7 +193,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-001:** autenticar usuários com frontend e backend no mesmo site; em produção o cookie de sessão é `HttpOnly`, `Secure` e `SameSite=Lax`, e toda mutação autenticada exige token antiforgery enviado em `X-CSRF-TOKEN`.
 - **FR-002:** autorizar ações por papel e tenant corrente.
 - **FR-003:** permitir ao PlatformAdmin autorizado criar, suspender e reativar tenants por casos de uso, API e interface administrativa, preservando todo o histórico na suspensão.
-- **FR-004:** armazenar credenciais de tenant, o `app_secret` e o verify token globais da plataforma por abstração de cofre e nunca em texto puro.
+- **FR-004:** armazenar credenciais administradas pela plataforma, o `app_secret` e o verify token globais por abstração de cofre e nunca em texto puro; nenhuma API key de IA deve ser exibida ou alterada pelo tenant.
 - **FR-005:** usar um único Meta App compartilhado, validar seu challenge com o verify token global e validar a assinatura do POST com o `app_secret` global antes de resolver o tenant pelo `phone_number_id`.
 - **FR-006:** persistir cada evento de webhook antes do processamento assíncrono.
 - **FR-007:** deduplicar eventos e mensagens por identificadores do provedor.
@@ -210,7 +210,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-018:** disponibilizar estimativas de unidades e custos por período, representando valores monetários em unidade menor inteira e moeda ISO 4217.
 - **FR-019:** registrar auditoria imutável para ações sensíveis, com proteção de persistência contra `UPDATE` e `DELETE` pela identidade da aplicação.
 - **FR-020:** permitir política de retenção e exclusão operacional por tenant.
-- **FR-021:** testar as conexões Meta, WhatsApp Web/QR e OpenAI sem expor credenciais ao navegador.
+- **FR-021:** permitir ao PlatformAdmin testar as conexões Meta, WhatsApp Web/QR e provedores de IA sem expor credenciais ao navegador ou ao tenant.
 - **FR-022:** classificar eventos não reconhecidos, preservar um envelope operacional sanitizado separado do payload original cifrado e de acesso restrito, e permitir consulta e reprocessamento auditados.
 - **FR-023:** expor mídia básica por endpoint autenticado e limitado ao tenant corrente, atuando como download/proxy sem revelar token ou URL privada da Meta.
 - **FR-024:** paginar por cursor a lista de conversas e o histórico de mensagens, com limite máximo definido no contrato.
@@ -238,6 +238,8 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-046:** disponibilizar ao PlatformAdmin o consumo mensal real de tokens por tenant, separado em entrada/saída e distribuído por provedor e modelo, usando os valores retornados pelo provedor.
 - **FR-047:** exibir no dashboard do TenantOwner o pacote efetivo de respostas, separando limite-base e recargas, saldo, percentual usado, aviso a partir de 80% e estado de IA suspensa por franquia; recarga permanece uma ação administrativa.
 - **FR-048:** calcular custo somente quando houver preço registrado para o modelo/provedor, preservando tokens como fonte auditável e identificando a estimativa como não faturamento.
+- **FR-061:** permitir ao PlatformAdmin definir orçamento financeiro e limites técnicos mensais por tenant e impedir novas chamadas de IA quando qualquer limite efetivo for atingido.
+- **FR-062:** manter no tenant as diretrizes, o perfil, o conhecimento, a confiança, as filas, as tags e o handoff do atendimento da própria empresa, com isolamento completo entre tenants.
 - **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
 - **FR-051:** persistir alterações de configuração, modo, handoff e auditoria na mesma transação, validando todas as versões `If-Match` antes de qualquer escrita para impedir estado parcial.
@@ -260,7 +262,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-005:** somente mensagem recebida do cliente abre/renova a janela de 24 horas.
 - **BR-006:** marketing, promoção ou template proativo não é enviado pelo MVP; template transacional aprovado somente é permitido pela API Oficial.
 - **BR-007:** preço exibido é estimativo e versionado; unidades originais são a fonte auditável.
-- **BR-008:** credenciais pertencem ao tenant; o PlatformAdmin pode substituí-las, nunca recuperá-las em claro.
+- **BR-008:** credenciais de IA são administradas pela plataforma; o PlatformAdmin pode provisioná-las, rotacioná-las e testá-las sem recuperá-las em claro, e o tenant nunca pode visualizá-las ou substituí-las.
 - **BR-009:** após limite controlado de tentativas, o job vai para estado morto e gera alerta.
 - **BR-010:** resposta da IA é descartada se a versão da conversa mudou desde o início da geração.
 - **BR-011:** para conexões Cloud, a plataforma opera um único Meta App e guarda seu `app_secret` e verify token no cofre global; cada tenant mantém titularidade de WABA, `phone_number_id`, token de acesso e faturamento. Para conexões QR, a sessão Baileys é isolada por tenant e linha, com aceite explícito do tenant para os riscos operacionais do canal.
@@ -276,7 +278,8 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-021:** STAR libera IA e base de conhecimento, com 1 vaga de linha e 2 Operators; FLOW acrescenta BOT, tags e filas, com 2 vagas e 4 Operators; SCALA mantém todos os recursos implementados do FLOW, com 3 vagas e 8 Operators. Cada vaga pode ser provisionada como API Oficial ou QR Code, sem ultrapassar nem deixar vaga não distribuída.
 - **BR-022:** a franquia efetiva é o limite mensal persistido no tenant somado às recargas de 500 registradas no mês civil UTC; `null` preserva tenants legados sem limite, `0` sem recarga bloqueia respostas da IA e valores positivos limitam o mês. A suspensão por esgotamento afeta somente respostas da IA, preservando BOT, WhatsApp e atendimento humano. O alerta começa em 80%; tokens são medidos para controle de custo, não formam uma segunda franquia operacional.
 - **BR-023:** em planos comerciais, `official_api_line_count + qr_code_line_count` deve ser exatamente igual ao total de linhas do plano; valores negativos, excesso ou soma incompleta são rejeitados pelo backend.
-- **BR-024:** tokens e custos são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator, mesmo quando a credencial de IA pertence ao tenant.
+- **BR-024:** tokens, custos, orçamento e credenciais são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator; o tenant vê apenas sua franquia e alertas operacionais.
+- **BR-031:** diretrizes, perfil, conhecimento, confiança, filas, tags e handoff são configurações de atendimento do tenant e só podem ser lidos ou alterados no tenant corrente.
 - **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura ou handoff, nunca uma afirmação específica inventada.
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
@@ -318,7 +321,7 @@ Estas decisões não bloqueiam o desenho, mas precisam ser fechadas antes das fa
 
 - Conta Meta Business aprovada, WABA, número e permissões do cliente.
 - Um Meta App compartilhado da plataforma, com `app_secret` e verify token em cofre global, para conexões WhatsApp Cloud API; ou uma ponte WhatsApp Web/Baileys com QR e segredo de webhook para conexões QR.
-- Projeto OpenAI com faturamento, chave e limites do cliente.
+- Conta ou projetos dos provedores de IA contratados e administrados pela plataforma, com segregação de credenciais e limites por tenant sempre que disponível.
 - Domínio, TLS, PostgreSQL, armazenamento de segredos e backup.
 
 ## 11. Extensões registradas
@@ -343,24 +346,23 @@ Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa I
 
 A tela de configuração de IA deve suportar múltiplos provedores e reunir apenas as configurações de IA. Modo, mensagens e fluxo do BOT permanecem na tela e nos endpoints próprios do BOT.
 
-**Provedores suportados:**
+**Provedores suportados e administrados pelo PlatformAdmin:**
 - **OpenAI** (GPT-4o, GPT-4o-mini, etc.)
 - **Google Gemini** (Gemini 2.5 Pro, Gemini 2.5 Flash, etc.)
 - **Anthropic** (Claude Sonnet 4, Claude Haiku 3.5, etc.)
 - **Xiaomi MiMo** (mimo-v2.5-pro, mimo-v2.5, etc.)
 
 **Configuração na tela de IA (somente BOT + IA):**
-1. Seleção de provedor (dropdown com OpenAI, Gemini, Anthropic, Xiaomi)
-2. Modelo e credencial (API key) do provedor selecionado
-3. Teste de conexão específico por provedor
-4. Diretrizes estruturadas, limiar de confiança e handoff
-5. Status e indicadores do provedor ativo
+1. Seleção de provedor e modelo autorizados para o tenant
+2. Provisionamento, rotação e teste da credencial pelo PlatformAdmin
+3. Diretrizes estruturadas, perfil, limiar de confiança e handoff mantidos no tenant
+4. Status, limites e indicadores de custo visíveis somente ao PlatformAdmin
 
 **Configuração na tela de BOT (BOT e BOT + IA):** modo de operação, mensagens automáticas, fluxo e fallback do BOT.
 
 **Requisitos:**
 - FR-AI-001: suportar múltiplos provedores de IA com adapter específico por provider
-- FR-AI-002: credenciais são por provedor; tenant pode ter mais de um provedor configurado mas apenas um ativo por vez
+- FR-AI-002: credenciais são administradas pela plataforma por provedor; um tenant pode ter mais de um provedor provisionado, mas apenas um fica ativo por vez
 - FR-AI-003: `AiConfigPage` e `BotConfigPage` são telas distintas e condicionadas ao pacote; IA exige `aiEnabled`, BOT está disponível nos dois planos
 - FR-AI-004: testes de contrato para cada provedor devem validar a interface comum
 - BR-AI-001: provedor não suportado ou credencial inválida não impede operação em modo Manual

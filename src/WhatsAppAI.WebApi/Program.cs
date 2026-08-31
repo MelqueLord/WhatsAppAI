@@ -413,6 +413,7 @@ app.MapAntiforgeryBootstrap();
 app.MapAuthEndpoints();
 app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
+app.MapAdminAiProviderEndpoints();
 app.MapAdminAiPricingEndpoints();
 app.MapSubscriptionPlanEndpoints();
 app.MapSupportSessionEndpoints();

@@ -10,6 +10,8 @@ public sealed class Tenant
     public int QrCodeLineCount { get; private set; }
     public int OperatorLimit { get; private set; }
     public int? MonthlyAiResponseLimit { get; private set; }
+    public long? MonthlyAiTokenLimit { get; private set; }
+    public long? MonthlyAiCostLimitMinorUnits { get; private set; }
     public TenantStatus Status { get; private set; } = TenantStatus.Pending;
     public DateTime CreatedAt { get; private set; }
     public DateTime DueDate { get; private set; }
@@ -33,13 +35,19 @@ public sealed class Tenant
         int officialApiLineCount = 0,
         int qrCodeLineCount = 0,
         int operatorLimit = 0,
-        int? monthlyAiResponseLimit = null)
+        int? monthlyAiResponseLimit = null,
+        long? monthlyAiTokenLimit = null,
+        long? monthlyAiCostLimitMinorUnits = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
         if (monthlyAiResponseLimit is < 0)
             throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
+        if (monthlyAiTokenLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiTokenLimit));
+        if (monthlyAiCostLimitMinorUnits is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiCostLimitMinorUnits));
 
         var createdAt = DateTime.UtcNow;
         return new Tenant
@@ -52,6 +60,8 @@ public sealed class Tenant
             QrCodeLineCount = qrCodeLineCount,
             OperatorLimit = operatorLimit,
             MonthlyAiResponseLimit = monthlyAiResponseLimit,
+            MonthlyAiTokenLimit = monthlyAiTokenLimit,
+            MonthlyAiCostLimitMinorUnits = monthlyAiCostLimitMinorUnits,
             Status = TenantStatus.Pending,
             CreatedAt = createdAt,
             DueDate = createdAt.AddDays(30)
@@ -114,19 +124,27 @@ public sealed class Tenant
         int officialApiLineCount,
         int qrCodeLineCount,
         int operatorLimit,
-        int? monthlyAiResponseLimit)
+        int? monthlyAiResponseLimit,
+        long? monthlyAiTokenLimit = null,
+        long? monthlyAiCostLimitMinorUnits = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(officialApiLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(qrCodeLineCount);
         ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
         if (monthlyAiResponseLimit is < 0)
             throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
+        if (monthlyAiTokenLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiTokenLimit));
+        if (monthlyAiCostLimitMinorUnits is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiCostLimitMinorUnits));
 
         PlanId = planId;
         OfficialApiLineCount = officialApiLineCount;
         QrCodeLineCount = qrCodeLineCount;
         OperatorLimit = operatorLimit;
         MonthlyAiResponseLimit = monthlyAiResponseLimit;
+        MonthlyAiTokenLimit = monthlyAiTokenLimit;
+        MonthlyAiCostLimitMinorUnits = monthlyAiCostLimitMinorUnits;
         Version++;
     }
 
@@ -147,7 +165,9 @@ public sealed class Tenant
         int officialApiLineCount,
         int qrCodeLineCount,
         int operatorLimit,
-        int? monthlyAiResponseLimit = null)
+        int? monthlyAiResponseLimit = null,
+        long? monthlyAiTokenLimit = null,
+        long? monthlyAiCostLimitMinorUnits = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
@@ -156,6 +176,10 @@ public sealed class Tenant
         ArgumentOutOfRangeException.ThrowIfNegative(operatorLimit);
         if (monthlyAiResponseLimit is < 0)
             throw new ArgumentOutOfRangeException(nameof(monthlyAiResponseLimit));
+        if (monthlyAiTokenLimit is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiTokenLimit));
+        if (monthlyAiCostLimitMinorUnits is < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyAiCostLimitMinorUnits));
 
         Name = name.Trim();
         Slug = slug.Trim().ToLowerInvariant();
@@ -164,6 +188,8 @@ public sealed class Tenant
         QrCodeLineCount = qrCodeLineCount;
         OperatorLimit = operatorLimit;
         MonthlyAiResponseLimit = monthlyAiResponseLimit;
+        MonthlyAiTokenLimit = monthlyAiTokenLimit;
+        MonthlyAiCostLimitMinorUnits = monthlyAiCostLimitMinorUnits;
         Version++;
     }
 

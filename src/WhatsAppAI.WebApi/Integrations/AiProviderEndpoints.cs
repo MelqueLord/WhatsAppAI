@@ -26,9 +26,6 @@ public static class AiProviderEndpoints
         group.MapGet("/providers", GetProvidersAsync)
             .WithName("GetAiProviders");
 
-        group.MapPost("/", SaveConfigAsync)
-            .WithName("SaveAiConfig");
-
         group.MapPost("/toggle", ToggleAsync)
             .WithName("ToggleAi");
 

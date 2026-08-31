@@ -128,6 +128,8 @@ export interface User {
   qrCodeLineCount?: number
   operatorLimit?: number
   monthlyAiResponseLimit?: number | null
+  monthlyAiTokenLimit?: number | null
+  monthlyAiCostLimitMinorUnits?: number | null
   monthlyAiResponsesUsed?: number
   dueDate?: string
   tenantStatus?: string
@@ -173,6 +175,8 @@ export interface Tenant {
   monthlyAiBaseResponseLimit?: number | null
   monthlyAiResponseTopUps?: number
   monthlyAiResponseLimit?: number | null
+  monthlyAiTokenLimit?: number | null
+  monthlyAiCostLimitMinorUnits?: number | null
   monthlyAiResponsesUsed: number
   monthlyAiTokensUsed?: number
   monthlyAiEstimatedCostMinorUnits?: number
@@ -211,6 +215,15 @@ export interface TenantAiUsage {
     total: number
     estimatedCostMinorUnits: number
   }
+  budget?: {
+    tokenLimit: number | null
+    tokenUsed: number
+    tokenRemaining: number | null
+    costLimitMinorUnits: number | null
+    costUsedMinorUnits: number
+    costRemainingMinorUnits: number | null
+    status: 'available' | 'exhausted'
+  }
   byProvider: Array<{
     provider: string
     metric: string
@@ -223,6 +236,22 @@ export interface TenantAiUsage {
     outputTokens: number
     interactions: number
   }>
+}
+
+export interface AiProviderInfo {
+  id: string
+  name: string
+  models: Array<{ id: string; name: string }>
+}
+
+export interface AdminTenantAiConfig {
+  configured: boolean
+  provider?: string
+  modelId?: string
+  isActive?: boolean
+  version?: number
+  credentialScope: 'TenantProject' | 'SharedPlatform'
+  credentialManagedByPlatform: boolean
 }
 
 export interface Plan {
@@ -664,6 +693,24 @@ export const api = {
       aiUsage: (id: string) =>
         fetchApi<TenantAiUsage>(`/api/admin/tenants/${id}/ai-usage`),
 
+      aiConfig: (id: string) =>
+        fetchApi<AdminTenantAiConfig>(`/api/admin/tenants/${id}/ai`),
+
+      aiProviders: () =>
+        fetchApi<AiProviderInfo[]>('/api/admin/ai/providers'),
+
+      saveAiConfig: (id: string, data: { provider: string; modelId: string; apiKey: string; credentialScope: 'TenantProject' | 'SharedPlatform' }, version: number) =>
+        fetchApi<{ saved: boolean; provider: string; modelId: string; credentialScope: string }>(`/api/admin/tenants/${id}/ai`, {
+          method: 'POST',
+          headers: { 'If-Match': String(version) },
+          body: JSON.stringify(data),
+        }),
+
+      testAiConnection: (id: string) =>
+        fetchApi<{ success: boolean; model?: string; inputTokens?: number; outputTokens?: number; error?: string }>(`/api/admin/tenants/${id}/ai/test-connection`, {
+          method: 'POST',
+        }),
+
       addAiResponseTopUp: (id: string, idempotencyKey: string) =>
         fetchApi<AiResponseTopUpResult>(`/api/admin/tenants/${id}/ai-response-topups`, {
           method: 'POST',
@@ -679,6 +726,8 @@ export const api = {
         qrCodeLineCount: number
         operatorLimit: number
         monthlyAiResponseLimit?: number | null
+        monthlyAiTokenLimit?: number | null
+        monthlyAiCostLimitMinorUnits?: number | null
       }) =>
         fetchApi<CreateTenantResponse>('/api/admin/tenants', {
           method: 'POST',
@@ -696,6 +745,8 @@ export const api = {
           qrCodeLineCount: number
           operatorLimit: number
           monthlyAiResponseLimit?: number | null
+          monthlyAiTokenLimit?: number | null
+          monthlyAiCostLimitMinorUnits?: number | null
         },
         version: number
       ) =>

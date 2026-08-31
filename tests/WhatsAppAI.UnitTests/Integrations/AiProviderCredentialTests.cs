@@ -6,6 +6,31 @@ namespace WhatsAppAI.UnitTests.Integrations;
 public sealed class AiProviderCredentialTests
 {
     [Fact]
+    public void Create_UsesTenantProjectScopeByDefault()
+    {
+        var credential = AiProviderCredential.Create(
+            Guid.NewGuid(), "openai", "gpt-4o-mini", "ai:tenant:openai:apikey");
+
+        Assert.Equal(AiCredentialScopes.TenantProject, credential.CredentialScope);
+    }
+
+    [Fact]
+    public void Create_AllowsSharedPlatformScope()
+    {
+        var credential = AiProviderCredential.Create(
+            Guid.NewGuid(), "openai", "gpt-4o-mini", "ai:platform:openai:apikey", AiCredentialScopes.SharedPlatform);
+
+        Assert.Equal(AiCredentialScopes.SharedPlatform, credential.CredentialScope);
+    }
+
+    [Fact]
+    public void Create_RejectsUnsupportedScope()
+    {
+        Assert.Throws<ArgumentException>(() => AiProviderCredential.Create(
+            Guid.NewGuid(), "openai", "gpt-4o-mini", "secret-ref", "External"));
+    }
+
+    [Fact]
     public void UpdateInstructions_PersistsDistinctRoutingQueues()
     {
         var first = Guid.NewGuid();

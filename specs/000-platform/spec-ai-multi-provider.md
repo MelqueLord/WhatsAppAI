@@ -1,16 +1,16 @@
 # Spec: Multi-provedor de IA e configuração separada por plano
 
-**Status:** Implementado (Fase 10 - T150-T165)
+**Status:** Implementado parcialmente; revisão de modelo (Fase 11)
 **Depende de:** Plataforma base (T001-T075), Sistema de Planos (T090-T116)
 **Refs:** US-004, FR-013, FR-014, FR-021, BR-008
 
-> **Correção de decisão (2026-08-27):** BOT e IA são configurações separadas. O plano BOT deve operar sem provedor de IA; o plano BOT + IA adiciona a configuração de provedor, credencial, diretrizes, confiança e handoff da IA. A separação deve ser preservada na UI, nos contratos e nas permissões, sem misturar capacidades entre os pacotes.
+> **Correção de decisão (2026-08-27/2026-08-31):** BOT e IA são configurações separadas. O plano BOT deve operar sem provedor de IA; o plano BOT + IA usa provedor e credencial administrados pelo PlatformAdmin. Diretrizes, perfil, conhecimento, confiança e handoff permanecem configuráveis no tenant porque definem o atendimento daquela empresa. A separação deve ser preservada na UI, nos contratos e nas permissões.
 
 ## 1. Problema
 
-Atualmente a plataforma suporta apenas OpenAI como provedor de IA. A tela de configuração de IA (`AiConfigPage`) é limitada a model ID e API key. As configurações de comportamento do bot (mensagens automáticas, fluxo de respostas) ficam em uma tela separada (`BotConfigPage`), fragmentando a experiência do TenantOwner.
+Atualmente a plataforma suporta apenas OpenAI como provedor de IA. A tela de configuração de IA (`AiConfigPage`) é limitada a model ID e API key administrada no contexto do tenant. As configurações de comportamento do bot (mensagens automáticas, fluxo de respostas) ficam em uma tela separada (`BotConfigPage`), fragmentando a experiência do TenantOwner.
 
-O TenantOwner precisa de uma tela própria para configurar o atendimento automatizado por IA quando o tenant possui o plano BOT + IA. O fluxo do BOT continua em tela própria e deve funcionar também no plano BOT, sem exigir provedor ou credencial de IA.
+O TenantOwner precisa de uma tela própria para configurar o atendimento automatizado por IA quando o tenant possui o plano BOT + IA. O PlatformAdmin provisiona o provedor, modelo e credencial; o TenantOwner configura somente o comportamento do atendimento da própria empresa. O fluxo do BOT continua em tela própria e deve funcionar também no plano BOT, sem exigir provedor ou credencial de IA.
 
 ## 2. Provedores suportados
 
@@ -27,7 +27,7 @@ O TenantOwner precisa de uma tela própria para configurar o atendimento automat
 
 ### US-AI-001 — Escolher provedor de IA
 
-Como TenantOwner, quero escolher entre os provedores disponíveis no catálogo da plataforma como provedor de IA do meu atendimento, para usar o modelo que melhor atende meu caso e orçamento.
+Como PlatformAdmin, quero escolher o provedor e o modelo disponíveis no catálogo para cada tenant, para controlar o custo e a qualidade do atendimento.
 
 **Aceite:**
 1. A tela exibe um seletor com todos os provedores registrados no catálogo.
@@ -38,17 +38,17 @@ Como TenantOwner, quero escolher entre os provedores disponíveis no catálogo d
 
 ### US-AI-002 — Configurar atendimento IA na tela própria do pacote IA
 
-Como TenantOwner do plano BOT + IA, quero configurar provedor, modelo, credenciais, diretrizes, confiança e handoff na tela de "Atendimento com IA", mantendo o fluxo e as mensagens do BOT na tela própria do BOT.
+Como TenantOwner do plano BOT + IA, quero configurar diretrizes, perfil, conhecimento, confiança e handoff na tela de "Atendimento com IA", mantendo o fluxo e as mensagens do BOT na tela própria do BOT.
 
 **Aceite:**
-1. A tela de IA contém: provedor, modelo, API key, teste de conexão, diretrizes, limiar de confiança e handoff.
+1. A área administrativa contém provedor, modelo, teste de conexão e status da credencial; a área do tenant contém diretrizes, perfil, limiar de confiança e handoff, sem exibir API key.
 2. A tela de "Fluxo do bot" permanece disponível nos planos BOT e BOT + IA para modo, mensagens e fluxo do BOT.
 3. Os contratos e salvamentos de BOT e IA permanecem separados, sem sobrescrever configurações da outra capacidade.
 4. O BOT funciona sem provedor ou credencial de IA.
 
 ### US-AI-003 — Testar conexão por provedor
 
-Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para verificar se a credencial está correta antes de ativar o atendimento automático.
+Como PlatformAdmin, quero testar a conexão com o provedor de IA configurado para verificar a credencial antes de ativar o atendimento automático.
 
 **Aceite:**
 1. O teste envia uma requisição mínima ao provedor selecionado.
@@ -60,8 +60,8 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **FR-AI-001:** a entidade `AiProviderCredential` já suporta campo `Provider` (string). O sistema deve aceitar somente os identificadores de provedores registrados no catálogo (`openai`, `gemini`, `anthropic`, `xiaomi`, `grok`, `groq`).
 - **FR-AI-002:** implementar adaptadores `IAiProvider` para Gemini, Anthropic e Xiaomi, além do OpenAI existente.
 - **FR-AI-003:** `AiConfigPage` e `BotConfigPage` permanecem distintas. A primeira exige a capacidade `aiEnabled`; a segunda está disponível nos planos BOT e BOT + IA.
-- **FR-AI-004:** credenciais são armazenadas por provedor no `ISecretStore` com chave `ai:{tenantId}:{provider}:apikey`.
-- **FR-AI-005:** o `BotConfiguration` (modo, mensagens e fluxo) permanece como entidade e tela separadas; diretrizes, confiança e credenciais pertencem à configuração de IA.
+- **FR-AI-004:** credenciais administradas pela plataforma são armazenadas por provedor no `ISecretStore`, com referência segregada por tenant/projeto quando aplicável; API keys nunca são retornadas ao navegador ou ao tenant.
+- **FR-AI-005:** o `BotConfiguration` (modo, mensagens e fluxo) permanece como entidade e tela separadas; diretrizes, perfil, conhecimento autorizado, confiança e handoff pertencem à configuração de IA do tenant; provedor, modelo e credenciais são administrados pela plataforma.
 - **FR-AI-006:** o seletor de provedor deve exibir nome amigável e ícone/distintivo de cada provedor.
 - **FR-AI-007:** modelos sugeridos devem ser carregados por provedor (lista estática ou configuração).
 - **FR-AI-008:** as diretrizes da IA devem permitir selecionar filas ativas do tenant para encaminhamento automático conforme a escolha ou intenção expressa pelo cliente.
@@ -76,7 +76,7 @@ Como TenantOwner, quero testar a conexão com o provedor de IA escolhido para ve
 - **BR-AI-003:** em modo Manual, as configurações de IA ficam salvas mas inativas.
 - **BR-AI-004:** provedor com credencial inválida ou ausente não bloqueia o modo Manual ou SimpleAutoReply.
 - **BR-AI-005:** o teste de conexão deve usar o adaptador correto conforme o provedor selecionado.
-- **BR-AI-006:** o PlatformAdmin controla a franquia de respostas por empresa; tokens servem para medir e distribuir custo, sem substituir o limite comercial de respostas.
+- **BR-AI-006:** o PlatformAdmin controla franquia, orçamento, limites técnicos e custo por empresa; tokens servem para medir o custo real e podem bloquear o uso quando o orçamento for atingido, sem substituir o limite comercial de respostas.
 - **BR-AI-007:** falhas transitórias têm no máximo três tentativas por mensagem; o circuit breaker é isolado por tenant/provedor e uma abertura impede novas chamadas até a janela de recuperação.
 - **BR-AI-008:** alterações de provedor e diretrizes que também atualizam o BOT validam todas as versões antes da primeira escrita e persistem configuração e auditoria atomicamente.
 - **FR-AI-012:** nenhum modelo pode ser ativado sem avaliação aprovada; uma avaliação aprovada pode indicar modelo de rollback, que só é aplicado após validação e concorrência otimista.
@@ -135,16 +135,17 @@ BOT / BOT + IA — /bot-config
 | **Frontend** | `BotConfigPage.tsx` | Permanece como tela do BOT |
 | **Frontend** | `App.tsx` + `Sidebar.tsx` | Manter rotas e aplicar visibilidade por capacidade |
 
-### Entidades não afetadas
+### Entidades e responsabilidades
 
-- `AiProviderCredential`: já tem campo `Provider`, não precisa de migration.
+- `AiProviderCredential`: associa o tenant ao provedor/modelo provisionado pela plataforma; a referência protegida da credencial não é exposta ao tenant.
 - `BotConfiguration`: permanece como entidade separada no banco.
 - `AiInteraction`: registra provider usado, já compatível.
+- Diretrizes, perfil, confiança, filas, tags e handoff permanecem configurações do tenant.
 
 ## 9. Critérios de sucesso
 
-1. TenantOwner vê todos os provedores registrados no catálogo na tela e consegue configurar qualquer um.
-2. Teste de conexão funciona para cada provedor.
+1. PlatformAdmin vê os provedores registrados no catálogo e consegue provisionar o provedor/modelo de cada tenant.
+2. O PlatformAdmin consegue testar a conexão de cada provedor sem expor a credencial.
 3. IA responde corretamente usando qualquer provedor configurado.
 4. A tela de IA não aparece no plano BOT.
 5. A tela de BOT aparece nos dois planos e funciona sem provedor configurado.

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Building2,
@@ -18,8 +18,9 @@ import {
   TriangleAlert,
   Users,
   BarChart3,
+  Bot,
 } from 'lucide-react'
-import { api, type Tenant, type CreateTenantResponse } from '../../../lib/api'
+import { api, type Tenant, type CreateTenantResponse, type AiProviderInfo, type AdminTenantAiConfig } from '../../../lib/api'
 
 export function AdminTenantsPage() {
   const queryClient = useQueryClient()
@@ -39,10 +40,18 @@ export function AdminTenantsPage() {
   const [createOfficialLineCount, setCreateOfficialLineCount] = useState(1)
   const [editPlanCode, setEditPlanCode] = useState('')
   const [editAiLimit, setEditAiLimit] = useState(0)
+  const [editAiTokenLimit, setEditAiTokenLimit] = useState<number | null>(null)
+  const [editAiCostLimit, setEditAiCostLimit] = useState<number | null>(null)
   const [editOfficialLineCount, setEditOfficialLineCount] = useState(0)
   const [quotaFilter, setQuotaFilter] = useState<'all' | 'normal' | 'warning' | 'exhausted' | 'unlimited'>('all')
   const [quotaAlertsTarget, setQuotaAlertsTarget] = useState<Tenant | null>(null)
   const [aiUsageTarget, setAiUsageTarget] = useState<Tenant | null>(null)
+  const [aiConfigTarget, setAiConfigTarget] = useState<Tenant | null>(null)
+  const [aiProvider, setAiProvider] = useState('')
+  const [aiModel, setAiModel] = useState('')
+  const [aiApiKey, setAiApiKey] = useState('')
+  const [aiCredentialScope, setAiCredentialScope] = useState<'TenantProject' | 'SharedPlatform'>('TenantProject')
+  const [aiConnectionResult, setAiConnectionResult] = useState<{ success: boolean; error?: string } | null>(null)
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -71,6 +80,41 @@ export function AdminTenantsPage() {
     queryFn: () => api.admin.tenants.aiUsage(aiUsageTarget!.id),
     enabled: aiUsageTarget !== null,
   })
+
+  const { data: aiProviders = [] } = useQuery<AiProviderInfo[]>({
+    queryKey: ['admin', 'ai-providers'],
+    queryFn: () => api.admin.tenants.aiProviders(),
+  })
+
+  const { data: aiConfig, isLoading: isAiConfigLoading } = useQuery<AdminTenantAiConfig>({
+    queryKey: ['admin', 'tenant-ai-config', aiConfigTarget?.id],
+    queryFn: () => api.admin.tenants.aiConfig(aiConfigTarget!.id),
+    enabled: aiConfigTarget !== null,
+  })
+
+  const saveAiConfigMutation = useMutation({
+    mutationFn: () => api.admin.tenants.saveAiConfig(aiConfigTarget!.id, { provider: aiProvider, modelId: aiModel, apiKey: aiApiKey, credentialScope: aiCredentialScope }, aiConfig?.version ?? 0),
+    onSuccess: () => {
+      setAiApiKey('')
+      setAiConnectionResult(null)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-config'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-usage'] })
+    },
+  })
+
+  const testAiConnectionMutation = useMutation({
+    mutationFn: () => api.admin.tenants.testAiConnection(aiConfigTarget!.id),
+    onSuccess: setAiConnectionResult,
+  })
+
+  useEffect(() => {
+    if (!aiConfig) return
+    setAiProvider(aiConfig.provider ?? aiProviders[0]?.id ?? '')
+    setAiModel(aiConfig.modelId ?? '')
+    setAiCredentialScope(aiConfig.credentialScope ?? 'TenantProject')
+    setAiApiKey('')
+    setAiConnectionResult(null)
+  }, [aiConfig, aiProviders])
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number }) =>
@@ -122,7 +166,7 @@ export function AdminTenantsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number } }) =>
+    mutationFn: ({ tenant, data }: { tenant: Tenant; data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number; monthlyAiTokenLimit?: number | null; monthlyAiCostLimitMinorUnits?: number | null } }) =>
       api.admin.tenants.update(tenant.id, data, tenant.version),
     onSuccess: () => {
       setEditTarget(null)
@@ -197,6 +241,8 @@ export function AdminTenantsPage() {
         qrCodeLineCount: totalLineCount - editOfficialLineCount,
         operatorLimit: plans?.find((plan) => plan.code === editPlanCode)?.defaultOperatorLimit ?? editTarget.operatorLimit,
         monthlyAiResponseLimit: editAiLimit,
+        monthlyAiTokenLimit: editAiTokenLimit,
+        monthlyAiCostLimitMinorUnits: editAiCostLimit,
       },
     })
   }
@@ -607,6 +653,8 @@ export function AdminTenantsPage() {
                               setEditPlanCode(currentPlan?.code ?? '')
                               setEditAiLimit(tenant.monthlyAiBaseResponseLimit ?? tenant.monthlyAiResponseLimit ??
                                 currentPlan?.defaultMonthlyAiResponseLimit ?? 0)
+                              setEditAiTokenLimit(tenant.monthlyAiTokenLimit ?? null)
+                              setEditAiCostLimit(tenant.monthlyAiCostLimitMinorUnits ?? null)
                               setEditOfficialLineCount(tenant.officialApiLineCount)
                               setEditTarget(tenant)
                             }}
@@ -640,6 +688,18 @@ export function AdminTenantsPage() {
                             title="Ver consumo de tokens e modelo"
                           >
                             <BarChart3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAiConfigTarget(tenant)
+                              setAiConnectionResult(null)
+                              setAiApiKey('')
+                            }}
+                            className="inline-flex shrink-0 items-center text-xs text-cyan-700 hover:text-cyan-800 font-medium"
+                            aria-label={`Configurar IA de ${tenant.name}`}
+                            title="Configurar provedor e credencial de IA"
+                          >
+                            <Bot className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => {
@@ -772,6 +832,16 @@ export function AdminTenantsPage() {
                     <p className="mt-1 text-xl font-semibold">{aiUsage.tokens.output.toLocaleString('pt-BR')}</p>
                   </div>
                 </div>
+                <div className={`rounded-lg border p-4 ${aiUsage.budget?.status === 'exhausted' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold">Orçamento operacional</p>
+                    {aiUsage.budget?.status === 'exhausted' && <span className="text-xs font-semibold text-red-700">Limite atingido</span>}
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
+                    <div><p className="text-xs text-slate-500">Tokens</p><p className="font-semibold">{aiUsage.budget?.tokenUsed.toLocaleString('pt-BR') ?? aiUsage.tokens.total.toLocaleString('pt-BR')} / {aiUsage.budget?.tokenLimit?.toLocaleString('pt-BR') ?? 'Ilimitado'}</p><p className="text-xs text-slate-500">Saldo: {aiUsage.budget?.tokenRemaining?.toLocaleString('pt-BR') ?? 'Ilimitado'}</p></div>
+                    <div><p className="text-xs text-slate-500">Custo operacional</p><p className="font-semibold">R$ {((aiUsage.budget?.costUsedMinorUnits ?? aiUsage.tokens.estimatedCostMinorUnits) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {aiUsage.budget?.costLimitMinorUnits === null || aiUsage.budget?.costLimitMinorUnits === undefined ? 'Ilimitado' : `R$ ${(aiUsage.budget.costLimitMinorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p><p className="text-xs text-slate-500">Margem: {aiUsage.budget?.costRemainingMinorUnits === null || aiUsage.budget?.costRemainingMinorUnits === undefined ? 'Ilimitada' : `R$ ${(aiUsage.budget.costRemainingMinorUnits / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p></div>
+                  </div>
+                </div>
                 <div className="rounded-lg border border-slate-200 p-4">
                   <p className="text-sm font-semibold">Modelo contratado</p>
                   <p className="mt-1 text-sm text-slate-600">
@@ -838,6 +908,54 @@ export function AdminTenantsPage() {
                   </div>
                 </div>
                 <p className="text-xs text-slate-500">Os tokens são os valores retornados pelo provedor. O custo monetário só aparece quando houver preço registrado para o uso.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {aiConfigTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Configurar IA da empresa</h2>
+                <p className="mt-1 text-sm text-slate-500">{aiConfigTarget.name} · credencial administrada pela plataforma</p>
+              </div>
+              <button onClick={() => setAiConfigTarget(null)} className="rounded-lg p-2 hover:bg-slate-100" title="Fechar"><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+            {isAiConfigLoading ? (
+              <div className="flex items-center justify-center py-10 text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando configuração...</div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                <label className="block text-sm font-medium text-slate-700">Provedor
+                  <select value={aiProvider} onChange={(event) => { setAiProvider(event.target.value); setAiModel('') }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                    <option value="">Selecione...</option>
+                    {aiProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Modelo
+                  <select value={aiModel} onChange={(event) => setAiModel(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                    <option value="">Selecione...</option>
+                    {(aiProviders.find((item) => item.id === aiProvider)?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-slate-700">API Key do provedor
+                  <input type="password" value={aiApiKey} onChange={(event) => setAiApiKey(event.target.value)} placeholder="Informe para cadastrar ou rotacionar" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Escopo da credencial
+                  <select value={aiCredentialScope} onChange={(event) => setAiCredentialScope(event.target.value as 'TenantProject' | 'SharedPlatform')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                    <option value="TenantProject">Exclusiva desta empresa</option>
+                    <option value="SharedPlatform">Compartilhada pela plataforma</option>
+                  </select>
+                </label>
+                <p className="text-xs text-slate-500">A chave não será exibida novamente. Use o escopo compartilhado somente quando a plataforma administrar uma credencial interna comum.</p>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button onClick={() => testAiConnectionMutation.mutate()} disabled={testAiConnectionMutation.isPending || !aiConfig?.configured} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{testAiConnectionMutation.isPending ? 'Testando...' : 'Testar conexão atual'}</button>
+                  <button onClick={() => saveAiConfigMutation.mutate()} disabled={saveAiConfigMutation.isPending || !aiProvider || !aiModel || !aiApiKey.trim()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saveAiConfigMutation.isPending ? 'Salvando...' : 'Salvar credencial'}</button>
+                </div>
+                {(saveAiConfigMutation.isError || testAiConnectionMutation.isError) && <p className="text-sm text-red-600">Não foi possível concluir a operação. Atualize a tela e tente novamente.</p>}
+                {aiConnectionResult && <p className={`text-sm ${aiConnectionResult.success ? 'text-emerald-700' : 'text-red-600'}`}>{aiConnectionResult.success ? 'Conexão validada com sucesso.' : aiConnectionResult.error ?? 'Falha na conexão.'}</p>}
               </div>
             )}
           </div>
@@ -960,6 +1078,14 @@ export function AdminTenantsPage() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
                 <p className="text-xs text-slate-500 mt-1">Personalize a franquia desta empresa. Mensagens recebidas não contam.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-medium text-slate-700">Tokens por mês
+                  <input type="number" min="0" value={editAiTokenLimit ?? ''} onChange={(event) => setEditAiTokenLimit(event.target.value === '' ? null : Math.max(0, Number(event.target.value)))} placeholder="Ilimitado" className="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">Custo máximo (centavos)
+                  <input type="number" min="0" value={editAiCostLimit ?? ''} onChange={(event) => setEditAiCostLimit(event.target.value === '' ? null : Math.max(0, Number(event.target.value)))} placeholder="Ilimitado" className="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                </label>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button

@@ -38,13 +38,13 @@ Entidade tenant-owned. Purpose: `TenantOwnerActivation|OperatorActivation`. O to
 
 `id`, `provider`, `kind`, `secret_ref`, `status`, `rotated_at`, timestamps.
 
-Configuração global, não tenant-owned, acessível somente pela infraestrutura. No MVP mantém as referências do `app_secret` e verify token do único Meta App; os valores nunca entram no banco em claro (**FR-004**, **FR-005**, **BR-011**).
+Configuração global ou administrada pela plataforma, acessível somente pela infraestrutura e pelo PlatformAdmin através de casos de uso auditados. Mantém referências do `app_secret`, verify token e credenciais dos provedores de IA; os valores nunca entram no banco em claro (**FR-004**, **FR-005**, **BR-008**).
 
 ### AiProviderCredential
 
-`id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `routing_queue_ids_json`, `routing_tag_ids_json`, `is_active`, `created_at`, `updated_at`, `version`.
+`id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `credential_scope`, `routing_queue_ids_json`, `routing_tag_ids_json`, `is_active`, `created_at`, `updated_at`, `version`.
 
-Não contém chave em claro. Múltiplos provedores podem ser configurados por tenant (openai, gemini, anthropic, xiaomi), mas apenas um fica ativo por vez. Trocar de provedor desativa o anterior sem apagar a credencial (**FR-AI-001**, **BR-AI-001**, **BR-AI-002**).
+Não contém chave em claro. O registro associa o tenant ao provedor/modelo provisionado pela plataforma; `credential_scope` identifica se a credencial é isolada para o tenant/projeto ou compartilhada com rate/budget interno. Múltiplos provedores podem ser provisionados por tenant, mas apenas um fica ativo por vez. Trocar de provedor desativa o anterior sem apagar o histórico ou a referência protegida (**FR-AI-001**, **FR-AI-004**, **BR-AI-001**, **BR-AI-002**). Diretrizes, perfil, filas, tags e handoff permanecem dados de atendimento do tenant.
 `routing_queue_ids_json` contém apenas IDs distintos de filas ativas do mesmo tenant autorizadas para roteamento pela IA (**FR-036**, **BR-016**).
 `routing_tag_ids_json` contém apenas IDs distintos de tags ativas do mesmo tenant autorizadas para categorização pela IA (**FR-037**, **BR-017**).
 

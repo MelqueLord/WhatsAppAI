@@ -119,6 +119,8 @@ public static class AdminTenantEndpoints
                 return Results.BadRequest(new { error = "Operator limit cannot be negative." });
             if (request.MonthlyAiResponseLimit is < 0)
                 return Results.BadRequest(new { error = "Monthly AI response limit cannot be negative." });
+            if (request.MonthlyAiTokenLimit is < 0 || request.MonthlyAiCostLimitMinorUnits is < 0)
+                return Results.BadRequest(new { error = "AI token and cost limits cannot be negative." });
 
             var existingTenant = await dbContext.Tenants
                 .IgnoreQueryFilters()
@@ -170,7 +172,9 @@ public static class AdminTenantEndpoints
                 request.OfficialApiLineCount,
                 request.QrCodeLineCount,
                 plan.DefaultOperatorLimit,
-                monthlyAiResponseLimit);
+                monthlyAiResponseLimit,
+                request.MonthlyAiTokenLimit,
+                request.MonthlyAiCostLimitMinorUnits);
             tenant.Activate();
             dbContext.Tenants.Add(tenant);
 
@@ -210,6 +214,8 @@ public static class AdminTenantEndpoints
                 QrCodeLineCount = tenant.QrCodeLineCount,
                 OperatorLimit = tenant.OperatorLimit,
                 MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
+                MonthlyAiTokenLimit = tenant.MonthlyAiTokenLimit,
+                MonthlyAiCostLimitMinorUnits = tenant.MonthlyAiCostLimitMinorUnits,
                 TemporaryPassword = temporaryPassword,
                 Message = "Guarde a senha temporária. Ela será exigida no primeiro login e deverá ser alterada."
             });
@@ -551,6 +557,8 @@ public static class AdminTenantEndpoints
         var outputTokens = tokenRows
             .Where(row => row.metric == "output_tokens")
             .Sum(row => row.tokens);
+        var totalTokens = inputTokens + outputTokens;
+        var totalCost = tokenRows.Sum(row => row.estimatedCostMinorUnits);
 
         return Results.Ok(new
         {
@@ -574,8 +582,25 @@ public static class AdminTenantEndpoints
             {
                 input = inputTokens,
                 output = outputTokens,
-                total = inputTokens + outputTokens,
-                estimatedCostMinorUnits = tokenRows.Sum(row => row.estimatedCostMinorUnits)
+                total = totalTokens,
+                estimatedCostMinorUnits = totalCost
+            },
+            budget = new
+            {
+                tokenLimit = tenant.MonthlyAiTokenLimit,
+                tokenUsed = totalTokens,
+                tokenRemaining = tenant.MonthlyAiTokenLimit is null
+                    ? (long?)null
+                    : Math.Max(0, tenant.MonthlyAiTokenLimit.Value - totalTokens),
+                costLimitMinorUnits = tenant.MonthlyAiCostLimitMinorUnits,
+                costUsedMinorUnits = totalCost,
+                costRemainingMinorUnits = tenant.MonthlyAiCostLimitMinorUnits is null
+                    ? (long?)null
+                    : Math.Max(0, tenant.MonthlyAiCostLimitMinorUnits.Value - totalCost),
+                status = (tenant.MonthlyAiTokenLimit is not null && totalTokens >= tenant.MonthlyAiTokenLimit.Value) ||
+                    (tenant.MonthlyAiCostLimitMinorUnits is not null && totalCost >= tenant.MonthlyAiCostLimitMinorUnits.Value)
+                    ? "exhausted"
+                    : "available"
             },
             byProvider = tokenRows.Select(row => new
             {
@@ -640,6 +665,8 @@ public static class AdminTenantEndpoints
             return Results.BadRequest(new { error = "Operator limit cannot be negative." });
         if (request.MonthlyAiResponseLimit is < 0)
             return Results.BadRequest(new { error = "Monthly AI response limit cannot be negative." });
+        if (request.MonthlyAiTokenLimit is < 0 || request.MonthlyAiCostLimitMinorUnits is < 0)
+            return Results.BadRequest(new { error = "AI token and cost limits cannot be negative." });
 
         var slug = TenantSlugHelper.GenerateSlug(request.Name);
         if (string.IsNullOrWhiteSpace(slug))
@@ -693,7 +720,9 @@ public static class AdminTenantEndpoints
             officialApiLineCount,
             qrCodeLineCount,
             operatorLimit,
-            monthlyAiResponseLimit);
+            monthlyAiResponseLimit,
+            request.MonthlyAiTokenLimit,
+            request.MonthlyAiCostLimitMinorUnits);
         owner.UpdateEmail(ownerEmail);
         owner.UpdateDisplayName(request.OwnerDisplayName);
         await tenantRepository.UpdateAsync(tenant);
@@ -723,6 +752,8 @@ public static class AdminTenantEndpoints
             QrCodeLineCount = tenant.QrCodeLineCount,
             OperatorLimit = tenant.OperatorLimit,
             MonthlyAiResponseLimit = tenant.MonthlyAiResponseLimit,
+            MonthlyAiTokenLimit = tenant.MonthlyAiTokenLimit,
+            MonthlyAiCostLimitMinorUnits = tenant.MonthlyAiCostLimitMinorUnits,
             SuspendedAt = tenant.SuspendedAt,
             SuspensionReason = tenant.SuspensionReason
         });
@@ -950,6 +981,8 @@ public sealed class CreateTenantRequest
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
+    public long? MonthlyAiTokenLimit { get; init; }
+    public long? MonthlyAiCostLimitMinorUnits { get; init; }
 }
 
 public sealed class CreateTenantResponse
@@ -965,6 +998,8 @@ public sealed class CreateTenantResponse
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
+    public long? MonthlyAiTokenLimit { get; init; }
+    public long? MonthlyAiCostLimitMinorUnits { get; init; }
     public string TemporaryPassword { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
 }
@@ -996,6 +1031,8 @@ public sealed class UpdateTenantRequest
     public int QrCodeLineCount { get; init; }
     public int OperatorLimit { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
+    public long? MonthlyAiTokenLimit { get; init; }
+    public long? MonthlyAiCostLimitMinorUnits { get; init; }
 }
 
 public sealed class TenantResponse
@@ -1015,6 +1052,8 @@ public sealed class TenantResponse
     public int? MonthlyAiBaseResponseLimit { get; init; }
     public long MonthlyAiResponseTopUps { get; init; }
     public int? MonthlyAiResponseLimit { get; init; }
+    public long? MonthlyAiTokenLimit { get; init; }
+    public long? MonthlyAiCostLimitMinorUnits { get; init; }
     public long MonthlyAiResponsesUsed { get; init; }
     public long MonthlyAiTokensUsed { get; init; }
     public long MonthlyAiEstimatedCostMinorUnits { get; init; }

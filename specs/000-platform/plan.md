@@ -10,7 +10,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 ### Módulos
 
 - **Identity & Tenancy:** autenticação, papéis, tenant corrente e administração.
-- **Integrations:** configuração Meta Cloud, WhatsApp Web/Baileys, OpenAI, teste de conexão e segredos.
+- **Integrations:** configuração Meta Cloud, WhatsApp Web/Baileys, provedores de IA administrados pela plataforma, teste de conexão e segredos.
 - **Messaging:** webhook, contatos, conversas, mensagens, Inbox/Outbox e status.
 - **Automation:** política, contexto, interação de IA e handoff.
 - **Knowledge:** conteúdo ativo que fundamenta respostas.
@@ -26,7 +26,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | UI data | TanStack Query | cache e estados de servidor sem store global excessiva |
 | Banco | PostgreSQL | Supabase gerenciado ou container Docker na Hostinger |
 | Tempo real | SignalR | integração nativa e grupos por tenant |
-| IA | OpenAI Responses API | interface atual com saída estruturada e uso auditável |
+| IA | Provedores oficiais via adaptadores | saída estruturada, credenciais administradas pela plataforma e uso auditável por tenant |
 | WhatsApp | Meta Graph/Cloud API e Baileys/WhatsApp Web por QR | Cloud é o canal oficial; QR atende linhas conectadas por sessão Baileys |
 | Testes | xUnit, Testcontainers, Vitest, Playwright | pirâmide completa e ambiente realista |
 | Local | Docker Compose | PostgreSQL e dependências reproduzíveis |
@@ -59,7 +59,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 - `IWhatsAppClient`: enviar texto e templates transacionais, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud.
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
-- `ISecretStore`: gravar, recuperar para uso interno, rotacionar e remover segredo.
+- `ISecretStore`: gravar, recuperar somente para uso interno, rotacionar e remover segredo; credenciais de IA são administradas pela plataforma e nunca retornadas ao tenant.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.
 - `ICurrentTenant`: transportar contexto autenticado sem aceitar `TenantId` arbitrário do cliente.
 - `IOutboxDispatcher`: despachar operações externas idempotentes.
@@ -150,7 +150,7 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 
 - `docs/architecture/adr/0001-modular-monolith.md`;
 - `docs/architecture/adr/0002-official-whatsapp-cloud-api.md`;
-- `docs/architecture/adr/0003-customer-owned-provider-billing.md`;
+- `docs/architecture/adr/0003-customer-owned-provider-billing.md` (histórico, substituído para IA pelo ADR-0010);
 - `docs/architecture/adr/0004-no-n8n-core.md`;
 - `docs/architecture/adr/0005-postgres-inbox-outbox.md`;
 - `docs/architecture/adr/0006-hosting-and-secrets.md`;

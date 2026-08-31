@@ -35,6 +35,12 @@ public sealed class AiProviderCredentialConfiguration : IEntityTypeConfiguration
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(c => c.CredentialScope)
+            .HasColumnName("credential_scope")
+            .HasMaxLength(30)
+            .HasDefaultValue(AiCredentialScopes.TenantProject)
+            .IsRequired();
+
         builder.Property(c => c.SystemPrompt)
             .HasColumnName("system_prompt")
             .HasMaxLength(4000);

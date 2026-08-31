@@ -1,11 +1,13 @@
-# ADR-0003: contas e faturamento dos provedores pertencem ao cliente
+# ADR-0003: contas e faturamento dos provedores são administrados pela plataforma
 
-**Status:** Aceito — 2026-08-03
+**Status:** Substituído por ADR-0010 — 2026-08-31
 
-## Decisão
+## Decisão histórica
 
-Cada tenant conecta sua conta Meta e seu projeto/chave OpenAI. Meta e OpenAI cobram o cliente diretamente; o SaaS cobra implantação e assinatura próprias, fora do consumo.
+Cada tenant conectava sua conta Meta e seu projeto/chave OpenAI. Meta e OpenAI cobravam o cliente diretamente; o SaaS cobrava implantação e assinatura próprias, fora do consumo.
 
-## Consequências
+## Consequências históricas
 
-Há melhor transparência e menor risco de revenda. Onboarding e rotação de credenciais precisam ser excelentes. O painel mostra estimativas, sem se declarar fatura oficial.
+Havia melhor transparência e menor risco de revenda. A decisão foi substituída porque não atende ao modelo comercial em que a plataforma contrata e administra a capacidade de IA para cada tenant.
+
+Consulte o ADR-0010 para a decisão vigente.

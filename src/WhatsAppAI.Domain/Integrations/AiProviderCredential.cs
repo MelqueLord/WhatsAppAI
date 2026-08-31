@@ -7,6 +7,7 @@ public sealed class AiProviderCredential
     public string Provider { get; private set; } = "OpenAI";
     public string ModelId { get; private set; } = string.Empty;
     public string ApiKeyRef { get; private set; } = string.Empty;
+    public string CredentialScope { get; private set; } = AiCredentialScopes.TenantProject;
     public string? SystemPrompt { get; private set; }
     public string? RoutingQueueIdsJson { get; private set; }
     public string? RoutingTagIdsJson { get; private set; }
@@ -22,8 +23,12 @@ public sealed class AiProviderCredential
         Guid tenantId,
         string provider,
         string modelId,
-        string apiKeyRef)
+        string apiKeyRef,
+        string? credentialScope = null)
     {
+        if (!AiCredentialScopes.IsSupported(credentialScope ?? AiCredentialScopes.TenantProject))
+            throw new ArgumentException("Unsupported AI credential scope.", nameof(credentialScope));
+
         return new AiProviderCredential
         {
             Id = Guid.NewGuid(),
@@ -31,15 +36,21 @@ public sealed class AiProviderCredential
             Provider = provider.Trim(),
             ModelId = modelId.Trim(),
             ApiKeyRef = apiKeyRef,
+            CredentialScope = AiCredentialScopes.Normalize(credentialScope),
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
     }
 
-    public void Update(string modelId, string apiKeyRef)
+    public void Update(string modelId, string apiKeyRef, string? credentialScope = null)
     {
+        if (credentialScope is not null && !AiCredentialScopes.IsSupported(credentialScope))
+            throw new ArgumentException("Unsupported AI credential scope.", nameof(credentialScope));
+
         ModelId = modelId.Trim();
         ApiKeyRef = apiKeyRef;
+        if (credentialScope is not null)
+            CredentialScope = AiCredentialScopes.Normalize(credentialScope);
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }

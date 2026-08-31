@@ -19,6 +19,10 @@ vi.mock('../../../lib/api', () => ({
         updatePlan: vi.fn(),
         quotaAlerts: vi.fn(),
         aiUsage: vi.fn(),
+        aiConfig: vi.fn(),
+        aiProviders: vi.fn(),
+        saveAiConfig: vi.fn(),
+        testAiConnection: vi.fn(),
         addAiResponseTopUp: vi.fn(),
         resetOwnerPassword: vi.fn(),
       },
@@ -52,6 +56,9 @@ describe('AdminTenantsPage capacity', () => {
       byProvider: [],
       byModel: [],
     })
+    vi.mocked(api.admin.tenants.aiProviders).mockResolvedValue([
+      { id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o-mini', name: 'GPT-4o mini' }] },
+    ])
     vi.mocked(api.plans.list).mockResolvedValue([])
     vi.mocked(api.admin.tenants.capacity).mockResolvedValue({
       customers: { current: 0, limit: 25, utilizationPercentage: 0, status: 'Normal' },
