@@ -12,6 +12,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<WebhookProcessingWorker>();
         services.AddHostedService<OutboxProcessingWorker>();
         services.AddHostedService<AiOrchestrationWorker>();
+        services.AddHostedService<AiResponseQuotaReconciliationWorker>();
         services.AddHostedService<RetentionWorker>();
         services.AddHostedService<TenantSuspensionWorker>();
         services.AddHostedService<BroadcastDispatchWorker>();
