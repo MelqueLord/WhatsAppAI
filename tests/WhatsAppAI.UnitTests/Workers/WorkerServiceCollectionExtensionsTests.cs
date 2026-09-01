@@ -23,6 +23,18 @@ public sealed class WorkerServiceCollectionExtensionsTests
 
         services.AddWorkers();
 
-        Assert.Equal(6, services.Count(descriptor => descriptor.ServiceType == typeof(IHostedService)));
+        var hostedWorkers = services
+            .Where(descriptor => descriptor.ServiceType == typeof(IHostedService))
+            .ToList();
+
+        Assert.Collection(
+            hostedWorkers,
+            descriptor => Assert.Equal(typeof(WebhookProcessingWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(OutboxProcessingWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(AiOrchestrationWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(AiResponseQuotaReconciliationWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(RetentionWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(TenantSuspensionWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(BroadcastDispatchWorker), descriptor.ImplementationType));
     }
 }
