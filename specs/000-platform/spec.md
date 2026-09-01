@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.26.0
+**Versão:** 0.27.0
 **Data:** 2026-08-31
 
 ## 1. Problema
@@ -242,6 +242,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-062:** manter no tenant as diretrizes, o perfil, o conhecimento, a confiança, as filas, as tags e o handoff do atendimento da própria empresa, com isolamento completo entre tenants.
 - **FR-063:** permitir ao TenantOwner classificar cada item de conhecimento como geral, pergunta frequente, serviço, preço, horário, pagamento, localização ou política, usando um cadastro guiado que preserve itens existentes e não altere o isolamento, a ativação ou a concorrência otimista.
 - **FR-064:** permitir ao TenantOwner criar, editar, ativar e desativar exemplos de mensagem do cliente e resposta ideal, isolados por tenant e com concorrência otimista; no máximo um exemplo ativo lexicalmente relevante pode orientar o estilo de cada resposta ou simulação, sem servir como fonte de fatos comerciais.
+- **FR-065:** permitir ao TenantOwner testar a IA por cenários predefinidos de preço, reclamação, agendamento, pedido de atendimento humano e assunto fora do escopo, além de uma mensagem personalizada, sem enviar mensagem ao WhatsApp, alterar conversas/Outbox ou consumir a franquia de respostas; cada teste deve usar as diretrizes, o perfil, o conhecimento e o exemplo relevante do tenant e retornar decisão, texto, confiança e motivo de handoff sanitizados.
 - **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
 - **FR-051:** persistir alterações de configuração, modo, handoff e auditoria na mesma transação, validando todas as versões `If-Match` antes de qualquer escrita para impedir estado parcial.
@@ -284,6 +285,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-031:** diretrizes, perfil, conhecimento, confiança, filas, tags e handoff são configurações de atendimento do tenant e só podem ser lidos ou alterados no tenant corrente.
 - **BR-032:** a categoria do conhecimento organiza o cadastro e orienta o preenchimento; cada item continua contendo um único fato oficial, e somente itens ativos lexicalmente relevantes podem fundamentar respostas da IA.
 - **BR-033:** exemplos de atendimento orientam tom, vocabulário e estrutura, nunca comprovam preço, política, prazo ou disponibilidade; exemplo sem correspondência com a mensagem atual não entra no contexto.
+- **BR-034:** testes de IA por cenário são diagnósticos e não consomem a franquia de respostas, mas podem gerar tokens e custo no provedor; mensagem, prompt e resposta completos do teste não são persistidos, e a auditoria registra somente metadados sanitizados.
 - **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura ou handoff, nunca uma afirmação específica inventada.
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.

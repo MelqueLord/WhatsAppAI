@@ -197,6 +197,42 @@ public sealed class ContextAssemblerTests
         Assert.True(prompt.Length <= 2_200);
     }
 
+    [Fact]
+    public async Task BuildSimulationAsync_UsesRelevantTenantKnowledgeAndExample()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Preço da consulta", "A consulta custa R$ 150.", 100),
+            KnowledgeItem.Create(tenantId, "Endereço", "A clínica fica no centro.", 90)
+        ]);
+        var pricingExample = AiResponseExample.Create(
+            tenantId,
+            "Qual é o preço da consulta?",
+            "Claro! Vou informar o valor da consulta.");
+        var schedulingExample = AiResponseExample.Create(
+            tenantId,
+            "Quero agendar uma consulta",
+            "Vamos encontrar o melhor horário.");
+        var examples = new FakeResponseExampleRepository([pricingExample, schedulingExample]);
+
+        var context = await new ContextAssembler(
+            new FakeConversationQueries([]),
+            knowledge,
+            examples).BuildSimulationAsync(
+                tenantId,
+                "Qual o preço da consulta? Meu e-mail é cliente@example.com",
+                "Seja acolhedor.",
+                CancellationToken.None);
+
+        Assert.Single(context.Messages);
+        Assert.Contains("[redacted]", context.Messages[0].Content, StringComparison.Ordinal);
+        Assert.Contains("Preço da consulta: A consulta custa R$ 150.", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Endereço:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains(pricingExample.IdealResponse, context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(schedulingExample.IdealResponse, context.SystemPrompt, StringComparison.Ordinal);
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
@@ -229,5 +265,26 @@ public sealed class ContextAssemblerTests
         public Task AddAsync(KnowledgeItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task UpdateAsync(KnowledgeItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeResponseExampleRepository(IReadOnlyList<AiResponseExample> examples)
+        : IAiResponseExampleRepository
+    {
+        public Task<AiResponseExample?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(examples.FirstOrDefault(example => example.Id == id));
+
+        public Task<IReadOnlyList<AiResponseExample>> GetByTenantAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken = default) => Task.FromResult(examples);
+
+        public Task<IReadOnlyList<AiResponseExample>> GetActiveByTenantAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken = default) => Task.FromResult(examples);
+
+        public Task AddAsync(AiResponseExample example, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task UpdateAsync(AiResponseExample example, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

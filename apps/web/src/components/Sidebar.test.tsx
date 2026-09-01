@@ -9,6 +9,7 @@ vi.mock('../lib/auth', () => ({
       displayName: 'Empresa',
       email: 'empresa@example.com',
       role: 'TenantOwner',
+      aiEnabled: true,
       tagsEnabled: false,
       automaticDistributionEnabled: false,
     },
@@ -29,6 +30,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByRole('link', { name: 'Filas' })).toHaveAttribute('href', '/queues')
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
+    expect(screen.getByRole('link', { name: 'Teste IA' })).toHaveAttribute('href', '/integrations/ai/scenarios')
     expect(screen.getByText('Administrador da empresa')).toBeInTheDocument()
     expect(screen.queryByText('TenantOwner')).not.toBeInTheDocument()
   })

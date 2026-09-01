@@ -461,7 +461,7 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         ISecretStore secretStore,
         IAiProviderResolver aiProviderResolver,
-        IAiResponseExampleRepository responseExampleRepository,
+        ContextAssembler contextAssembler,
         IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
         HttpContext httpContext)
@@ -473,6 +473,8 @@ public static class AiProviderEndpoints
 
         if (string.IsNullOrWhiteSpace(request.Message))
             return Results.BadRequest(new { error = "A mensagem de simulação é obrigatória." });
+        if (request.Message.Trim().Length > 500)
+            return Results.BadRequest(new { error = "A mensagem de simulação deve ter no máximo 500 caracteres." });
 
         var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
         if (credential is null || !credential.IsActive)
@@ -482,20 +484,18 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "Credencial do provedor não disponível." });
 
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-        var relevantExample = ContextAssembler.SelectRelevantResponseExample(
-            await responseExampleRepository.GetActiveByTenantAsync(currentTenant.TenantId.Value, httpContext.RequestAborted),
-            request.Message);
+        var simulationContext = await contextAssembler.BuildSimulationAsync(
+            currentTenant.TenantId.Value,
+            request.Message,
+            credential.SystemPrompt,
+            httpContext.RequestAborted);
         var response = await aiProviderResolver.Resolve(credential.Provider).GetResponseAsync(new AiRequest
         {
             ModelId = credential.ModelId,
             ApiKey = apiKey,
-            SystemPrompt = ContextAssembler.ComposeSystemPrompt(
-                credential.SystemPrompt,
-                responseExample: relevantExample is null
-                    ? null
-                    : new ResponseExampleContext(relevantExample.CustomerMessage, relevantExample.IdealResponse)),
+            SystemPrompt = simulationContext.SystemPrompt,
             MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
-            Messages = [new AiMessage { Role = "user", Content = request.Message.Trim() }]
+            Messages = simulationContext.Messages
         });
         response = BehaviorPolicy.SanitizeResponse(response, botConfig?.ConfidenceThreshold ?? 0.5);
         var decision = response.Decision;

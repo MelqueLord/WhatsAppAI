@@ -12,7 +12,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 - **Identity & Tenancy:** autenticação, papéis, tenant corrente e administração.
 - **Integrations:** configuração Meta Cloud, WhatsApp Web/Baileys, provedores de IA administrados pela plataforma, teste de conexão e segredos.
 - **Messaging:** webhook, contatos, conversas, mensagens, Inbox/Outbox e status.
-- **Automation:** política, contexto, exemplos de atendimento por tenant, interação de IA e handoff.
+- **Automation:** política, contexto, exemplos de atendimento por tenant, testes diagnósticos por cenário, interação de IA e handoff.
 - **Knowledge:** conteúdo ativo, classificado e guiado por tipo de fato, que fundamenta respostas.
 - **Usage & Audit:** unidades, estimativas, auditoria e métricas.
 

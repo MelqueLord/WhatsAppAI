@@ -71,6 +71,35 @@ public sealed class ContextAssembler(
         };
     }
 
+    public async Task<ConversationContext> BuildSimulationAsync(
+        Guid tenantId,
+        string message,
+        string? systemPrompt,
+        CancellationToken cancellationToken = default)
+    {
+        var sanitizedMessage = AiContextSanitizer.RedactPersonalData(Limit(message, MaxMessageCharacters));
+        var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
+        var knowledgeTexts = RetrieveKnowledge(knowledge, sanitizedMessage)
+            .Select(item => $"{Limit(AiContextSanitizer.RedactPersonalData(item.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(item.Content), MaxKnowledgeItemCharacters)}")
+            .ToList();
+        var responseExample = responseExampleRepository is null
+            ? null
+            : SelectRelevantResponseExample(
+                await responseExampleRepository.GetActiveByTenantAsync(tenantId, cancellationToken),
+                sanitizedMessage);
+
+        return new ConversationContext
+        {
+            SystemPrompt = ComposeSystemPrompt(
+                systemPrompt,
+                knowledgeTexts,
+                responseExample: responseExample is null
+                    ? null
+                    : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse)),
+            Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }]
+        };
+    }
+
     public static string ComposeSystemPrompt(
         string? configuredInstructions,
         IReadOnlyList<string>? knowledgeItems = null,
