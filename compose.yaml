@@ -46,6 +46,8 @@ services:
       ASPNETCORE_HTTP_PORTS: "5000"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Jwt__Secret: ${Jwt__Secret:?Jwt__Secret is required}
+      ForwardedHeaders__Enabled: ${ForwardedHeaders__Enabled:-true}
+      ForwardedHeaders__KnownNetworks__0: ${ForwardedHeaders__KnownNetworks__0:-172.16.0.0/12}
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
@@ -80,6 +82,8 @@ services:
       ASPNETCORE_HTTP_PORTS: "5001"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
       Jwt__Secret: ${Jwt__Secret:?Jwt__Secret is required}
+      ForwardedHeaders__Enabled: ${ForwardedHeaders__Enabled:-true}
+      ForwardedHeaders__KnownNetworks__0: ${ForwardedHeaders__KnownNetworks__0:-172.16.0.0/12}
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
