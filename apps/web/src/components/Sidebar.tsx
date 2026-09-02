@@ -38,7 +38,7 @@ function SidebarToggle({ collapsed, onToggle }: Pick<SidebarProps, 'collapsed' |
       onClick={onToggle}
       aria-label={label}
       title={label}
-      className="absolute right-3 top-20 z-20 w-9 h-9 bg-[#0d1a30] border border-white/20 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#10223f] transition-colors shadow-lg"
+      className="absolute -right-[18px] top-20 z-20 w-9 h-9 bg-[#0d1a30] border border-white/20 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#10223f] transition-colors shadow-lg"
     >
       {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
     </button>
@@ -56,7 +56,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
     return (
       <aside
         className={cn(
-          'h-dvh flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
+          'h-dvh relative flex flex-col overflow-visible border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out',
           collapsed ? 'w-[72px]' : 'w-[260px]'
         )}
       >
@@ -187,7 +187,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'h-dvh flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
+        'h-dvh relative flex flex-col overflow-visible border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out',
         collapsed ? 'w-[72px]' : 'w-[260px]'
       )}
     >

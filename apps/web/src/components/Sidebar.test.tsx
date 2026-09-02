@@ -38,6 +38,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', { name: 'Teste IA' })).toHaveAttribute('href', '/integrations/ai/scenarios')
     expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Recolher menu' })).toHaveClass('-right-[18px]')
     expect(screen.getByText('Administrador da empresa')).toBeInTheDocument()
     expect(screen.queryByText('TenantOwner')).not.toBeInTheDocument()
     expect(container.querySelector('aside')).toHaveClass('h-dvh')
