@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prepare an Ubuntu 24.04 Hostinger VPS for the WhatsApp AI Platform.
+# Prepare an Ubuntu 24.04 or 26.04 Hostinger VPS for the WhatsApp AI Platform.
 set -Eeuo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -8,8 +8,8 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 . /etc/os-release
-if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
-  echo "Este instalador exige Ubuntu 24.04; encontrado ${PRETTY_NAME:-sistema desconhecido}." >&2
+if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" && "${VERSION_ID:-}" != "26.04" ]]; then
+  echo "Este instalador exige Ubuntu 24.04 ou 26.04; encontrado ${PRETTY_NAME:-sistema desconhecido}." >&2
   exit 1
 fi
 
@@ -23,8 +23,9 @@ fi
 
 if [[ ! -f /etc/apt/sources.list.d/docker.list ]]; then
   . /etc/os-release
+  docker_codename="${UBUNTU_CODENAME:-$VERSION_CODENAME}"
   printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
-    "$(dpkg --print-architecture)" "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker.list
+    "$(dpkg --print-architecture)" "$docker_codename" > /etc/apt/sources.list.d/docker.list
 fi
 
 apt-get update

@@ -6,7 +6,7 @@ servidor e não devem ser versionados.
 
 ## Pré-requisitos
 
-- Use um VPS/KVM com Ubuntu 24.04 e Docker. O plano de hospedagem compartilhada
+- Use um VPS/KVM com Ubuntu 24.04 ou 26.04 e Docker. O plano de hospedagem compartilhada
   não suporta este Compose, workers persistentes, SignalR e a ponte QR.
 - Reserve um domínio/subdomínio exclusivo para a plataforma, por exemplo
   `app.seudominio.com`.
