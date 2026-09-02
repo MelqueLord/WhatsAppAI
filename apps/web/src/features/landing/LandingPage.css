@@ -1766,8 +1766,16 @@
     height: 69px;
   }
 
+  .atenz-site .nav-actions {
+    gap: 10px;
+  }
+
   .atenz-site .nav-actions .login-link {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .atenz-site .brand-symbol-image {
