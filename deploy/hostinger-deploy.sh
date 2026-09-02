@@ -11,9 +11,17 @@ for file in "${required_files[@]}"; do
   [[ -f "$file" ]] || { echo "Arquivo obrigatório ausente: $PROJECT_DIR/$file" >&2; exit 1; }
 done
 
-chmod 600 .env deploy/secrets/dataprotection.pfx deploy/nginx/certs/privkey.pem
+chmod 600 .env deploy/nginx/certs/privkey.pem
 docker compose --profile production config >/dev/null
 docker compose build
+
+# The .NET image runs as the non-root `app` user. Bind-mounted PFX files keep
+# host ownership, so grant access only to that container user.
+app_uid="$(docker run --rm --entrypoint id --user app whatsapp-ai-api -u)"
+app_gid="$(docker run --rm --entrypoint id --user app whatsapp-ai-api -g)"
+chown "${app_uid}:${app_gid}" deploy/secrets/dataprotection.pfx
+chmod 600 deploy/secrets/dataprotection.pfx
+
 docker compose up -d postgres
 
 for attempt in {1..30}; do
