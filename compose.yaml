@@ -45,6 +45,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTP_PORTS: "5000"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
+      Jwt__Secret: ${Jwt__Secret:?Jwt__Secret is required}
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
@@ -78,6 +79,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTP_PORTS: "5001"
       Encryption__Key: ${Encryption__Key:?Encryption__Key is required}
+      Jwt__Secret: ${Jwt__Secret:?Jwt__Secret is required}
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:?BootstrapAdmin__Email is required}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:?BootstrapAdmin__Password is required}
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
