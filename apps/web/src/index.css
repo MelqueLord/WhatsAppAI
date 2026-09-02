@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Keep every full-screen dialog reachable on short and narrow viewports. */
+@layer components {
+  .fixed.inset-0.z-50.flex.items-center.justify-center {
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .fixed.inset-0.z-50.flex.items-center.justify-center > :first-child {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
+
+  @media (max-width: 639px) {
+    .fixed.inset-0.z-50.flex.items-center.justify-center {
+      align-items: flex-start;
+    }
+  }
+}
+
 @theme {
   --color-emerald-50: #ecfdf5;
   --color-emerald-100: #d1fae5;
