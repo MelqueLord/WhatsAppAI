@@ -30,6 +30,21 @@ interface SidebarProps {
   onMobileClose?: () => void
 }
 
+function SidebarToggle({ collapsed, onToggle }: Pick<SidebarProps, 'collapsed' | 'onToggle'>) {
+  const label = collapsed ? 'Expandir menu' : 'Recolher menu'
+
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={label}
+      title={label}
+      className="absolute right-3 top-20 z-20 w-9 h-9 bg-[#0d1a30] border border-white/20 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#10223f] transition-colors shadow-lg"
+    >
+      {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+    </button>
+  )
+}
+
 export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   const { user, isPlatformAdmin, isTenantOwner, isOperator, logout } = useAuth()
 
@@ -41,11 +56,11 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
     return (
       <aside
         className={cn(
-          'h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
+          'h-dvh flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
           collapsed ? 'w-[72px]' : 'w-[260px]'
         )}
       >
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
+        <div className="flex shrink-0 items-center gap-3 px-5 h-16 border-b border-white/10">
           <img src={atenzLogo} alt="ATENZ" className="w-9 h-9 object-contain flex-shrink-0" />
           {!collapsed && (
             <div className="overflow-hidden">
@@ -54,7 +69,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
             </div>
           )}
         </div>
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        <nav className="min-h-0 flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           <NavLink
             to="/inbox"
             className={({ isActive }) =>
@@ -110,7 +125,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
             {!collapsed && <span>Disparo em massa</span>}
           </NavLink>
         </nav>
-        <div className="border-t border-white/10 p-3">
+        <div className="shrink-0 border-t border-white/10 p-3">
           <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
             <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
               {user?.displayName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? user?.email?.slice(0, 2).toUpperCase() ?? '??'}
@@ -128,6 +143,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
             )}
           </div>
         </div>
+        <SidebarToggle collapsed={collapsed} onToggle={onToggle} />
       </aside>
     )
   }
@@ -171,12 +187,12 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
+        'h-dvh flex flex-col border-r border-white/10 bg-gradient-to-b from-[#0b1222] via-[#0b162d] to-[#0a1d2f] text-white transition-all duration-300 ease-in-out relative',
         collapsed ? 'w-[72px]' : 'w-[260px]'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10">
+      <div className="flex shrink-0 items-center gap-3 px-5 h-16 border-b border-white/10">
         <img src={atenzLogo} alt="ATENZ" className="w-9 h-9 object-contain flex-shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
@@ -187,7 +203,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+      <nav className="min-h-0 flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -210,7 +226,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
       </nav>
 
       {/* User Section */}
-      <div className="border-t border-white/10 p-3">
+      <div className="shrink-0 border-t border-white/10 p-3">
         <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-3')}>
           <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
             {initials}
@@ -237,13 +253,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
         </div>
       </div>
 
-      {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-3 top-20 w-6 h-6 bg-[#0d1a30] border border-white/20 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#10223f] transition-colors z-10"
-      >
-        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-      </button>
+      <SidebarToggle collapsed={collapsed} onToggle={onToggle} />
     </aside>
   )
 }

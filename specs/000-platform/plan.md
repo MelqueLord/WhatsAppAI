@@ -24,6 +24,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 | ORM | EF Core 10 + Npgsql | migrations e integração PostgreSQL |
 | Frontend | React 19.2 + TypeScript + Vite | SPA simples, tipada e de ciclo rápido |
 | UI data | TanStack Query | cache e estados de servidor sem store global excessiva |
+| Navegação responsiva | Sidebar colapsável no desktop e drawer rolável no mobile | mantém navegação, sessão e controle de largura acessíveis em qualquer altura de tela |
 | Banco | PostgreSQL | Supabase gerenciado ou container Docker na Hostinger |
 | Tempo real | SignalR | integração nativa e grupos por tenant |
 | IA | Provedores oficiais via adaptadores | saída estruturada, credenciais administradas pela plataforma e uso auditável por tenant |

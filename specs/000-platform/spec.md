@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.27.0
+**Versão:** 0.28.0
 **Data:** 2026-08-31
 
 ## 1. Problema
@@ -243,6 +243,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-063:** permitir ao TenantOwner classificar cada item de conhecimento como geral, pergunta frequente, serviço, preço, horário, pagamento, localização ou política, usando um cadastro guiado que preserve itens existentes e não altere o isolamento, a ativação ou a concorrência otimista.
 - **FR-064:** permitir ao TenantOwner criar, editar, ativar e desativar exemplos de mensagem do cliente e resposta ideal, isolados por tenant e com concorrência otimista; no máximo um exemplo ativo lexicalmente relevante pode orientar o estilo de cada resposta ou simulação, sem servir como fonte de fatos comerciais.
 - **FR-065:** permitir ao TenantOwner testar a IA por cenários predefinidos de preço, reclamação, agendamento, pedido de atendimento humano e assunto fora do escopo, além de uma mensagem personalizada, sem enviar mensagem ao WhatsApp, alterar conversas/Outbox ou consumir a franquia de respostas; cada teste deve usar as diretrizes, o perfil, o conhecimento e o exemplo relevante do tenant e retornar decisão, texto, confiança e motivo de handoff sanitizados.
+- **FR-066:** manter a navegação lateral utilizável em telas móveis, com cabeçalho e rodapé acessíveis, lista de itens rolável e controle de recolhimento sempre visível para todos os papéis.
 - **FR-049:** manter preços versionados por provedor/modelo, calcular separadamente entrada e saída no instante do uso e persistir custo, moeda e versão no `UsageLedger`.
 - **FR-050:** limitar tentativas do provedor, abrir circuito por tenant/provedor após falhas consecutivas e finalizar novas mensagens com fallback/handoff seguro enquanto o circuito estiver aberto.
 - **FR-051:** persistir alterações de configuração, modo, handoff e auditoria na mesma transação, validando todas as versões `If-Match` antes de qualquer escrita para impedir estado parcial.
