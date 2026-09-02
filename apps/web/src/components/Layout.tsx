@@ -38,7 +38,12 @@ export function Layout() {
         {/* Mobile top bar */}
         <div className="flex items-center gap-3 px-4 h-14 border-b border-white/10 bg-[#0b1222] lg:hidden">
           <button
-            onClick={() => setMobileOpen(true)}
+            onClick={() => {
+              setSidebarCollapsed(false)
+              setMobileOpen(true)
+            }}
+            aria-label="Abrir menu"
+            title="Abrir menu"
             className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
           >
             <Menu className="w-5 h-5" />

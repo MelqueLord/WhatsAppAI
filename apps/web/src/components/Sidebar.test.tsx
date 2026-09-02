@@ -37,8 +37,9 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Filas' })).toHaveAttribute('href', '/queues')
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', { name: 'Teste IA' })).toHaveAttribute('href', '/integrations/ai/scenarios')
+    expect(screen.getByRole('button', { name: 'Fechar menu' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Recolher menu' })).toHaveClass('-right-[18px]')
+    expect(screen.getByRole('button', { name: 'Recolher menu' })).toHaveClass('-right-[18px]', 'lg:flex')
     expect(screen.getByText('Administrador da empresa')).toBeInTheDocument()
     expect(screen.queryByText('TenantOwner')).not.toBeInTheDocument()
     expect(container.querySelector('aside')).toHaveClass('h-dvh')
@@ -46,23 +47,26 @@ describe('Sidebar', () => {
     expect(container.querySelector('nav')?.nextElementSibling).toHaveClass('shrink-0')
   })
 
-  it('keeps the collapse control available after the menu is collapsed', () => {
+  it('uses the edge control to close the mobile drawer instead of collapsing it', () => {
     const onToggle = vi.fn()
+    const onMobileClose = vi.fn()
     const { rerender } = render(
       <MemoryRouter>
-        <Sidebar collapsed={false} onToggle={onToggle} />
+        <Sidebar collapsed={false} onToggle={onToggle} onMobileClose={onMobileClose} />
       </MemoryRouter>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recolher menu' }))
-    expect(onToggle).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar menu' }))
+    expect(onMobileClose).toHaveBeenCalledOnce()
+    expect(onToggle).not.toHaveBeenCalled()
 
     rerender(
       <MemoryRouter>
-        <Sidebar collapsed onToggle={onToggle} />
+        <Sidebar collapsed onToggle={onToggle} onMobileClose={onMobileClose} />
       </MemoryRouter>,
     )
 
+    expect(screen.getByRole('button', { name: 'Fechar menu' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Expandir menu' })).toBeVisible()
   })
 
@@ -71,10 +75,10 @@ describe('Sidebar', () => {
 
     render(
       <MemoryRouter>
-        <Sidebar collapsed={false} onToggle={vi.fn()} />
+        <Sidebar collapsed={false} onToggle={vi.fn()} onMobileClose={vi.fn()} />
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Fechar menu' })).toBeVisible()
   })
 })
