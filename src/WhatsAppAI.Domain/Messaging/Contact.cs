@@ -37,6 +37,15 @@ public sealed class Contact
         }
     }
 
+    public void UpdatePhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            throw new ArgumentException("Phone number is required.", nameof(phoneNumber));
+
+        PhoneNumber = phoneNumber;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void UpdateProfilePicture(string? url)
     {
         ProfilePictureUrl = url;

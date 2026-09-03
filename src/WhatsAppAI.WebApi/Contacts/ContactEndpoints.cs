@@ -264,6 +264,21 @@ public static class ContactEndpoints
         if (contact is null)
             return Results.NotFound();
 
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            var phone = new string(request.PhoneNumber.Where(char.IsDigit).ToArray());
+            if (phone.Length is < 8 or > 15)
+                return Results.BadRequest(new { error = "Phone number must contain between 8 and 15 digits." });
+
+            if (await dbContext.Contacts.AnyAsync(c =>
+                    c.Id != contactId &&
+                    c.TenantId == currentTenant.TenantId.Value &&
+                    c.PhoneNumber == phone))
+                return Results.Conflict(new { error = "This phone number is already in use." });
+
+            contact.UpdatePhoneNumber(phone);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Name))
             contact.UpdateName(request.Name);
 
@@ -331,6 +346,7 @@ public sealed class CreateContactRequest
 
 public sealed class UpdateContactRequest
 {
+    public string? PhoneNumber { get; init; }
     public string? Name { get; init; }
     public string? ProfilePictureUrl { get; init; }
 }

@@ -318,7 +318,10 @@ export function ContactsPage() {
                 const fd = new FormData(e.currentTarget)
                 updateMutation.mutate({
                   id: editTarget.id,
-                  data: { name: (fd.get('name') as string) || undefined },
+                  data: {
+                    phoneNumber: (fd.get('phoneNumber') as string).replace(/\D/g, ''),
+                    name: (fd.get('name') as string) || undefined,
+                  },
                 })
               }}
               className="space-y-4"
@@ -327,9 +330,10 @@ export function ContactsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Telefone</label>
                 <input
                   type="text"
+                  name="phoneNumber"
                   value={editTarget.phoneNumber}
-                  disabled
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400"
+                  onChange={(e) => setEditTarget({ ...editTarget, phoneNumber: e.target.value.replace(/\D/g, '') })}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>

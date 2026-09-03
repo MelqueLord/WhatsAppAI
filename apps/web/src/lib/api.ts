@@ -603,7 +603,7 @@ export const api = {
 
     update: (
       id: string,
-      data: { name?: string; profilePictureUrl?: string }
+      data: { phoneNumber?: string; name?: string; profilePictureUrl?: string }
     ) =>
       fetchApi<Contact>(`/api/contacts/${id}`, {
         method: 'PUT',
