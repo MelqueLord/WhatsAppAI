@@ -59,7 +59,7 @@ export function ContactsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { phoneNumber?: string; name?: string } }) =>
       api.contacts.update(id, data),
     onSuccess: (updated) => {
       queryClient.setQueryData<Contact[]>(['contacts'], (current = []) =>
