@@ -266,6 +266,11 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
       const mappedLid = await getLidForPhone(session, phoneJid)
       if (mappedLid) recipientJid = mappedLid
     }
+
+    const registeredContact = (await session.sock.onWhatsApp(recipientPhone))
+      ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
+    if (registeredContact?.jid) recipientJid = registeredContact.jid
+
     const result = await session.sock.sendMessage(recipientJid, { text })
     res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
   } catch (error) {
