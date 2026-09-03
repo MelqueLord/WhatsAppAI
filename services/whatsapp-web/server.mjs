@@ -261,10 +261,15 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
   try {
     const lidJid = `${recipientPhone}@lid`
     const phoneJid = `${recipientPhone}@s.whatsapp.net`
-    const recipientJid = session.conversations.has(lidJid) ? lidJid : phoneJid
+    let recipientJid = session.conversations.has(lidJid) ? lidJid : phoneJid
+    if (recipientJid === phoneJid) {
+      const mappedLid = await getLidForPhone(session, phoneJid)
+      if (mappedLid) recipientJid = mappedLid
+    }
     const result = await session.sock.sendMessage(recipientJid, { text })
     res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
-  } catch {
+  } catch (error) {
+    logError('Failed to send WhatsApp message', req.params.tenantId, error)
     res.status(502).json({ success: false, error: 'WhatsApp Web message could not be sent.' })
   }
 }))
@@ -360,6 +365,8 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
   if (!match || !msg.key?.id) return
 
   const [, tenantId, lineNumber] = match
+  const remoteJid = msg.key.remoteJid
+  const phoneNumber = await resolvePhoneNumber(session, remoteJid)
   const payload = {
     object: 'whatsapp_business_account',
     entry: [{
@@ -373,11 +380,11 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
             phone_number_id: `qr:${tenantId}:${lineNumber}`,
           },
           contacts: [{
-            wa_id: msg.key.remoteJid?.split('@')[0],
+            wa_id: phoneNumber,
             profile: { name: msg.pushName },
           }],
           messages: [{
-            from: msg.key.remoteJid?.split('@')[0],
+            from: phoneNumber,
             id: msg.key.id,
             timestamp: Math.floor(new Date(createdAt).getTime() / 1000),
             type: msg.message?.conversation || msg.message?.extendedTextMessage?.text ? 'text' : 'image',
@@ -508,6 +515,19 @@ function sessionDirectory(tenantId) {
 
 function sessionStateUrl(tenantId) {
   return `${apiWebhookUrl}/session/${encodeURIComponent(tenantId)}`
+}
+
+async function resolvePhoneNumber(session, jid) {
+  const [value, server] = String(jid ?? '').split('@')
+  if (server !== 'lid') return value
+
+  const mappedPhone = await session.sock?.signalRepository?.lidMapping?.getPNForLID(`${value}@lid`)
+  return mappedPhone?.split('@')[0] ?? value
+}
+
+async function getLidForPhone(session, phoneJid) {
+  const mappedLid = await session.sock?.signalRepository?.lidMapping?.getLIDForPN(phoneJid)
+  return mappedLid ?? null
 }
 
 class SessionOwnedElsewhereError extends Error {
