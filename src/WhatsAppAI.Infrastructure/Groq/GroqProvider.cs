@@ -15,6 +15,11 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private static readonly JsonSerializerOptions RequestJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     public async Task<AiResponse> GetResponseAsync(AiRequest request, CancellationToken cancellationToken = default)
     {
         var messages = new List<object>
@@ -55,7 +60,7 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
         };
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "openai/v1/chat/completions")
         {
-            Content = JsonContent.Create(payload, options: JsonOptions)
+            Content = JsonContent.Create(payload, options: RequestJsonOptions)
         };
         httpRequest.Headers.Add("Authorization", $"Bearer {request.ApiKey}");
 

@@ -40,6 +40,8 @@ public sealed class GroqProviderTests : IDisposable
         Assert.Equal("json_schema", responseFormat.GetProperty("type").GetString());
         Assert.True(schema.GetProperty("strict").GetBoolean());
         Assert.Equal("ai_decision", schema.GetProperty("name").GetString());
+        Assert.False(schema.GetProperty("schema").GetProperty("additionalProperties").GetBoolean());
+        Assert.False(schema.GetProperty("schema").TryGetProperty("additional_properties", out _));
         Assert.Equal(AiAction.Reply, result.Decision.Action);
         Assert.Equal("Olá!", result.Decision.Text);
     }
