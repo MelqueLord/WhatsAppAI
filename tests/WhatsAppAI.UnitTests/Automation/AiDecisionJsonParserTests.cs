@@ -15,6 +15,19 @@ public sealed class AiDecisionJsonParserTests
         Assert.Equal(new[] { "VIP", "Novo" }, decision.TagNames);
     }
 
+    [Fact]
+    public void Parse_ReadsJsonWrappedByModelFormatting()
+    {
+        var decision = AiDecisionJsonParser.Parse("""
+        ```json
+        {"action":"reply","text":"Olá","confidence":0.9,"handoff_reason":null,"queue":null,"tags":[]}
+        ```
+        """);
+
+        Assert.Equal(AiAction.Reply, decision.Action);
+        Assert.Equal("Olá", decision.Text);
+    }
+
     [Theory]
     [InlineData("Resposta livre fora do JSON")]
     [InlineData("{\"action\":\"reply\",\"text\":\"Conteúdo sem confiança\"}")]

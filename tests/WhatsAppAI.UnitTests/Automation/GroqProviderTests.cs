@@ -25,7 +25,7 @@ public sealed class GroqProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResponseAsync_RequestsJsonObjectFormat()
+    public async Task GetResponseAsync_DoesNotRequireResponseFormatCompatibility()
     {
         _handler.Response = CreateResponse("""
         { "id": "groq-1", "choices": [{ "message": { "content": "{\"action\":\"reply\",\"text\":\"Olá!\",\"confidence\":0.9,\"handoff_reason\":null,\"queue\":null,\"tags\":[]}" } }], "usage": { "prompt_tokens": 10, "completion_tokens": 5 } }
@@ -34,10 +34,7 @@ public sealed class GroqProviderTests : IDisposable
         var result = await _provider.GetResponseAsync(CreateRequest());
 
         using var requestBody = JsonDocument.Parse(_handler.LastRequestBody!);
-        var responseFormat = requestBody.RootElement.GetProperty("response_format");
-
-        Assert.Equal("json_object", responseFormat.GetProperty("type").GetString());
-        Assert.False(responseFormat.TryGetProperty("json_schema", out _));
+        Assert.False(requestBody.RootElement.TryGetProperty("response_format", out _));
         Assert.Equal(AiAction.Reply, result.Decision.Action);
         Assert.Equal("Olá!", result.Decision.Text);
     }

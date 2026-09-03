@@ -11,7 +11,11 @@ public static class AiDecisionJsonParser
     {
         try
         {
-            using var document = JsonDocument.Parse(output);
+            var json = ExtractJsonObject(output);
+            if (json is null)
+                return InvalidDecision();
+
+            using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
                 !root.TryGetProperty("action", out var actionValue) ||
@@ -68,6 +72,15 @@ public static class AiDecisionJsonParser
         {
             return InvalidDecision();
         }
+    }
+
+    private static string? ExtractJsonObject(string output)
+    {
+        var firstBrace = output.IndexOf('{');
+        var lastBrace = output.LastIndexOf('}');
+        return firstBrace >= 0 && lastBrace > firstBrace
+            ? output[firstBrace..(lastBrace + 1)]
+            : null;
     }
 
     private static string? ReadOptionalString(JsonElement root, string propertyName, out bool isValid)
