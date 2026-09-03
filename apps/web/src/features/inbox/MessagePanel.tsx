@@ -88,7 +88,7 @@ export function MessagePanel({
     queryFn: () =>
       api.conversations.getMessages(conversation.id),
 
-    refetchInterval: 10000,
+    refetchInterval: 2000,
 
     refetchOnMount: 'always',
 
