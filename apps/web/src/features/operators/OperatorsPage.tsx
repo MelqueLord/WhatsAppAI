@@ -91,7 +91,12 @@ export function OperatorsPage() {
   const assignLinesMutation = useMutation({
     mutationFn: ({ operatorId, lines }: { operatorId: string; lines: LineAssignment[] }) =>
       api.operators.assignLines(operatorId, lines),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operators'] }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Operator[]>(['operators'], (current = []) =>
+        current.map((operator) => operator.id === updated.id ? updated : operator)
+      )
+      queryClient.invalidateQueries({ queryKey: ['operators'] })
+    },
   })
 
   const assignQueueMutation = useMutation({

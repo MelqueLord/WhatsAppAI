@@ -141,6 +141,7 @@ public sealed class TenantMembership
         if (string.IsNullOrWhiteSpace(AssignedLinesJson))
         {
             _assignedLines.Clear();
+            LoadLegacyLineAssignment();
             return;
         }
         _assignedLines.Clear();
@@ -150,6 +151,16 @@ public sealed class TenantMembership
                 int.TryParse(match.Groups["lineNumber"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lineNumber))
                 _assignedLines.Add(new LineAssignment(connectionType, lineNumber));
         }
+
+        // Keep memberships created before multi-line assignments visible to the UI.
+        if (_assignedLines.Count == 0)
+            LoadLegacyLineAssignment();
+    }
+
+    private void LoadLegacyLineAssignment()
+    {
+        if (AssignedConnectionType is not null && AssignedLineNumber is > 0)
+            _assignedLines.Add(new LineAssignment(AssignedConnectionType.Value, AssignedLineNumber.Value));
     }
 
     private void SyncAssignedLinesJson()
