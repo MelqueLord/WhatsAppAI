@@ -25,7 +25,7 @@ public sealed class GroqProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResponseAsync_RequestsStrictAiDecisionSchema()
+    public async Task GetResponseAsync_RequestsJsonObjectFormat()
     {
         _handler.Response = CreateResponse("""
         { "id": "groq-1", "choices": [{ "message": { "content": "{\"action\":\"reply\",\"text\":\"Olá!\",\"confidence\":0.9,\"handoff_reason\":null,\"queue\":null,\"tags\":[]}" } }], "usage": { "prompt_tokens": 10, "completion_tokens": 5 } }
@@ -35,13 +35,9 @@ public sealed class GroqProviderTests : IDisposable
 
         using var requestBody = JsonDocument.Parse(_handler.LastRequestBody!);
         var responseFormat = requestBody.RootElement.GetProperty("response_format");
-        var schema = responseFormat.GetProperty("json_schema");
 
-        Assert.Equal("json_schema", responseFormat.GetProperty("type").GetString());
-        Assert.True(schema.GetProperty("strict").GetBoolean());
-        Assert.Equal("ai_decision", schema.GetProperty("name").GetString());
-        Assert.False(schema.GetProperty("schema").GetProperty("additionalProperties").GetBoolean());
-        Assert.False(schema.GetProperty("schema").TryGetProperty("additional_properties", out _));
+        Assert.Equal("json_object", responseFormat.GetProperty("type").GetString());
+        Assert.False(responseFormat.TryGetProperty("json_schema", out _));
         Assert.Equal(AiAction.Reply, result.Decision.Action);
         Assert.Equal("Olá!", result.Decision.Text);
     }
