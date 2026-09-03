@@ -21,6 +21,7 @@ public sealed class ModelEvaluationRepository(AppDbContext context) : IModelEval
     public async Task<ModelEvaluation?> GetLatestApprovedAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await context.Set<ModelEvaluation>()
+            .IgnoreQueryFilters()
             .Where(e => e.TenantId == tenantId && e.IsApproved)
             .OrderByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -34,6 +35,7 @@ public sealed class ModelEvaluationRepository(AppDbContext context) : IModelEval
             ? modelId["models/".Length..]
             : modelId;
         return await context.Set<ModelEvaluation>()
+            .IgnoreQueryFilters()
             .Where(e => e.TenantId == tenantId && e.IsApproved &&
                 e.Provider == normalizedProvider &&
                 (e.ModelId == modelId || e.ModelId == normalizedModelId))
@@ -44,6 +46,7 @@ public sealed class ModelEvaluationRepository(AppDbContext context) : IModelEval
     public async Task<IReadOnlyList<ModelEvaluation>> GetByTenantAsync(Guid tenantId, int limit = 20, CancellationToken cancellationToken = default)
     {
         return await context.Set<ModelEvaluation>()
+            .IgnoreQueryFilters()
             .Where(e => e.TenantId == tenantId)
             .OrderByDescending(e => e.CreatedAt)
             .Take(limit)
