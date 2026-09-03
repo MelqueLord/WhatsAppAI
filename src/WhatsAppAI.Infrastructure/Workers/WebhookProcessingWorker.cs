@@ -30,7 +30,7 @@ public sealed class WebhookProcessingWorker(
             {
                 var hadWork = await ProcessEventsAsync(stoppingToken);
                 await Task.Delay(
-                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(5),
+                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

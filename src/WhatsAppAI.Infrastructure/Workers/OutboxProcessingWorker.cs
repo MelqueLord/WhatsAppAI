@@ -38,7 +38,7 @@ public sealed class OutboxProcessingWorker(
             {
                 var hadWork = await ProcessOutboxAsync(stoppingToken);
                 await Task.Delay(
-                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(3),
+                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
