@@ -731,7 +731,8 @@ function scheduleReconnect(tenantId) {
 
 function logError(event, tenantId, error) {
   const errorType = error instanceof Error ? error.name : 'UnknownError'
-  console.error(`${event}: session=${tenantId} error=${errorType}`)
+  const errorMessage = error instanceof Error ? error.message.replace(/[\r\n]+/g, ' ').slice(0, 240) : String(error).slice(0, 240)
+  console.error(`${event}: session=${tenantId} error=${errorType} message=${errorMessage}`)
 }
 
 async function flushAuthBackups() {
