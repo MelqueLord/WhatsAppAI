@@ -62,6 +62,20 @@ public sealed class AiResponseQuotaReservation
         ReleaseReason = reason.Trim();
     }
 
+    public void Retry(string idempotencyKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        if (Status != AiResponseQuotaReservationStatus.Released)
+            throw new InvalidOperationException("Only a released AI response quota reservation can be retried.");
+
+        IdempotencyKey = idempotencyKey.Trim();
+        Status = AiResponseQuotaReservationStatus.Pending;
+        CreatedAt = DateTime.UtcNow;
+        CommittedAt = null;
+        ReleasedAt = null;
+        ReleaseReason = null;
+    }
+
     private void EnsurePending()
     {
         if (Status != AiResponseQuotaReservationStatus.Pending)

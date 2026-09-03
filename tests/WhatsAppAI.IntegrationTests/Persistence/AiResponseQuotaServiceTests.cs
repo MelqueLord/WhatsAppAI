@@ -46,6 +46,36 @@ public sealed class AiResponseQuotaServiceTests(TestWebApplicationFactory factor
     }
 
     [Fact]
+    public async Task Released_reservation_can_be_reused_for_a_manual_reprocessing()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync();
+        var plan = await dbContext.SubscriptionPlans.FirstAsync();
+        var tenant = Tenant.Create(
+            $"Retry {Guid.NewGuid():N}",
+            $"retry-{Guid.NewGuid():N}",
+            plan.Id,
+            monthlyAiResponseLimit: 1);
+        tenant.Activate();
+        dbContext.Tenants.Add(tenant);
+        await dbContext.SaveChangesAsync();
+
+        var service = scope.ServiceProvider.GetRequiredService<IAiResponseQuotaService>();
+        var sourceMessageId = Guid.NewGuid();
+        var first = await service.TryReserveAsync(tenant.Id, sourceMessageId, "message:first");
+        await service.ReleaseAsync(tenant.Id, first.ReservationId!.Value, "invalid-response");
+
+        var retried = await service.TryReserveAsync(tenant.Id, sourceMessageId, "message:retry");
+
+        Assert.True(retried.IsReserved);
+        Assert.False(retried.IsExisting);
+        Assert.Equal(first.ReservationId, retried.ReservationId);
+        Assert.Equal(AiResponseQuotaReservationStatus.Pending, retried.ReservationStatus);
+        Assert.Equal(0, retried.Snapshot.AvailableResponses);
+    }
+
+    [Fact]
     public async Task Reconciliation_releases_only_expired_pending_reservations()
     {
         await using var scope = factory.Services.CreateAsyncScope();

@@ -30,6 +30,33 @@ public sealed class AiResponseQuotaService(AppDbContext dbContext) : IAiResponse
         if (existing is not null)
         {
             var existingSnapshot = await BuildSnapshotAsync(tenantId, cancellationToken);
+            if (existing.Status == AiResponseQuotaReservationStatus.Released)
+            {
+                if (!AiResponseQuotaContract.CanReserve(
+                        existingSnapshot.EffectiveLimit,
+                        existingSnapshot.CommittedResponses,
+                        existingSnapshot.PendingReservations))
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return new AiResponseQuotaReservationResult(false, false, null, null, existingSnapshot);
+                }
+
+                existing.Retry(idempotencyKey);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return new AiResponseQuotaReservationResult(
+                    true,
+                    false,
+                    existing.Id,
+                    existing.Status,
+                    existingSnapshot with
+                    {
+                        PendingReservations = checked(existingSnapshot.PendingReservations + 1)
+                    },
+                    existing.PackageType,
+                    existing.PackageReference);
+            }
+
             await transaction.CommitAsync(cancellationToken);
             return new AiResponseQuotaReservationResult(
                 existing.Status is AiResponseQuotaReservationStatus.Pending or AiResponseQuotaReservationStatus.Committed,
