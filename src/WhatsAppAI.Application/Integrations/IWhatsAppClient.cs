@@ -51,6 +51,7 @@ public sealed record WhatsAppConnectionResult
 public sealed record SendMessageResult
 {
     public bool IsSuccess { get; init; }
+    public bool IsRetryable { get; init; } = true;
     public string? MessageId { get; init; }
     public string? ErrorMessage { get; init; }
 }

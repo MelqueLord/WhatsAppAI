@@ -123,7 +123,8 @@ public sealed class OutboxProcessingWorker(
             if (contact is null)
             {
                 outboxMessage.MarkDead("Contact not found");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                message.MarkFailed("Contact not found");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 logger.LogWarning("Outbox {OutboxId} references missing contact {ContactId}", outboxMessage.Id, message.ContactId);
                 return;
             }
@@ -143,7 +144,8 @@ public sealed class OutboxProcessingWorker(
             if (account is null && !isQrSession)
             {
                 outboxMessage.MarkDead("WhatsApp account not found or inactive");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                message.MarkFailed("WhatsApp account not found or inactive");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 logger.LogWarning("No active WhatsApp account for tenant {TenantId}", outboxMessage.TenantId);
                 return;
             }
@@ -151,7 +153,8 @@ public sealed class OutboxProcessingWorker(
             if (account is not null && !account.IsActive)
             {
                 outboxMessage.MarkDead("WhatsApp account not found or inactive");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                message.MarkFailed("WhatsApp account not found or inactive");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 return;
             }
 
@@ -159,7 +162,8 @@ public sealed class OutboxProcessingWorker(
             if (string.IsNullOrWhiteSpace(outboundPhoneNumberId))
             {
                 outboxMessage.MarkDead("WhatsApp phone number not found");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                message.MarkFailed("WhatsApp phone number not found");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 return;
             }
 
@@ -171,7 +175,8 @@ public sealed class OutboxProcessingWorker(
             if (string.IsNullOrEmpty(token))
             {
                 outboxMessage.MarkDead("Access token not available");
-                await outboxRepository.UpdateAsync(outboxMessage);
+                message.MarkFailed("Access token not available");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 return;
             }
 
@@ -262,8 +267,20 @@ public sealed class OutboxProcessingWorker(
             }
             else
             {
-                HandleFailure(outboxMessage, result.ErrorMessage ?? "Send failed");
-                message.MarkFailed(result.ErrorMessage ?? "Send failed");
+                var error = result.ErrorMessage ?? "Send failed";
+                if (result.IsRetryable)
+                {
+                    HandleFailure(outboxMessage, error);
+                    if (outboxMessage.Status == OutboxStatus.Dead)
+                        message.MarkFailed(error);
+                    else
+                        message.MarkQueuedForRetry();
+                }
+                else
+                {
+                    outboxMessage.MarkDead(error);
+                    message.MarkFailed(error);
+                }
                 await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
 
                 logger.LogWarning("Outbox {OutboxId} failed: {Error}", outboxMessage.Id, outboxMessage.LastError);

@@ -1,5 +1,5 @@
-using System.Net.Http.Json;
 using System.Net;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
 using WhatsAppAI.Application.Integrations;
 
@@ -44,6 +44,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
             return Task.FromResult(new SendMessageResult
             {
                 IsSuccess = false,
+                IsRetryable = false,
                 ErrorMessage = "Invalid WhatsApp Web session reference."
             });
         }
@@ -86,6 +87,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
             return new SendMessageResult
             {
                 IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                IsRetryable = IsRetryableStatus(response.StatusCode),
                 MessageId = result?.MessageId,
                 ErrorMessage = result?.Error ?? "WhatsApp Web message could not be sent."
             };
@@ -174,6 +176,11 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
                 $"{baseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/logout"),
             cancellationToken);
     }
+
+    private static bool IsRetryableStatus(HttpStatusCode statusCode) =>
+        statusCode == HttpStatusCode.RequestTimeout ||
+        statusCode == HttpStatusCode.TooManyRequests ||
+        (int)statusCode >= 500;
 
     private async Task<HttpResponseMessage> SendToSessionOwnerAsync(
         Func<string, HttpRequestMessage> requestFactory,

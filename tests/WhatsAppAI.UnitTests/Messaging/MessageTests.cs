@@ -98,6 +98,36 @@ public class MessageTests
     }
 
     [Fact]
+    public void MarkSent_ClearsPreviousFailure()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "idem123");
+        message.MarkFailed("Temporary network error");
+
+        message.MarkSent("wa-msg-123");
+
+        Assert.Equal(MessageStatus.Sent, message.Status);
+        Assert.Null(message.FailureReason);
+        Assert.Null(message.FailedAt);
+    }
+
+    [Fact]
+    public void MarkQueuedForRetry_ClearsFailureAndKeepsMessagePending()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "idem123");
+        message.MarkFailed("Temporary network error");
+
+        message.MarkQueuedForRetry();
+
+        Assert.Equal(MessageStatus.Queued, message.Status);
+        Assert.Null(message.FailureReason);
+        Assert.Null(message.FailedAt);
+    }
+
+    [Fact]
     public void MarkDelivered_SetsStatus()
     {
         var message = Message.CreateOutbound(

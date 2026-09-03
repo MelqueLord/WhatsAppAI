@@ -125,6 +125,15 @@ public sealed class Message
         ExternalId = externalId;
         Status = MessageStatus.Sent;
         SentAt = DateTime.UtcNow;
+        FailedAt = null;
+        FailureReason = null;
+    }
+
+    public void MarkQueuedForRetry()
+    {
+        Status = MessageStatus.Queued;
+        FailedAt = null;
+        FailureReason = null;
     }
 
     public void MarkDelivered()
