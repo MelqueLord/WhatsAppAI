@@ -23,7 +23,36 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
         };
         messages.AddRange(request.Messages.Select(message => new { role = message.Role, content = message.Content }));
 
-        var payload = new { model = request.ModelId, messages, max_tokens = request.MaxTokens };
+        var payload = new
+        {
+            model = request.ModelId,
+            messages,
+            max_tokens = request.MaxTokens,
+            response_format = new
+            {
+                type = "json_schema",
+                json_schema = new
+                {
+                    name = "ai_decision",
+                    strict = true,
+                    schema = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            action = new { type = "string", @enum = new[] { "reply", "handoff", "no_action" } },
+                            text = new { type = new[] { "string", "null" } },
+                            confidence = new { type = "number", minimum = 0, maximum = 1 },
+                            handoff_reason = new { type = new[] { "string", "null" } },
+                            queue = new { type = new[] { "string", "null" } },
+                            tags = new { type = "array", items = new { type = "string" } }
+                        },
+                        required = new[] { "action", "text", "confidence", "handoff_reason", "queue", "tags" },
+                        additionalProperties = false
+                    }
+                }
+            }
+        };
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "openai/v1/chat/completions")
         {
             Content = JsonContent.Create(payload, options: JsonOptions)
