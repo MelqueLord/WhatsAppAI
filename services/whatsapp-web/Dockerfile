@@ -11,6 +11,9 @@ RUN npm ci
 
 COPY --chown=node:node . .
 
+# Ensure a newly created named volume is writable by the runtime user.
+RUN mkdir -p /app/sessions && chown node:node /app/sessions
+
 EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
