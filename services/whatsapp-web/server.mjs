@@ -269,7 +269,13 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
 
     const registeredContact = (await session.sock.onWhatsApp(recipientPhone))
       ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
-    if (registeredContact?.jid) recipientJid = registeredContact.jid
+    if (!registeredContact?.jid) {
+      console.warn(`WhatsApp recipient is not registered: session=${req.params.tenantId}`)
+      return res.status(422).json({ success: false, error: 'The recipient is not registered on WhatsApp.' })
+    }
+
+    recipientJid = registeredContact.jid
+    console.log(`WhatsApp recipient resolved: session=${req.params.tenantId} type=${recipientJid.split('@')[1] ?? 'unknown'}`)
 
     const result = await session.sock.sendMessage(recipientJid, { text })
     res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
