@@ -34,8 +34,9 @@ public sealed class GroqProviderTests : IDisposable
         var result = await _provider.GetResponseAsync(CreateRequest());
 
         using var requestBody = JsonDocument.Parse(_handler.LastRequestBody!);
-        Assert.Equal(240, requestBody.RootElement.GetProperty("max_completion_tokens").GetInt32());
+        Assert.Equal(512, requestBody.RootElement.GetProperty("max_completion_tokens").GetInt32());
         Assert.False(requestBody.RootElement.GetProperty("include_reasoning").GetBoolean());
+        Assert.Equal("low", requestBody.RootElement.GetProperty("reasoning_effort").GetString());
         Assert.False(requestBody.RootElement.TryGetProperty("response_format", out _));
         Assert.Equal(AiAction.Reply, result.Decision.Action);
         Assert.Equal("Olá!", result.Decision.Text);

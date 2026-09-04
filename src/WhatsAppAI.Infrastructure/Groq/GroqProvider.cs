@@ -23,12 +23,14 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
         };
         messages.AddRange(request.Messages.Select(message => new { role = message.Role, content = message.Content }));
 
+        var isGptOssModel = request.ModelId.StartsWith("openai/gpt-oss-", StringComparison.OrdinalIgnoreCase);
         var payload = new
         {
             model = request.ModelId,
             messages,
-            max_completion_tokens = request.MaxTokens,
-            include_reasoning = false
+            max_completion_tokens = isGptOssModel ? Math.Max(request.MaxTokens, 512) : request.MaxTokens,
+            include_reasoning = isGptOssModel ? false : (bool?)null,
+            reasoning_effort = isGptOssModel ? "low" : null
         };
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "openai/v1/chat/completions")
         {
