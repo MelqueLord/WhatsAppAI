@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.30.0
+**Versão:** 0.31.0
 **Data:** 2026-09-03
 
 ## 1. Problema
@@ -257,6 +257,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-059:** permitir ao operador enviar template transacional aprovado pela Meta com idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas; o backend deve rejeitar templates em conexões QR Code e persistir a intenção na Outbox.
 - **FR-060:** permitir executar múltiplas instâncias da ponte QR sem que duas instâncias controlem a mesma sessão; cada sessão deve ter lease exclusivo e renovável no PostgreSQL, e chamadas devem ser roteadas para a instância dona.
 - **FR-067:** criar para toda empresa nova uma finalidade ativa de atendimento automatizado por IA, com base legal de consentimento e retenção de 365 dias; a finalidade não substitui o registro individual de consentimento de cada contato.
+- **FR-068:** solicitar, uma única vez por conversa, o aceite padronizado para atendimento automatizado por IA ao contato sem consentimento ativo; ao receber a resposta explícita `SIM`, registrar evidência vinculada à mensagem recebida, confirmar o registro e habilitar os próximos atendimentos automáticos daquele contato no tenant corrente.
 
 ## 6. Regras de negócio
 
@@ -295,6 +296,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-029:** template transacional exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres, e só pode ser despachado por uma conta `OfficialApi`; QR Code deve finalizar a Outbox sem chamada externa.
 - **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem, publicar webhook de entrada ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
 - **BR-035:** a finalidade padrão de IA é isolada pelo tenant e não autoriza processamento por si só; uma evidência de consentimento ativa do contato continua obrigatória antes de uma resposta automática.
+- **BR-036:** somente a mensagem recebida cujo conteúdo normalizado seja exatamente `SIM` constitui aceite automatizado; a evidência registra a origem WhatsApp e a referência técnica da mensagem, sem registrar seu conteúdo em auditoria. Uma mensagem ambígua não concede consentimento.
 
 ## 7. Requisitos não funcionais
 

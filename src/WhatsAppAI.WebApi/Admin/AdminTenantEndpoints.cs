@@ -204,8 +204,8 @@ public static class AdminTenantEndpoints
             // Consent remains required per contact before automation can process their messages.
             dbContext.ProcessingPurposes.Add(ProcessingPurpose.Create(
                 tenant.Id,
-                "Atendimento automatizado por IA",
-                "Processamento de mensagens para atendimento automatizado por inteligência artificial.",
+                AiConsentOptInPolicy.DefaultPurposeName,
+                AiConsentOptInPolicy.DefaultPurposeDescription,
                 LegalBasis.Consent,
                 365,
                 owner.Id));

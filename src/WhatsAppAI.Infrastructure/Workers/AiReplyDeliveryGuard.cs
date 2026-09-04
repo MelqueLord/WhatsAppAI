@@ -14,7 +14,9 @@ internal static class AiReplyDeliveryGuard
         "ai-quota:",
         "ai-retry-exhausted:",
         "ai-handoff:",
-        "ai-queue-transfer:"
+        "ai-queue-transfer:",
+        "consent-request:",
+        "consent-confirmation:"
     ];
 
     public static string CreateIdempotencyKey(Guid inboundMessageId, uint conversationVersion) =>
