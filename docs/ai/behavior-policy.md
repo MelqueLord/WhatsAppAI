@@ -27,13 +27,11 @@ Pode responder saudações, horário, endereço, disponibilidade e informações
 
 Transferir quando:
 
-- o cliente pedir uma pessoa, reclamar ou demonstrar conflito;
-- não houver informação suficiente ou fontes se contradisserem;
-- houver preço/condição não documentada, negociação, reembolso ou compromisso;
-- surgir dado sensível, emergência, conselho médico/jurídico/financeiro;
-- confiança ficar abaixo do limiar configurado;
-- a resposta exigir mensagem proativa/template ou estiver fora da janela;
-- ocorrer falha repetida do provedor ou suspeita de abuso.
+- o cliente pedir explicitamente uma pessoa, atendente ou operador;
+- uma palavra-chave de uma fila humana autorizada corresponder à mensagem;
+- um operador fizer a transferência manualmente.
+
+Quando não houver informação confirmada ou a mensagem estiver fora do escopo, a plataforma mantém a IA ativa e responde de modo genérico e seguro, sem inventar fatos. As proteções críticas — conteúdo sensível ou malicioso, falha repetida do provedor e situação fora da janela — continuam podendo exigir handoff seguro.
 
 ## Proibições
 

@@ -373,12 +373,7 @@ public sealed class AiOrchestrationWorker(
             // Queue keywords are an explicit tenant rule, so evaluate them before
             // consulting the model. This makes the transfer deterministic and avoids
             // spending an AI response quota for a request that must go to a human queue.
-            if (automaticDistributionEnabled && routingQueues.Count > 0 &&
-                BusinessHoursPolicy.IsOpen(
-                    botConfig.BusinessHoursEnabled,
-                    botConfig.BusinessHoursJson,
-                    botConfig.TimeZoneId,
-                    DateTime.UtcNow))
+            if (automaticDistributionEnabled && routingQueues.Count > 0)
             {
                 await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
                 if (!AiReplyDeliveryGuard.CanSend(
@@ -393,7 +388,11 @@ public sealed class AiOrchestrationWorker(
                 }
 
                 var keywordQueue = SelectBotRoutingQueue(
-                    conversation.QueueId, routingQueues, message.Content);
+                    conversation.QueueId, routingQueues, message.Content) ??
+                    (HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content)
+                        ? routingQueues.FirstOrDefault(queue =>
+                            HumanHandoffRequestPolicy.IsHumanQueueName(queue.Name))
+                        : null);
                 if (keywordQueue is not null)
                 {
                     await PersistAutomaticHandoffAsync(
@@ -560,6 +559,17 @@ public sealed class AiOrchestrationWorker(
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
                 conversation.QueueId is not null);
             response = response with { Decision = routingResult.Decision };
+            if (response.Decision.Action == AiAction.Handoff &&
+                routingResult.QueueId is null &&
+                HumanHandoffRequestPolicy.ShouldKeepConversationAutomatic(
+                    response.Decision, message.Content))
+            {
+                logger.LogInformation(
+                    "AI handoff {HandoffReason} kept conversation {ConversationId} automatic",
+                    response.Decision.HandoffReason,
+                    message.ConversationId);
+                response = HumanHandoffRequestPolicy.KeepConversationAutomatic(response);
+            }
             var categorizedTagIds = TagCategorizationPolicy.ResolveAuthorizedTagIds(
                 response.Decision.TagNames,
                 routingTags.Select(tag => new RoutingTagCandidate(tag.Id, tag.Name)).ToList());
