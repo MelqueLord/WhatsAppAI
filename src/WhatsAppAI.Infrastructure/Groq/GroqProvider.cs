@@ -28,8 +28,7 @@ public sealed class GroqProvider(HttpClient httpClient, ILogger<GroqProvider> lo
             model = request.ModelId,
             messages,
             max_completion_tokens = request.MaxTokens,
-            include_reasoning = false,
-            response_format = new { type = "json_object" }
+            include_reasoning = false
         };
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "openai/v1/chat/completions")
         {

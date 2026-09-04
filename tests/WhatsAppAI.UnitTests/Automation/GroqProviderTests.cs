@@ -25,7 +25,7 @@ public sealed class GroqProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task GetResponseAsync_ExcludesReasoningAndRequestsJsonObjectFormat()
+    public async Task GetResponseAsync_ExcludesReasoningWithoutUnsupportedJsonMode()
     {
         _handler.Response = CreateResponse("""
         { "id": "groq-1", "choices": [{ "message": { "content": "{\"action\":\"reply\",\"text\":\"Olá!\",\"confidence\":0.9,\"handoff_reason\":null,\"queue\":null,\"tags\":[]}" } }], "usage": { "prompt_tokens": 10, "completion_tokens": 5 } }
@@ -36,9 +36,7 @@ public sealed class GroqProviderTests : IDisposable
         using var requestBody = JsonDocument.Parse(_handler.LastRequestBody!);
         Assert.Equal(240, requestBody.RootElement.GetProperty("max_completion_tokens").GetInt32());
         Assert.False(requestBody.RootElement.GetProperty("include_reasoning").GetBoolean());
-        Assert.Equal(
-            "json_object",
-            requestBody.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+        Assert.False(requestBody.RootElement.TryGetProperty("response_format", out _));
         Assert.Equal(AiAction.Reply, result.Decision.Action);
         Assert.Equal("Olá!", result.Decision.Text);
     }
