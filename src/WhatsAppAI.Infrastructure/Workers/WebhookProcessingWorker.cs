@@ -376,8 +376,24 @@ public sealed class WebhookProcessingWorker(
         }
     }
 
-    private static string NormalizePhoneNumber(string phoneNumber) =>
-           new string(phoneNumber.Where(char.IsDigit).ToArray());
+    internal static string NormalizePhoneNumber(string phoneNumber)
+    {
+        var deviceSeparator = phoneNumber.IndexOf(':');
+        var phoneIdentity = deviceSeparator >= 0
+            ? phoneNumber[..deviceSeparator]
+            : phoneNumber;
+        var normalized = new string(phoneIdentity.Where(char.IsDigit).ToArray());
+
+        // WhatsApp Web can identify a Brazilian mobile as an eight-digit
+        // number followed by its device suffix (for example, :0). The suffix
+        // is not part of the phone number; restore the mobile prefix only for
+        // that explicit QR identity format.
+        return deviceSeparator >= 0 &&
+               normalized.Length == 12 &&
+               normalized.StartsWith("55", StringComparison.Ordinal)
+            ? string.Concat(normalized.AsSpan(0, 4), "9", normalized.AsSpan(4))
+            : normalized;
+    }
 
     private async Task ProcessStatusUpdateAsync(
         WebhookStatus status,

@@ -538,10 +538,23 @@ async function resolvePhoneNumber(session, jid, alternateJid) {
   if (alternateServer === 's.whatsapp.net' && /^\d{8,15}$/.test(alternateValue))
     return alternateValue
 
-  if (server !== 'lid') return value
+  if (server !== 'lid') return normalizePhoneJidUser(value)
 
   const mappedPhone = await session.sock?.signalRepository?.lidMapping?.getPNForLID(`${value}@lid`)
-  return mappedPhone?.split('@')[0] ?? value
+  return normalizePhoneJidUser(mappedPhone?.split('@')[0] ?? value)
+}
+
+function normalizePhoneJidUser(value) {
+  const [phoneIdentity, deviceSuffix] = String(value ?? '').split(':', 2)
+  const digits = phoneIdentity.replace(/\D/g, '')
+
+  // A QR JID with :0 identifies a device, not a final digit of the contact.
+  // The legacy Brazilian identity contains eight local digits, so restore the
+  // mandatory mobile prefix after country code and DDD.
+  if (deviceSuffix !== undefined && /^55\d{10}$/.test(digits))
+    return `${digits.slice(0, 4)}9${digits.slice(4)}`
+
+  return digits
 }
 
 async function getLidForPhone(session, phoneJid) {
