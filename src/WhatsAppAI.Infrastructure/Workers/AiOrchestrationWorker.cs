@@ -936,8 +936,6 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
-        IClientTagRepository tagRepository,
-        IContactTagRepository contactTagRepository,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
