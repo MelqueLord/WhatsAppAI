@@ -114,6 +114,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-015**: An inbound message matching an active queue keyword MUST keep or restore automatic mode when no operator is explicitly assigned, including when the conversation was previously moved to human mode by an automatic decision; an explicitly assigned operator MUST remain in human mode.
 - **FR-QTN-016**: The AI context MUST treat tenant guidelines as behavioral instructions, active knowledge items as the authoritative source of company facts, and response examples as style and workflow demonstrations; overlapping content MUST NOT cause examples to override documented facts.
 - **FR-QTN-017**: For each automatic inbound message, the context assembler MUST consider the current message and recent user history when retrieving relevant knowledge and examples, tolerate accent/plural variations, and provide enough matching items for a multi-part request before using an out-of-scope handoff.
+- **FR-QTN-018**: General questions about the tenant's identity, business, services and platform operation MUST be answerable from the authorized tenant profile and service directions even when no specific knowledge item matches; missing knowledge alone MUST NOT trigger an out-of-scope handoff.
 
 ### Key Entities
 

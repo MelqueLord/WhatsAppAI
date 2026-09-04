@@ -69,6 +69,17 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void ComposeSystemPrompt_AllowsGeneralCompanyAnswersFromProfileAndDirections()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            "[PERFIL_EMPRESA]\nDescrição do negócio: Plataforma de atendimento pelo WhatsApp.\nProdutos e serviços: Inbox, automação e IA.\n[/PERFIL_EMPRESA]\nExplique o funcionamento da plataforma com clareza.");
+
+        Assert.Contains("perguntas gerais sobre quem somos, o que fazemos", prompt, StringComparison.Ordinal);
+        Assert.Contains("não esteja no perfil, nas diretrizes ou na base autorizada", prompt, StringComparison.Ordinal);
+        Assert.Contains("negócio: Plataforma de atendimento", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task BuildAsync_UsesCurrentAndThreePreviousMessagesAndPreservesMandatoryInstructions()
     {
         var tenantId = Guid.NewGuid();

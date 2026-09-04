@@ -195,7 +195,7 @@ public sealed class ContextAssembler(
         }
         else
         {
-            dynamicParts.Add(("Não há conhecimento da empresa relevante para esta solicitação. Não invente fatos específicos; para fato empresarial não documentado, use action \"handoff\" com handoff_reason \"out_of_scope\".", 240));
+            dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil da empresa e as diretrizes cadastradas para responder perguntas gerais sobre quem somos, o que fazemos, nossos serviços e como funciona o atendimento. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 420));
         }
 
         IReadOnlyList<ResponseExampleContext> selectedExamples = responseExamples is { Count: > 0 }
