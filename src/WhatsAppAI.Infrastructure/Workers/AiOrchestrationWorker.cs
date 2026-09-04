@@ -213,12 +213,12 @@ public sealed class AiOrchestrationWorker(
 
                 try
                 {
-                    IReadOnlyList<ServiceLine> activeQueues = await dbContext.HasAutomaticDistributionEnabledAsync(
+                    IReadOnlyList<ServiceLine> simpleModeQueues = await dbContext.HasAutomaticDistributionEnabledAsync(
                             message.TenantId, cancellationToken)
                         ? await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken)
                         : [];
                     if (await HandleAutomaticQueueMessageAsync(
-                            message, conversation, botConfig, activeQueues,
+                            message, conversation, botConfig, simpleModeQueues,
                             dbContext, messageRepository, conversationRepository,
                             outboxRepository, handoffEventRepository, tagRepository,
                             contactTagRepository, cancellationToken))
