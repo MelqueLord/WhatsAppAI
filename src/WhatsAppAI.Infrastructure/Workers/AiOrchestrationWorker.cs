@@ -639,6 +639,27 @@ public sealed class AiOrchestrationWorker(
                 response.Decision.TagNames,
                 routingTags.Select(tag => new RoutingTagCandidate(tag.Id, tag.Name)).ToList());
 
+            var companyMemory = CompanyMemoryPolicy.CreateFromGroundedReply(
+                message.TenantId,
+                message.Content,
+                response,
+                context.RelevantKnowledge,
+                botConfig.ConfidenceThreshold);
+            if (companyMemory is not null &&
+                !await dbContext.KnowledgeItems.AnyAsync(item =>
+                    item.TenantId == message.TenantId &&
+                    item.IsActive &&
+                    item.Title == companyMemory.Title &&
+                    item.Content == companyMemory.Content,
+                    cancellationToken))
+            {
+                dbContext.KnowledgeItems.Add(companyMemory);
+                logger.LogInformation(
+                    "Stored grounded company memory for tenant {TenantId} from conversation {ConversationId}",
+                    message.TenantId,
+                    message.ConversationId);
+            }
+
             // Persist interaction (no prompt/response content)
             var interaction = AiInteraction.Create(
                 message.TenantId, message.ConversationId, message.Id,

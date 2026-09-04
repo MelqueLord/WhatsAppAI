@@ -270,6 +270,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-067:** criar para toda empresa nova uma finalidade ativa de atendimento automatizado por IA, com base legal de consentimento e retenção de 365 dias; a finalidade não substitui o registro individual de consentimento de cada contato.
 - **FR-068:** solicitar, uma única vez por conversa, o aceite padronizado para atendimento automatizado por IA ao contato sem consentimento ativo; ao receber a resposta explícita `SIM`, registrar evidência vinculada à mensagem recebida, confirmar o registro e habilitar os próximos atendimentos automáticos daquele contato no tenant corrente.
 - **FR-069:** permitir o encerramento explícito de uma conversa pelo operador, listá-la separadamente como encerrada sem apagar mensagens, e reabrir a mesma conversa no modo automático quando o cliente enviar nova mensagem, preservando o contexto recente.
+- **FR-070:** manter memória institucional automática por tenant, aproveitando respostas de IA com alta confiança e fundamentadas em conhecimento ativo para orientar atendimentos futuros da mesma empresa, sem compartilhar conteúdo entre tenants.
 
 ## 6. Regras de negócio
 
@@ -310,6 +311,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-035:** a finalidade padrão de IA é isolada pelo tenant e não autoriza processamento por si só; uma evidência de consentimento ativa do contato continua obrigatória antes de uma resposta automática.
 - **BR-036:** somente a mensagem recebida cujo conteúdo normalizado seja exatamente `SIM` constitui aceite automatizado; a evidência registra a origem WhatsApp e a referência técnica da mensagem, sem registrar seu conteúdo em auditoria. Uma mensagem ambígua não concede consentimento.
 - **BR-037:** encerrar uma conversa altera somente seu estado operacional e remove atribuições ativas; uma nova mensagem do cliente reabre o mesmo registro, retorna ao modo `Automatic` e deixa a IA usar a mensagem atual e até três mensagens anteriores.
+- **BR-038:** memória institucional só pode ser criada a partir de resposta segura, com confiança mínima de 0,8 e ao menos uma fonte ativa do tenant; a pergunta deve ser sanitizada, a memória permanece tenant-scoped e não pode conter credenciais, dados pessoais ou conteúdo de outro tenant.
 
 ## 7. Requisitos não funcionais
 

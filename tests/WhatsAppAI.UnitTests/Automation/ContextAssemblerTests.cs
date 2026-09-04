@@ -432,6 +432,59 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void CompanyMemoryPolicy_CreatesTenantScopedMemoryFromGroundedReply()
+    {
+        var tenantId = Guid.NewGuid();
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Confidence = 0.92
+            },
+            Content = "A Atenz organiza o atendimento da empresa pelo WhatsApp.",
+            InputTokens = 10,
+            OutputTokens = 8
+        };
+
+        var memory = CompanyMemoryPolicy.CreateFromGroundedReply(
+            tenantId,
+            "Como funciona a Atenz?",
+            response,
+            ["Serviço: A Atenz organiza o atendimento pelo WhatsApp."],
+            0.5);
+
+        Assert.NotNull(memory);
+        Assert.Equal(tenantId, memory!.TenantId);
+        Assert.StartsWith("Memória da empresa:", memory.Title, StringComparison.Ordinal);
+        Assert.Equal(response.Content, memory.Content);
+        Assert.True(CompanyMemoryPolicy.IsMemory(memory));
+    }
+
+    [Fact]
+    public void CompanyMemoryPolicy_DoesNotRememberUngroundedOrLowConfidenceReplies()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Confidence = 0.79
+            },
+            Content = "Uma resposta."
+        };
+
+        var memory = CompanyMemoryPolicy.CreateFromGroundedReply(
+            Guid.NewGuid(),
+            "Pergunta",
+            response,
+            [],
+            0.5);
+
+        Assert.Null(memory);
+    }
+
+    [Fact]
     public void ContextAssembler_PricingQuestionPrefersPricingCategoryItems()
     {
         var tenantId = Guid.NewGuid();
