@@ -359,6 +359,65 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
+            var automaticDistributionEnabled = await dbContext.HasAutomaticDistributionEnabledAsync(
+                message.TenantId, cancellationToken);
+            var configuredQueueIds = automaticDistributionEnabled
+                ? credential.GetRoutingQueueIds().ToHashSet()
+                : [];
+            List<ServiceLine> routingQueues = configuredQueueIds.Count == 0
+                ? []
+                : (await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
+                    .Where(queue => configuredQueueIds.Contains(queue.Id))
+                    .ToList();
+
+            // Queue keywords are an explicit tenant rule, so evaluate them before
+            // consulting the model. This makes the transfer deterministic and avoids
+            // spending an AI response quota for a request that must go to a human queue.
+            if (automaticDistributionEnabled && routingQueues.Count > 0 &&
+                BusinessHoursPolicy.IsOpen(
+                    botConfig.BusinessHoursEnabled,
+                    botConfig.BusinessHoursJson,
+                    botConfig.TimeZoneId,
+                    DateTime.UtcNow))
+            {
+                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                if (!AiReplyDeliveryGuard.CanSend(
+                        conversation, expectedConversationVersion, DateTime.UtcNow))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation(
+                        "AI keyword routing discarded after conversation {ConversationId} changed",
+                        message.ConversationId);
+                    return;
+                }
+
+                var keywordQueue = SelectBotRoutingQueue(
+                    conversation.QueueId, routingQueues, message.Content);
+                if (keywordQueue is not null)
+                {
+                    await PersistAutomaticHandoffAsync(
+                        message.TenantId,
+                        message,
+                        conversation,
+                        "queue_selection",
+                        ResolveQueueTransferMessage(botConfig),
+                        "ai-keyword-queue-transfer",
+                        dbContext,
+                        messageRepository,
+                        conversationRepository,
+                        outboxRepository,
+                        handoffEventRepository,
+                        cancellationToken,
+                        keywordQueue.Id);
+                    logger.LogInformation(
+                        "AI keyword routing transferred conversation {ConversationId} to queue {QueueName}",
+                        conversation.Id,
+                        keywordQueue.Name);
+                    return;
+                }
+            }
+
             var purposes = await dbContext.ProcessingPurposes
                 .IgnoreQueryFilters()
                 .Where(purpose => purpose.TenantId == message.TenantId && purpose.IsActive)
@@ -399,16 +458,6 @@ public sealed class AiOrchestrationWorker(
                 logger.LogWarning(ex, "AI provider '{Provider}' not available for tenant {TenantId}", credential.Provider, message.TenantId);
                 return;
             }
-
-            var configuredQueueIds = await dbContext.HasAutomaticDistributionEnabledAsync(
-                message.TenantId, cancellationToken)
-                ? credential.GetRoutingQueueIds().ToHashSet()
-                : [];
-            List<ServiceLine> routingQueues = configuredQueueIds.Count == 0
-                ? []
-                : (await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
-                    .Where(queue => configuredQueueIds.Contains(queue.Id))
-                    .ToList();
 
             var configuredTagIds = await dbContext.HasTagsEnabledAsync(
                 message.TenantId, cancellationToken)

@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text;
+
 namespace WhatsAppAI.Domain.Messaging;
 
 public sealed class ServiceLine
@@ -47,9 +50,40 @@ public sealed class ServiceLine
         if (string.IsNullOrWhiteSpace(Keywords) || string.IsNullOrWhiteSpace(text))
             return false;
 
-        var textLower = text.ToLowerInvariant();
+        var normalizedText = $" {NormalizeForKeywordMatch(text)} ";
         var keywords = Keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return Array.Exists(keywords, keyword => textLower.Contains(keyword.ToLowerInvariant()));
+        return Array.Exists(keywords, keyword =>
+        {
+            var normalizedKeyword = NormalizeForKeywordMatch(keyword);
+            return !string.IsNullOrWhiteSpace(normalizedKeyword) &&
+                normalizedText.Contains($" {normalizedKeyword}", StringComparison.Ordinal);
+        });
+    }
+
+    private static string NormalizeForKeywordMatch(string value)
+    {
+        var decomposed = value.Normalize(NormalizationForm.FormD);
+        var normalized = new StringBuilder(decomposed.Length);
+        var previousWasSpace = true;
+
+        foreach (var character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            if (char.IsLetterOrDigit(character))
+            {
+                normalized.Append(char.ToLowerInvariant(character));
+                previousWasSpace = false;
+            }
+            else if (!previousWasSpace)
+            {
+                normalized.Append(' ');
+                previousWasSpace = true;
+            }
+        }
+
+        return normalized.ToString().Trim();
     }
 
     public void Deactivate() { IsActive = false; }

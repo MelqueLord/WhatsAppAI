@@ -60,7 +60,7 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
-    public void SelectBotRoutingQueue_UsesKeywordQueueAndPreservesExistingAssignment()
+    public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndPreservesExistingAssignment()
     {
         var tenantId = Guid.NewGuid();
         var matchingQueue = ServiceLine.Create(tenantId, "Financeiro");
@@ -74,6 +74,8 @@ public sealed class AiOrchestrationWorkerTests
             .SelectBotRoutingQueue(matchingQueue.Id, [matchingQueue, otherQueue], "Quero saber sobre cobrança")?.Id);
         Assert.Null(AiOrchestrationWorker
             .SelectBotRoutingQueue(otherQueue.Id, [matchingQueue, otherQueue], "Preciso da segunda via do boleto"));
+        Assert.Null(AiOrchestrationWorker
+            .SelectBotRoutingQueue(null, [matchingQueue], "Quero saber o preço"));
     }
 
     [Theory]
