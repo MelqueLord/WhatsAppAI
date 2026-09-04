@@ -44,6 +44,7 @@
 - [X] T020 [US4/US5] Give authorized queue keywords precedence over an unassigned automatic handoff, restoring automatic mode for the selected queue while preserving explicitly assigned human conversations in `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`, with regression coverage.
 - [X] T021 [US5] Expand tenant-agent context retrieval to use recent user history, multiple relevant knowledge items and examples, with accent/plural normalization and explicit source precedence in `src/WhatsAppAI.Application/Automation/Context/ContextAssembler.cs`, with regression coverage.
 - [X] T022 [US5] Allow general company and service questions to use the tenant profile and directions without treating a missing exact knowledge match as an automatic handoff, with regression coverage in `src/WhatsAppAI.Application/Automation/Context/ContextAssembler.cs` and `tests/WhatsAppAI.UnitTests/Automation/ContextAssemblerTests.cs`.
+- [X] T023 [US5] Prevent stale frontend HTML from masking deployed behavior by adding cache headers for the entry document and fingerprinted assets in `apps/web/nginx.conf` and `deploy/nginx/default.conf.template`, then validate headers in production.
 
 ## Dependencies
 
