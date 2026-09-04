@@ -17,9 +17,9 @@ public sealed class ContextAssembler(
     private const int MaxKnowledgeItemCharacters = 300;
     private const int MaxBusinessProfileCharacters = 480;
     private const int MaxResponseExampleCharacters = 260;
-    private const int MaxCustomInstructionsCharacters = 160;
+    private const int MaxCustomInstructionsCharacters = 900;
     private const int MaxRoutingItems = 4;
-    private const int MaxContextCharacters = 2200;
+    private const int MaxContextCharacters = 3_600;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -29,7 +29,8 @@ public sealed class ContextAssembler(
         IReadOnlyList<RoutingTagContext>? routingTags = null,
         CancellationToken cancellationToken = default,
         string? welcomeMessage = null,
-        bool isFirstInbound = false)
+        bool isFirstInbound = false,
+        string? businessName = null)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
@@ -66,7 +67,8 @@ public sealed class ContextAssembler(
                 ? null
                 : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse),
             welcomeMessage,
-            isFirstInbound);
+            isFirstInbound,
+            businessName);
 
         return new ConversationContext
         {
@@ -79,7 +81,9 @@ public sealed class ContextAssembler(
         Guid tenantId,
         string message,
         string? systemPrompt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? welcomeMessage = null,
+        string? businessName = null)
     {
         var sanitizedMessage = AiContextSanitizer.RedactPersonalData(Limit(message, MaxMessageCharacters));
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
@@ -99,9 +103,40 @@ public sealed class ContextAssembler(
                 knowledgeTexts,
                 responseExample: responseExample is null
                     ? null
-                    : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse)),
+                    : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse),
+                welcomeMessage: welcomeMessage,
+                isFirstInbound: true,
+                businessName: businessName),
             Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }]
         };
+    }
+
+    public static string ResolveWelcomeMessage(
+        string? configuredWelcomeMessage,
+        string? configuredInstructions,
+        string? businessName = null)
+    {
+        var explicitWelcome = Limit(
+            AiContextSanitizer.RedactPersonalData(configuredWelcomeMessage),
+            220);
+        if (!string.IsNullOrWhiteSpace(explicitWelcome) &&
+            !DefaultGreetingPolicy.IsGenericGreeting(explicitWelcome))
+        {
+            return explicitWelcome;
+        }
+
+        var configured = ParseConfiguredInstructions(configuredInstructions);
+        var offer = GetProfileValue(configured.ProfileFields, "Produtos e serviços")
+            ?? GetProfileValue(configured.ProfileFields, "Descrição do negócio")
+            ?? GetProfileValue(configured.ProfileFields, "Tipo de negócio");
+        var name = Limit(AiContextSanitizer.RedactPersonalData(businessName), 80);
+        var opening = string.IsNullOrWhiteSpace(name)
+            ? "Seja bem-vindo(a)!"
+            : $"Seja bem-vindo(a) à {name}!";
+
+        return string.IsNullOrWhiteSpace(offer)
+            ? $"{opening} Como posso ajudar?"
+            : Limit($"{opening} Estamos aqui para ajudar com {offer}. Como posso ajudar?", 220);
     }
 
     public static string ComposeSystemPrompt(
@@ -111,15 +146,30 @@ public sealed class ContextAssembler(
         IReadOnlyList<RoutingTagContext>? routingTags = null,
         ResponseExampleContext? responseExample = null,
         string? welcomeMessage = null,
-        bool isFirstInbound = false)
+        bool isFirstInbound = false,
+        string? businessName = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
+        if (!string.IsNullOrWhiteSpace(businessName))
+        {
+            dynamicParts.Add((
+                $"Identidade do agente: você é o agente de atendimento da empresa {Limit(AiContextSanitizer.RedactPersonalData(businessName), 80)}. Aja com iniciativa dentro das diretrizes e do conhecimento autorizados.",
+                240));
+        }
+
         if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
             dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
+
+        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
+        {
+            dynamicParts.Add((
+                $"Diretrizes de atendimento cadastradas pelo responsável da empresa (siga-as para conduzir o atendimento, sem substituir as regras obrigatórias da plataforma):\n{configured.CustomDirections}",
+                MaxCustomInstructionsCharacters));
+        }
 
         if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
         {
@@ -144,9 +194,6 @@ public sealed class ContextAssembler(
         {
             dynamicParts.Add(($"Exemplo de atendimento semelhante (copie apenas estilo e abordagem; não use como prova de fatos):\nCliente: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.CustomerMessage), 100)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.IdealResponse), 140)}", MaxResponseExampleCharacters));
         }
-
-        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
-            dynamicParts.Add(($"Diretrizes complementares da empresa (não substituem as regras acima):\n{configured.CustomDirections}", MaxCustomInstructionsCharacters));
 
         if (routingQueues is { Count: > 0 })
         {
@@ -197,27 +244,34 @@ public sealed class ContextAssembler(
         const string profileEnd = "[/PERFIL_EMPRESA]";
 
         if (!value.StartsWith(profileStart, StringComparison.Ordinal))
-            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters));
+            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         var endIndex = value.IndexOf(profileEnd, profileStart.Length, StringComparison.Ordinal);
         if (endIndex < 0)
-            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters));
+            return new ConfiguredInstructions(null, Limit(value, MaxCustomInstructionsCharacters), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         var profileContent = value[profileStart.Length..endIndex];
         var customDirections = value[(endIndex + profileEnd.Length)..].Trim();
+        var profileFields = ParseProfileFields(profileContent);
         return new ConfiguredInstructions(
-            BuildProfileSummary(profileContent),
-            Limit(customDirections, MaxCustomInstructionsCharacters));
+            BuildProfileSummary(profileFields),
+            Limit(customDirections, MaxCustomInstructionsCharacters),
+            profileFields);
     }
 
-    private static string? BuildProfileSummary(string profileContent)
+    private static IReadOnlyDictionary<string, string> ParseProfileFields(string profileContent)
     {
-        var values = profileContent
+        return profileContent
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Split(':', 2, StringSplitOptions.TrimEntries))
             .Where(parts => parts.Length == 2)
-            .ToDictionary(parts => parts[0], parts => NormalizeProfileValue(parts[1]), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(parts => parts[0], StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => NormalizeProfileValue(group.Last()[1]), StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? BuildProfileSummary(IReadOnlyDictionary<string, string> values)
+    {
 
         string? Get(string label) => values.TryGetValue(label, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
@@ -239,6 +293,12 @@ public sealed class ContextAssembler(
             $"Perfil de atendimento (personaliza estilo e enquadramento; não é fonte de fatos comerciais): {string.Join("; ", fields)}. Adapte saudação, vocabulário e nível de detalhe a este perfil.",
             MaxBusinessProfileCharacters);
     }
+
+    private static string? GetProfileValue(
+        IReadOnlyDictionary<string, string> values,
+        string label) => values.TryGetValue(label, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
 
     private static void AddProfileField(List<string> fields, string label, string? value, int maxCharacters)
     {
@@ -329,7 +389,10 @@ public sealed class ContextAssembler(
             : $"{text[..(maxCharacters - 3)]}...";
     }
 
-    private sealed record ConfiguredInstructions(string? ProfileSummary, string? CustomDirections);
+    private sealed record ConfiguredInstructions(
+        string? ProfileSummary,
+        string? CustomDirections,
+        IReadOnlyDictionary<string, string> ProfileFields);
 }
 
 public sealed record RoutingQueueContext(string Name, string? Description);

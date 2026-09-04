@@ -40,6 +40,7 @@
 - [X] T016 [US5] Clarify the business-specific AI welcome message in `apps/web/src/features/bot/BotConfigPage.tsx` and document the queued-AI validation flow in `specs/001-queue-transfer-notices/quickstart.md`.
 - [X] T017 [US5] Enforce human handoff for AI decisions marked `out_of_scope` and cover the distinction from ambiguous human requests in `src/WhatsAppAI.Application/Automation/Policy/` and `tests/WhatsAppAI.UnitTests/Automation/`.
 - [X] T018 [US5] Expand AI context to the current message plus three previous messages and prevent greeting logic from restarting an existing conversation in `src/WhatsAppAI.Application/Automation/Context/` and `src/WhatsAppAI.Application/Automation/Policy/`, with unit coverage.
+- [X] T019 [US5] Preserve tenant profile and service directions in the agent prompt, derive a non-generic first-contact welcome, and synchronize the normalized greeting decision with the outbound response in `src/WhatsAppAI.Application/Automation/Context/`, `src/WhatsAppAI.Application/Automation/Policy/`, `src/WhatsAppAI.Infrastructure/Workers/`, and `src/WhatsAppAI.WebApi/Integrations/`, with unit coverage.
 
 ## Dependencies
 

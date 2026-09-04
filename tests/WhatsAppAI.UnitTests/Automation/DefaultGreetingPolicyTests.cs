@@ -28,8 +28,43 @@ public sealed class DefaultGreetingPolicyTests
             "oi");
 
         Assert.Equal(AiAction.Reply, decision.Action);
-        Assert.Equal("Olá! Como posso ajudar?", decision.Text);
+        Assert.Equal("Seja bem-vindo(a)! Como posso ajudar?", decision.Text);
         Assert.Null(decision.HandoffReason);
+    }
+
+    [Fact]
+    public void Apply_ReplacesGenericGreetingWithPersonalizedWelcome()
+    {
+        var decision = DefaultGreetingPolicy.Apply(
+            new AiDecision
+            {
+                Action = AiAction.Reply,
+                Text = "Olá! Como posso ajudar?",
+                Confidence = 0.9
+            },
+            "oi",
+            personalizedWelcome: "Seja bem-vindo(a) à Clínica Aurora! Como posso ajudar?");
+
+        Assert.Equal(AiAction.Reply, decision.Action);
+        Assert.Equal("Seja bem-vindo(a) à Clínica Aurora! Como posso ajudar?", decision.Text);
+    }
+
+    [Fact]
+    public void Apply_PreservesNonGenericGreetingGeneratedByTheAgent()
+    {
+        var decision = new AiDecision
+        {
+            Action = AiAction.Reply,
+            Text = "Seja bem-vindo à Clínica Aurora!",
+            Confidence = 0.9
+        };
+
+        var result = DefaultGreetingPolicy.Apply(
+            decision,
+            "oi",
+            personalizedWelcome: "Seja bem-vindo(a) à Clínica Aurora! Como posso ajudar?");
+
+        Assert.Same(decision, result);
     }
 
     [Fact]

@@ -420,6 +420,10 @@ public sealed class AiOrchestrationWorker(
                 .AnyAsync(item => item.ConversationId == message.ConversationId &&
                     item.Direction == MessageDirection.Inbound && item.Id != message.Id,
                     cancellationToken);
+            var welcomeMessage = ContextAssembler.ResolveWelcomeMessage(
+                botConfig.WelcomeMessage,
+                credential.SystemPrompt,
+                tenant?.Name);
             var context = await contextAssembler.BuildAsync(
                 message.TenantId, message.ConversationId, credential.SystemPrompt,
                 routingQueues
@@ -429,8 +433,9 @@ public sealed class AiOrchestrationWorker(
                     .Select(tag => new RoutingTagContext(tag.Name, tag.Description))
                     .ToList(),
                 cancellationToken,
-                botConfig.WelcomeMessage,
-                isFirstInbound);
+                welcomeMessage,
+                isFirstInbound,
+                tenant?.Name);
 
             var request = new AiRequest
             {
@@ -504,11 +509,11 @@ public sealed class AiOrchestrationWorker(
             // Apply behavior policy
             var sanitizedResponse = BehaviorPolicy.SanitizeResponse(
                 response, botConfig.ConfidenceThreshold);
-            response = sanitizedResponse with
-            {
-                Decision = DefaultGreetingPolicy.Apply(
-                    sanitizedResponse.Decision, message.Content, isFirstInbound)
-            };
+            response = ApplyGreetingPolicy(
+                sanitizedResponse,
+                message.Content,
+                isFirstInbound,
+                welcomeMessage);
             var routingResult = QueueRoutingPolicy.Apply(
                 response.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
@@ -1134,6 +1139,24 @@ public sealed class AiOrchestrationWorker(
 
     internal static string ResolveQueueWaitingMessage(ServiceLine queue) =>
         $"Aguarde, você está na fila {queue.Name} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.";
+
+    internal static AiResponse ApplyGreetingPolicy(
+        AiResponse response,
+        string? messageContent,
+        bool isFirstInbound,
+        string? personalizedWelcome)
+    {
+        var decision = DefaultGreetingPolicy.Apply(
+            response.Decision,
+            messageContent,
+            isFirstInbound,
+            personalizedWelcome);
+        return response with
+        {
+            Decision = decision,
+            Content = decision.Action == AiAction.Reply ? decision.Text : null
+        };
+    }
 
     private static async Task<bool> HandleAutomaticQueueMessageAsync(
         Message message,

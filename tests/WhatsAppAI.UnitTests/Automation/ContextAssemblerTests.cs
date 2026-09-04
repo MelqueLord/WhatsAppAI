@@ -1,9 +1,11 @@
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Infrastructure.Workers;
 
 namespace WhatsAppAI.UnitTests.Automation;
 
@@ -91,7 +93,7 @@ public sealed class ContextAssemblerTests
         Assert.Equal(4, context.Messages.Count);
         Assert.DoesNotContain(context.Messages, message => message.Content.Contains("mensagem-1-", StringComparison.Ordinal));
         Assert.All(context.Messages, message => Assert.True(message.Content.Length <= 180));
-        Assert.True(context.SystemPrompt.Length <= 2_200);
+        Assert.True(context.SystemPrompt.Length <= 3_600);
         Assert.Contains("Boleto:", context.SystemPrompt);
         Assert.DoesNotContain("Quarto item:", context.SystemPrompt);
         Assert.Contains("Retorne somente um objeto JSON válido", context.SystemPrompt);
@@ -165,7 +167,7 @@ public sealed class ContextAssemblerTests
         Assert.Contains("segmento: Serviços profissionais", context.SystemPrompt);
         Assert.Contains("tom: Profissional e objetivo", context.SystemPrompt);
         Assert.Contains("Boleto: A segunda via é solicitada pelo portal do cliente.", context.SystemPrompt);
-        Assert.True(context.SystemPrompt.Length <= 2_200);
+        Assert.True(context.SystemPrompt.Length <= 3_600);
     }
 
     [Fact]
@@ -214,6 +216,77 @@ public sealed class ContextAssemblerTests
         Assert.Contains("Mensagem de boas-vindas personalizada", firstContactPrompt);
         Assert.Contains("Clínica Aurora", firstContactPrompt);
         Assert.DoesNotContain("Mensagem de boas-vindas personalizada", returningContactPrompt);
+    }
+
+    [Fact]
+    public void ResolveWelcomeMessage_UsesBusinessProfileWhenConfiguredWelcomeIsGeneric()
+    {
+        var profile = """
+            [PERFIL_EMPRESA]
+            Tipo de negócio: Clínica e saúde
+            Descrição do negócio: Atendimento odontológico humanizado.
+            Produtos e serviços: Consultas e tratamentos odontológicos.
+            [/PERFIL_EMPRESA]
+            """;
+
+        var welcome = ContextAssembler.ResolveWelcomeMessage(
+            "Olá! Como posso ajudar?",
+            profile,
+            "Clínica Aurora");
+
+        Assert.Equal(
+            "Seja bem-vindo(a) à Clínica Aurora! Estamos aqui para ajudar com Consultas e tratamentos odontológicos. Como posso ajudar?",
+            welcome);
+    }
+
+    [Fact]
+    public void ComposeSystemPrompt_PreservesBusinessDirectionsAsAgentInstructions()
+    {
+        var directions = """
+            [PERFIL_EMPRESA]
+            Tipo de negócio: Serviços profissionais
+            Tom de voz: Consultivo e acolhedor
+            [/PERFIL_EMPRESA]
+
+            Ao responder, conduza o cliente como um agente da empresa, faça uma pergunta objetiva e ofereça o próximo passo documentado.
+            """;
+
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            directions,
+            welcomeMessage: "Seja bem-vindo(a)! Estamos aqui para ajudar.",
+            isFirstInbound: true,
+            businessName: "Empresa Aurora");
+
+        Assert.Contains("agente de atendimento da empresa Empresa Aurora", prompt);
+        Assert.Contains("Diretrizes de atendimento cadastradas pelo responsável", prompt);
+        Assert.Contains("ofereça o próximo passo documentado", prompt);
+        Assert.Contains("Seja bem-vindo(a)!", prompt);
+    }
+
+    [Fact]
+    public void ApplyGreetingPolicySynchronizesContentWithPersonalizedDecision()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Text = "Olá! Como posso ajudar?",
+                Confidence = 0.9
+            },
+            Content = "Olá! Como posso ajudar?",
+            InputTokens = 1,
+            OutputTokens = 1
+        };
+
+        var result = AiOrchestrationWorker.ApplyGreetingPolicy(
+            response,
+            "oi",
+            isFirstInbound: true,
+            personalizedWelcome: "Seja bem-vindo(a) à Empresa Aurora!");
+
+        Assert.Equal(result.Decision.Text, result.Content);
+        Assert.Equal("Seja bem-vindo(a) à Empresa Aurora!", result.Content);
     }
 
     [Fact]

@@ -22,23 +22,57 @@ public static class DefaultGreetingPolicy
         "boa noite tudo bem"
     };
 
+    private static readonly IReadOnlySet<string> GenericGreetings = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "ola como posso ajudar",
+        "ola como podemos ajudar",
+        "oi como posso ajudar",
+        "oi como podemos ajudar",
+        "ola em que posso ajudar",
+        "oi em que posso ajudar"
+    };
+
     public static bool IsGreeting(string? content) => Greetings.Contains(Normalize(content));
 
-    public static AiDecision Apply(AiDecision decision, string? content, bool isFirstInbound = true)
+    public static bool IsGenericGreeting(string? content) => GenericGreetings.Contains(Normalize(content));
+
+    public static AiDecision Apply(
+        AiDecision decision,
+        string? content,
+        bool isFirstInbound = true,
+        string? personalizedWelcome = null)
     {
         if (!isFirstInbound ||
-            !IsGreeting(content) ||
-            decision.Action != AiAction.Handoff ||
-            decision.HandoffReason is not ("out_of_scope" or "customer_request"))
+            !IsGreeting(content))
             return decision;
 
-        return new AiDecision
+        var greeting = string.IsNullOrWhiteSpace(personalizedWelcome)
+            ? "Seja bem-vindo(a)! Como posso ajudar?"
+            : Limit(personalizedWelcome, 220);
+        if (decision.Action == AiAction.Reply &&
+            !string.IsNullOrWhiteSpace(decision.Text) &&
+            !IsGenericGreeting(decision.Text))
+            return decision;
+
+        return decision with
         {
             Action = AiAction.Reply,
-            Text = "Olá! Como posso ajudar?",
+            Text = greeting,
+            HandoffReason = null,
+            QueueName = null,
             Confidence = Math.Max(decision.Confidence, 0.8),
-            TagNames = decision.TagNames
+            TagNames = decision.TagNames,
         };
+    }
+
+    private static string Limit(string value, int maxCharacters)
+    {
+        var text = value.Trim();
+        if (text.Length <= maxCharacters)
+            return text;
+        return maxCharacters <= 3
+            ? text[..maxCharacters]
+            : $"{text[..(maxCharacters - 3)]}...";
     }
 
     private static string Normalize(string? content)

@@ -484,11 +484,20 @@ public static class AiProviderEndpoints
             return Results.BadRequest(new { error = "Credencial do provedor não disponível." });
 
         var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        var tenant = await dbContext.Tenants.FindAsync(
+            [currentTenant.TenantId.Value],
+            httpContext.RequestAborted);
+        var welcomeMessage = ContextAssembler.ResolveWelcomeMessage(
+            botConfig?.WelcomeMessage,
+            credential.SystemPrompt,
+            tenant?.Name);
         var simulationContext = await contextAssembler.BuildSimulationAsync(
             currentTenant.TenantId.Value,
             request.Message,
             credential.SystemPrompt,
-            httpContext.RequestAborted);
+            httpContext.RequestAborted,
+            welcomeMessage,
+            tenant?.Name);
         var response = await aiProviderResolver.Resolve(credential.Provider).GetResponseAsync(new AiRequest
         {
             ModelId = credential.ModelId,
@@ -498,7 +507,16 @@ public static class AiProviderEndpoints
             Messages = simulationContext.Messages
         });
         response = BehaviorPolicy.SanitizeResponse(response, botConfig?.ConfidenceThreshold ?? 0.5);
-        var decision = response.Decision;
+        var decision = DefaultGreetingPolicy.Apply(
+            response.Decision,
+            request.Message,
+            isFirstInbound: true,
+            personalizedWelcome: welcomeMessage);
+        response = response with
+        {
+            Decision = decision,
+            Content = decision.Action == AiAction.Reply ? decision.Text : null
+        };
 
         var userId = Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
             ? parsedUserId
