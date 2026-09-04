@@ -2,13 +2,21 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class KnownKnowledgeResponsePolicy
 {
+    public static bool ShouldRequestInference(
+        AiResponse response,
+        IReadOnlyList<string> relevantKnowledge) =>
+        response.Decision.Action == AiAction.Handoff &&
+        string.Equals(response.Decision.HandoffReason, "out_of_scope", StringComparison.OrdinalIgnoreCase) &&
+        relevantKnowledge.Count > 0;
+
+    public static string BuildInferenceInstruction() =>
+        "Reavalie a pergunta usando os fatos autorizados já fornecidos no contexto. A resposta pode ser inferida pela combinação de fatos compatíveis, mesmo que a pergunta use outras palavras. Responda diretamente em action reply quando houver suporte suficiente; não invente, não use exemplos como fatos e só mantenha out_of_scope se a conclusão exigir informação ausente.";
+
     public static AiResponse RecoverKnownAnswer(
         AiResponse response,
         IReadOnlyList<string> relevantKnowledge)
     {
-        if (response.Decision.Action != AiAction.Handoff ||
-            !string.Equals(response.Decision.HandoffReason, "out_of_scope", StringComparison.OrdinalIgnoreCase) ||
-            relevantKnowledge.Count == 0)
+        if (!ShouldRequestInference(response, relevantKnowledge))
         {
             return response;
         }

@@ -532,6 +532,36 @@ public sealed class AiOrchestrationWorker(
                 message.Content,
                 isFirstInbound,
                 welcomeMessage);
+            if (KnownKnowledgeResponsePolicy.ShouldRequestInference(response, context.RelevantKnowledge))
+            {
+                try
+                {
+                    var inferenceResponse = await aiProvider.GetResponseAsync(
+                        request with
+                        {
+                            SystemPrompt = $"{request.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.BuildInferenceInstruction()}"
+                        },
+                        cancellationToken);
+                    if (inferenceResponse.Decision.Action == AiAction.Reply)
+                    {
+                        response = ApplyGreetingPolicy(
+                            BehaviorPolicy.SanitizeResponse(inferenceResponse, botConfig.ConfidenceThreshold),
+                            message.Content,
+                            isFirstInbound,
+                            welcomeMessage);
+                        logger.LogInformation(
+                            "AI provider synthesized an answer from relevant tenant knowledge for conversation {ConversationId}",
+                            message.ConversationId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "AI inference retry failed for conversation {ConversationId}; keeping safe fallback",
+                        message.ConversationId);
+                }
+            }
             var recoveredKnowledgeResponse = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(
                 response,
                 context.RelevantKnowledge);

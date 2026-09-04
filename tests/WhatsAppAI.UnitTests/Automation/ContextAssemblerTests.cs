@@ -307,6 +307,25 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void KnownKnowledgeResponsePolicy_RequestsProviderInferenceBeforeFallback()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = "out_of_scope",
+                Confidence = 0.97
+            },
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        Assert.True(KnownKnowledgeResponsePolicy.ShouldRequestInference(response, ["Serviço: Fato autorizado."]));
+        Assert.Contains("combinação de fatos compatíveis", KnownKnowledgeResponsePolicy.BuildInferenceInstruction(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_DoesNotOverrideOtherHandoffReasons()
     {
         var response = new AiResponse
