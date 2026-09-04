@@ -35,8 +35,8 @@ public static class HumanHandoffRequestPolicy
 
     public static bool ShouldKeepConversationAutomatic(AiDecision decision, string? messageContent)
     {
-        return decision.HandoffReason is "out_of_scope" ||
-            (decision.HandoffReason is "customer_request" && !IsExplicitHumanRequest(messageContent));
+        return decision.HandoffReason is "customer_request" &&
+            !IsExplicitHumanRequest(messageContent);
     }
 
     public static AiResponse KeepConversationAutomatic(AiResponse response)

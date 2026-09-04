@@ -18,14 +18,14 @@ public sealed class HumanHandoffRequestPolicyTests
     }
 
     [Fact]
-    public void KeepConversationAutomatic_ReplacesUnrequestedHandoffWithSafeReply()
+    public void KeepConversationAutomatic_ReplacesAmbiguousCustomerRequestWithSafeReply()
     {
         var response = new AiResponse
         {
             Decision = new AiDecision
             {
                 Action = AiAction.Handoff,
-                HandoffReason = "out_of_scope",
+                HandoffReason = "customer_request",
                 Confidence = 0.35
             },
             InputTokens = 10,
@@ -40,7 +40,7 @@ public sealed class HumanHandoffRequestPolicyTests
     }
 
     [Theory]
-    [InlineData("out_of_scope", "Aceita cartão?", true)]
+    [InlineData("out_of_scope", "Aceita cartão?", false)]
     [InlineData("customer_request", "Preciso de suporte", true)]
     [InlineData("customer_request", "Quero falar com atendente", false)]
     [InlineData("sensitive_topic", "Tenho uma emergência", false)]
