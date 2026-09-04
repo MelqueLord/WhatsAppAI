@@ -95,28 +95,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<double>("DraftConfidenceThreshold")
-                        .HasDefaultValue(0.5)
-                        .HasColumnType("double precision")
-                        .HasColumnName("draft_confidence_threshold");
-
-                    b.Property<int>("DraftMaxTokensPerResponse")
-                        .HasColumnType("integer")
-                        .HasColumnName("draft_max_tokens_per_response");
-
-                    b.Property<string>("DraftRoutingQueueIdsJson")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("draft_routing_queue_ids_json");
-
-                    b.Property<string>("DraftRoutingTagIdsJson")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("draft_routing_tag_ids_json");
-
-                    b.Property<string>("DraftSystemPrompt")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("draft_system_prompt");
-
                     b.Property<string>("Decision")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -854,6 +832,28 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<double>("DraftConfidenceThreshold")
+                        .HasDefaultValue(0.5)
+                        .HasColumnType("double precision")
+                        .HasColumnName("draft_confidence_threshold");
+
+                    b.Property<int>("DraftMaxTokensPerResponse")
+                        .HasColumnType("integer")
+                        .HasColumnName("draft_max_tokens_per_response");
+
+                    b.Property<string>("DraftRoutingQueueIdsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("draft_routing_queue_ids_json");
+
+                    b.Property<string>("DraftRoutingTagIdsJson")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("draft_routing_tag_ids_json");
+
+                    b.Property<string>("DraftSystemPrompt")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("draft_system_prompt");
+
                     b.Property<string>("CredentialScope")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -898,6 +898,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
+
+                    b.Property<long>("DraftVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("draft_version");
 
                     b.Property<long>("PublishedVersion")
                         .HasColumnType("bigint")
