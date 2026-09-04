@@ -821,7 +821,7 @@ public sealed class AiOrchestrationWorker(
         }
     }
 
-    private static async Task<bool> HandleConsentOptInAsync(
+    private async Task<bool> HandleConsentOptInAsync(
         Message message,
         Conversation conversation,
         uint expectedConversationVersion,
@@ -857,7 +857,7 @@ public sealed class AiOrchestrationWorker(
                 item.TenantId == message.TenantId &&
                 item.ContactId == message.ContactId &&
                 item.ProcessingPurposeId == purpose.Id &&
-                item.RevokedAt is null,
+                !item.RevokedAt.HasValue,
                 cancellationToken);
         if (isAuthorized)
             return false;
