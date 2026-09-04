@@ -69,6 +69,8 @@ public sealed class AiReplyDeliveryGuardTests
     [InlineData("ai-unavailable")]
     [InlineData("ai-handoff")]
     [InlineData("ai-quota")]
+    [InlineData("consent-request")]
+    [InlineData("consent-confirmation")]
     public void AutomatedNotice_RequiresVersionedKey(string kind)
     {
         var id = Guid.NewGuid();

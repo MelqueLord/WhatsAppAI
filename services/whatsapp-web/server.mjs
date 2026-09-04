@@ -377,7 +377,7 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
 
   const [, tenantId, lineNumber] = match
   const remoteJid = msg.key.remoteJid
-  const phoneNumber = await resolvePhoneNumber(session, remoteJid)
+  const phoneNumber = await resolvePhoneNumber(session, remoteJid, msg.key.remoteJidAlt)
   const payload = {
     object: 'whatsapp_business_account',
     entry: [{
@@ -528,8 +528,16 @@ function sessionStateUrl(tenantId) {
   return `${apiWebhookUrl}/session/${encodeURIComponent(tenantId)}`
 }
 
-async function resolvePhoneNumber(session, jid) {
+async function resolvePhoneNumber(session, jid, alternateJid) {
   const [value, server] = String(jid ?? '').split('@')
+  const [alternateValue, alternateServer] = String(alternateJid ?? '').split('@')
+
+  // Baileys provides remoteJidAlt when a LID conversation is associated with
+  // the participant's real phone-number JID. Prefer that authoritative value
+  // so a LID or legacy JID is never persisted as a customer phone number.
+  if (alternateServer === 's.whatsapp.net' && /^\d{8,15}$/.test(alternateValue))
+    return alternateValue
+
   if (server !== 'lid') return value
 
   const mappedPhone = await session.sock?.signalRepository?.lidMapping?.getPNForLID(`${value}@lid`)

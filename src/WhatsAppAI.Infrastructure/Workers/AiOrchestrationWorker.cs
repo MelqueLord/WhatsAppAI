@@ -897,13 +897,17 @@ public sealed class AiOrchestrationWorker(
             return true;
         }
 
-        var requestIdempotencyKey = $"consent-request:{conversation.Id}";
+        var consentRequestPrefix = $"consent-request:{conversation.Id}:";
+        var requestIdempotencyKey = AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+            "consent-request", message.Id, expectedConversationVersion);
         var requestAlreadyQueued = await dbContext.Messages
             .IgnoreQueryFilters()
             .AnyAsync(item =>
                 item.TenantId == message.TenantId &&
                 item.ConversationId == message.ConversationId &&
-                item.IdempotencyKey == requestIdempotencyKey,
+                item.IdempotencyKey != null &&
+                item.IdempotencyKey.StartsWith(consentRequestPrefix) &&
+                item.Status != MessageStatus.Failed,
                 cancellationToken);
         if (!requestAlreadyQueued && AiReplyDeliveryGuard.CanSend(conversation, expectedConversationVersion, DateTime.UtcNow))
         {
