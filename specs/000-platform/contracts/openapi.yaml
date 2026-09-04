@@ -345,7 +345,7 @@ paths:
           name: mode
           schema: { $ref: '#/components/schemas/ConversationMode' }
         - in: query
-          name: state
+          name: status
           schema: { type: string, enum: [Open, Closed] }
       responses:
         '200':
@@ -433,6 +433,23 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConversationSummary' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /conversations/{conversationId}/close:
+    post:
+      tags: [Conversations]
+      operationId: closeConversation
+      summary: Encerrar conversa e preservá-la no histórico
+      x-requirements: [US-014, FR-069, BR-037]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      responses:
+        '200':
+          description: Conversa movida para a fila de encerradas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationLifecycleResponse' }
         '409': { $ref: '#/components/responses/Problem' }
   /conversations/{conversationId}/messages/{messageId}/media:
     get:
@@ -940,6 +957,13 @@ components:
     ConversationDetail:
       allOf:
         - $ref: '#/components/schemas/ConversationSummary'
+    ConversationLifecycleResponse:
+      type: object
+      required: [id, status, version]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [Closed] }
+        version: { type: integer, minimum: 0 }
     Message:
       type: object
       required: [id, direction, senderType, type, status, occurredAt]
