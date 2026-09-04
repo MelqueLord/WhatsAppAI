@@ -282,6 +282,34 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public async Task BuildAsync_IncludesAllPricingPlansForGenericPriceQuestion()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Plano STAR", "STAR custa R$ 149 por mês.", 100, KnowledgeCategories.Pricing),
+            KnowledgeItem.Create(tenantId, "Plano FLOW", "FLOW custa R$ 299 por mês.", 100, KnowledgeCategories.Pricing),
+            KnowledgeItem.Create(tenantId, "Plano SCALA", "SCALA custa R$ 497 por mês.", 100, KnowledgeCategories.Pricing),
+            KnowledgeItem.Create(tenantId, "Horário", "Atendemos em horário comercial.", 100, KnowledgeCategories.BusinessHours)
+        ]);
+        var queries = new FakeConversationQueries(
+        [new MessageDto
+        {
+            Direction = "Inbound",
+            Content = "Preço",
+            CreatedAt = DateTime.UtcNow
+        }]);
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
+
+        Assert.Contains("Plano STAR:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Plano FLOW:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Plano SCALA:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Horário:", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_RecoversOutOfScopeDecisionWhenFactWasFound()
     {
         var response = new AiResponse

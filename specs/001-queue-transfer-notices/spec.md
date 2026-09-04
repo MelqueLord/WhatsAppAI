@@ -122,6 +122,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-023**: When the configured AI provider incorrectly returns `out_of_scope` while relevant authorized facts are present, the backend MUST request one bounded re-evaluation from that same provider using the facts already in context before applying a safe fallback; the retry MUST not override explicit human, safety or sensitive-topic handoffs.
 - **FR-QTN-024**: When business hours are enabled, the AI path MUST evaluate the configured timezone and weekly schedule before calling the provider; outside the schedule it MUST send the configured offline message through the durable outbox and not invoke the AI provider.
 - **FR-QTN-025**: Every automated customer-facing text reply, including AI, BOT, fallback, consent, queue and handoff messages, MUST be limited to 160 characters before entering the outbound queue.
+- **FR-QTN-026**: A generic pricing question without a plan name MUST retrieve the active pricing items for the tenant and guide the customer to choose a plan, while a named-plan question MUST prioritize only that plan's item.
 
 ### Key Entities
 

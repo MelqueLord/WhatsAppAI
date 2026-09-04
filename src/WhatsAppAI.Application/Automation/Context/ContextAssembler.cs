@@ -166,7 +166,10 @@ public sealed class ContextAssembler(
 
         dynamicParts.Add((
             "Inferência segura: compreenda a intenção e a finalidade da pergunta, conecte fatos compatíveis de mais de uma fonte autorizada e explique a conclusão em linguagem natural. Uma pergunta não precisa repetir o título ou a frase cadastrada. Se a conexão exigir suposição não comprovada, não complete a lacuna: faça handoff.",
-            420));
+            280));
+        dynamicParts.Add((
+            "Quando o cliente perguntar apenas por preço, valor ou planos, use os itens oficiais de preços para apresentar um resumo dos planos disponíveis e pergunte qual deseja conhecer; não invente valores nem misture detalhes além do limite da resposta.",
+            220));
 
         if (!string.IsNullOrWhiteSpace(businessName))
         {
@@ -361,13 +364,15 @@ public sealed class ContextAssembler(
     {
         var purposeQuestion = queryTerms.Contains("funcionamento") ||
             queryTerms.Contains("plataforma") || queryTerms.Contains("servico");
-        if (!purposeQuestion)
+        var pricingQuestion = queryTerms.Contains("preco");
+        if (!purposeQuestion && !pricingQuestion)
             return 0;
 
         return item.Category switch
         {
-            KnowledgeCategories.Service => 2,
-            KnowledgeCategories.General => 1,
+            KnowledgeCategories.Pricing when pricingQuestion => 3,
+            KnowledgeCategories.Service when purposeQuestion => 2,
+            KnowledgeCategories.General when purposeQuestion => 1,
             _ => 0
         };
     }
