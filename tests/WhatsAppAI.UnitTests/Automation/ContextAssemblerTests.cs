@@ -236,6 +236,27 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public async Task BuildAsync_MatchesNaturalParaphraseForCompanyPurpose()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [KnowledgeItem.Create(tenantId, "O que o sistema ATENZ faz?", "A ATENZ centraliza o atendimento pelo WhatsApp e ajuda sua equipe a responder clientes.", 100)]);
+        var queries = new FakeConversationQueries(
+        [new MessageDto
+        {
+            Direction = "Inbound",
+            Content = "Para que serve o ATENZ?",
+            CreatedAt = DateTime.UtcNow
+        }]);
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
+
+        Assert.Contains("O que o sistema ATENZ faz?", context.RelevantKnowledge, StringComparer.Ordinal);
+        Assert.Contains("não exija que o cliente repita literalmente", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_RecoversOutOfScopeDecisionWhenFactWasFound()
     {
         var response = new AiResponse
