@@ -257,6 +257,31 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public async Task BuildAsync_UsesServiceKnowledgeForAnIndirectBenefitQuestion()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Atendimento centralizado", "A plataforma reúne as conversas do WhatsApp em uma inbox para a equipe responder com mais agilidade.", 100, KnowledgeCategories.Service),
+            KnowledgeItem.Create(tenantId, "Política de troca", "Trocas são analisadas pelo setor responsável.", 90, KnowledgeCategories.Policy)
+        ]);
+        var queries = new FakeConversationQueries(
+        [new MessageDto
+        {
+            Direction = "Inbound",
+            Content = "Como isso ajuda minha empresa?",
+            CreatedAt = DateTime.UtcNow
+        }]);
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
+
+        Assert.Contains("Atendimento centralizado:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Política de troca:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Inferência segura", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_RecoversOutOfScopeDecisionWhenFactWasFound()
     {
         var response = new AiResponse

@@ -118,6 +118,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-019**: The web client MUST prevent stale HTML from masking a deployed frontend update; the entry document MUST be served with no-cache/no-store directives while fingerprinted assets MAY use immutable long-term caching.
 - **FR-QTN-020**: When relevant authorized tenant knowledge is present for an automatic inbound message, an AI `out_of_scope` decision MUST NOT trigger human handoff; the backend MUST provide a safe answer from that knowledge, while preserving explicit human requests and other mandatory handoff reasons.
 - **FR-QTN-021**: Knowledge retrieval and the agent prompt MUST recognize natural paraphrases, synonyms, accents and plural variations, so a customer need not repeat the exact wording of a knowledge title to receive an in-scope answer.
+- **FR-QTN-022**: For an in-scope question whose answer is implied by compatible authorized profile, guideline or knowledge facts, the agent MUST synthesize a concise answer from those facts; it MUST hand off when the inference would require an unsupported assumption.
 
 ### Key Entities
 

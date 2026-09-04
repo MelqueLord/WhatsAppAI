@@ -47,6 +47,7 @@
 - [X] T023 [US5] Prevent stale frontend HTML from masking deployed behavior by adding cache headers for the entry document and fingerprinted assets in `apps/web/nginx.conf` and `deploy/nginx/default.conf.template`, then validate headers in production.
 - [X] T024 [US5] Prevent an AI `out_of_scope` decision from overriding relevant authorized tenant knowledge, with safe backend recovery and regression coverage while preserving explicit human handoffs.
 - [X] T025 [US5] Improve intent matching for natural paraphrases and synonyms such as “para que serve” versus “o que faz”, with prompt guidance and regression coverage.
+- [X] T026 [US5] Enable bounded inference across compatible tenant facts for indirect company/service questions, with category-aware retrieval, prompt guidance and regression coverage.
 
 ## Dependencies
 

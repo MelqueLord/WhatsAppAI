@@ -164,6 +164,10 @@ public sealed class ContextAssembler(
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
+        dynamicParts.Add((
+            "Inferência segura: compreenda a intenção e a finalidade da pergunta, conecte fatos compatíveis de mais de uma fonte autorizada e explique a conclusão em linguagem natural. Uma pergunta não precisa repetir o título ou a frase cadastrada. Se a conexão exigir suposição não comprovada, não complete a lacuna: faça handoff.",
+            420));
+
         if (!string.IsNullOrWhiteSpace(businessName))
         {
             dynamicParts.Add((
@@ -336,13 +340,13 @@ public sealed class ContextAssembler(
         IReadOnlyList<KnowledgeItem> knowledge,
         string query)
     {
-        var queryTerms = Tokenize(query);
+        var queryTerms = ExpandIntentTerms(query);
 
         return knowledge
             .Select(item => new
             {
                 Item = item,
-                Score = Score(item, queryTerms)
+                Score = Score(item, queryTerms) + InferredCategoryScore(item, queryTerms)
             })
             .Where(result => result.Score > 0)
             .OrderByDescending(result => result.Score)
@@ -351,6 +355,21 @@ public sealed class ContextAssembler(
             .Take(MaxKnowledgeItems)
             .Select(result => result.Item)
             .ToList();
+    }
+
+    private static int InferredCategoryScore(KnowledgeItem item, HashSet<string> queryTerms)
+    {
+        var purposeQuestion = queryTerms.Contains("funcionamento") ||
+            queryTerms.Contains("plataforma") || queryTerms.Contains("servico");
+        if (!purposeQuestion)
+            return 0;
+
+        return item.Category switch
+        {
+            KnowledgeCategories.Service => 2,
+            KnowledgeCategories.General => 1,
+            _ => 0
+        };
     }
 
     public static AiResponseExample? SelectRelevantResponseExample(
@@ -403,6 +422,24 @@ public sealed class ContextAssembler(
             .ToHashSet(StringComparer.Ordinal);
     }
 
+    private static HashSet<string> ExpandIntentTerms(string query)
+    {
+        var terms = Tokenize(query);
+        if (terms.Count == 0)
+            return terms;
+
+        if (terms.Contains("funcionamento") || terms.Contains("plataforma") ||
+            terms.Contains("servico") || terms.Contains("beneficio") ||
+            terms.Contains("ajuda") || terms.Contains("permite") || terms.Contains("consegue"))
+        {
+            terms.Add("funcionamento");
+            terms.Add("plataforma");
+            terms.Add("servico");
+        }
+
+        return terms;
+    }
+
     private static string NormalizeToken(string token)
     {
         var decomposed = token.Normalize(NormalizationForm.FormD);
@@ -420,7 +457,7 @@ public sealed class ContextAssembler(
         {
             "serve" or "servir" or "funciona" or "funcionamento" or "faz" or "fazer" or "oferece" or "oferecer" or "utilidade" or "finalidade" or "uso" => "funcionamento",
             "sistema" or "plataforma" or "solucao" or "ferramenta" => "plataforma",
-            "servico" or "produto" or "recurso" or "funcionalidade" => "servico",
+            "servico" or "produto" or "recurso" or "funcionalidade" or "beneficio" or "ajuda" or "permite" or "consegue" => "servico",
             "custa" or "custar" or "valor" or "preco" => "preco",
             _ => singular
         };
