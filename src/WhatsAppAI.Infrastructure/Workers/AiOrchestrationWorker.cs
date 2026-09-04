@@ -494,11 +494,15 @@ public sealed class AiOrchestrationWorker(
             // Apply behavior policy
             var sanitizedResponse = BehaviorPolicy.SanitizeResponse(
                 response, botConfig.ConfidenceThreshold);
+            response = sanitizedResponse with
+            {
+                Decision = DefaultGreetingPolicy.Apply(sanitizedResponse.Decision, message.Content)
+            };
             var routingResult = QueueRoutingPolicy.Apply(
-                sanitizedResponse.Decision,
+                response.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
                 conversation.QueueId is not null);
-            response = sanitizedResponse with { Decision = routingResult.Decision };
+            response = response with { Decision = routingResult.Decision };
             var categorizedTagIds = TagCategorizationPolicy.ResolveAuthorizedTagIds(
                 response.Decision.TagNames,
                 routingTags.Select(tag => new RoutingTagCandidate(tag.Id, tag.Name)).ToList());
