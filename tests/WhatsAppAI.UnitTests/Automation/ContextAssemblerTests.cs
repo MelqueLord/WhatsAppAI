@@ -185,6 +185,46 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void SelectRelevantResponseExamples_UsesSeveralRelevantExamples()
+    {
+        var tenantId = Guid.NewGuid();
+        var scheduling = AiResponseExample.Create(tenantId, "Quero agendar uma consulta", "Vamos encontrar um horário.");
+        var pricing = AiResponseExample.Create(tenantId, "Qual é o preço da consulta?", "A consulta custa conforme a tabela vigente.");
+        var unrelated = AiResponseExample.Create(tenantId, "Quero alterar meu endereço", "Vou orientar a atualização.");
+
+        var selected = ContextAssembler.SelectRelevantResponseExamples(
+            [scheduling, pricing, unrelated],
+            "Quero saber o preço e agendar uma consulta",
+            3);
+
+        Assert.Equal(2, selected.Count);
+        Assert.Contains(scheduling, selected);
+        Assert.Contains(pricing, selected);
+        Assert.DoesNotContain(unrelated, selected);
+    }
+
+    [Fact]
+    public async Task BuildAsync_MatchesAccentsAndPluralVariations()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [KnowledgeItem.Create(tenantId, "Preço", "Os preços dos planos estão na tabela comercial.", 100)]);
+        var queries = new FakeConversationQueries(
+        [new MessageDto
+        {
+            Direction = "Inbound",
+            Content = "Quais são os precos dos planos?",
+            CreatedAt = DateTime.UtcNow
+        }]);
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
+
+        Assert.Contains("Preço:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Não há conhecimento da empresa relevante", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ComposeSystemPrompt_MarksResponseExampleAsStyleOnly()
     {
         var prompt = ContextAssembler.ComposeSystemPrompt(

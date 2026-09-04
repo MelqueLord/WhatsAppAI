@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Automation.Policy;
@@ -13,11 +15,12 @@ public sealed class ContextAssembler(
 {
     private const int MaxMessages = 4;
     private const int MaxMessageCharacters = 180;
-    private const int MaxKnowledgeItems = 1;
-    private const int MaxKnowledgeItemCharacters = 300;
+    private const int MaxKnowledgeItems = 6;
+    private const int MaxKnowledgeItemCharacters = 360;
     private const int MaxBusinessProfileCharacters = 480;
-    private const int MaxResponseExampleCharacters = 260;
-    private const int MaxCustomInstructionsCharacters = 900;
+    private const int MaxResponseExamples = 3;
+    private const int MaxResponseExampleCharacters = 820;
+    private const int MaxCustomInstructionsCharacters = 1_100;
     private const int MaxRoutingItems = 4;
     private const int MaxContextCharacters = 3_600;
 
@@ -48,27 +51,30 @@ public sealed class ContextAssembler(
             .ToList();
 
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
-        var query = messages.LastOrDefault(message => message.Role == "user")?.Content ?? string.Empty;
+        var query = string.Join(' ', messages
+            .Where(message => message.Role == "user")
+            .Select(message => message.Content));
         var knowledgeTexts = RetrieveKnowledge(knowledge, query)
             .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
-        var responseExample = responseExampleRepository is null
-            ? null
-            : SelectRelevantResponseExample(
+        IReadOnlyList<AiResponseExample> responseExamples = responseExampleRepository is null
+            ? []
+            : SelectRelevantResponseExamples(
                 await responseExampleRepository.GetActiveByTenantAsync(tenantId, cancellationToken),
-                query);
+                query,
+                MaxResponseExamples);
 
         var fullSystemPrompt = ComposeSystemPrompt(
             systemPrompt,
             knowledgeTexts,
             routingQueues,
             routingTags,
-            responseExample is null
-                ? null
-                : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse),
-            welcomeMessage,
-            isFirstInbound,
-            businessName);
+            responseExamples: responseExamples
+                .Select(example => new ResponseExampleContext(example.CustomerMessage, example.IdealResponse))
+                .ToList(),
+            welcomeMessage: welcomeMessage,
+            isFirstInbound: isFirstInbound,
+            businessName: businessName);
 
         return new ConversationContext
         {
@@ -90,20 +96,21 @@ public sealed class ContextAssembler(
         var knowledgeTexts = RetrieveKnowledge(knowledge, sanitizedMessage)
             .Select(item => $"{Limit(AiContextSanitizer.RedactPersonalData(item.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(item.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
-        var responseExample = responseExampleRepository is null
-            ? null
-            : SelectRelevantResponseExample(
+        IReadOnlyList<AiResponseExample> responseExamples = responseExampleRepository is null
+            ? []
+            : SelectRelevantResponseExamples(
                 await responseExampleRepository.GetActiveByTenantAsync(tenantId, cancellationToken),
-                sanitizedMessage);
+                sanitizedMessage,
+                MaxResponseExamples);
 
         return new ConversationContext
         {
             SystemPrompt = ComposeSystemPrompt(
                 systemPrompt,
                 knowledgeTexts,
-                responseExample: responseExample is null
-                    ? null
-                    : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse),
+                responseExamples: responseExamples
+                    .Select(example => new ResponseExampleContext(example.CustomerMessage, example.IdealResponse))
+                    .ToList(),
                 welcomeMessage: welcomeMessage,
                 isFirstInbound: true,
                 businessName: businessName),
@@ -145,12 +152,13 @@ public sealed class ContextAssembler(
         IReadOnlyList<RoutingQueueContext>? routingQueues = null,
         IReadOnlyList<RoutingTagContext>? routingTags = null,
         ResponseExampleContext? responseExample = null,
+        IReadOnlyList<ResponseExampleContext>? responseExamples = null,
         string? welcomeMessage = null,
         bool isFirstInbound = false,
         string? businessName = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. As diretrizes definem comportamento e limites; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
@@ -180,19 +188,27 @@ public sealed class ContextAssembler(
 
         if (knowledgeItems is { Count: > 0 })
         {
-            var items = new List<string> { "Conhecimento relevante da empresa:" };
+            var items = new List<string> { "Conhecimento relevante da empresa (fonte oficial de fatos; use todos os itens aplicáveis):" };
             foreach (var item in knowledgeItems.Take(MaxKnowledgeItems))
                 items.Add($"- {item}");
-            dynamicParts.Add((string.Join('\n', items), 400));
+            dynamicParts.Add((string.Join('\n', items), 1_500));
         }
         else
         {
             dynamicParts.Add(("Não há conhecimento da empresa relevante para esta solicitação. Não invente fatos específicos; para fato empresarial não documentado, use action \"handoff\" com handoff_reason \"out_of_scope\".", 240));
         }
 
-        if (responseExample is not null)
+        IReadOnlyList<ResponseExampleContext> selectedExamples = responseExamples is { Count: > 0 }
+            ? responseExamples
+            : responseExample is null ? [] : [responseExample];
+        if (selectedExamples.Count > 0)
         {
-            dynamicParts.Add(($"Exemplo de atendimento semelhante (copie apenas estilo e abordagem; não use como prova de fatos):\nCliente: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.CustomerMessage), 100)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(responseExample.IdealResponse), 140)}", MaxResponseExampleCharacters));
+            var examples = new List<string> { "Exemplos de atendimento semelhantes (use para aprender estilo e fluxo; não use como prova de fatos):" };
+            foreach (var example in selectedExamples.Take(MaxResponseExamples))
+            {
+                examples.Add($"Cliente: {Limit(AiContextSanitizer.RedactPersonalData(example.CustomerMessage), 120)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(example.IdealResponse), 160)}");
+            }
+            dynamicParts.Add((string.Join('\n', examples), MaxResponseExampleCharacters));
         }
 
         if (routingQueues is { Count: > 0 })
@@ -338,10 +354,16 @@ public sealed class ContextAssembler(
     public static AiResponseExample? SelectRelevantResponseExample(
         IReadOnlyList<AiResponseExample> examples,
         string query)
+        => SelectRelevantResponseExamples(examples, query, 1).FirstOrDefault();
+
+    public static IReadOnlyList<AiResponseExample> SelectRelevantResponseExamples(
+        IReadOnlyList<AiResponseExample> examples,
+        string query,
+        int maxExamples)
     {
         var queryTerms = Tokenize(query);
-        if (queryTerms.Count == 0)
-            return null;
+        if (queryTerms.Count == 0 || maxExamples <= 0)
+            return [];
 
         return examples
             .Select(example => new
@@ -353,7 +375,8 @@ public sealed class ContextAssembler(
             .OrderByDescending(result => result.Score)
             .ThenByDescending(result => result.Example.UpdatedAt ?? result.Example.CreatedAt)
             .Select(result => result.Example)
-            .FirstOrDefault();
+            .Take(maxExamples)
+            .ToList();
     }
 
     private static int Score(KnowledgeItem item, HashSet<string> queryTerms)
@@ -372,9 +395,24 @@ public sealed class ContextAssembler(
     {
         return value
             .Split([' ', '\t', '\r', '\n', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '/', '\\', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(token => new string(token.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant())
+            .Select(token => new string(token.Where(char.IsLetterOrDigit).ToArray()))
+            .Select(NormalizeToken)
             .Where(token => token.Length >= 3)
             .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static string NormalizeToken(string token)
+    {
+        var decomposed = token.Normalize(NormalizationForm.FormD);
+        var withoutAccents = new string(decomposed
+            .Where(character => CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .Normalize(NormalizationForm.FormC)
+            .ToLowerInvariant();
+
+        return withoutAccents.Length > 4 && withoutAccents.EndsWith('s')
+            ? withoutAccents[..^1]
+            : withoutAccents;
     }
 
     private static string Limit(string? value, int maxCharacters)

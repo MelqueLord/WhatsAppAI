@@ -42,6 +42,7 @@
 - [X] T018 [US5] Expand AI context to the current message plus three previous messages and prevent greeting logic from restarting an existing conversation in `src/WhatsAppAI.Application/Automation/Context/` and `src/WhatsAppAI.Application/Automation/Policy/`, with unit coverage.
 - [X] T019 [US5] Preserve tenant profile and service directions in the agent prompt, derive a non-generic first-contact welcome, and synchronize the normalized greeting decision with the outbound response in `src/WhatsAppAI.Application/Automation/Context/`, `src/WhatsAppAI.Application/Automation/Policy/`, `src/WhatsAppAI.Infrastructure/Workers/`, and `src/WhatsAppAI.WebApi/Integrations/`, with unit coverage.
 - [X] T020 [US4/US5] Give authorized queue keywords precedence over an unassigned automatic handoff, restoring automatic mode for the selected queue while preserving explicitly assigned human conversations in `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`, with regression coverage.
+- [X] T021 [US5] Expand tenant-agent context retrieval to use recent user history, multiple relevant knowledge items and examples, with accent/plural normalization and explicit source precedence in `src/WhatsAppAI.Application/Automation/Context/ContextAssembler.cs`, with regression coverage.
 
 ## Dependencies
 
