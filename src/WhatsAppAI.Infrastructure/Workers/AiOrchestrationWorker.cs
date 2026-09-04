@@ -615,6 +615,10 @@ public sealed class AiOrchestrationWorker(
                     message.ConversationId);
                 response = recoveredKnowledgeResponse;
             }
+            response = KnownKnowledgeResponsePolicy.EnforceAuthorizedPricing(
+                response,
+                message.Content,
+                context.RelevantKnowledge);
             var routingResult = QueueRoutingPolicy.Apply(
                 response.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),

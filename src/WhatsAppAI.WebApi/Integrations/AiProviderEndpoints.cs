@@ -559,6 +559,10 @@ public static class AiProviderEndpoints
             Decision = decision,
             Content = decision.Action == AiAction.Reply ? decision.Text : null
         };
+        response = KnownKnowledgeResponsePolicy.EnforceAuthorizedPricing(
+            response,
+            request.Message,
+            simulationContext.RelevantKnowledge);
 
         var userId = Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
             ? parsedUserId

@@ -4,6 +4,51 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class KnownKnowledgeResponsePolicy
 {
+    public static bool IsPricingQuestion(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        var normalized = new string(message
+            .Normalize(System.Text.NormalizationForm.FormD)
+            .Where(character => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .ToLowerInvariant();
+
+        return normalized.Split([' ', '\t', '\r', '\n', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '/', '\\', '-'], StringSplitOptions.RemoveEmptyEntries)
+            .Any(term => term is "preco" or "precos" or "valor" or "valores" or "quanto" or "custa" or "custam" or "mensalidade" or "mensalidades" or "assinatura" or "assinaturas" or "plano" or "planos");
+    }
+
+    public static AiResponse EnforceAuthorizedPricing(
+        AiResponse response,
+        string? customerMessage,
+        IReadOnlyList<string> relevantKnowledge)
+    {
+        if (!IsPricingQuestion(customerMessage))
+            return response;
+
+        var answer = BuildAnswer(relevantKnowledge);
+        if (string.IsNullOrWhiteSpace(answer) ||
+            response.Decision.HandoffReason is "customer_request" or "sensitive_topic" or "complaint" or "refund_request" or "legal_issue" or "unsafe_content")
+        {
+            return response;
+        }
+
+        var decision = response.Decision with
+        {
+            Action = AiAction.Reply,
+            Text = answer,
+            HandoffReason = null,
+            Confidence = Math.Max(response.Decision.Confidence, 0.9)
+        };
+
+        return response with
+        {
+            Decision = decision,
+            Content = answer
+        };
+    }
+
     public static bool ShouldRequestInference(
         AiResponse response,
         IReadOnlyList<string> relevantKnowledge) =>

@@ -383,6 +383,57 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void KnownKnowledgeResponsePolicy_ReplacesUnsupportedPricingReplyWithAuthorizedFacts()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Text = "Temos o plano Premium por R$ 999.",
+                Confidence = 0.99
+            },
+            Content = "Temos o plano Premium por R$ 999.",
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var result = KnownKnowledgeResponsePolicy.EnforceAuthorizedPricing(
+            response,
+            "Quero saber os preços",
+            ["Plano FLOW: R$ 299 por mês."]);
+
+        Assert.Equal(AiAction.Reply, result.Decision.Action);
+        Assert.Contains("FLOW", result.Content, StringComparison.Ordinal);
+        Assert.Contains("299", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Premium", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("999", result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContextAssembler_PricingQuestionPrefersPricingCategoryItems()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Plano real", "Plano FLOW custa R$ 299.", 1, KnowledgeCategories.Pricing),
+            KnowledgeItem.Create(tenantId, "Plano antigo", "Plano Premium custa R$ 999.", 100),
+            KnowledgeItem.Create(tenantId, "Atendimento", "Atendemos pelo WhatsApp.", 100)
+        ]);
+
+        var context = new ContextAssembler(
+            new FakeConversationQueries([]),
+            knowledge).BuildSimulationAsync(
+                tenantId,
+                "Quais são os preços?",
+                null,
+                CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.Contains("Plano real", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Plano antigo", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_DoesNotOverrideOtherHandoffReasons()
     {
         var response = new AiResponse

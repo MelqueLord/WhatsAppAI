@@ -347,7 +347,7 @@ public sealed class ContextAssembler(
     {
         var queryTerms = ExpandIntentTerms(query);
 
-        return knowledge
+        var ranked = knowledge
             .Select(item => new
             {
                 Item = item,
@@ -357,6 +357,20 @@ public sealed class ContextAssembler(
             .OrderByDescending(result => result.Score)
             .ThenByDescending(result => result.Item.Priority)
             .ThenByDescending(result => result.Item.CreatedAt)
+            .ToList();
+
+        if (queryTerms.Contains("preco"))
+        {
+            var pricingItems = ranked
+                .Where(result => result.Item.Category == KnowledgeCategories.Pricing)
+                .Take(MaxKnowledgeItems)
+                .Select(result => result.Item)
+                .ToList();
+            if (pricingItems.Count > 0)
+                return pricingItems;
+        }
+
+        return ranked
             .Take(MaxKnowledgeItems)
             .Select(result => result.Item)
             .ToList();
