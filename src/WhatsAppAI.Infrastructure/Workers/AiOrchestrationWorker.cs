@@ -1196,12 +1196,6 @@ public sealed class AiOrchestrationWorker(
             isWaitingInCurrentQueue ? "queue-waiting" : "queue-transfer",
             dbContext,
             cancellationToken);
-        logger.LogInformation(
-            isWaitingInCurrentQueue
-                ? "Conversation {ConversationId} remains in queue {QueueName}"
-                : "Conversation {ConversationId} moved automatically to queue {QueueName}",
-            conversation.Id,
-            selectedQueue.Name);
         return true;
     }
 
