@@ -91,6 +91,7 @@ export interface ServiceQueue {
   color?: string | null
   sortOrder: number
   isActive: boolean
+  transferNotice?: string | null
 }
 
 export interface Message {

@@ -60,6 +60,38 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
+    public void ResolveQueueTransferMessage_PrefersSelectedQueueNotice()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
+        queue.SetTransferNotice("Você será atendido pelo suporte.");
+        var botConfig = BotConfiguration.Create(Guid.NewGuid(), BotMode.SimpleAutoReply);
+        botConfig.UpdateMessages(null, null, null, null, null, "Transferência geral", null);
+
+        Assert.Equal("Você será atendido pelo suporte.",
+            AiOrchestrationWorker.ResolveQueueTransferMessage(queue, botConfig));
+    }
+
+    [Fact]
+    public void ResolveQueueTransferMessage_UsesTenantConfigurationWhenQueueHasNoNotice()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
+        var botConfig = BotConfiguration.Create(Guid.NewGuid(), BotMode.SimpleAutoReply);
+        botConfig.UpdateMessages(null, null, null, null, null, "Transferência geral", null);
+
+        Assert.Equal("Transferência geral",
+            AiOrchestrationWorker.ResolveQueueTransferMessage(queue, botConfig));
+    }
+
+    [Fact]
+    public void ResolveQueueTransferMessage_UsesPlatformDefaultWhenNoNoticeIsConfigured()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
+
+        Assert.Equal("Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.",
+            AiOrchestrationWorker.ResolveQueueTransferMessage(queue, null));
+    }
+
+    [Fact]
     public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndLetsExplicitKeywordReplacePriorAssignment()
     {
         var tenantId = Guid.NewGuid();

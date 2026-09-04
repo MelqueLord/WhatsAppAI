@@ -5,12 +5,15 @@ namespace WhatsAppAI.Domain.Messaging;
 
 public sealed class ServiceLine
 {
+    public const int TransferNoticeMaxLength = 160;
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public string? Color { get; private set; }
     public string? Keywords { get; private set; }
+    public string? TransferNotice { get; private set; }
     public int SortOrder { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -43,6 +46,16 @@ public sealed class ServiceLine
     public void SetKeywords(string? keywords)
     {
         Keywords = string.IsNullOrWhiteSpace(keywords) ? null : keywords.Trim();
+    }
+
+    public void SetTransferNotice(string? transferNotice)
+    {
+        var normalizedNotice = string.IsNullOrWhiteSpace(transferNotice) ? null : transferNotice.Trim();
+        if (normalizedNotice?.Length > TransferNoticeMaxLength)
+            throw new ArgumentOutOfRangeException(nameof(transferNotice),
+                $"Transfer notice must contain at most {TransferNoticeMaxLength} characters.");
+
+        TransferNotice = normalizedNotice;
     }
 
     public bool MatchesKeywords(string text)

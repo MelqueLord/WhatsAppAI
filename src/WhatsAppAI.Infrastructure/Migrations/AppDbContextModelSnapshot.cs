@@ -1687,6 +1687,11 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("keywords");
 
+                    b.Property<string>("TransferNotice")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("transfer_notice");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

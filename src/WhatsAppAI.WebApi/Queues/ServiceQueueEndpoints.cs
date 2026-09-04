@@ -36,7 +36,7 @@ public static class ServiceLineEndpoints
         {
             id = q.Id, name = q.Name, description = q.Description,
             color = q.Color, sortOrder = q.SortOrder, isActive = q.IsActive,
-            keywords = q.Keywords
+            keywords = q.Keywords, transferNotice = q.TransferNotice
         }));
     }
 
@@ -47,11 +47,14 @@ public static class ServiceLineEndpoints
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         if (string.IsNullOrWhiteSpace(request.Name))
             return Results.BadRequest(new { error = "Name is required." });
+        if (request.TransferNotice?.Trim().Length > ServiceLine.TransferNoticeMaxLength)
+            return Results.BadRequest(new { error = $"Transfer notice must contain at most {ServiceLine.TransferNoticeMaxLength} characters." });
 
         var queue = ServiceLine.Create(
             currentTenant.TenantId.Value, request.Name,
             request.Description, request.Color, request.SortOrder);
         queue.SetKeywords(request.Keywords);
+        queue.SetTransferNotice(request.TransferNotice);
         await repo.AddAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -63,9 +66,12 @@ public static class ServiceLineEndpoints
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         var queue = await repo.GetByIdAsync(id);
         if (queue is null || queue.TenantId != currentTenant.TenantId) return Results.NotFound();
+        if (request.TransferNotice?.Trim().Length > ServiceLine.TransferNoticeMaxLength)
+            return Results.BadRequest(new { error = $"Transfer notice must contain at most {ServiceLine.TransferNoticeMaxLength} characters." });
 
         queue.Update(request.Name, request.Description, request.Color, request.SortOrder);
         queue.SetKeywords(request.Keywords);
+        queue.SetTransferNotice(request.TransferNotice);
         await repo.UpdateAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -150,6 +156,6 @@ public static class ServiceLineEndpoints
     }
 }
 
-public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords);
-public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords);
+public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice);
+public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice);
 public sealed record AssignQueueRequest(Guid? QueueId);

@@ -16,6 +16,7 @@ public sealed class ServiceLineConfiguration : IEntityTypeConfiguration<ServiceL
         builder.Property(q => q.Description).HasColumnName("description").HasMaxLength(500);
         builder.Property(q => q.Color).HasColumnName("color").HasMaxLength(20);
         builder.Property(q => q.Keywords).HasColumnName("keywords").HasMaxLength(500);
+        builder.Property(q => q.TransferNotice).HasColumnName("transfer_notice").HasMaxLength(ServiceLine.TransferNoticeMaxLength);
         builder.Property(q => q.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(q => q.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(q => q.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();

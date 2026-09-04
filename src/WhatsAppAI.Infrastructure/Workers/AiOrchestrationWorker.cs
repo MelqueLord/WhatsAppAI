@@ -272,7 +272,7 @@ public sealed class AiOrchestrationWorker(
                             message,
                             conversation,
                             "queue_selection",
-                            ResolveQueueTransferMessage(botConfig),
+                            ResolveQueueTransferMessage(routingQueue, botConfig),
                             "bot-queue-transfer",
                             dbContext,
                             messageRepository,
@@ -400,7 +400,7 @@ public sealed class AiOrchestrationWorker(
                         message,
                         conversation,
                         "queue_selection",
-                        ResolveQueueTransferMessage(botConfig),
+                        ResolveQueueTransferMessage(keywordQueue, botConfig),
                         "ai-keyword-queue-transfer",
                         dbContext,
                         messageRepository,
@@ -636,9 +636,8 @@ public sealed class AiOrchestrationWorker(
                     conversation.Id, response.Decision.QueueName);
 
                 // Send queue transfer message to client
-                var queueTransferText = !string.IsNullOrWhiteSpace(botConfig.QueueTransferMessage)
-                    ? botConfig.QueueTransferMessage
-                    : "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
+                var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
+                var queueTransferText = ResolveQueueTransferMessage(selectedRoutingQueue, botConfig);
 
                 var queueTransferMsg = Message.CreateOutbound(
                     message.TenantId, conversation.Id, message.ContactId,
@@ -1156,6 +1155,14 @@ public sealed class AiOrchestrationWorker(
 
     internal static string ResolveQueueTransferMessage(BotConfiguration? botConfig)
     {
+        return ResolveQueueTransferMessage(null, botConfig);
+    }
+
+    internal static string ResolveQueueTransferMessage(ServiceLine? queue, BotConfiguration? botConfig)
+    {
+        if (!string.IsNullOrWhiteSpace(queue?.TransferNotice))
+            return queue.TransferNotice;
+
         if (!string.IsNullOrWhiteSpace(botConfig?.QueueTransferMessage))
             return botConfig.QueueTransferMessage;
 

@@ -11,6 +11,7 @@ interface ServiceQueue {
   sortOrder: number
   isActive: boolean
   keywords: string | null
+  transferNotice: string | null
 }
 
 export function QueuesPage() {
@@ -22,6 +23,7 @@ export function QueuesPage() {
   const [color, setColor] = useState('#6366F1')
   const [sortOrder, setSortOrder] = useState(0)
   const [keywords, setKeywords] = useState('')
+  const [transferNotice, setTransferNotice] = useState('')
 
   const { data: queues, isLoading } = useQuery({
     queryKey: ['service-queues'],
@@ -37,7 +39,7 @@ export function QueuesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder, keywords }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice }),
       })
       if (!res.ok) throw new Error('Erro ao criar fila')
       return res.json()
@@ -51,7 +53,7 @@ export function QueuesPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder, keywords }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice }),
       })
       if (!res.ok) throw new Error('Erro ao atualizar fila')
       return res.json()
@@ -70,12 +72,12 @@ export function QueuesPage() {
 
   const resetForm = () => {
     setShowForm(false); setEditing(null)
-    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords('')
+    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords(''); setTransferNotice('')
   }
 
   const startEdit = (q: ServiceQueue) => {
     setEditing(q); setName(q.name); setDescription(q.description || '')
-    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setShowForm(true)
+    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setTransferNotice(q.transferNotice || ''); setShowForm(true)
   }
 
   return (
@@ -110,6 +112,12 @@ export function QueuesPage() {
             <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="Palavras-chave (separadas por vírgula)"
               className="md:col-span-2 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
             <p className="md:col-span-2 text-xs text-slate-500 -mt-2">Ex: suporte, técnico, problema. Conversas com essas palavras serão roteadas automaticamente para esta fila.</p>
+            <div className="md:col-span-2">
+              <textarea value={transferNotice} onChange={(e) => setTransferNotice(e.target.value)} maxLength={160}
+                placeholder="Mensagem ao transferir para esta fila (opcional)" rows={2}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              <p className="mt-1 text-xs text-slate-500">Enviada ao cliente ao entrar nesta fila. Em branco, usa a mensagem geral. {transferNotice.length}/160</p>
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button onClick={() => editing ? updateMutation.mutate(editing) : createMutation.mutate()}
@@ -139,6 +147,7 @@ export function QueuesPage() {
                 <h3 className="font-medium text-slate-800">{q.name}</h3>
                 {q.description && <p className="text-sm text-slate-500 truncate">{q.description}</p>}
                 {q.keywords && <p className="text-xs text-indigo-500 truncate mt-0.5">Palavras-chave: {q.keywords}</p>}
+                {q.transferNotice && <p className="text-xs text-emerald-600 truncate mt-0.5">Aviso ao cliente: {q.transferNotice}</p>}
               </div>
               <span className="text-xs text-slate-400">#{q.sortOrder}</span>
               <div className="flex gap-1">

@@ -24,4 +24,18 @@ public sealed class ServiceLineTests
         Assert.False(queue.MatchesKeywords("Bom dia, tudo bem?"));
         Assert.True(queue.MatchesKeywords("Quero falar sobre IA"));
     }
+
+    [Fact]
+    public void SetTransferNotice_NormalizesBlankTextAndRejectsLongMessages()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
+
+        queue.SetTransferNotice("  Aguarde o suporte.  ");
+        Assert.Equal("Aguarde o suporte.", queue.TransferNotice);
+
+        queue.SetTransferNotice(" ");
+        Assert.Null(queue.TransferNotice);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            queue.SetTransferNotice(new string('a', ServiceLine.TransferNoticeMaxLength + 1)));
+    }
 }
