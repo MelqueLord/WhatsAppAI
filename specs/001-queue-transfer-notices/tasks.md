@@ -41,6 +41,7 @@
 - [X] T017 [US5] Enforce human handoff for AI decisions marked `out_of_scope` and cover the distinction from ambiguous human requests in `src/WhatsAppAI.Application/Automation/Policy/` and `tests/WhatsAppAI.UnitTests/Automation/`.
 - [X] T018 [US5] Expand AI context to the current message plus three previous messages and prevent greeting logic from restarting an existing conversation in `src/WhatsAppAI.Application/Automation/Context/` and `src/WhatsAppAI.Application/Automation/Policy/`, with unit coverage.
 - [X] T019 [US5] Preserve tenant profile and service directions in the agent prompt, derive a non-generic first-contact welcome, and synchronize the normalized greeting decision with the outbound response in `src/WhatsAppAI.Application/Automation/Context/`, `src/WhatsAppAI.Application/Automation/Policy/`, `src/WhatsAppAI.Infrastructure/Workers/`, and `src/WhatsAppAI.WebApi/Integrations/`, with unit coverage.
+- [X] T020 [US4/US5] Give authorized queue keywords precedence over an unassigned automatic handoff, restoring automatic mode for the selected queue while preserving explicitly assigned human conversations in `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`, with regression coverage.
 
 ## Dependencies
 

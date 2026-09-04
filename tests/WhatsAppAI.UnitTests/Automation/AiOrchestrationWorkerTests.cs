@@ -120,6 +120,45 @@ public sealed class AiOrchestrationWorkerTests
             .SelectBotRoutingQueue(null, [matchingQueue], "Quero saber o preço"));
     }
 
+    [Fact]
+    public void RestoreAutomaticForQueueKeyword_ReopensUnassignedHumanConversation()
+    {
+        var tenantId = Guid.NewGuid();
+        var commercialQueue = ServiceLine.Create(tenantId, "Comercial");
+        commercialQueue.SetKeywords("preço, saber mais");
+        var conversation = Conversation.Create(tenantId, Guid.NewGuid(), "phone-number-id");
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version);
+
+        var selectedQueue = AiOrchestrationWorker.RestoreAutomaticForQueueKeyword(
+            conversation,
+            [commercialQueue],
+            "Quero saber mais sobre os serviços");
+
+        Assert.Same(commercialQueue, selectedQueue);
+        Assert.Equal(ConversationMode.Automatic, conversation.Mode);
+        Assert.Equal(commercialQueue.Id, conversation.QueueId);
+        Assert.Null(conversation.AssignedToUserId);
+    }
+
+    [Fact]
+    public void RestoreAutomaticForQueueKeyword_DoesNotOverrideOperatorOwnership()
+    {
+        var tenantId = Guid.NewGuid();
+        var commercialQueue = ServiceLine.Create(tenantId, "Comercial");
+        commercialQueue.SetKeywords("preço");
+        var conversation = Conversation.Create(tenantId, Guid.NewGuid(), "phone-number-id");
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version, "operator-1");
+
+        var selectedQueue = AiOrchestrationWorker.RestoreAutomaticForQueueKeyword(
+            conversation,
+            [commercialQueue],
+            "Quero saber o preço");
+
+        Assert.Null(selectedQueue);
+        Assert.Equal(ConversationMode.Human, conversation.Mode);
+        Assert.Equal("operator-1", conversation.AssignedToUserId);
+    }
+
     [Theory]
     [InlineData("low_confidence")]
     [InlineData("customer_request")]

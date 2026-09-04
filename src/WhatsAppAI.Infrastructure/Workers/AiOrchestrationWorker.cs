@@ -139,9 +139,27 @@ public sealed class AiOrchestrationWorker(
 
             if (conversation.Mode != ConversationMode.Automatic)
             {
-                message.MarkProcessedByAi();
-                await messageRepository.UpdateAsync(message, cancellationToken);
-                return;
+                // An authorized queue keyword is a new automatic routing request.
+                // It may recover a conversation left in Human mode by a previous
+                // automatic handoff, but it must never override an operator who
+                // explicitly owns the conversation.
+                var activeQueuesForKeyword = await queueRepository.GetActiveByTenantAsync(
+                    message.TenantId, cancellationToken);
+                var keywordQueue = RestoreAutomaticForQueueKeyword(
+                    conversation, activeQueuesForKeyword, message.Content);
+                if (keywordQueue is null)
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    return;
+                }
+
+                dbContext.Set<Conversation>().Update(conversation);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation(
+                    "Authorized queue keyword {QueueName} restored conversation {ConversationId} to automatic mode",
+                    keywordQueue.Name,
+                    conversation.Id);
             }
 
             var expectedConversationVersion = conversation.Version;
@@ -1324,6 +1342,27 @@ public sealed class AiOrchestrationWorker(
         return assignedQueueId is Guid queueId
             ? matchingQueues.FirstOrDefault(queue => queue.Id == queueId) ?? matchingQueues[0]
             : matchingQueues[0];
+    }
+
+    internal static ServiceLine? RestoreAutomaticForQueueKeyword(
+        Conversation conversation,
+        IReadOnlyList<ServiceLine> activeQueues,
+        string? messageContent)
+    {
+        if (conversation.Mode == ConversationMode.Automatic ||
+            !string.IsNullOrWhiteSpace(conversation.AssignedToUserId))
+            return null;
+
+        var selectedQueue = SelectBotRoutingQueue(
+            conversation.QueueId,
+            activeQueues,
+            messageContent);
+        if (selectedQueue is null)
+            return null;
+
+        conversation.SwitchMode(ConversationMode.Automatic, conversation.Version);
+        conversation.AssignQueue(selectedQueue.Id);
+        return selectedQueue;
     }
 
     internal static async Task<bool> RegisterAutomaticHandoffAsync(

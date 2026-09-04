@@ -111,6 +111,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-012**: A configured business-specific welcome message MUST be included as guidance for the AI on the first inbound message only.
 - **FR-QTN-013**: The AI context MUST include the current inbound message and up to the three previous conversation messages; a greeting in an existing conversation MUST be treated as continuation when the history provides context.
 - **FR-QTN-014**: The AI system prompt MUST preserve the tenant's structured profile and configured service directions as agent instructions, prioritizing them over generic greeting behavior while retaining the mandatory platform and JSON response rules.
+- **FR-QTN-015**: An inbound message matching an active queue keyword MUST keep or restore automatic mode when no operator is explicitly assigned, including when the conversation was previously moved to human mode by an automatic decision; an explicitly assigned operator MUST remain in human mode.
 
 ### Key Entities
 
