@@ -321,7 +321,7 @@ export function BotConfigPage() {
             <MessageField
               icon={MessageSquare}
               label="Primeiro contato"
-              hint="Enviada quando um novo cliente envia a primeira mensagem."
+              hint="A IA usa esta mensagem como base personalizada quando um novo cliente envia a primeira mensagem."
               value={val(welcomeMessage, config?.welcomeMessage)}
               onChange={setWelcomeMessage}
               placeholder="Olá! Bem-vindo(a). Como posso ajudar?"

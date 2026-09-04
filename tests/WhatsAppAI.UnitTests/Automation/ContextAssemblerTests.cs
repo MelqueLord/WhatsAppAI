@@ -199,6 +199,23 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void ComposeSystemPrompt_IncludesConfiguredWelcomeOnlyForFirstInbound()
+    {
+        var firstContactPrompt = ContextAssembler.ComposeSystemPrompt(
+            null,
+            welcomeMessage: "Olá! Somos a Clínica Aurora. Como podemos ajudar?",
+            isFirstInbound: true);
+        var returningContactPrompt = ContextAssembler.ComposeSystemPrompt(
+            null,
+            welcomeMessage: "Olá! Somos a Clínica Aurora. Como podemos ajudar?",
+            isFirstInbound: false);
+
+        Assert.Contains("Mensagem de boas-vindas personalizada", firstContactPrompt);
+        Assert.Contains("Clínica Aurora", firstContactPrompt);
+        Assert.DoesNotContain("Mensagem de boas-vindas personalizada", returningContactPrompt);
+    }
+
+    [Fact]
     public async Task BuildSimulationAsync_UsesRelevantTenantKnowledgeAndExample()
     {
         var tenantId = Guid.NewGuid();

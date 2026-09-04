@@ -27,7 +27,9 @@ public sealed class ContextAssembler(
         string? systemPrompt,
         IReadOnlyList<RoutingQueueContext>? routingQueues = null,
         IReadOnlyList<RoutingTagContext>? routingTags = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? welcomeMessage = null,
+        bool isFirstInbound = false)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
@@ -62,7 +64,9 @@ public sealed class ContextAssembler(
             routingTags,
             responseExample is null
                 ? null
-                : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse));
+                : new ResponseExampleContext(responseExample.CustomerMessage, responseExample.IdealResponse),
+            welcomeMessage,
+            isFirstInbound);
 
         return new ConversationContext
         {
@@ -105,7 +109,9 @@ public sealed class ContextAssembler(
         IReadOnlyList<string>? knowledgeItems = null,
         IReadOnlyList<RoutingQueueContext>? routingQueues = null,
         IReadOnlyList<RoutingTagContext>? routingTags = null,
-        ResponseExampleContext? responseExample = null)
+        ResponseExampleContext? responseExample = null,
+        string? welcomeMessage = null,
+        bool isFirstInbound = false)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
         const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado.";
@@ -114,6 +120,13 @@ public sealed class ContextAssembler(
 
         if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
             dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
+
+        if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
+        {
+            dynamicParts.Add((
+                $"Mensagem de boas-vindas personalizada para o primeiro contato. Use esta mensagem como base, adaptando apenas o necessário ao pedido do cliente: {Limit(AiContextSanitizer.RedactPersonalData(welcomeMessage), 260)}",
+                360));
+        }
 
         if (knowledgeItems is { Count: > 0 })
         {

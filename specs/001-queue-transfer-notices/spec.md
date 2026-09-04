@@ -68,12 +68,28 @@ As a customer waiting in an automated queue, I want a clear status message when 
 2. **Given** a conversation remains in an automatic queue, **When** the customer sends a keyword belonging to another authorized queue, **Then** the conversation changes to that queue and the new queue transfer notice is sent.
 3. **Given** a conversation is already in human mode, **When** the customer sends a message, **Then** the waiting rule does not send an automated response.
 
+---
+
+### User Story 5 - Continue AI service while queued (Priority: P1)
+
+As a customer waiting in a queue, I want the configured AI service to continue applying the company's guidelines and knowledge so that queue assignment does not make the conversation unresponsive.
+
+**Why this priority**: A queue is a routing state, not an automatic interruption. The company must be able to answer known requests immediately and escalate only what falls outside its service rules.
+
+**Independent Test**: Put an automatic conversation in a queue, send a message covered by the company's guidelines or knowledge, and verify an AI response; then send an out-of-scope message and verify the configured human-transfer message and human mode.
+
+**Acceptance Scenarios**:
+
+1. **Given** an automatic conversation is in any queue, **When** the customer asks about a topic covered by the tenant guidelines or knowledge, **Then** the AI evaluates the full context and sends the applicable response or performs the applicable configured action.
+2. **Given** an automatic conversation is in any queue, **When** the customer asks about a topic outside the configured service, **Then** the AI informs the customer that it will transfer the conversation to a human and the conversation changes to human mode.
+3. **Given** a new automatic conversation, **When** the first message is processed by the AI, **Then** the configured business-specific welcome message is provided to the AI as the first-contact response guidance.
+
 ### Edge Cases
 
 - A blank notice is treated as absent and falls back to the current tenant-wide or platform message.
 - A notice longer than the existing customer message safety limit is rejected before it can be saved.
 - Reprocessing the same inbound message does not create duplicate notices.
-- Repeated messages while waiting use an idempotent customer-facing response per inbound message.
+- Repeated messages while waiting use an idempotent customer-facing response per inbound message only when the AI returns no applicable action.
 - A manual queue assignment does not itself assume the conversation; an explicit human mode action is required.
 
 ## Requirements *(mandatory)*
@@ -86,9 +102,12 @@ As a customer waiting in an automated queue, I want a clear status message when 
 - **FR-QTN-004**: The system MUST create at most one customer notice for each transfer event, including retries or duplicate webhook delivery.
 - **FR-QTN-005**: The system MUST enforce the existing tenant and permission boundaries when reading or changing a queue notice.
 - **FR-QTN-006**: The system MUST retain all existing transfer behavior for queues that have not yet been configured with a notice.
-- **FR-QTN-007**: A conversation assigned automatically to a non-human queue MUST remain automated until a human takes over or the customer is routed to a human queue.
-- **FR-QTN-008**: While a conversation remains in an automatic queue, each new inbound message without a different authorized queue keyword MUST receive the queue waiting message containing the current queue name and instructions for changing service type.
+- **FR-QTN-007**: A conversation assigned automatically to any queue, including a human-service queue, MUST remain automated until a human explicitly takes over.
+- **FR-QTN-008**: While a conversation remains in an automatic queue, each new inbound message without a different authorized queue keyword MUST be evaluated by the tenant AI using its guidelines, profile and relevant knowledge; the queue waiting message is sent only when the AI returns no applicable action.
 - **FR-QTN-009**: An authorized keyword for a different queue MUST move the conversation to that queue and send its transfer notice before processing another automated reply.
+- **FR-QTN-010**: Queue assignment MUST NOT bypass the tenant AI guidelines or knowledge; a covered request MUST receive the configured AI response or action even while waiting in a queue.
+- **FR-QTN-011**: An out-of-scope AI decision MUST use the configured human-transfer message and switch the conversation to human mode.
+- **FR-QTN-012**: A configured business-specific welcome message MUST be included as guidance for the AI on the first inbound message only.
 
 ### Key Entities
 

@@ -213,15 +213,14 @@ public sealed class AiOrchestrationWorker(
 
                 try
                 {
-                    IReadOnlyList<ServiceLine> simpleModeQueues = await dbContext.HasAutomaticDistributionEnabledAsync(
-                            message.TenantId, cancellationToken)
-                        ? await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken)
-                        : [];
+                    IReadOnlyList<ServiceLine> simpleModeQueues =
+                        await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken);
                     if (await HandleAutomaticQueueMessageAsync(
                             message, conversation, botConfig, simpleModeQueues,
                             dbContext, messageRepository, conversationRepository,
                             outboxRepository, handoffEventRepository, tagRepository,
-                            contactTagRepository, cancellationToken))
+                            contactTagRepository, includeWaitingResponse: true,
+                            cancellationToken: cancellationToken))
                     {
                         return;
                     }
@@ -341,9 +340,8 @@ public sealed class AiOrchestrationWorker(
 
             var automaticDistributionEnabled = await dbContext.HasAutomaticDistributionEnabledAsync(
                 message.TenantId, cancellationToken);
-            var activeQueues = automaticDistributionEnabled
-                ? await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken)
-                : [];
+            var activeQueues = await queueRepository.GetActiveByTenantAsync(
+                message.TenantId, cancellationToken);
             var configuredQueueIds = automaticDistributionEnabled
                 ? credential.GetRoutingQueueIds().ToHashSet()
                 : [];
@@ -354,13 +352,14 @@ public sealed class AiOrchestrationWorker(
                     .ToList();
 
             // Queue keywords are an explicit tenant rule, so evaluate them before
-            // consulting the model. This also keeps an assigned queue responsive
-            // without spending an AI response quota for every follow-up message.
+            // consulting the model. A queued message without a routing keyword must
+            // still reach the AI so the tenant guidelines and knowledge can answer it.
             if (await HandleAutomaticQueueMessageAsync(
                     message, conversation, botConfig, activeQueues,
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
-                    contactTagRepository, cancellationToken))
+                    contactTagRepository, includeWaitingResponse: false,
+                    cancellationToken: cancellationToken))
             {
                 return;
             }
@@ -416,6 +415,11 @@ public sealed class AiOrchestrationWorker(
                     .Where(tag => configuredTagIds.Contains(tag.Id))
                     .ToList();
 
+            var isFirstInbound = !await dbContext.Messages
+                .IgnoreQueryFilters()
+                .AnyAsync(item => item.ConversationId == message.ConversationId &&
+                    item.Direction == MessageDirection.Inbound && item.Id != message.Id,
+                    cancellationToken);
             var context = await contextAssembler.BuildAsync(
                 message.TenantId, message.ConversationId, credential.SystemPrompt,
                 routingQueues
@@ -424,7 +428,9 @@ public sealed class AiOrchestrationWorker(
                 routingTags
                     .Select(tag => new RoutingTagContext(tag.Name, tag.Description))
                     .ToList(),
-                cancellationToken);
+                cancellationToken,
+                botConfig.WelcomeMessage,
+                isFirstInbound);
 
             var request = new AiRequest
             {
@@ -573,7 +579,9 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            // Auto-assign queue if AI categorized and conversation has no queue yet
+            // Auto-assign queue if AI categorized and conversation has no queue yet.
+            // Queue assignment remains automatic; the selected queue notice is the
+            // only customer-facing response for this routing decision.
             if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId is null)
             {
                 var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
@@ -760,6 +768,19 @@ public sealed class AiOrchestrationWorker(
             await responseQuotaService.ReleaseAsync(
                 message.TenantId, responseQuotaReservation!.Value, "non-reply-ai-decision", cancellationToken);
             responseQuotaFinalized = true;
+            // No-action is the safe waiting fallback when the conversation is queued.
+            // A real AI reply or handoff above always takes precedence.
+            await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+            if (await HandleAutomaticQueueMessageAsync(
+                    message, conversation, botConfig, activeQueues,
+                    dbContext, messageRepository, conversationRepository,
+                    outboxRepository, handoffEventRepository, tagRepository,
+                    contactTagRepository, includeWaitingResponse: true,
+                    cancellationToken: cancellationToken))
+            {
+                return;
+            }
+
             message.MarkProcessedByAi();
             await messageRepository.UpdateAsync(message, cancellationToken);
         }
@@ -1125,6 +1146,7 @@ public sealed class AiOrchestrationWorker(
         IHandoffEventRepository handoffEventRepository,
         IClientTagRepository tagRepository,
         IContactTagRepository contactTagRepository,
+        bool includeWaitingResponse,
         CancellationToken cancellationToken)
     {
         if (activeQueues.Count == 0)
@@ -1149,6 +1171,9 @@ public sealed class AiOrchestrationWorker(
             return false;
 
         var isWaitingInCurrentQueue = currentQueue is not null && currentQueue.Id == selectedQueue.Id;
+        if (isWaitingInCurrentQueue && !includeWaitingResponse)
+            return false;
+
         await PersistAutomaticQueueNoticeAsync(
             message,
             conversation,
