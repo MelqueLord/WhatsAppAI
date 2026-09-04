@@ -25,6 +25,13 @@
 
 - [ ] T008 Validate migration, backend build, relevant tests and frontend build; update `specs/001-queue-transfer-notices/quickstart.md` if needed.
 
+## Phase 6 — User Story 4: Keep customers informed while waiting
+
+- [X] T009 [US4] Add deterministic waiting-message resolution and automatic queue handling in `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`.
+- [X] T010 [US4] Preserve human-mode handoff behavior while allowing authorized keywords to move automatic conversations between queues.
+- [X] T011 [US4] Add unit coverage for the waiting message and queue-state transitions in `tests/WhatsAppAI.UnitTests/Automation/`.
+- [ ] T012 [US4] Validate duplicate-safe queue waiting outbox creation and update the quickstart flow.
+
 ## Dependencies
 
-`T001 → T003/T004/T005 → T006/T007 → T008`
+`T001 → T003/T004/T005 → T006/T007 → T009/T010/T011 → T008/T012`

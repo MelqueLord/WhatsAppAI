@@ -6,7 +6,7 @@
 
 **Status**: Ready for implementation
 
-**Input**: User description: "agora implemente para cada fila que sera enviada antes de enviar uma mensagem de aviso seja enviada ao cliente"
+**Input**: User description: "agora implemente para cada fila que sera enviada antes de enviar uma mensagem de aviso seja enviada ao cliente; mensagem ao permanecer na fila e o cliente digitar algo deve ser ..."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -50,13 +50,30 @@ As a PlatformAdmin, I want each company's queue notices isolated so one company'
 
 **Acceptance Scenarios**:
 
-1. **Given** two companies with their own queues, **When** one company updates its queue notice, **Then** the other company's configuration remains unchanged and inaccessible.
+    1. **Given** two companies with their own queues, **When** one company updates its queue notice, **Then** the other company's configuration remains unchanged and inaccessible.
+
+---
+
+### User Story 4 - Keep the customer informed while waiting (Priority: P1)
+
+As a customer waiting in an automated queue, I want a clear status message when I send another message so I know where I am and how to request a different service.
+
+**Why this priority**: Customers must not interpret silence as a connection failure, and queue keywords must remain available for changing the destination.
+
+**Independent Test**: Put a conversation in an automatic queue, send a message without another queue keyword, and verify the queue-specific waiting message; then send a different queue keyword and verify the conversation changes queues.
+
+**Acceptance Scenarios**:
+
+1. **Given** a conversation remains in an automatic queue, **When** the customer sends another message without a different queue keyword, **Then** the customer receives `Aguarde, você está na fila {nome} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.` and the conversation remains automated in the same queue.
+2. **Given** a conversation remains in an automatic queue, **When** the customer sends a keyword belonging to another authorized queue, **Then** the conversation changes to that queue and the new queue transfer notice is sent.
+3. **Given** a conversation is already in human mode, **When** the customer sends a message, **Then** the waiting rule does not send an automated response.
 
 ### Edge Cases
 
 - A blank notice is treated as absent and falls back to the current tenant-wide or platform message.
 - A notice longer than the existing customer message safety limit is rejected before it can be saved.
 - Reprocessing the same inbound message does not create duplicate notices.
+- Repeated messages while waiting use an idempotent customer-facing response per inbound message.
 - A manual transfer follows the same queue-specific notice rule when it results in a customer notification.
 
 ## Requirements *(mandatory)*
@@ -69,6 +86,9 @@ As a PlatformAdmin, I want each company's queue notices isolated so one company'
 - **FR-QTN-004**: The system MUST create at most one customer notice for each transfer event, including retries or duplicate webhook delivery.
 - **FR-QTN-005**: The system MUST enforce the existing tenant and permission boundaries when reading or changing a queue notice.
 - **FR-QTN-006**: The system MUST retain all existing transfer behavior for queues that have not yet been configured with a notice.
+- **FR-QTN-007**: A conversation assigned automatically to a non-human queue MUST remain automated until a human takes over or the customer is routed to a human queue.
+- **FR-QTN-008**: While a conversation remains in an automatic queue, each new inbound message without a different authorized queue keyword MUST receive the queue waiting message containing the current queue name and instructions for changing service type.
+- **FR-QTN-009**: An authorized keyword for a different queue MUST move the conversation to that queue and send its transfer notice before processing another automated reply.
 
 ### Key Entities
 
@@ -83,9 +103,13 @@ As a PlatformAdmin, I want each company's queue notices isolated so one company'
 - **SC-QTN-002**: In automated tests, 100% of transfers to queues without a notice retain the previous fallback message behavior.
 - **SC-QTN-003**: A TenantOwner can configure and save a queue notice in under one minute on desktop or mobile.
 - **SC-QTN-004**: Tests confirm no queue notice from one company can be returned or used by another company.
+- **SC-QTN-005**: 100% of follow-up messages in an automatic queue receive the current queue waiting message unless a different queue keyword is detected.
+- **SC-QTN-006**: A customer keyword for another authorized queue changes the queue without invoking an unnecessary AI response.
 
 ## Assumptions
 
 - The notice is sent as the existing transfer notification, immediately after the transfer is persisted and through the existing durable outbound delivery flow.
 - Existing queues start with no notice and therefore require no migration action by the TenantOwner.
 - The current customer-message character limit applies to a queue transfer notice.
+- The standard waiting message is generated from the queue name and is not editable per tenant in this increment.
+- A queue named for human service continues to switch the conversation to human mode.

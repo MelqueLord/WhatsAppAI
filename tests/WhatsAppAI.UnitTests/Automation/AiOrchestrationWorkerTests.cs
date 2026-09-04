@@ -92,6 +92,16 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
+    public void ResolveQueueWaitingMessage_IncludesCurrentQueueAndChangeInstructions()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte Técnico");
+
+        Assert.Equal(
+            "Aguarde, você está na fila Suporte Técnico para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.",
+            AiOrchestrationWorker.ResolveQueueWaitingMessage(queue));
+    }
+
+    [Fact]
     public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndLetsExplicitKeywordReplacePriorAssignment()
     {
         var tenantId = Guid.NewGuid();

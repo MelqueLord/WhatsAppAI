@@ -213,6 +213,18 @@ public sealed class AiOrchestrationWorker(
 
                 try
                 {
+                    IReadOnlyList<ServiceLine> activeQueues = await dbContext.HasAutomaticDistributionEnabledAsync(
+                            message.TenantId, cancellationToken)
+                        ? await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken)
+                        : [];
+                    if (await HandleAutomaticQueueMessageAsync(
+                            message, conversation, botConfig, activeQueues,
+                            dbContext, messageRepository, conversationRepository,
+                            outboxRepository, handoffEventRepository, cancellationToken))
+                    {
+                        return;
+                    }
+
                     var withinBusinessHours = BusinessHoursPolicy.IsOpen(
                         botConfig.BusinessHoursEnabled,
                         botConfig.BusinessHoursJson,
@@ -252,39 +264,6 @@ public sealed class AiOrchestrationWorker(
                         message.MarkProcessedByAi();
                         await messageRepository.UpdateAsync(message, cancellationToken);
                         logger.LogInformation("SimpleAutoReply discarded after conversation {ConversationId} changed", message.ConversationId);
-                        return;
-                    }
-
-                    ServiceLine? routingQueue = null;
-                    if (withinBusinessHours &&
-                        await dbContext.HasAutomaticDistributionEnabledAsync(message.TenantId, cancellationToken))
-                    {
-                        var activeQueues = await queueRepository.GetActiveByTenantAsync(
-                            message.TenantId, cancellationToken);
-                        routingQueue = SelectBotRoutingQueue(
-                            conversation.QueueId, activeQueues, message.Content);
-                    }
-
-                    if (routingQueue is not null)
-                    {
-                        await PersistAutomaticHandoffAsync(
-                            message.TenantId,
-                            message,
-                            conversation,
-                            "queue_selection",
-                            ResolveQueueTransferMessage(routingQueue, botConfig),
-                            "bot-queue-transfer",
-                            dbContext,
-                            messageRepository,
-                            conversationRepository,
-                            outboxRepository,
-                            handoffEventRepository,
-                            cancellationToken,
-                            routingQueue.Id);
-                        logger.LogInformation(
-                            "SimpleAutoReply routed conversation {ConversationId} to queue {QueueName}",
-                            conversation.Id,
-                            routingQueue.Name);
                         return;
                     }
 
@@ -371,50 +350,14 @@ public sealed class AiOrchestrationWorker(
                     .ToList();
 
             // Queue keywords are an explicit tenant rule, so evaluate them before
-            // consulting the model. This makes the transfer deterministic and avoids
-            // spending an AI response quota for a request that must go to a human queue.
-            if (automaticDistributionEnabled && routingQueues.Count > 0)
+            // consulting the model. This also keeps an assigned queue responsive
+            // without spending an AI response quota for every follow-up message.
+            if (await HandleAutomaticQueueMessageAsync(
+                    message, conversation, botConfig, routingQueues,
+                    dbContext, messageRepository, conversationRepository,
+                    outboxRepository, handoffEventRepository, cancellationToken))
             {
-                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
-                if (!AiReplyDeliveryGuard.CanSend(
-                        conversation, expectedConversationVersion, DateTime.UtcNow))
-                {
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
-                    logger.LogInformation(
-                        "AI keyword routing discarded after conversation {ConversationId} changed",
-                        message.ConversationId);
-                    return;
-                }
-
-                var keywordQueue = SelectBotRoutingQueue(
-                    conversation.QueueId, routingQueues, message.Content) ??
-                    (HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content)
-                        ? routingQueues.FirstOrDefault(queue =>
-                            HumanHandoffRequestPolicy.IsHumanQueueName(queue.Name))
-                        : null);
-                if (keywordQueue is not null)
-                {
-                    await PersistAutomaticHandoffAsync(
-                        message.TenantId,
-                        message,
-                        conversation,
-                        "queue_selection",
-                        ResolveQueueTransferMessage(keywordQueue, botConfig),
-                        "ai-keyword-queue-transfer",
-                        dbContext,
-                        messageRepository,
-                        conversationRepository,
-                        outboxRepository,
-                        handoffEventRepository,
-                        cancellationToken,
-                        keywordQueue.Id);
-                    logger.LogInformation(
-                        "AI keyword routing transferred conversation {ConversationId} to queue {QueueName}",
-                        conversation.Id,
-                        keywordQueue.Name);
-                    return;
-                }
+                return;
             }
 
             var purposes = await dbContext.ProcessingPurposes
@@ -628,6 +571,35 @@ public sealed class AiOrchestrationWorker(
             // Auto-assign queue if AI categorized and conversation has no queue yet
             if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId is null)
             {
+                var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
+                if (selectedRoutingQueue is not null &&
+                    !HumanHandoffRequestPolicy.IsHumanQueueName(selectedRoutingQueue.Name))
+                {
+                    await responseQuotaService.ReleaseAsync(
+                        message.TenantId, responseQuotaReservation!.Value, "queue-routing", cancellationToken);
+                    responseQuotaFinalized = true;
+                    await PersistAutomaticQueueNoticeAsync(
+                        message,
+                        conversation,
+                        selectedRoutingQueue,
+                        ResolveQueueTransferMessage(selectedRoutingQueue, botConfig),
+                        "ai-queue-transfer",
+                        dbContext,
+                        cancellationToken);
+                    await ApplyQueueTagAsync(
+                        message.TenantId,
+                        message.ContactId,
+                        selectedRoutingQueue.Name,
+                        tagRepository,
+                        contactTagRepository,
+                        cancellationToken);
+                    logger.LogInformation(
+                        "Conversation {ConversationId} auto-assigned to queue {QueueName} while remaining automatic",
+                        conversation.Id,
+                        selectedRoutingQueue.Name);
+                    return;
+                }
+
                 conversation.AssignQueue(routingQueueId);
                 await conversationRepository.UpdateAsync(conversation, cancellationToken);
                 // Queue routing is an internal change; use its new version for the final delivery guard.
@@ -636,7 +608,6 @@ public sealed class AiOrchestrationWorker(
                     conversation.Id, response.Decision.QueueName);
 
                 // Send queue transfer message to client
-                var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
                 var queueTransferText = ResolveQueueTransferMessage(selectedRoutingQueue, botConfig);
 
                 var queueTransferMsg = Message.CreateOutbound(
@@ -650,23 +621,13 @@ public sealed class AiOrchestrationWorker(
                 var queueTransferOutbox = OutboxMessage.Create(message.TenantId, queueTransferMsg.Id);
                 await outboxRepository.AddAsync(queueTransferOutbox);
 
-                // Apply tag with same name as the queue (if it exists for this tenant)
-                var queueName = response.Decision.QueueName;
-                if (!string.IsNullOrWhiteSpace(queueName))
-                {
-                    var allTenantTags = await tagRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken);
-                    var queueTag = allTenantTags.FirstOrDefault(t =>
-                        t.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
-                    if (queueTag is not null &&
-                        !await contactTagRepository.ExistsAsync(message.TenantId, message.ContactId, queueTag.Id, cancellationToken))
-                    {
-                        await contactTagRepository.AddAsync(
-                            ContactTag.Create(message.ContactId, queueTag.Id, message.TenantId),
-                            cancellationToken);
-                        logger.LogInformation("Tag '{TagName}' applied to contact {ContactId} via queue routing",
-                            queueTag.Name, message.ContactId);
-                    }
-                }
+                await ApplyQueueTagAsync(
+                    message.TenantId,
+                    message.ContactId,
+                    response.Decision.QueueName,
+                    tagRepository,
+                    contactTagRepository,
+                    cancellationToken);
             }
 
             foreach (var tagId in categorizedTagIds)
@@ -1167,6 +1128,170 @@ public sealed class AiOrchestrationWorker(
             return botConfig.QueueTransferMessage;
 
         return "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
+    }
+
+    internal static string ResolveQueueWaitingMessage(ServiceLine queue) =>
+        $"Aguarde, você está na fila {queue.Name} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.";
+
+    private static async Task<bool> HandleAutomaticQueueMessageAsync(
+        Message message,
+        Conversation conversation,
+        BotConfiguration botConfig,
+        IReadOnlyList<ServiceLine> activeQueues,
+        AppDbContext dbContext,
+        IMessageRepository messageRepository,
+        IConversationRepository conversationRepository,
+        IOutboxMessageRepository outboxRepository,
+        IHandoffEventRepository handoffEventRepository,
+        CancellationToken cancellationToken)
+    {
+        if (activeQueues.Count == 0)
+            return false;
+
+        var currentQueue = conversation.QueueId is Guid currentQueueId
+            ? activeQueues.FirstOrDefault(queue => queue.Id == currentQueueId)
+            : null;
+        var selectedQueue = SelectBotRoutingQueue(
+            conversation.QueueId, activeQueues, message.Content);
+        if (selectedQueue is null && HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content))
+        {
+            selectedQueue = activeQueues.FirstOrDefault(queue =>
+                HumanHandoffRequestPolicy.IsHumanQueueName(queue.Name));
+        }
+
+        if (currentQueue is null && selectedQueue is null)
+            return false;
+
+        selectedQueue ??= currentQueue;
+        if (selectedQueue is null)
+            return false;
+
+        if (HumanHandoffRequestPolicy.IsHumanQueueName(selectedQueue.Name))
+        {
+            await PersistAutomaticHandoffAsync(
+                message.TenantId,
+                message,
+                conversation,
+                "queue_selection",
+                ResolveQueueTransferMessage(selectedQueue, botConfig),
+                "queue-human-transfer",
+                dbContext,
+                messageRepository,
+                conversationRepository,
+                outboxRepository,
+                handoffEventRepository,
+                cancellationToken,
+                selectedQueue.Id);
+            return true;
+        }
+
+        var isWaitingInCurrentQueue = currentQueue is not null && currentQueue.Id == selectedQueue.Id;
+        await PersistAutomaticQueueNoticeAsync(
+            message,
+            conversation,
+            selectedQueue,
+            isWaitingInCurrentQueue
+                ? ResolveQueueWaitingMessage(selectedQueue)
+                : ResolveQueueTransferMessage(selectedQueue, botConfig),
+            isWaitingInCurrentQueue ? "queue-waiting" : "queue-transfer",
+            dbContext,
+            cancellationToken);
+        logger.LogInformation(
+            isWaitingInCurrentQueue
+                ? "Conversation {ConversationId} remains in queue {QueueName}"
+                : "Conversation {ConversationId} moved automatically to queue {QueueName}",
+            conversation.Id,
+            selectedQueue.Name);
+        return true;
+    }
+
+    private static async Task PersistAutomaticQueueNoticeAsync(
+        Message inboundMessage,
+        Conversation conversation,
+        ServiceLine selectedQueue,
+        string noticeText,
+        string idempotencyPrefix,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var expectedConversationVersion = conversation.Version;
+            if (!AiReplyDeliveryGuard.CanSend(
+                    conversation, expectedConversationVersion, DateTime.UtcNow))
+            {
+                inboundMessage.MarkProcessedByAi();
+                dbContext.Set<Message>().Update(inboundMessage);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return;
+            }
+
+            if (conversation.QueueId != selectedQueue.Id)
+            {
+                conversation.AssignQueue(selectedQueue.Id);
+                dbContext.Set<Conversation>().Update(conversation);
+            }
+
+            var idempotencyKey = AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                idempotencyPrefix, inboundMessage.Id, conversation.Version);
+            var noticeAlreadyQueued = await dbContext.Messages
+                .IgnoreQueryFilters()
+                .AnyAsync(item =>
+                    item.TenantId == inboundMessage.TenantId &&
+                    item.ConversationId == inboundMessage.ConversationId &&
+                    item.IdempotencyKey == idempotencyKey &&
+                    item.Status != MessageStatus.Failed,
+                    cancellationToken);
+            if (!noticeAlreadyQueued && !string.IsNullOrWhiteSpace(noticeText))
+            {
+                var notice = Message.CreateOutbound(
+                    inboundMessage.TenantId,
+                    inboundMessage.ConversationId,
+                    inboundMessage.ContactId,
+                    MessageType.Text,
+                    noticeText,
+                    idempotencyKey);
+                dbContext.Set<Message>().Add(notice);
+                dbContext.Set<OutboxMessage>().Add(
+                    OutboxMessage.Create(inboundMessage.TenantId, notice.Id));
+            }
+
+            inboundMessage.MarkProcessedByAi();
+            dbContext.Set<Message>().Update(inboundMessage);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task ApplyQueueTagAsync(
+        Guid tenantId,
+        Guid contactId,
+        string? queueName,
+        IClientTagRepository tagRepository,
+        IContactTagRepository contactTagRepository,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(queueName))
+            return;
+
+        var allTenantTags = await tagRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
+        var queueTag = allTenantTags.FirstOrDefault(tag =>
+            tag.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
+        if (queueTag is null ||
+            await contactTagRepository.ExistsAsync(tenantId, contactId, queueTag.Id, cancellationToken))
+        {
+            return;
+        }
+
+        await contactTagRepository.AddAsync(
+            ContactTag.Create(contactId, queueTag.Id, tenantId), cancellationToken);
     }
 
     internal static ServiceLine? SelectBotRoutingQueue(
