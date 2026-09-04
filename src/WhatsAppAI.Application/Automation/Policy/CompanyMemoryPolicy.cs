@@ -1,4 +1,5 @@
 using WhatsAppAI.Domain.Knowledge;
+using WhatsAppAI.Application.Automation.Context;
 
 namespace WhatsAppAI.Application.Automation.Policy;
 
