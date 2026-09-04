@@ -341,12 +341,15 @@ public sealed class AiOrchestrationWorker(
 
             var automaticDistributionEnabled = await dbContext.HasAutomaticDistributionEnabledAsync(
                 message.TenantId, cancellationToken);
+            var activeQueues = automaticDistributionEnabled
+                ? await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken)
+                : [];
             var configuredQueueIds = automaticDistributionEnabled
                 ? credential.GetRoutingQueueIds().ToHashSet()
                 : [];
             List<ServiceLine> routingQueues = configuredQueueIds.Count == 0
                 ? []
-                : (await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken))
+                : activeQueues
                     .Where(queue => configuredQueueIds.Contains(queue.Id))
                     .ToList();
 
@@ -354,7 +357,7 @@ public sealed class AiOrchestrationWorker(
             // consulting the model. This also keeps an assigned queue responsive
             // without spending an AI response quota for every follow-up message.
             if (await HandleAutomaticQueueMessageAsync(
-                    message, conversation, botConfig, routingQueues,
+                    message, conversation, botConfig, activeQueues,
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
                     contactTagRepository, cancellationToken))
@@ -601,34 +604,10 @@ public sealed class AiOrchestrationWorker(
                     return;
                 }
 
-                conversation.AssignQueue(routingQueueId);
-                await conversationRepository.UpdateAsync(conversation, cancellationToken);
-                // Queue routing is an internal change; use its new version for the final delivery guard.
-                expectedConversationVersion = conversation.Version;
-                logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName}",
-                    conversation.Id, response.Decision.QueueName);
-
-                // Send queue transfer message to client
-                var queueTransferText = ResolveQueueTransferMessage(selectedRoutingQueue, botConfig);
-
-                var queueTransferMsg = Message.CreateOutbound(
-                    message.TenantId, conversation.Id, message.ContactId,
-                    MessageType.Text,
-                    queueTransferText,
-                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                        "ai-queue-transfer", message.Id, expectedConversationVersion));
-                await messageRepository.AddAsync(queueTransferMsg, cancellationToken);
-
-                var queueTransferOutbox = OutboxMessage.Create(message.TenantId, queueTransferMsg.Id);
-                await outboxRepository.AddAsync(queueTransferOutbox);
-
-                await ApplyQueueTagAsync(
-                    message.TenantId,
-                    message.ContactId,
-                    response.Decision.QueueName,
-                    tagRepository,
-                    contactTagRepository,
-                    cancellationToken);
+                logger.LogWarning(
+                    "AI selected an unavailable routing queue {QueueId} for conversation {ConversationId}",
+                    routingQueueId,
+                    conversation.Id);
             }
 
             foreach (var tagId in categorizedTagIds)
@@ -1146,6 +1125,8 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
+        IClientTagRepository tagRepository,
+        IContactTagRepository contactTagRepository,
         CancellationToken cancellationToken)
     {
         if (activeQueues.Count == 0)
