@@ -540,14 +540,16 @@ public static class AiProviderEndpoints
             httpContext.RequestAborted,
             welcomeMessage,
             tenant?.Name);
-        var response = await aiProviderResolver.Resolve(credential.Provider).GetResponseAsync(new AiRequest
+        var simulationRequest = new AiRequest
         {
             ModelId = credential.ModelId,
             ApiKey = apiKey,
             SystemPrompt = simulationContext.SystemPrompt,
             MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
             Messages = simulationContext.Messages
-        });
+        };
+        var aiProvider = aiProviderResolver.Resolve(credential.Provider);
+        var response = await aiProvider.GetResponseAsync(simulationRequest);
         response = BehaviorPolicy.SanitizeResponse(response, botConfig?.ConfidenceThreshold ?? 0.5);
         var decision = DefaultGreetingPolicy.Apply(
             response.Decision,
@@ -559,6 +561,30 @@ public static class AiProviderEndpoints
             Decision = decision,
             Content = decision.Action == AiAction.Reply ? decision.Text : null
         };
+        if (KnownKnowledgeResponsePolicy.ShouldRequestInference(response, simulationContext.RelevantKnowledge))
+        {
+            var inferenceResponse = await aiProvider.GetResponseAsync(
+                simulationRequest with
+                {
+                    SystemPrompt = $"{simulationRequest.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.BuildInferenceInstruction()}"
+                });
+            if (inferenceResponse.Decision.Action == AiAction.Reply)
+            {
+                var inferredDecision = DefaultGreetingPolicy.Apply(
+                    BehaviorPolicy.SanitizeResponse(inferenceResponse, botConfig?.ConfidenceThreshold ?? 0.5).Decision,
+                    request.Message,
+                    isFirstInbound: true,
+                    personalizedWelcome: welcomeMessage);
+                response = inferenceResponse with
+                {
+                    Decision = inferredDecision,
+                    Content = inferredDecision.Action == AiAction.Reply ? inferredDecision.Text : null
+                };
+            }
+        }
+        response = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(
+            response,
+            simulationContext.RelevantKnowledge);
         response = KnownKnowledgeResponsePolicy.EnforceAuthorizedPricing(
             response,
             request.Message,

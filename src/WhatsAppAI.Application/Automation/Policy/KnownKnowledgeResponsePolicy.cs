@@ -53,7 +53,7 @@ public static class KnownKnowledgeResponsePolicy
         AiResponse response,
         IReadOnlyList<string> relevantKnowledge) =>
         response.Decision.Action == AiAction.Handoff &&
-        string.Equals(response.Decision.HandoffReason, "out_of_scope", StringComparison.OrdinalIgnoreCase) &&
+        response.Decision.HandoffReason is "out_of_scope" or "low_confidence" or "escalation_needed" &&
         relevantKnowledge.Count > 0;
 
     public static string BuildInferenceInstruction() =>

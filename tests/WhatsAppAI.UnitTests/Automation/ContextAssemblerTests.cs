@@ -353,6 +353,27 @@ public sealed class ContextAssemblerTests
         Assert.Contains("combinação de fatos compatíveis", KnownKnowledgeResponsePolicy.BuildInferenceInstruction(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("out_of_scope")]
+    [InlineData("low_confidence")]
+    [InlineData("escalation_needed")]
+    public void KnownKnowledgeResponsePolicy_RequestsInferenceForKnownButUncertainTopics(string reason)
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = reason,
+                Confidence = 0.4
+            }
+        };
+
+        Assert.True(KnownKnowledgeResponsePolicy.ShouldRequestInference(
+            response,
+            ["Serviço: A Atenz é uma solução para atendimento no WhatsApp."]));
+    }
+
     [Fact]
     public void KnownKnowledgeResponsePolicy_SummarizesMultiplePlansWithinReplyLimit()
     {
