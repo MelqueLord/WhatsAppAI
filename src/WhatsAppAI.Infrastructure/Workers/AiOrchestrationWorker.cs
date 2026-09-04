@@ -307,6 +307,49 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
+            var withinBusinessHoursForAi = BusinessHoursPolicy.IsOpen(
+                botConfig.BusinessHoursEnabled,
+                botConfig.BusinessHoursJson,
+                botConfig.TimeZoneId,
+                DateTime.UtcNow);
+            if (!withinBusinessHoursForAi)
+            {
+                if (string.IsNullOrWhiteSpace(botConfig.OfflineMessage))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation("AI skipped outside business hours for tenant {TenantId}", message.TenantId);
+                    return;
+                }
+
+                await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+                if (!AiReplyDeliveryGuard.CanSend(
+                        conversation, expectedConversationVersion, DateTime.UtcNow))
+                {
+                    message.MarkProcessedByAi();
+                    await messageRepository.UpdateAsync(message, cancellationToken);
+                    logger.LogInformation("Outside-hours reply discarded after conversation {ConversationId} changed", message.ConversationId);
+                    return;
+                }
+
+                var offlineMessage = Message.CreateOutbound(
+                    message.TenantId,
+                    message.ConversationId,
+                    message.ContactId,
+                    MessageType.Text,
+                    botConfig.OfflineMessage,
+                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                        "outside-business-hours", message.Id, expectedConversationVersion));
+                var offlineOutbox = OutboxMessage.Create(message.TenantId, offlineMessage.Id);
+                message.MarkProcessedByAi();
+                dbContext.Set<Message>().Add(offlineMessage);
+                dbContext.Set<OutboxMessage>().Add(offlineOutbox);
+                dbContext.Set<Message>().Update(message);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("AI sent outside-hours message for tenant {TenantId}", message.TenantId);
+                return;
+            }
+
             // Check if tenant plan has AI enabled
             if (!await dbContext.HasAiEnabledAsync(message.TenantId, cancellationToken))
             {
