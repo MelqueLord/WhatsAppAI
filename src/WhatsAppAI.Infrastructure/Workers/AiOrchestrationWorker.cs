@@ -41,7 +41,7 @@ public sealed class AiOrchestrationWorker(
             {
                 var hadWork = await ProcessInboundAsync(stoppingToken);
                 await Task.Delay(
-                    hadWork ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500),
+                    hadWork ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromMilliseconds(100),
                     stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
