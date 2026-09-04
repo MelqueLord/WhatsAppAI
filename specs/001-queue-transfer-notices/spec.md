@@ -83,6 +83,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 1. **Given** an automatic conversation is in any queue, **When** the customer asks about a topic covered by the tenant guidelines or knowledge, **Then** the AI evaluates the full context and sends the applicable response or performs the applicable configured action.
 2. **Given** an automatic conversation is in any queue, **When** the customer asks about a topic outside the configured service, **Then** the AI informs the customer that it will transfer the conversation to a human and the conversation changes to human mode.
 3. **Given** a new automatic conversation, **When** the first message is processed by the AI, **Then** the configured business-specific welcome message is provided to the AI as the first-contact response guidance.
+4. **Given** an existing automatic conversation, **When** the customer sends a short greeting such as `oi`, **Then** the AI considers the current message and the three previous messages before deciding how to continue, without restarting the welcome flow.
 
 ### Edge Cases
 
@@ -108,6 +109,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-010**: Queue assignment MUST NOT bypass the tenant AI guidelines or knowledge; a covered request MUST receive the configured AI response or action even while waiting in a queue.
 - **FR-QTN-011**: An out-of-scope AI decision MUST use the configured human-transfer message and switch the conversation to human mode.
 - **FR-QTN-012**: A configured business-specific welcome message MUST be included as guidance for the AI on the first inbound message only.
+- **FR-QTN-013**: The AI context MUST include the current inbound message and up to the three previous conversation messages; a greeting in an existing conversation MUST be treated as continuation when the history provides context.
 
 ### Key Entities
 

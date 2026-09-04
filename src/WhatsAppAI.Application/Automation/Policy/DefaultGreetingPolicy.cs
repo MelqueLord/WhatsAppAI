@@ -24,9 +24,10 @@ public static class DefaultGreetingPolicy
 
     public static bool IsGreeting(string? content) => Greetings.Contains(Normalize(content));
 
-    public static AiDecision Apply(AiDecision decision, string? content)
+    public static AiDecision Apply(AiDecision decision, string? content, bool isFirstInbound = true)
     {
-        if (!IsGreeting(content) ||
+        if (!isFirstInbound ||
+            !IsGreeting(content) ||
             decision.Action != AiAction.Handoff ||
             decision.HandoffReason is not ("out_of_scope" or "customer_request"))
             return decision;

@@ -506,7 +506,8 @@ public sealed class AiOrchestrationWorker(
                 response, botConfig.ConfidenceThreshold);
             response = sanitizedResponse with
             {
-                Decision = DefaultGreetingPolicy.Apply(sanitizedResponse.Decision, message.Content)
+                Decision = DefaultGreetingPolicy.Apply(
+                    sanitizedResponse.Decision, message.Content, isFirstInbound)
             };
             var routingResult = QueueRoutingPolicy.Apply(
                 response.Decision,

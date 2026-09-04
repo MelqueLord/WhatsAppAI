@@ -8,5 +8,6 @@
 6. Send a message with no applicable AI action while the conversation remains automatic in the queue and verify the customer receives `Aguarde, você está na fila Support para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.`.
 7. Send a keyword configured for a different authorized queue and verify the conversation moves there and receives that queue's transfer notice.
 8. Start a new automatic conversation and verify the configured business-specific welcome message is used as first-contact guidance for the AI.
-9. Clear the queue notice, repeat with a new automatic conversation, and verify the existing generic transfer message appears instead.
-10. Repeat the first scenario from a different tenant and verify only its own configured notice is used.
+9. In an existing queued conversation, send `oi` and verify the AI considers the current message plus the three previous messages instead of restarting the welcome flow.
+10. Clear the queue notice, repeat with a new automatic conversation, and verify the existing generic transfer message appears instead.
+11. Repeat the first scenario from a different tenant and verify only its own configured notice is used.

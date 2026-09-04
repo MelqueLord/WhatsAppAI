@@ -66,7 +66,7 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
-    public async Task BuildAsync_UsesBoundedRecentContextAndPreservesMandatoryInstructions()
+    public async Task BuildAsync_UsesCurrentAndThreePreviousMessagesAndPreservesMandatoryInstructions()
     {
         var tenantId = Guid.NewGuid();
         var knowledge = new FakeKnowledgeRepository(
@@ -87,7 +87,7 @@ public sealed class ContextAssemblerTests
         var context = await new ContextAssembler(queries, knowledge).BuildAsync(
             tenantId, Guid.NewGuid(), new string('d', 5_000), cancellationToken: CancellationToken.None);
 
-        Assert.Equal(2, context.Messages.Count);
+        Assert.Equal(4, context.Messages.Count);
         Assert.DoesNotContain(context.Messages, message => message.Content.Contains("mensagem-1-", StringComparison.Ordinal));
         Assert.All(context.Messages, message => Assert.True(message.Content.Length <= 180));
         Assert.True(context.SystemPrompt.Length <= 2_200);

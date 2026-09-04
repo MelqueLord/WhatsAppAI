@@ -39,7 +39,8 @@
 - [X] T015 [US5] Allow queued automatic messages to reach the AI, use the queue notice only for `no_action`, and preserve human handoff for out-of-scope decisions in `src/WhatsAppAI.Infrastructure/Workers/AiOrchestrationWorker.cs`.
 - [X] T016 [US5] Clarify the business-specific AI welcome message in `apps/web/src/features/bot/BotConfigPage.tsx` and document the queued-AI validation flow in `specs/001-queue-transfer-notices/quickstart.md`.
 - [X] T017 [US5] Enforce human handoff for AI decisions marked `out_of_scope` and cover the distinction from ambiguous human requests in `src/WhatsAppAI.Application/Automation/Policy/` and `tests/WhatsAppAI.UnitTests/Automation/`.
+- [X] T018 [US5] Expand AI context to the current message plus three previous messages and prevent greeting logic from restarting an existing conversation in `src/WhatsAppAI.Application/Automation/Context/` and `src/WhatsAppAI.Application/Automation/Policy/`, with unit coverage.
 
 ## Dependencies
 
-`T001 → T003/T004/T005 → T006/T007 → T009/T010/T011/T013 → T014/T015/T016/T017 → T008/T012`
+`T001 → T003/T004/T005 → T006/T007 → T009/T010/T011/T013 → T014/T015/T016/T017/T018 → T008/T012`

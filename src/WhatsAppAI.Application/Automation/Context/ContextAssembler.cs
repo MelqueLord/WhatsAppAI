@@ -11,7 +11,7 @@ public sealed class ContextAssembler(
     IKnowledgeItemRepository knowledgeRepository,
     IAiResponseExampleRepository? responseExampleRepository = null)
 {
-    private const int MaxMessages = 2;
+    private const int MaxMessages = 4;
     private const int MaxMessageCharacters = 180;
     private const int MaxKnowledgeItems = 1;
     private const int MaxKnowledgeItemCharacters = 300;
@@ -114,7 +114,7 @@ public sealed class ContextAssembler(
         bool isFirstInbound = false)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado.";
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
