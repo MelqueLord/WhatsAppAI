@@ -123,6 +123,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-024**: When business hours are enabled, the AI path MUST evaluate the configured timezone and weekly schedule before calling the provider; outside the schedule it MUST send the configured offline message through the durable outbox and not invoke the AI provider.
 - **FR-QTN-025**: Every automated customer-facing text reply, including AI, BOT, fallback, consent, queue and handoff messages, MUST be limited to 160 characters before entering the outbound queue.
 - **FR-QTN-026**: A generic pricing question without a plan name MUST retrieve the active pricing items for the tenant and guide the customer to choose a plan, while a named-plan question MUST prioritize only that plan's item.
+- **FR-QTN-027**: The tenant AI configuration MUST present one guided “Preparar agente” area with clear steps for company identity, agent behavior, knowledge and routing, and validation/activation, while preserving the existing persistence and authorization contracts.
 
 ### Key Entities
 

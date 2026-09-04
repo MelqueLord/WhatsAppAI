@@ -52,6 +52,7 @@
 - [X] T028 [US5] Apply the configured business-hours schedule to the AI path, sending the offline message durably and preserving conversation safety without restarting WhatsApp.
 - [X] T029 [US5] Enforce the 160-character limit on all automated outbound text paths and add regression coverage.
 - [X] T030 [US5] Route generic price questions to all active pricing items and guide plan selection within the response limit, with regression coverage.
+- [X] T031 [US5] Reorganize the tenant AI configuration into the guided “Preparar agente” flow with responsive steps for identity, behavior, knowledge/routing and test/activation, preserving existing endpoints and configuration behavior in `apps/web/src/features/integrations/ai/AiConfigPage.tsx`.
 
 ## Dependencies
 

@@ -54,21 +54,19 @@ describe('AiConfigPage', () => {
   it('renders all main sections after loading', async () => {
     renderPage()
     await waitFor(() => {
-      expect(screen.getByText('Atendimento com IA')).toBeInTheDocument()
+      expect(screen.getByText('Preparar agente')).toBeInTheDocument()
     }, { timeout: 5000 })
 
-    expect(screen.getByText('Provedor de IA')).toBeInTheDocument()
-    expect(screen.getByText('OpenAI')).toBeInTheDocument()
-    expect(screen.getByText('Modelo autorizado')).toBeInTheDocument()
-    expect(screen.getByText('Provedor administrado pela plataforma')).toBeInTheDocument()
+    expect(screen.getByText('1. Identidade')).toBeInTheDocument()
+    expect(screen.getByText('Descrição do negócio')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /2\. Comportamento/ }))
+    expect(screen.getByText('Regras da plataforma')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /3\. Conhecimento/ }))
+    expect(screen.getByText('Base de conhecimento')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /4\. Testar e ativar/ }))
+    expect(screen.getByText('Avaliação do modelo')).toBeInTheDocument()
     expect(screen.queryByText('API Key')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Testar conexão' })).not.toBeInTheDocument()
-    expect(screen.getByText('Regras estruturadas')).toBeInTheDocument()
-    expect(screen.getByText('Limiar de confiança')).toBeInTheDocument()
-    expect(screen.getByText('Descrição do negócio')).toBeInTheDocument()
-    expect(screen.getByText('Público-alvo')).toBeInTheDocument()
-    expect(screen.getByText('Produtos e serviços')).toBeInTheDocument()
-    expect(screen.getByText('Tom de voz')).toBeInTheDocument()
     expect(screen.queryByText('Mensagens automáticas')).not.toBeInTheDocument()
   })
 
@@ -83,8 +81,9 @@ describe('AiConfigPage', () => {
 
   it('simulates a decision without calling bot endpoints', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getByText('Simular antes de ativar')).toBeInTheDocument())
-    const input = screen.getByPlaceholderText('Digite uma mensagem de exemplo')
+    await waitFor(() => expect(screen.getByText('Preparar agente')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /4\. Testar e ativar/ }))
+    const input = screen.getByPlaceholderText('Ex.: Quero saber os preços dos planos')
     fireEvent.change(input, { target: { value: 'Preciso de ajuda' } })
     fireEvent.click(screen.getByRole('button', { name: 'Simular decisão' }))
     await waitFor(() => expect(screen.getByText('Motivo do handoff:')).toBeInTheDocument())
