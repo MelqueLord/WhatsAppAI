@@ -50,6 +50,7 @@
 - [X] T026 [US5] Enable bounded inference across compatible tenant facts for indirect company/service questions, with category-aware retrieval, prompt guidance and regression coverage.
 - [X] T027 [US5] Ask the configured AI provider for one bounded inference retry when relevant tenant facts are present before using the safe fallback, preserving explicit and safety handoffs.
 - [X] T028 [US5] Apply the configured business-hours schedule to the AI path, sending the offline message durably and preserving conversation safety without restarting WhatsApp.
+- [X] T029 [US5] Enforce the 160-character limit on all automated outbound text paths and add regression coverage.
 
 ## Dependencies
 

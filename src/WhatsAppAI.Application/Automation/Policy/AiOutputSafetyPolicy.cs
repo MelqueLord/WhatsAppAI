@@ -7,6 +7,20 @@ public static class AiOutputSafetyPolicy
     public const int MaxReplyCharacters = 160;
     public const string UnsafeContentHandoffReason = "unsafe_content";
 
+    public static string LimitReply(string? content)
+    {
+        var text = content?.Trim() ?? string.Empty;
+        if (text.Length <= MaxReplyCharacters)
+            return text;
+
+        var candidate = text[..(MaxReplyCharacters - 3)].TrimEnd();
+        var lastSpace = candidate.LastIndexOf(' ');
+        if (lastSpace >= MaxReplyCharacters / 2)
+            candidate = candidate[..lastSpace].TrimEnd();
+
+        return $"{candidate}...";
+    }
+
     private static readonly string[] SensitiveMarkers =
     [
         "system prompt",

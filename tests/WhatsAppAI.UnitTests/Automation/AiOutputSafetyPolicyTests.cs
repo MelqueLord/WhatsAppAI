@@ -52,6 +52,15 @@ public sealed class AiOutputSafetyPolicyTests
         Assert.Null(result.Content);
     }
 
+    [Fact]
+    public void LimitReply_KeepsEveryAutomatedMessageWithinWhatsAppLimit()
+    {
+        var result = AiOutputSafetyPolicy.LimitReply(new string('a', 200));
+
+        Assert.True(result.Length <= AiOutputSafetyPolicy.MaxReplyCharacters);
+        Assert.EndsWith("...", result, StringComparison.Ordinal);
+    }
+
     private static AiDecision Reply(string text) => new()
     {
         Action = AiAction.Reply,

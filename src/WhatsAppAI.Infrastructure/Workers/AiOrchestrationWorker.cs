@@ -288,7 +288,7 @@ public sealed class AiOrchestrationWorker(
                     var outboundMsg = Message.CreateOutbound(
                         message.TenantId, message.ConversationId, message.ContactId,
                         MessageType.Text,
-                        replyContent,
+                        AiOutputSafetyPolicy.LimitReply(replyContent),
                         AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
                             "simple-auto-reply", message.Id, expectedConversationVersion));
                     var outboxMsg = OutboxMessage.Create(message.TenantId, outboundMsg.Id);
@@ -337,7 +337,7 @@ public sealed class AiOrchestrationWorker(
                     message.ConversationId,
                     message.ContactId,
                     MessageType.Text,
-                    botConfig.OfflineMessage,
+                    AiOutputSafetyPolicy.LimitReply(botConfig.OfflineMessage),
                     AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
                         "outside-business-hours", message.Id, expectedConversationVersion));
                 var offlineOutbox = OutboxMessage.Create(message.TenantId, offlineMessage.Id);
@@ -800,7 +800,7 @@ public sealed class AiOrchestrationWorker(
                     message.ConversationId,
                     message.ContactId,
                     MessageType.Text,
-                    response.Content,
+                    AiOutputSafetyPolicy.LimitReply(response.Content),
                     AiReplyDeliveryGuard.CreateIdempotencyKey(
                         message.Id, expectedConversationVersion));
 
@@ -1004,7 +1004,7 @@ public sealed class AiOrchestrationWorker(
                 message.ConversationId,
                 message.ContactId,
                 MessageType.Text,
-                AiConsentOptInPolicy.ConfirmationMessage,
+                AiOutputSafetyPolicy.LimitReply(AiConsentOptInPolicy.ConfirmationMessage),
                 AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
                     "consent-confirmation", message.Id, expectedConversationVersion));
 
@@ -1043,7 +1043,7 @@ public sealed class AiOrchestrationWorker(
                 message.ConversationId,
                 message.ContactId,
                 MessageType.Text,
-                AiConsentOptInPolicy.RequestMessage,
+                AiOutputSafetyPolicy.LimitReply(AiConsentOptInPolicy.RequestMessage),
                 requestIdempotencyKey);
             dbContext.Messages.Add(request);
             dbContext.OutboxMessages.Add(OutboxMessage.Create(message.TenantId, request.Id));
@@ -1203,7 +1203,7 @@ public sealed class AiOrchestrationWorker(
             message.ConversationId,
             message.ContactId,
             MessageType.Text,
-            ResolveHandoffMessage(botConfig),
+            AiOutputSafetyPolicy.LimitReply(ResolveHandoffMessage(botConfig)),
             expectedConversationVersion is uint version
                 ? AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey("ai-unavailable", message.Id, version)
                 : $"ai-unavailable:{message.Id}");
@@ -1213,13 +1213,13 @@ public sealed class AiOrchestrationWorker(
     {
         var handoffMessage = botConfig?.HandoffMessage;
         if (!string.IsNullOrWhiteSpace(handoffMessage))
-            return handoffMessage;
+            return AiOutputSafetyPolicy.LimitReply(handoffMessage);
 
         var fallbackMessage = botConfig?.FallbackMessage;
         if (!string.IsNullOrWhiteSpace(fallbackMessage))
-            return fallbackMessage;
+            return AiOutputSafetyPolicy.LimitReply(fallbackMessage);
 
-        return "Vou encaminhar voce para um atendente.";
+        return AiOutputSafetyPolicy.LimitReply("Vou encaminhar voce para um atendente.");
     }
 
     internal static string ResolveQueueTransferMessage(BotConfiguration? botConfig)
@@ -1230,10 +1230,10 @@ public sealed class AiOrchestrationWorker(
     internal static string ResolveQueueTransferMessage(ServiceLine? queue, BotConfiguration? botConfig)
     {
         if (!string.IsNullOrWhiteSpace(queue?.TransferNotice))
-            return queue.TransferNotice;
+            return AiOutputSafetyPolicy.LimitReply(queue.TransferNotice);
 
         if (!string.IsNullOrWhiteSpace(botConfig?.QueueTransferMessage))
-            return botConfig.QueueTransferMessage;
+            return AiOutputSafetyPolicy.LimitReply(botConfig.QueueTransferMessage);
 
         return "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
     }
@@ -1365,7 +1365,7 @@ public sealed class AiOrchestrationWorker(
                     inboundMessage.ConversationId,
                     inboundMessage.ContactId,
                     MessageType.Text,
-                    noticeText,
+                    AiOutputSafetyPolicy.LimitReply(noticeText),
                     idempotencyKey);
                 dbContext.Set<Message>().Add(notice);
                 dbContext.Set<OutboxMessage>().Add(
@@ -1528,7 +1528,7 @@ public sealed class AiOrchestrationWorker(
                 conversation.Id,
                 inboundMessage.ContactId,
                 MessageType.Text,
-                handoffText,
+                AiOutputSafetyPolicy.LimitReply(handoffText),
                 AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
                     idempotencyPrefix, inboundMessage.Id, conversation.Version));
             await messageRepository.AddAsync(handoffMessage, cancellationToken);
