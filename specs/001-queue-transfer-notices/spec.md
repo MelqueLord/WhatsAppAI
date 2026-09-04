@@ -126,6 +126,8 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-027**: The tenant AI configuration MUST present one guided “Preparar agente” area with clear steps for company identity, agent behavior, knowledge and routing, and validation/activation, while preserving the existing persistence and authorization contracts.
 - **FR-QTN-028**: AI simulation MUST expose the sanitized names and types of the authorized tenant sources selected for the response, including profile, directions, knowledge items and examples, without exposing secrets, full prompts or personal data.
 - **FR-QTN-029**: Semantic retrieval MUST expand natural intent groups such as pricing/plans and company/service/function questions before scoring knowledge items, while retaining tenant isolation and excluding unrelated items.
+- **FR-QTN-030**: Each tenant MUST receive ready-to-run AI scenarios that use its current configuration and cover welcome, company purpose, pricing, service, human request and out-of-scope behavior.
+- **FR-QTN-031**: AI instructions MUST support a tenant-scoped draft version and explicit publication; automated conversations MUST use only the last published version, while draft saves MUST NOT change live behavior.
 
 ### Key Entities
 

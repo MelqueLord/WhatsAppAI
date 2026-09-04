@@ -20,9 +20,24 @@ interface AiScenarioResult {
   confidence: number
   handoffReason?: string | null
   fallbackReason?: string | null
+  sources?: Array<{ type: string; name: string; detail: string }>
 }
 
 const scenarios = [
+  {
+    id: 'welcome',
+    name: 'Boas-vindas',
+    description: 'Confere se a IA inicia o atendimento com o perfil e o tom da sua empresa.',
+    message: 'Oi, é meu primeiro contato.',
+    icon: MessageCircleWarning,
+  },
+  {
+    id: 'company-purpose',
+    name: 'Sobre a empresa',
+    description: 'Testa se a IA explica o negócio mesmo quando a pergunta usa outras palavras.',
+    message: 'Pode me explicar como vocês podem me ajudar?',
+    icon: CircleHelp,
+  },
   {
     id: 'pricing',
     name: 'Preço',
@@ -203,6 +218,9 @@ export function AiScenarioTestsPage() {
               )}
               {result.fallbackReason && (
                 <p className="text-sm text-amber-700"><strong>Observação:</strong> {result.fallbackReason}</p>
+              )}
+              {result.sources && result.sources.length > 0 && (
+                <div className="border-t border-slate-100 pt-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dados usados no teste</p><div className="mt-2 space-y-2">{result.sources.map((source, index) => <div key={`${source.type}-${source.name}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-medium text-slate-800">{source.name}</p><p className="text-xs text-slate-500">{source.detail}</p></div>)}</div></div>
               )}
             </div>
           </section>

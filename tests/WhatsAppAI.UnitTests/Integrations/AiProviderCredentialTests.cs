@@ -31,7 +31,7 @@ public sealed class AiProviderCredentialTests
     }
 
     [Fact]
-    public void UpdateInstructions_PersistsDistinctRoutingQueues()
+    public void UpdateInstructions_PersistsDistinctDraftRoutingQueues()
     {
         var first = Guid.NewGuid();
         var second = Guid.NewGuid();
@@ -42,8 +42,8 @@ public sealed class AiProviderCredentialTests
         credential.UpdateInstructions(
             "Atenda brevemente", 300, credential.Version, [first, second, first], [tagId, tagId]);
 
-        Assert.Equal(new[] { first, second }.OrderBy(id => id), credential.GetRoutingQueueIds());
-        Assert.Equal(new[] { tagId }, credential.GetRoutingTagIds());
+        Assert.Equal(new[] { first, second }.OrderBy(id => id), credential.GetDraftRoutingQueueIds());
+        Assert.Equal(new[] { tagId }, credential.GetDraftRoutingTagIds());
     }
 
     [Fact]
@@ -57,8 +57,8 @@ public sealed class AiProviderCredentialTests
         Assert.Throws<ConcurrencyException>(() =>
             credential.UpdateInstructions("Versão obsoleta", 300, 0));
 
-        Assert.Equal("Versão atual", credential.SystemPrompt);
-        Assert.Equal(180, credential.MaxTokensPerResponse);
+        Assert.Equal("Versão atual", credential.DraftSystemPrompt);
+        Assert.Equal(180, credential.DraftMaxTokensPerResponse);
         Assert.Equal(currentVersion, credential.Version);
     }
 
@@ -70,6 +70,33 @@ public sealed class AiProviderCredentialTests
 
         credential.UpdateInstructions("Atenda brevemente", 1_000, credential.Version);
 
-        Assert.Equal(240, credential.MaxTokensPerResponse);
+        Assert.Equal(240, credential.DraftMaxTokensPerResponse);
+    }
+
+    [Fact]
+    public void PublishDraft_MakesOnlyTheDraftLive()
+    {
+        var credential = AiProviderCredential.Create(Guid.NewGuid(), "openai", "gpt-4o-mini", "secret-ref");
+        credential.UpdateInstructions("Versão de teste", 180, credential.Version);
+        credential.UpdateDraftConfidenceThreshold(0.8);
+
+        Assert.Null(credential.SystemPrompt);
+        credential.PublishDraft(credential.Version);
+
+        Assert.Equal("Versão de teste", credential.SystemPrompt);
+        Assert.Equal(credential.DraftVersion, credential.PublishedVersion);
+        Assert.True(credential.PublishedAt.HasValue);
+    }
+
+    [Fact]
+    public void PublishDraft_WithStaleVersionDoesNotOverwriteLiveConfiguration()
+    {
+        var credential = AiProviderCredential.Create(Guid.NewGuid(), "openai", "gpt-4o-mini", "secret-ref");
+        credential.UpdateInstructions("Rascunho", 180, credential.Version);
+        var version = credential.Version;
+        credential.UpdateInstructions("Outro rascunho", 180, credential.Version);
+
+        Assert.Throws<ConcurrencyException>(() => credential.PublishDraft(version));
+        Assert.Null(credential.SystemPrompt);
     }
 }

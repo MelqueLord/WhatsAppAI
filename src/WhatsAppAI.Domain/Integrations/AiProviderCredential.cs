@@ -9,13 +9,21 @@ public sealed class AiProviderCredential
     public string ApiKeyRef { get; private set; } = string.Empty;
     public string CredentialScope { get; private set; } = AiCredentialScopes.TenantProject;
     public string? SystemPrompt { get; private set; }
+    public string? DraftSystemPrompt { get; private set; }
     public string? RoutingQueueIdsJson { get; private set; }
+    public string? DraftRoutingQueueIdsJson { get; private set; }
     public string? RoutingTagIdsJson { get; private set; }
+    public string? DraftRoutingTagIdsJson { get; private set; }
     public int MaxTokensPerResponse { get; private set; } = 180;
+    public int DraftMaxTokensPerResponse { get; private set; } = 180;
+    public double DraftConfidenceThreshold { get; private set; } = 0.5;
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
     public uint Version { get; private set; }
+    public uint DraftVersion { get; private set; }
+    public uint PublishedVersion { get; private set; }
+    public DateTime? PublishedAt { get; private set; }
 
     private AiProviderCredential() { }
 
@@ -38,7 +46,8 @@ public sealed class AiProviderCredential
             ApiKeyRef = apiKeyRef,
             CredentialScope = AiCredentialScopes.Normalize(credentialScope),
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            DraftConfidenceThreshold = 0.5
         };
     }
 
@@ -66,10 +75,36 @@ public sealed class AiProviderCredential
             throw new ConcurrencyException(
                 $"Version conflict: expected {expectedVersion}, actual {Version}.");
 
-        SystemPrompt = systemPrompt?.Trim();
-        MaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 240);
-        RoutingQueueIdsJson = SerializeGuidList(routingQueueIds);
-        RoutingTagIdsJson = SerializeGuidList(routingTagIds);
+        DraftSystemPrompt = systemPrompt?.Trim();
+        DraftMaxTokensPerResponse = Math.Clamp(maxTokensPerResponse, 80, 240);
+        DraftRoutingQueueIdsJson = SerializeGuidList(routingQueueIds);
+        DraftRoutingTagIdsJson = SerializeGuidList(routingTagIds);
+        UpdatedAt = DateTime.UtcNow;
+        DraftVersion = Version + 1;
+        Version++;
+    }
+
+    public void UpdateDraftConfidenceThreshold(double confidenceThreshold)
+    {
+        if (double.IsNaN(confidenceThreshold) || confidenceThreshold is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(confidenceThreshold));
+
+        DraftConfidenceThreshold = confidenceThreshold;
+    }
+
+    public void PublishDraft(uint expectedVersion)
+    {
+        if (Version != expectedVersion)
+            throw new ConcurrencyException($"Version conflict: expected {expectedVersion}, actual {Version}.");
+        if (DraftVersion == 0)
+            throw new InvalidOperationException("There is no AI draft to publish.");
+
+        SystemPrompt = DraftSystemPrompt;
+        MaxTokensPerResponse = DraftMaxTokensPerResponse;
+        RoutingQueueIdsJson = DraftRoutingQueueIdsJson;
+        RoutingTagIdsJson = DraftRoutingTagIdsJson;
+        PublishedVersion = DraftVersion;
+        PublishedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
@@ -78,6 +113,10 @@ public sealed class AiProviderCredential
     {
         return ParseGuidList(RoutingTagIdsJson);
     }
+
+    public IReadOnlyList<Guid> GetDraftRoutingTagIds() => ParseGuidList(DraftRoutingTagIdsJson);
+
+    public IReadOnlyList<Guid> GetDraftRoutingQueueIds() => ParseGuidList(DraftRoutingQueueIdsJson);
 
     public IReadOnlyList<Guid> GetRoutingQueueIds()
     {

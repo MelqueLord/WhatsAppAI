@@ -33,6 +33,9 @@ public static class AiProviderEndpoints
         group.MapPut("/instructions", UpdateInstructionsAsync)
             .WithName("UpdateAiInstructions");
 
+        group.MapPost("/instructions/publish", PublishInstructionsAsync)
+            .WithName("PublishAiInstructions");
+
         group.MapPost("/test-connection", TestConnectionAsync)
             .WithName("TestAiConnection");
 
@@ -85,13 +88,22 @@ public static class AiProviderEndpoints
             provider = credential is null ? null : provider,
             modelId = credential is null ? null : modelId,
             systemPrompt = credential?.SystemPrompt,
+            draftSystemPrompt = credential?.DraftSystemPrompt ?? credential?.SystemPrompt,
             routingQueueIds = credential?.GetRoutingQueueIds() ?? [],
             routingTagIds = credential?.GetRoutingTagIds() ?? [],
+            draftRoutingQueueIds = credential?.GetDraftRoutingQueueIds() ?? credential?.GetRoutingQueueIds() ?? [],
+            draftRoutingTagIds = credential?.GetDraftRoutingTagIds() ?? credential?.GetRoutingTagIds() ?? [],
             maxTokensPerResponse = credential?.MaxTokensPerResponse ?? 180,
+            draftMaxTokensPerResponse = credential?.DraftMaxTokensPerResponse ?? credential?.MaxTokensPerResponse ?? 180,
             confidenceThreshold = botConfig?.ConfidenceThreshold ?? 0.5,
+            draftConfidenceThreshold = credential?.DraftConfidenceThreshold ?? botConfig?.ConfidenceThreshold ?? 0.5,
             guidelines = AiGuidelinePolicy.Rules,
             isActive = credential?.IsActive,
             version = credential?.Version,
+            draftVersion = credential?.DraftVersion,
+            publishedVersion = credential?.PublishedVersion,
+            publishedAt = credential?.PublishedAt,
+            hasUnpublishedChanges = credential is not null && credential.DraftVersion > credential.PublishedVersion,
             botVersion = botConfig?.Version,
             aiActive = botConfig?.Enabled == true && botConfig.Mode == BotMode.AiPowered
         });
@@ -203,7 +215,6 @@ public static class AiProviderEndpoints
         [FromBody] UpdateAiInstructionsRequest request,
         ICurrentTenant currentTenant,
         IAiProviderCredentialRepository credentialRepository,
-        IBotConfigurationRepository botConfigRepository,
         IServiceLineRepository queueRepository,
         IClientTagRepository tagRepository,
         IAuditLogRepository auditLogRepository,
@@ -250,16 +261,6 @@ public static class AiProviderEndpoints
         if (Array.Exists(requestedTagIds, id => !activeTagIds.Contains(id)))
             return Results.BadRequest(new { error = "Selecione somente tags ativas desta empresa." });
 
-        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
-        if (request.ConfidenceThreshold is not null && botConfig is not null)
-        {
-            var botIfMatch = httpContext.Request.Headers["If-Match-Bot"].FirstOrDefault();
-            if (botIfMatch is null || !uint.TryParse(botIfMatch, out var expectedBotVersion))
-                return Results.BadRequest(new { error = "If-Match-Bot com a versão do BOT é obrigatório ao salvar o limiar." });
-            if (botConfig.Version != expectedBotVersion)
-                return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
-        }
-
         await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
         try
         {
@@ -269,19 +270,9 @@ public static class AiProviderEndpoints
                 expectedVersion,
                 requestedQueueIds,
                 requestedTagIds);
+            if (request.ConfidenceThreshold is double draftConfidenceThreshold)
+                credential.UpdateDraftConfidenceThreshold(draftConfidenceThreshold);
             await credentialRepository.UpdateAsync(credential, httpContext.RequestAborted);
-
-            if (botConfig is null)
-            {
-                botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
-                botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
-                await botConfigRepository.AddAsync(botConfig, httpContext.RequestAborted);
-            }
-            else
-            {
-                botConfig.UpdateConfidenceThreshold(request.ConfidenceThreshold ?? botConfig.ConfidenceThreshold);
-                await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
-            }
 
             await auditLogRepository.AddAsync(AuditLog.Create(
                 currentTenant.TenantId.Value,
@@ -289,7 +280,7 @@ public static class AiProviderEndpoints
                 "AI.InstructionsUpdated",
                 "AiProviderCredential",
                 credential.Id.ToString(),
-                $"provider={credential.Provider};model={credential.ModelId};confidence={botConfig.ConfidenceThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                $"provider={credential.Provider};model={credential.ModelId};draft_version={credential.DraftVersion}"),
                 httpContext.RequestAborted);
 
             await transaction.CommitAsync(httpContext.RequestAborted);
@@ -307,9 +298,60 @@ public static class AiProviderEndpoints
         {
             saved = true,
             version = credential.Version,
-            maxTokensPerResponse = credential.MaxTokensPerResponse,
-            confidenceThreshold = botConfig.ConfidenceThreshold
+            draftVersion = credential.DraftVersion,
+            publishedVersion = credential.PublishedVersion,
+            hasUnpublishedChanges = credential.DraftVersion > credential.PublishedVersion,
+            maxTokensPerResponse = credential.DraftMaxTokensPerResponse,
+            confidenceThreshold = credential.DraftConfidenceThreshold
         });
+    }
+
+    private static async Task<IResult> PublishInstructionsAsync(
+        ICurrentTenant currentTenant,
+        IAiProviderCredentialRepository credentialRepository,
+        IBotConfigurationRepository botConfigRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext)
+    {
+        if (currentTenant.TenantId is null) return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner") return Results.Forbid();
+        if (!await dbContext.HasAiEnabledAsync(currentTenant.TenantId.Value)) return Results.BadRequest(new { error = "AI not available in your plan." });
+
+        if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match com a versão do rascunho é obrigatório." });
+        if (!uint.TryParse(httpContext.Request.Headers["If-Match-Bot"].FirstOrDefault(), out var expectedBotVersion))
+            return Results.BadRequest(new { error = "If-Match-Bot com a versão do BOT é obrigatório ao publicar." });
+
+        var credential = await credentialRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (credential is null) return Results.BadRequest(new { error = "Configure um provedor de IA antes de publicar." });
+        var botConfig = await botConfigRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (botConfig is not null && botConfig.Version != expectedBotVersion)
+            return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            credential.PublishDraft(expectedVersion);
+            await credentialRepository.UpdateAsync(credential, httpContext.RequestAborted);
+            if (botConfig is null)
+            {
+                botConfig = BotConfiguration.Create(currentTenant.TenantId.Value);
+                botConfig.UpdateConfidenceThreshold(credential.DraftConfidenceThreshold);
+                await botConfigRepository.AddAsync(botConfig, httpContext.RequestAborted);
+            }
+            else
+            {
+                botConfig.UpdateConfidenceThreshold(credential.DraftConfidenceThreshold);
+                await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
+            }
+            await auditLogRepository.AddAsync(AuditLog.Create(currentTenant.TenantId.Value, currentTenant.UserId, "AI.InstructionsPublished", "AiProviderCredential", credential.Id.ToString(), $"published_version={credential.PublishedVersion}"), httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+            return Results.Ok(new { published = true, publishedVersion = credential.PublishedVersion, version = credential.Version, botVersion = botConfig.Version });
+        }
+        catch (ConcurrencyException) { return Results.Conflict(new { error = "O rascunho foi alterado por outro usuário." }); }
+        catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+        catch (DbUpdateConcurrencyException) { return Results.Conflict(new { error = "A configuração foi alterada por outro usuário." }); }
     }
 
     private static async Task<IResult> ToggleAsync(

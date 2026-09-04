@@ -54,6 +54,8 @@
 - [X] T030 [US5] Route generic price questions to all active pricing items and guide plan selection within the response limit, with regression coverage.
 - [X] T031 [US5] Reorganize the tenant AI configuration into the guided “Preparar agente” flow with responsive steps for identity, behavior, knowledge/routing and test/activation, preserving existing endpoints and configuration behavior in `apps/web/src/features/integrations/ai/AiConfigPage.tsx`.
 - [X] T032 [US5] Expand semantic intent groups for knowledge retrieval and expose sanitized simulation source metadata through `ContextAssembler`, the simulation endpoint and the preparation UI, with regression coverage.
+- [X] T033 [US5] Add ready-to-run tenant AI scenarios and show selected sources in the scenario test screen.
+- [X] T034 [US5] Add draft/published AI configuration state with versioned persistence, explicit publication endpoint, migration and UI controls; keep live automation on published values.
 
 ## Dependencies
 

@@ -45,16 +45,37 @@ public sealed class AiProviderCredentialConfiguration : IEntityTypeConfiguration
             .HasColumnName("system_prompt")
             .HasMaxLength(4000);
 
+        builder.Property(c => c.DraftSystemPrompt)
+            .HasColumnName("draft_system_prompt")
+            .HasMaxLength(4000);
+
         builder.Property(c => c.RoutingQueueIdsJson)
             .HasColumnName("routing_queue_ids_json")
+            .HasColumnType("TEXT");
+
+        builder.Property(c => c.DraftRoutingQueueIdsJson)
+            .HasColumnName("draft_routing_queue_ids_json")
             .HasColumnType("TEXT");
 
         builder.Property(c => c.RoutingTagIdsJson)
             .HasColumnName("routing_tag_ids_json")
             .HasColumnType("TEXT");
 
+        builder.Property(c => c.DraftRoutingTagIdsJson)
+            .HasColumnName("draft_routing_tag_ids_json")
+            .HasColumnType("TEXT");
+
         builder.Property(c => c.MaxTokensPerResponse)
             .HasColumnName("max_tokens_per_response")
+            .IsRequired();
+
+        builder.Property(c => c.DraftMaxTokensPerResponse)
+            .HasColumnName("draft_max_tokens_per_response")
+            .IsRequired();
+
+        builder.Property(c => c.DraftConfidenceThreshold)
+            .HasColumnName("draft_confidence_threshold")
+            .HasDefaultValue(0.5)
             .IsRequired();
 
         builder.Property(c => c.IsActive)
@@ -74,6 +95,18 @@ public sealed class AiProviderCredentialConfiguration : IEntityTypeConfiguration
             .HasColumnName("version")
             .IsConcurrencyToken()
             .IsRequired();
+
+        builder.Property(c => c.DraftVersion)
+            .HasColumnName("draft_version")
+            .IsRequired();
+
+        builder.Property(c => c.PublishedVersion)
+            .HasColumnName("published_version")
+            .IsRequired();
+
+        builder.Property(c => c.PublishedAt)
+            .HasColumnName("published_at")
+            .HasColumnType("timestamp with time zone");
 
         builder.HasIndex(c => new { c.TenantId, c.Provider })
             .IsUnique();
