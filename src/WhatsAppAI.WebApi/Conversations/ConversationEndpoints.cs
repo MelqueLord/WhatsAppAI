@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Domain;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Domain.Messaging;
@@ -33,6 +35,9 @@ public static class ConversationEndpoints
         group.MapPost("/{conversationId:guid}/messages", SendMessageAsync)
             .WithName("SendMessage");
 
+        group.MapPost("/{conversationId:guid}/close", CloseConversationAsync)
+            .WithName("CloseConversation");
+
         return app;
     }
 
@@ -46,13 +51,23 @@ public static class ConversationEndpoints
         int limit = 50,
         string? operatorUserId = null,
         string? lineConnectionType = null,
-        int? lineNumber = null)
+        int? lineNumber = null,
+        string? status = null)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
 
         if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
             return Results.StatusCode(StatusCodes.Status423Locked);
+
+        ConversationStatus? requestedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<ConversationStatus>(status, true, out var parsedStatus) ||
+                !Enum.IsDefined(parsedStatus))
+                return Results.BadRequest(new { error = "Invalid conversation status. Use Open or Closed." });
+            requestedStatus = parsedStatus;
+        }
 
         List<string>? phoneNumberIds = null;
         Guid? queueId = null;
@@ -70,7 +85,9 @@ public static class ConversationEndpoints
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
 
             selectedMembership.LoadAssignedLinesFromJson();
-            queueId = selectedMembership.AssignedQueueId;
+            queueId = requestedStatus == ConversationStatus.Closed
+                ? null
+                : selectedMembership.AssignedQueueId;
             phoneNumberIds = await ResolvePhoneNumberIdsAsync(
                 selectedMembership, currentTenant.TenantId.Value, accountRepository);
             if (phoneNumberIds.Count == 0)
@@ -84,7 +101,9 @@ public static class ConversationEndpoints
             var membership = await membershipRepository.GetByUserAndTenantAsync(
                 currentTenant.UserId.Value, currentTenant.TenantId.Value);
             membership?.LoadAssignedLinesFromJson();
-            queueId = membership?.AssignedQueueId;
+            queueId = requestedStatus == ConversationStatus.Closed
+                ? null
+                : membership?.AssignedQueueId;
 
             // If the operator requested a specific line tab, resolve only that line
             if (!string.IsNullOrWhiteSpace(lineConnectionType) && lineNumber is not null &&
@@ -109,7 +128,8 @@ public static class ConversationEndpoints
             new CursorPaginationRequest { Cursor = cursor, Limit = limit },
             operatorUserId,
             phoneNumberIds,
-            queueId);
+            queueId,
+            requestedStatus);
 
         return Results.Ok(result);
     }
@@ -188,6 +208,9 @@ public static class ConversationEndpoints
         var conversation = await conversationRepository.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId)
             return Results.NotFound();
+
+        if (conversation.Status == ConversationStatus.Closed)
+            return Results.Conflict(new { error = "Conversation is closed. Wait for a new customer message to reopen it." });
 
         if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
         {
@@ -279,6 +302,77 @@ public static class ConversationEndpoints
         return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
     }
 
+    private static async Task<IResult> CloseConversationAsync(
+        Guid conversationId,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IAuditLogRepository auditLogRepository,
+        AppDbContext dbContext,
+        HttpContext httpContext,
+        IHubContext<InboxHub> hubContext)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        if (conversation is null || conversation.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+
+        if (conversation.Status == ConversationStatus.Closed)
+            return Results.Conflict(new { error = "Conversation is closed. Wait for a new customer message to reopen it." });
+
+        if (!await OperatorCanAccessConversationAsync(
+                conversationId,
+                currentTenant,
+                conversationRepository,
+                membershipRepository,
+                accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+
+        var ifMatch = httpContext.Request.Headers["If-Match"].FirstOrDefault();
+        if (ifMatch is null || !uint.TryParse(ifMatch.Trim('"'), out var expectedVersion))
+            return Results.BadRequest(new { error = "If-Match header with version is required." });
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(httpContext.RequestAborted);
+        try
+        {
+            conversation.Close(expectedVersion);
+            await conversationRepository.UpdateAsync(conversation, httpContext.RequestAborted);
+            await auditLogRepository.AddAsync(AuditLog.Create(
+                currentTenant.TenantId.Value,
+                currentTenant.UserId.Value,
+                "Conversation.Closed",
+                "Conversation",
+                conversationId.ToString(),
+                "Conversation closed by operator"),
+                httpContext.RequestAborted);
+            await transaction.CommitAsync(httpContext.RequestAborted);
+        }
+        catch (ConcurrencyException)
+        {
+            return Results.Conflict(new { error = "Version conflict. Conversation was modified." });
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "Version conflict. Conversation was modified." });
+        }
+
+        await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}")
+            .SendAsync(InboxHubMethods.ConversationUpdated, new { conversationId }, httpContext.RequestAborted);
+
+        return Results.Ok(new
+        {
+            id = conversation.Id,
+            status = conversation.Status.ToString(),
+            version = conversation.Version
+        });
+    }
+
     private static async Task<bool> IsTenantActiveAsync(Guid tenantId, AppDbContext dbContext)
     {
         var tenant = await dbContext.Tenants.FindAsync(tenantId);
@@ -314,7 +408,9 @@ public static class ConversationEndpoints
 
         var includeManual = phoneNumberIds.Exists(p =>
             p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) && p.EndsWith(":1"));
-        return membership.CanAccessQueue(conversation.QueueId) &&
+        var canAccessQueue = conversation.Status == ConversationStatus.Closed ||
+            membership.CanAccessQueue(conversation.QueueId);
+        return canAccessQueue &&
             phoneNumberIds.Count > 0 &&
             (phoneNumberIds.Contains(conversation.PhoneNumberId) ||
              (conversation.PhoneNumberId == "manual" && includeManual));

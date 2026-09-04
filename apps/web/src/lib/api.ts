@@ -482,7 +482,7 @@ export const api = {
   },
 
   conversations: {
-    list: (cursor?: string, limit = 50, operatorUserId?: string, lineFilter?: { connectionType: string; lineNumber: number }) => {
+    list: (cursor?: string, limit = 50, operatorUserId?: string, lineFilter?: { connectionType: string; lineNumber: number }, status = 'Open') => {
       const params = new URLSearchParams()
       params.set('limit', String(limit))
       if (cursor) params.set('cursor', cursor)
@@ -491,6 +491,7 @@ export const api = {
         params.set('lineConnectionType', lineFilter.connectionType)
         params.set('lineNumber', String(lineFilter.lineNumber))
       }
+      params.set('status', status)
       return fetchApi<CursorPaginationResponse<Conversation>>(`/api/conversations?${params.toString()}`)
     },
 
@@ -529,6 +530,15 @@ export const api = {
           method: 'PUT',
           body: JSON.stringify({ mode }),
           headers: version ? { 'If-Match': version.toString() } : {},
+        }
+      ),
+
+    close: (id: string, version: number) =>
+      fetchApi<{ id: string; status: string; version: number }>(
+        `/api/conversations/${id}/close`,
+        {
+          method: 'POST',
+          headers: { 'If-Match': version.toString() },
         }
       ),
   },

@@ -21,16 +21,19 @@ import {
   Wifi,
   WifiOff,
   UserPlus,
+  XCircle,
 } from 'lucide-react'
 
 interface MessagePanelProps {
   conversation: Conversation
   onBack?: () => void
+  onConversationClosed?: () => void
 }
 
 export function MessagePanel({
   conversation,
   onBack,
+  onConversationClosed,
 }: MessagePanelProps) {
   const { user } = useAuth()
   const queuesEnabled = user?.automaticDistributionEnabled === true
@@ -50,7 +53,8 @@ export function MessagePanel({
   const isPhoneNumber = /^\+?\d+$/.test(
     conversation.contactName.replace(/\s/g, '')
   )
-  const isConversationOpen = conversation.isQrCode || conversation.isWindowOpen
+  const isConversationClosed = conversation.status === 'Closed'
+  const isConversationOpen = !isConversationClosed && (conversation.isQrCode || conversation.isWindowOpen)
 
   const { data: serviceQueues = [] } = useQuery({
     queryKey: ['service-queues', 'active'],
@@ -142,6 +146,14 @@ export function MessagePanel({
       setSelectedQueueId(data.queueId ?? '')
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    },
+  })
+
+  const closeMutation = useMutation({
+    mutationFn: () => api.conversations.close(conversation.id, conversation.version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      onConversationClosed?.()
     },
   })
 
@@ -369,6 +381,22 @@ export function MessagePanel({
 
           {getModeBadge()}
 
+          {isConversationClosed ? (
+            <span className="rounded-lg bg-slate-700 px-2 py-1.5 text-xs font-medium text-slate-200">
+              Encerrada
+            </span>
+          ) : (
+            <button
+              onClick={() => closeMutation.mutate()}
+              disabled={closeMutation.isPending}
+              className="text-xs rounded-lg bg-red-50 px-2 py-1.5 font-medium text-red-700 disabled:opacity-50"
+              title="Mover para conversas encerradas"
+            >
+              <XCircle className="mr-1 inline h-3.5 w-3.5" />
+              {closeMutation.isPending ? 'Encerrando…' : 'Encerrar'}
+            </button>
+          )}
+
           <button
             onClick={() =>
               handleModeChange('Human')
@@ -514,7 +542,14 @@ export function MessagePanel({
 
       {/* Input */}
       <div className="bg-[#0b1222] border-t border-white/10 p-4">
-        {!isConversationOpen && (
+        {isConversationClosed ? (
+          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl p-3 mb-3">
+            <XCircle className="w-4 h-4 text-slate-500 flex-shrink-0" />
+            <p className="text-xs text-slate-600">
+              Conversa encerrada. Se o cliente enviar uma nova mensagem, ela será reaberta automaticamente com o histórico preservado.
+            </p>
+          </div>
+        ) : !isConversationOpen && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
 
@@ -526,7 +561,7 @@ export function MessagePanel({
           </div>
         )}
 
-        {!isConversationOpen && !conversation.isQrCode && (
+        {!isConversationClosed && !isConversationOpen && !conversation.isQrCode && (
           <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-[#10223f] p-3">
             <p className="text-xs font-medium text-slate-200">Enviar template aprovado pela Meta</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

@@ -11,14 +11,14 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
         Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, List<string>? phoneNumberIds = null,
-        Guid? queueId = null,
+        Guid? queueId = null, ConversationStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
 
         var query = context.Conversations
             .Include(c => c.Contact)
-            .Where(c => c.TenantId == tenantId)
+            .Where(c => c.TenantId == tenantId && c.Status == (status ?? ConversationStatus.Open))
             .AsQueryable();
 
         if (operatorUserId == "unassigned")

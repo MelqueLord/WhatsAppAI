@@ -130,6 +130,20 @@ public class ConversationTests
     }
 
     [Fact]
+    public void Close_ClearsActiveAssignment()
+    {
+        var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123");
+        conversation.AssignQueue(Guid.NewGuid());
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version, "user123");
+
+        conversation.Close(conversation.Version);
+
+        Assert.Equal(ConversationStatus.Closed, conversation.Status);
+        Assert.Null(conversation.QueueId);
+        Assert.Null(conversation.AssignedToUserId);
+    }
+
+    [Fact]
     public void Reopen_SetsStatusOpen()
     {
         var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123");
@@ -137,6 +151,31 @@ public class ConversationTests
         conversation.Reopen();
 
         Assert.Equal(ConversationStatus.Open, conversation.Status);
+    }
+
+    [Fact]
+    public void Reopen_ReturnsToAutomaticWithoutCreatingANewConversation()
+    {
+        var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123", ConversationMode.Human);
+        conversation.AssignQueue(Guid.NewGuid());
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version, "user123");
+        var originalId = conversation.Id;
+
+        conversation.Close();
+        conversation.Reopen();
+
+        Assert.Equal(originalId, conversation.Id);
+        Assert.Equal(ConversationMode.Automatic, conversation.Mode);
+        Assert.Null(conversation.QueueId);
+        Assert.Null(conversation.AssignedToUserId);
+    }
+
+    [Fact]
+    public void Close_ThrowsOnVersionConflict()
+    {
+        var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123");
+
+        Assert.Throws<ConcurrencyException>(() => conversation.Close(999));
     }
 
     [Fact]

@@ -78,16 +78,28 @@ public sealed class Conversation
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void Close()
+    public void Close(uint? expectedVersion = null)
     {
+        EnsureVersion(expectedVersion);
+        if (Status == ConversationStatus.Closed)
+            return;
+
         Status = ConversationStatus.Closed;
+        AssignedToUserId = null;
+        QueueId = null;
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
 
     public void Reopen()
     {
+        if (Status == ConversationStatus.Open)
+            return;
+
         Status = ConversationStatus.Open;
+        Mode = ConversationMode.Automatic;
+        AssignedToUserId = null;
+        QueueId = null;
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }
@@ -96,6 +108,12 @@ public sealed class Conversation
     {
         QueueId = queueId;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private void EnsureVersion(uint? expectedVersion)
+    {
+        if (expectedVersion.HasValue && Version != expectedVersion.Value)
+            throw new ConcurrencyException($"Version conflict: expected {expectedVersion.Value}, actual {Version}.");
     }
 }
 

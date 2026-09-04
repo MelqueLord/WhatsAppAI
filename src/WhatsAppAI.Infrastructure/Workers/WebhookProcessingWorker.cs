@@ -302,6 +302,9 @@ public sealed class WebhookProcessingWorker(
         }
         else
         {
+            // Reuse the same conversation when a customer returns after it was
+            // closed, preserving history for the next AI context window.
+            conversation.Reopen();
             // Only renew window for inbound customer messages
             conversation.RenewWindow();
             conversation.RecordMessage();

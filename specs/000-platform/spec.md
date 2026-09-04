@@ -119,6 +119,17 @@ Como PlatformAdmin, quero acompanhar o consumo de cada empresa e liberar ou reno
 3. A visão permite comparar a distribuição de tokens entre empresas para estimar o gasto da plataforma.
 4. O consumo é isolado por tenant e não expõe credenciais, prompts ou conteúdo de conversas.
 
+### US-014 — Encerrar e retomar conversas (P1)
+
+Como Operator, quero encerrar uma conversa quando o atendimento terminar e permitir que o cliente retome o contato sem perder o contexto.
+
+**Aceite:**
+
+1. O operador pode encerrar a conversa com um comando explícito; ela deixa a lista de abertas e aparece na fila de encerradas.
+2. O encerramento preserva a conversa e todas as suas mensagens, sem apagar histórico nem derrubar a conexão WhatsApp.
+3. Uma nova mensagem do cliente reabre a mesma conversa no modo automático, remove a atribuição humana e mantém o histórico disponível para a IA.
+4. Ao retomar, o contexto automático considera a mensagem recebida e até três mensagens anteriores, usando as diretrizes, o perfil e o conhecimento do tenant para guiar o atendimento.
+
 ### US-007 — Auditar operação (P2)
 
 Como PlatformAdmin, quero identificar falhas e ações relevantes sem ler segredos ou misturar clientes.
@@ -258,6 +269,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-060:** permitir executar múltiplas instâncias da ponte QR sem que duas instâncias controlem a mesma sessão; cada sessão deve ter lease exclusivo e renovável no PostgreSQL, e chamadas devem ser roteadas para a instância dona.
 - **FR-067:** criar para toda empresa nova uma finalidade ativa de atendimento automatizado por IA, com base legal de consentimento e retenção de 365 dias; a finalidade não substitui o registro individual de consentimento de cada contato.
 - **FR-068:** solicitar, uma única vez por conversa, o aceite padronizado para atendimento automatizado por IA ao contato sem consentimento ativo; ao receber a resposta explícita `SIM`, registrar evidência vinculada à mensagem recebida, confirmar o registro e habilitar os próximos atendimentos automáticos daquele contato no tenant corrente.
+- **FR-069:** permitir o encerramento explícito de uma conversa pelo operador, listá-la separadamente como encerrada sem apagar mensagens, e reabrir a mesma conversa no modo automático quando o cliente enviar nova mensagem, preservando o contexto recente.
 
 ## 6. Regras de negócio
 
@@ -297,6 +309,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem, publicar webhook de entrada ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
 - **BR-035:** a finalidade padrão de IA é isolada pelo tenant e não autoriza processamento por si só; uma evidência de consentimento ativa do contato continua obrigatória antes de uma resposta automática.
 - **BR-036:** somente a mensagem recebida cujo conteúdo normalizado seja exatamente `SIM` constitui aceite automatizado; a evidência registra a origem WhatsApp e a referência técnica da mensagem, sem registrar seu conteúdo em auditoria. Uma mensagem ambígua não concede consentimento.
+- **BR-037:** encerrar uma conversa altera somente seu estado operacional e remove atribuições ativas; uma nova mensagem do cliente reabre o mesmo registro, retorna ao modo `Automatic` e deixa a IA usar a mensagem atual e até três mensagens anteriores.
 
 ## 7. Requisitos não funcionais
 

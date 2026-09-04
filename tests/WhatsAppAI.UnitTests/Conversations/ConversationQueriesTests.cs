@@ -26,13 +26,16 @@ public sealed class ConversationQueriesTests
 
         var firstContact = Contact.Create(tenantId, "5511999990001", "First");
         var secondContact = Contact.Create(tenantId, "5511999990002", "Second");
+        var closedContact = Contact.Create(tenantId, "5511999990003", "Closed");
         var assignedConversation = Conversation.Create(tenantId, firstContact.Id, "phone-1");
         var otherConversation = Conversation.Create(tenantId, secondContact.Id, "phone-1");
+        var closedConversation = Conversation.Create(tenantId, closedContact.Id, "phone-1");
+        closedConversation.Close();
         assignedConversation.AssignQueue(assignedQueueId);
         otherConversation.AssignQueue(otherQueueId);
-        context.AddRange(firstContact, secondContact, assignedConversation, otherConversation);
+        context.AddRange(firstContact, secondContact, closedContact, assignedConversation, otherConversation, closedConversation);
         await context.SaveChangesAsync();
-        Assert.Equal(2, await context.Conversations.CountAsync());
+        Assert.Equal(3, await context.Conversations.CountAsync());
         Assert.Equal(assignedQueueId, await context.Conversations
             .Where(conversation => conversation.Id == assignedConversation.Id)
             .Select(conversation => conversation.QueueId)
@@ -46,9 +49,15 @@ public sealed class ConversationQueriesTests
         var generalResult = await queries.GetConversationsAsync(
             tenantId,
             new CursorPaginationRequest { Limit = 50 });
+        var closedResult = await queries.GetConversationsAsync(
+            tenantId,
+            new CursorPaginationRequest { Limit = 50 },
+            status: ConversationStatus.Closed);
 
         Assert.Collection(result.Items, item => Assert.Equal(assignedConversation.Id, item.Id));
         Assert.Equal(2, generalResult.Items.Count);
+        Assert.Single(closedResult.Items);
+        Assert.Equal(closedConversation.Id, closedResult.Items[0].Id);
     }
 
     private sealed class TenantContext(Guid tenantId) : ICurrentTenant

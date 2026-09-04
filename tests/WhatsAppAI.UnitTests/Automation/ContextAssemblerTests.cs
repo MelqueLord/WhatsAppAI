@@ -3,6 +3,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Automation;
+using WhatsAppAI.Domain.Messaging;
 
 namespace WhatsAppAI.UnitTests.Automation;
 
@@ -256,6 +257,7 @@ public sealed class ContextAssemblerTests
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
             Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null,
             List<string>? phoneNumberIds = null, Guid? queueId = null,
+            ConversationStatus? status = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new CursorPaginationResponse<ConversationDto>());
 

@@ -21,6 +21,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
   const [queueFilter, setQueueFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<'Open' | 'Closed'>('Open')
 
   // For operators with multiple lines: which line tab is selected (null = all)
   const assignedLines = user?.assignedLines ?? []
@@ -32,12 +33,13 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     : undefined
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['conversations', operatorFilter, activeLineFilter ?? 'all'],
+    queryKey: ['conversations', operatorFilter, activeLineFilter ?? 'all', statusFilter],
     queryFn: () => api.conversations.list(
       undefined,
       50,
       operatorFilter === 'all' ? undefined : operatorFilter,
-      activeLineFilter
+      activeLineFilter,
+      statusFilter
     ),
     refetchInterval: 30000,
     refetchOnMount: 'always',
@@ -136,8 +138,21 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
           </div>
         )}
 
+        <select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as 'Open' | 'Closed')
+            setQueueFilter('all')
+          }}
+          aria-label="Filtrar status das conversas"
+          className="w-full text-sm border border-white/10 rounded-lg px-3 py-1.5 bg-[#10223f] text-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="Open">Conversas abertas</option>
+          <option value="Closed">Conversas encerradas</option>
+        </select>
+
         {/* Queue filter */}
-        {queues.length > 0 && (
+        {statusFilter === 'Open' && queues.length > 0 && (
           <select
             value={queueFilter}
             onChange={(event) => setQueueFilter(event.target.value)}

@@ -102,6 +102,7 @@ export function InboxPage() {
             <MessagePanel
               conversation={selectedConversation}
               onBack={handleBack}
+              onConversationClosed={handleBack}
             />
           ) : (
             <EmptyState isConnected={isConnected} />
