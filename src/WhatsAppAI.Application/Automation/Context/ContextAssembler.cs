@@ -108,7 +108,7 @@ public sealed class ContextAssembler(
         ResponseExampleContext? responseExample = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use [].";
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 

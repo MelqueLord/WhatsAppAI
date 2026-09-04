@@ -62,6 +62,7 @@ public sealed class ContextAssemblerTests
         Assert.DoesNotContain("Maior prioridade:", context.SystemPrompt);
         Assert.DoesNotContain("Menor prioridade:", context.SystemPrompt);
         Assert.Contains("Não há conhecimento da empresa relevante", context.SystemPrompt);
+        Assert.Contains("Saudações curtas como oi", context.SystemPrompt);
     }
 
     [Fact]
