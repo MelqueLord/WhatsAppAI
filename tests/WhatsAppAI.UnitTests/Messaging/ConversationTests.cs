@@ -53,6 +53,17 @@ public class ConversationTests
     }
 
     [Fact]
+    public void AssignQueue_DoesNotAssumeConversation()
+    {
+        var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123");
+
+        conversation.AssignQueue(Guid.NewGuid());
+
+        Assert.Equal(ConversationMode.Automatic, conversation.Mode);
+        Assert.Null(conversation.AssignedToUserId);
+    }
+
+    [Fact]
     public void SwitchMode_ClearsAssignedUserWhenNotHuman()
     {
         var conversation = Conversation.Create(Guid.NewGuid(), Guid.NewGuid(), "phone123");

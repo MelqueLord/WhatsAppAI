@@ -74,7 +74,7 @@ As a customer waiting in an automated queue, I want a clear status message when 
 - A notice longer than the existing customer message safety limit is rejected before it can be saved.
 - Reprocessing the same inbound message does not create duplicate notices.
 - Repeated messages while waiting use an idempotent customer-facing response per inbound message.
-- A manual transfer follows the same queue-specific notice rule when it results in a customer notification.
+- A manual queue assignment does not itself assume the conversation; an explicit human mode action is required.
 
 ## Requirements *(mandatory)*
 
@@ -93,7 +93,7 @@ As a customer waiting in an automated queue, I want a clear status message when 
 ### Key Entities
 
 - **Queue transfer notice**: Optional customer-facing text attached to one queue in one company and used when that queue receives a conversation.
-- **Queue transfer event**: A movement of a conversation to a human queue that may create one outbound customer notification.
+- **Queue transfer event**: A movement of a conversation to a queue that may create one outbound customer notification while automation remains active.
 
 ## Success Criteria *(mandatory)*
 
@@ -112,4 +112,4 @@ As a customer waiting in an automated queue, I want a clear status message when 
 - Existing queues start with no notice and therefore require no migration action by the TenantOwner.
 - The current customer-message character limit applies to a queue transfer notice.
 - The standard waiting message is generated from the queue name and is not editable per tenant in this increment.
-- A queue named for human service continues to switch the conversation to human mode.
+- A queue named for human service does not switch the conversation to human mode until an operator explicitly assumes it.

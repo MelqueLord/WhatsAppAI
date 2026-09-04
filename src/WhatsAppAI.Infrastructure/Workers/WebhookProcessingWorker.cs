@@ -164,9 +164,6 @@ public sealed class WebhookProcessingWorker(
         var messageRepository = serviceProvider.GetRequiredService<IMessageRepository>();
         var encryptionService = serviceProvider.GetRequiredService<IEncryptionService>();
         var notifier = serviceProvider.GetRequiredService<IRealtimeNotifier>();
-        var queueRepository = serviceProvider.GetRequiredService<IServiceLineRepository>();
-        var tagRepository = serviceProvider.GetRequiredService<IClientTagRepository>();
-        var contactTagRepository = serviceProvider.GetRequiredService<IContactTagRepository>();
 
         try
         {
@@ -210,9 +207,6 @@ public sealed class WebhookProcessingWorker(
                                 contactRepository,
                                 conversationRepository,
                                 messageRepository,
-                                queueRepository,
-                                tagRepository,
-                                contactTagRepository,
                                 notifier,
                                 cancellationToken);
                         }
@@ -249,9 +243,6 @@ public sealed class WebhookProcessingWorker(
         IContactRepository contactRepository,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
-        IServiceLineRepository queueRepository,
-        IClientTagRepository tagRepository,
-        IContactTagRepository contactTagRepository,
         IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
@@ -337,32 +328,6 @@ public sealed class WebhookProcessingWorker(
 
         logger.LogInformation("Processed inbound message {MessageId} for contact {ContactId}",
             message.Id, contact.Id);
-
-        // Auto-assign queue based on keywords if conversation has no queue yet
-        if (conversation.QueueId is null && !string.IsNullOrWhiteSpace(content))
-        {
-            var queues = await queueRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
-            var matchedQueue = queues.FirstOrDefault(q => q.MatchesKeywords(content));
-            if (matchedQueue is not null)
-            {
-                conversation.AssignQueue(matchedQueue.Id);
-                await conversationRepository.UpdateAsync(conversation, cancellationToken);
-                logger.LogInformation("Conversation {ConversationId} auto-assigned to queue {QueueName} by keyword match",
-                    conversation.Id, matchedQueue.Name);
-
-                // Apply tag with same name as the queue (mirrors AI routing behaviour)
-                var allTenantTags = await tagRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
-                var queueTag = allTenantTags.FirstOrDefault(t =>
-                    t.Name.Equals(matchedQueue.Name, StringComparison.OrdinalIgnoreCase));
-                if (queueTag is not null &&
-                    !await contactTagRepository.ExistsAsync(tenantId, contact.Id, queueTag.Id, cancellationToken))
-                {
-                    await contactTagRepository.AddAsync(
-                        ContactTag.Create(contact.Id, queueTag.Id, tenantId),
-                        cancellationToken);
-                }
-            }
-        }
 
         // Notify frontend via SignalR so the conversation bubbles to the top immediately
         try

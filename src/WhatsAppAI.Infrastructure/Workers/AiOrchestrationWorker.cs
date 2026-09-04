@@ -220,7 +220,8 @@ public sealed class AiOrchestrationWorker(
                     if (await HandleAutomaticQueueMessageAsync(
                             message, conversation, botConfig, activeQueues,
                             dbContext, messageRepository, conversationRepository,
-                            outboxRepository, handoffEventRepository, cancellationToken))
+                            outboxRepository, handoffEventRepository, tagRepository,
+                            contactTagRepository, cancellationToken))
                     {
                         return;
                     }
@@ -355,7 +356,8 @@ public sealed class AiOrchestrationWorker(
             if (await HandleAutomaticQueueMessageAsync(
                     message, conversation, botConfig, routingQueues,
                     dbContext, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, cancellationToken))
+                    outboxRepository, handoffEventRepository, tagRepository,
+                    contactTagRepository, cancellationToken))
             {
                 return;
             }
@@ -572,8 +574,7 @@ public sealed class AiOrchestrationWorker(
             if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId is null)
             {
                 var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
-                if (selectedRoutingQueue is not null &&
-                    !HumanHandoffRequestPolicy.IsHumanQueueName(selectedRoutingQueue.Name))
+                if (selectedRoutingQueue is not null)
                 {
                     await responseQuotaService.ReleaseAsync(
                         message.TenantId, responseQuotaReservation!.Value, "queue-routing", cancellationToken);
@@ -956,6 +957,8 @@ public sealed class AiOrchestrationWorker(
         IConversationRepository conversationRepository,
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
+        IClientTagRepository tagRepository,
+        IContactTagRepository contactTagRepository,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
@@ -1166,25 +1169,6 @@ public sealed class AiOrchestrationWorker(
         if (selectedQueue is null)
             return false;
 
-        if (HumanHandoffRequestPolicy.IsHumanQueueName(selectedQueue.Name))
-        {
-            await PersistAutomaticHandoffAsync(
-                message.TenantId,
-                message,
-                conversation,
-                "queue_selection",
-                ResolveQueueTransferMessage(selectedQueue, botConfig),
-                "queue-human-transfer",
-                dbContext,
-                messageRepository,
-                conversationRepository,
-                outboxRepository,
-                handoffEventRepository,
-                cancellationToken,
-                selectedQueue.Id);
-            return true;
-        }
-
         var isWaitingInCurrentQueue = currentQueue is not null && currentQueue.Id == selectedQueue.Id;
         await PersistAutomaticQueueNoticeAsync(
             message,
@@ -1195,6 +1179,13 @@ public sealed class AiOrchestrationWorker(
                 : ResolveQueueTransferMessage(selectedQueue, botConfig),
             isWaitingInCurrentQueue ? "queue-waiting" : "queue-transfer",
             dbContext,
+            cancellationToken);
+        await ApplyQueueTagAsync(
+            message.TenantId,
+            message.ContactId,
+            selectedQueue.Name,
+            tagRepository,
+            contactTagRepository,
             cancellationToken);
         return true;
     }

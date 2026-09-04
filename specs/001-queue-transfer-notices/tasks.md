@@ -31,7 +31,8 @@
 - [X] T010 [US4] Preserve human-mode handoff behavior while allowing authorized keywords to move automatic conversations between queues.
 - [X] T011 [US4] Add unit coverage for the waiting message and queue-state transitions in `tests/WhatsAppAI.UnitTests/Automation/`.
 - [ ] T012 [US4] Validate duplicate-safe queue waiting outbox creation and update the quickstart flow.
+- [ ] T013 [US4] Keep every queue, including the human queue, automatic until an operator explicitly assumes the conversation; queue assignment alone must not switch mode.
 
 ## Dependencies
 
-`T001 → T003/T004/T005 → T006/T007 → T009/T010/T011 → T008/T012`
+`T001 → T003/T004/T005 → T006/T007 → T009/T010/T011/T013 → T008/T012`
