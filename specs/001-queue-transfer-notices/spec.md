@@ -116,6 +116,7 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-017**: For each automatic inbound message, the context assembler MUST consider the current message and recent user history when retrieving relevant knowledge and examples, tolerate accent/plural variations, and provide enough matching items for a multi-part request before using an out-of-scope handoff.
 - **FR-QTN-018**: General questions about the tenant's identity, business, services and platform operation MUST be answerable from the authorized tenant profile and service directions even when no specific knowledge item matches; missing knowledge alone MUST NOT trigger an out-of-scope handoff.
 - **FR-QTN-019**: The web client MUST prevent stale HTML from masking a deployed frontend update; the entry document MUST be served with no-cache/no-store directives while fingerprinted assets MAY use immutable long-term caching.
+- **FR-QTN-020**: When relevant authorized tenant knowledge is present for an automatic inbound message, an AI `out_of_scope` decision MUST NOT trigger human handoff; the backend MUST provide a safe answer from that knowledge, while preserving explicit human requests and other mandatory handoff reasons.
 
 ### Key Entities
 

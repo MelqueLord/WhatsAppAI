@@ -532,6 +532,16 @@ public sealed class AiOrchestrationWorker(
                 message.Content,
                 isFirstInbound,
                 welcomeMessage);
+            var recoveredKnowledgeResponse = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(
+                response,
+                context.RelevantKnowledge);
+            if (!ReferenceEquals(recoveredKnowledgeResponse, response))
+            {
+                logger.LogInformation(
+                    "Known tenant knowledge prevented an unnecessary out-of-scope handoff for conversation {ConversationId}",
+                    message.ConversationId);
+                response = recoveredKnowledgeResponse;
+            }
             var routingResult = QueueRoutingPolicy.Apply(
                 response.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),

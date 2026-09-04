@@ -236,6 +236,52 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void KnownKnowledgeResponsePolicy_RecoversOutOfScopeDecisionWhenFactWasFound()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = "out_of_scope",
+                Confidence = 0.97
+            },
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var recovered = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(
+            response,
+            ["Preços dos planos: Plano Flow custa R$ 299 por mês."]);
+
+        Assert.Equal(AiAction.Reply, recovered.Decision.Action);
+        Assert.Equal(recovered.Decision.Text, recovered.Content);
+        Assert.Contains("Plano Flow", recovered.Content, StringComparison.Ordinal);
+        Assert.Null(recovered.Decision.HandoffReason);
+    }
+
+    [Fact]
+    public void KnownKnowledgeResponsePolicy_DoesNotOverrideOtherHandoffReasons()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = "customer_request",
+                Confidence = 0.97
+            },
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var result = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(response, ["Fato autorizado."]);
+
+        Assert.Equal(AiAction.Handoff, result.Decision.Action);
+        Assert.Equal("customer_request", result.Decision.HandoffReason);
+    }
+
+    [Fact]
     public void ComposeSystemPrompt_MarksResponseExampleAsStyleOnly()
     {
         var prompt = ContextAssembler.ComposeSystemPrompt(

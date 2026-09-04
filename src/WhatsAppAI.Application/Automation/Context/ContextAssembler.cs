@@ -79,7 +79,8 @@ public sealed class ContextAssembler(
         return new ConversationContext
         {
             SystemPrompt = fullSystemPrompt,
-            Messages = messages
+            Messages = messages,
+            RelevantKnowledge = knowledgeTexts
         };
     }
 
@@ -114,7 +115,8 @@ public sealed class ContextAssembler(
                 welcomeMessage: welcomeMessage,
                 isFirstInbound: true,
                 businessName: businessName),
-            Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }]
+            Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }],
+            RelevantKnowledge = knowledgeTexts
         };
     }
 
@@ -441,4 +443,5 @@ public sealed record ConversationContext
 {
     public required string SystemPrompt { get; init; }
     public required IReadOnlyList<AiMessage> Messages { get; init; }
+    public IReadOnlyList<string> RelevantKnowledge { get; init; } = [];
 }
