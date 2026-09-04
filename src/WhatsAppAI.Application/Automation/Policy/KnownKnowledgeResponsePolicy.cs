@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class KnownKnowledgeResponsePolicy
@@ -21,11 +23,7 @@ public static class KnownKnowledgeResponsePolicy
             return response;
         }
 
-        var answer = string.Join(" ", relevantKnowledge)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Trim();
-        if (answer.Length > AiOutputSafetyPolicy.MaxReplyCharacters)
-            answer = answer[..(AiOutputSafetyPolicy.MaxReplyCharacters - 3)].TrimEnd() + "...";
+        var answer = BuildAnswer(relevantKnowledge);
 
         if (!AiOutputSafetyPolicy.IsSafe(answer))
             return response;
@@ -42,5 +40,28 @@ public static class KnownKnowledgeResponsePolicy
             Decision = decision,
             Content = answer
         };
+    }
+
+    private static string BuildAnswer(IReadOnlyList<string> relevantKnowledge)
+    {
+        var planSummaries = relevantKnowledge
+            .Select(item =>
+            {
+                var separator = item.IndexOf(':');
+                var title = separator > 0 ? item[..separator].Trim() : item.Trim();
+                var price = Regex.Match(item, @"R\$\s*[0-9.]+(?:,[0-9]{1,2})?", RegexOptions.IgnoreCase).Value;
+                return title.StartsWith("Plano", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(price)
+                    ? $"{title}: {price}"
+                    : null;
+            })
+            .Where(summary => summary is not null)
+            .Cast<string>()
+            .ToList();
+
+        var answer = planSummaries.Count >= 2
+            ? $"Temos {string.Join(", ", planSummaries)}. Qual plano deseja conhecer?"
+            : string.Join(" ", relevantKnowledge).Replace("\n", " ", StringComparison.Ordinal).Trim();
+
+        return AiOutputSafetyPolicy.LimitReply(answer);
     }
 }

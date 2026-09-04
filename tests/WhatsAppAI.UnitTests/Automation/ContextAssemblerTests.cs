@@ -354,6 +354,35 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void KnownKnowledgeResponsePolicy_SummarizesMultiplePlansWithinReplyLimit()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Handoff,
+                HandoffReason = "out_of_scope",
+                Confidence = 0.97
+            },
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var recovered = KnownKnowledgeResponsePolicy.RecoverKnownAnswer(
+            response,
+            [
+                "Plano STAR: O plano STAR custa R$ 149 por mês, inclui 1 linha.",
+                "Plano FLOW: O plano FLOW custa R$ 299 por mês, inclui 2 linhas.",
+                "Plano SCALA: O plano SCALA custa R$ 497 por mês, inclui 3 linhas."
+            ]);
+
+        Assert.Contains("STAR: R$ 149", recovered.Content, StringComparison.Ordinal);
+        Assert.Contains("FLOW: R$ 299", recovered.Content, StringComparison.Ordinal);
+        Assert.Contains("SCALA: R$ 497", recovered.Content, StringComparison.Ordinal);
+        Assert.True(recovered.Content!.Length <= AiOutputSafetyPolicy.MaxReplyCharacters);
+    }
+
+    [Fact]
     public void KnownKnowledgeResponsePolicy_DoesNotOverrideOtherHandoffReasons()
     {
         var response = new AiResponse
