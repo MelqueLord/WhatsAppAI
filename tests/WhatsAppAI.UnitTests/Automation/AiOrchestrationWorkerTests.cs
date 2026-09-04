@@ -60,7 +60,7 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
-    public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndPreservesExistingAssignment()
+    public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndLetsExplicitKeywordReplacePriorAssignment()
     {
         var tenantId = Guid.NewGuid();
         var matchingQueue = ServiceLine.Create(tenantId, "Financeiro");
@@ -72,8 +72,8 @@ public sealed class AiOrchestrationWorkerTests
             .SelectBotRoutingQueue(null, [matchingQueue, otherQueue], "Preciso da segunda via do boleto")?.Id);
         Assert.Equal(matchingQueue.Id, AiOrchestrationWorker
             .SelectBotRoutingQueue(matchingQueue.Id, [matchingQueue, otherQueue], "Quero saber sobre cobrança")?.Id);
-        Assert.Null(AiOrchestrationWorker
-            .SelectBotRoutingQueue(otherQueue.Id, [matchingQueue, otherQueue], "Preciso da segunda via do boleto"));
+        Assert.Equal(matchingQueue.Id, AiOrchestrationWorker
+            .SelectBotRoutingQueue(otherQueue.Id, [matchingQueue, otherQueue], "Preciso da segunda via do boleto")?.Id);
         Assert.Null(AiOrchestrationWorker
             .SelectBotRoutingQueue(null, [matchingQueue], "Quero saber o preço"));
     }
@@ -175,6 +175,7 @@ public sealed class AiOrchestrationWorkerTests
         await connection.OpenAsync();
         var tenantId = Guid.NewGuid();
         var queueId = Guid.NewGuid();
+        var priorQueueId = Guid.NewGuid();
         var currentTenant = new TestCurrentTenant(tenantId);
         var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
         await using var db = new AppDbContext(options, currentTenant);
@@ -182,6 +183,7 @@ public sealed class AiOrchestrationWorkerTests
 
         var contact = Contact.Create(tenantId, "+5511999999999");
         var conversation = Conversation.Create(tenantId, contact.Id, "manual");
+        conversation.AssignQueue(priorQueueId);
         var inbound = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "inbound-queue", MessageType.Text, "financeiro");
         db.Contacts.Add(contact);
         db.Conversations.Add(conversation);

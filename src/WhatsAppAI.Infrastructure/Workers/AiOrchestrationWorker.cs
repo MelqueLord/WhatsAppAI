@@ -1158,9 +1158,17 @@ public sealed class AiOrchestrationWorker(
         string? messageContent)
     {
         var text = messageContent ?? string.Empty;
+        var matchingQueues = activeQueues
+            .Where(queue => queue.MatchesKeywords(text))
+            .ToList();
+        if (matchingQueues.Count == 0)
+            return null;
+
+        // A matching current assignment remains preferred, but an explicit keyword
+        // may replace an earlier automatic classification while the bot owns the conversation.
         return assignedQueueId is Guid queueId
-            ? activeQueues.FirstOrDefault(queue => queue.Id == queueId && queue.MatchesKeywords(text))
-            : activeQueues.FirstOrDefault(queue => queue.MatchesKeywords(text));
+            ? matchingQueues.FirstOrDefault(queue => queue.Id == queueId) ?? matchingQueues[0]
+            : matchingQueues[0];
     }
 
     internal static async Task<bool> RegisterAutomaticHandoffAsync(
@@ -1230,7 +1238,7 @@ public sealed class AiOrchestrationWorker(
         var registered = await RegisterAutomaticHandoffAsync(
             tenantId, conversation, reason, conversationRepository, handoffEventRepository, cancellationToken);
 
-        if (registered && queueId is Guid selectedQueueId && conversation.QueueId is null)
+        if (registered && queueId is Guid selectedQueueId && conversation.QueueId != selectedQueueId)
         {
             conversation.AssignQueue(selectedQueueId);
             await conversationRepository.UpdateAsync(conversation, cancellationToken);
