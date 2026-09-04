@@ -536,7 +536,13 @@ public static class AiProviderEndpoints
             text = decision.Action == AiAction.Reply ? response.Content : null,
             confidence = decision.Confidence,
             handoffReason = decision.Action == AiAction.Handoff ? decision.HandoffReason : null,
-            fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null
+            fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null,
+            sources = simulationContext.RelevantSources.Select(source => new
+            {
+                type = source.Type,
+                name = source.Name,
+                detail = source.Detail
+            })
         });
     }
 

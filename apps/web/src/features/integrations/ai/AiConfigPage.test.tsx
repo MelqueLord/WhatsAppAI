@@ -36,7 +36,7 @@ describe('AiConfigPage', () => {
           isProviders
             ? [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o' }] }]
             : isSimulation
-              ? { decision: 'Handoff', confidence: 0.2, handoffReason: 'low_confidence', fallbackReason: 'A confiança ficou abaixo do limiar configurado.' }
+              ? { decision: 'Handoff', confidence: 0.2, handoffReason: 'low_confidence', fallbackReason: 'A confiança ficou abaixo do limiar configurado.', sources: [{ type: 'conhecimento', name: 'Preço da consulta', detail: 'Categoria: Pricing' }] }
             : isQueues || isTags
               ? []
             : {
@@ -90,6 +90,8 @@ describe('AiConfigPage', () => {
     expect(screen.getByText('Encaminhar para atendimento humano')).toBeInTheDocument()
     expect(screen.getByText('20%')).toBeInTheDocument()
     expect(screen.getByText('Confiança abaixo do limiar')).toBeInTheDocument()
+    expect(screen.getByText('Dados usados nesta simulação')).toBeInTheDocument()
+    expect(screen.getByText('Preço da consulta')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.objectContaining({ method: 'POST' }))
     expect(fetch).not.toHaveBeenCalledWith('/api/bot-config', expect.anything())
   })

@@ -94,7 +94,8 @@ public sealed class ContextAssembler(
     {
         var sanitizedMessage = AiContextSanitizer.RedactPersonalData(Limit(message, MaxMessageCharacters));
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
-        var knowledgeTexts = RetrieveKnowledge(knowledge, sanitizedMessage)
+        var selectedKnowledge = RetrieveKnowledge(knowledge, sanitizedMessage);
+        var knowledgeTexts = selectedKnowledge
             .Select(item => $"{Limit(AiContextSanitizer.RedactPersonalData(item.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(item.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
         IReadOnlyList<AiResponseExample> responseExamples = responseExampleRepository is null
@@ -116,7 +117,8 @@ public sealed class ContextAssembler(
                 isFirstInbound: true,
                 businessName: businessName),
             Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }],
-            RelevantKnowledge = knowledgeTexts
+            RelevantKnowledge = knowledgeTexts,
+            RelevantSources = BuildSimulationSources(systemPrompt, selectedKnowledge, responseExamples)
         };
     }
 
@@ -364,7 +366,7 @@ public sealed class ContextAssembler(
     {
         var purposeQuestion = queryTerms.Contains("funcionamento") ||
             queryTerms.Contains("plataforma") || queryTerms.Contains("servico");
-        var pricingQuestion = queryTerms.Contains("preco");
+        var pricingQuestion = queryTerms.Contains("preco") || queryTerms.Contains("plano") || queryTerms.Contains("mensalidade");
         if (!purposeQuestion && !pricingQuestion)
             return 0;
 
@@ -433,9 +435,18 @@ public sealed class ContextAssembler(
         if (terms.Count == 0)
             return terms;
 
+        if (terms.Contains("quanto") || terms.Contains("valor") || terms.Contains("custa") ||
+            terms.Contains("plano") || terms.Contains("mensalidade") || terms.Contains("assinatura"))
+        {
+            terms.Add("preco");
+            terms.Add("plano");
+            terms.Add("valor");
+        }
+
         if (terms.Contains("funcionamento") || terms.Contains("plataforma") ||
             terms.Contains("servico") || terms.Contains("beneficio") ||
-            terms.Contains("ajuda") || terms.Contains("permite") || terms.Contains("consegue"))
+            terms.Contains("ajuda") || terms.Contains("permite") || terms.Contains("consegue") ||
+            terms.Contains("empresa") || terms.Contains("atendimento") || terms.Contains("sobre"))
         {
             terms.Add("funcionamento");
             terms.Add("plataforma");
@@ -460,12 +471,34 @@ public sealed class ContextAssembler(
 
         return singular switch
         {
-            "serve" or "servir" or "funciona" or "funcionamento" or "faz" or "fazer" or "oferece" or "oferecer" or "utilidade" or "finalidade" or "uso" => "funcionamento",
+            "serve" or "servir" or "funciona" or "funcionamento" or "faz" or "fazer" or "oferece" or "oferecer" or "utilidade" or "finalidade" or "uso" or "explica" or "explicar" or "conhecer" => "funcionamento",
             "sistema" or "plataforma" or "solucao" or "ferramenta" => "plataforma",
-            "servico" or "produto" or "recurso" or "funcionalidade" or "beneficio" or "ajuda" or "permite" or "consegue" => "servico",
-            "custa" or "custar" or "valor" or "preco" => "preco",
+            "servico" or "produto" or "recurso" or "funcionalidade" or "beneficio" or "ajuda" or "permite" or "consegue" or "atendimento" => "servico",
+            "custa" or "custar" or "valor" or "preco" or "quanto" or "mensalidade" or "assinatura" or "plano" => "preco",
             _ => singular
         };
+    }
+
+    private static IReadOnlyList<SimulationSource> BuildSimulationSources(
+        string? systemPrompt,
+        IReadOnlyList<KnowledgeItem> knowledge,
+        IReadOnlyList<AiResponseExample> examples)
+    {
+        var sources = new List<SimulationSource>();
+        var configured = ParseConfiguredInstructions(systemPrompt);
+        if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
+            sources.Add(new SimulationSource("perfil", "Perfil da empresa", "Identidade, público, oferta e tom de voz."));
+        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
+            sources.Add(new SimulationSource("diretrizes", "Diretrizes da IA", "Regras de comportamento e limites."));
+        sources.AddRange(knowledge.Select(item => new SimulationSource(
+            "conhecimento",
+            Limit(AiContextSanitizer.RedactPersonalData(item.Title), 80),
+            $"Categoria: {item.Category}")));
+        sources.AddRange(examples.Select(example => new SimulationSource(
+            "exemplo",
+            Limit(AiContextSanitizer.RedactPersonalData(example.CustomerMessage), 100),
+            "Exemplo usado para orientar o estilo.")));
+        return sources;
     }
 
     private static string Limit(string? value, int maxCharacters)
@@ -495,4 +528,7 @@ public sealed record ConversationContext
     public required string SystemPrompt { get; init; }
     public required IReadOnlyList<AiMessage> Messages { get; init; }
     public IReadOnlyList<string> RelevantKnowledge { get; init; } = [];
+    public IReadOnlyList<SimulationSource> RelevantSources { get; init; } = [];
 }
+
+public sealed record SimulationSource(string Type, string Name, string Detail);

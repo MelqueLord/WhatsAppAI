@@ -542,6 +542,9 @@ public sealed class ContextAssemblerTests
         Assert.DoesNotContain("Endereço:", context.SystemPrompt, StringComparison.Ordinal);
         Assert.Contains(pricingExample.IdealResponse, context.SystemPrompt, StringComparison.Ordinal);
         Assert.DoesNotContain(schedulingExample.IdealResponse, context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains(context.RelevantSources, source => source.Type == "conhecimento" && source.Name == "Preço da consulta");
+        Assert.Contains(context.RelevantSources, source => source.Type == "exemplo" && source.Name == pricingExample.CustomerMessage);
+        Assert.DoesNotContain(context.RelevantSources, source => source.Name == "Endereço");
     }
 
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries

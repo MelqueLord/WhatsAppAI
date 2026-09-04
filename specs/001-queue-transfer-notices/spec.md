@@ -124,6 +124,8 @@ As a customer waiting in a queue, I want the configured AI service to continue a
 - **FR-QTN-025**: Every automated customer-facing text reply, including AI, BOT, fallback, consent, queue and handoff messages, MUST be limited to 160 characters before entering the outbound queue.
 - **FR-QTN-026**: A generic pricing question without a plan name MUST retrieve the active pricing items for the tenant and guide the customer to choose a plan, while a named-plan question MUST prioritize only that plan's item.
 - **FR-QTN-027**: The tenant AI configuration MUST present one guided “Preparar agente” area with clear steps for company identity, agent behavior, knowledge and routing, and validation/activation, while preserving the existing persistence and authorization contracts.
+- **FR-QTN-028**: AI simulation MUST expose the sanitized names and types of the authorized tenant sources selected for the response, including profile, directions, knowledge items and examples, without exposing secrets, full prompts or personal data.
+- **FR-QTN-029**: Semantic retrieval MUST expand natural intent groups such as pricing/plans and company/service/function questions before scoring knowledge items, while retaining tenant isolation and excluding unrelated items.
 
 ### Key Entities
 
