@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using WhatsAppAI.Infrastructure.Persistence;
 namespace WhatsAppAI.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905181142_SyncPendingAiModelChanges")]
+    partial class SyncPendingAiModelChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1371,10 +1374,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("profile_picture_url");
 
-                    b.Property<Guid?>("QueueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("queue_id");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -1386,10 +1385,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
-
-                    b.HasIndex("QueueId");
-
-                    b.HasIndex("TenantId", "QueueId");
 
                     b.HasIndex("TenantId", "PhoneNumber")
                         .IsUnique();
@@ -1550,14 +1545,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ConversationId", "OccurredAt");
 
                     b.ToTable("handoff_events", "whatsappai");
-                });
-
-            modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Contact", b =>
-                {
-                    b.HasOne("WhatsAppAI.Domain.Messaging.ServiceLine", null)
-                        .WithMany()
-                        .HasForeignKey("QueueId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Message", b =>
@@ -1780,16 +1767,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("keywords");
-
-                    b.Property<string>("InteractionReply")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("interaction_reply");
-
-                    b.Property<string>("TransferNotice")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("transfer_notice");
 
                     b.Property<string>("Name")
                         .IsRequired()
