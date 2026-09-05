@@ -799,6 +799,55 @@ public sealed class ContextAssemblerTests
         Assert.DoesNotContain("123", prompt, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Qual é o investimento mensal?", "Plano Flow", "A assinatura custa R$ 199 por mês.", KnowledgeCategories.Pricing)]
+    [InlineData("Quando vocês atendem?", "Expediente", "Funcionamos de segunda a sexta.", KnowledgeCategories.BusinessHours)]
+    [InlineData("Onde encontro vocês?", "Endereço", "Nossa unidade fica no Centro.", KnowledgeCategories.Location)]
+    [InlineData("Quero marcar um horário", "Agendamento", "Podemos agendar uma consulta.", KnowledgeCategories.Service)]
+    public void SemanticKnowledgeMatcher_MatchesIntentWithoutLiteralWords(
+        string query,
+        string title,
+        string content,
+        string category)
+    {
+        Assert.True(SemanticKnowledgeMatcher.Score(query, title, content, category) > 0);
+    }
+
+    [Fact]
+    public void SemanticKnowledgeMatcher_DoesNotMatchUnrelatedKnowledge()
+    {
+        var score = SemanticKnowledgeMatcher.Score(
+            "Meu cachorro gosta de brincar no parque",
+            "Segunda via de boleto",
+            "Acesse o portal financeiro para emitir o documento.",
+            KnowledgeCategories.Payment);
+
+        Assert.Equal(0, score);
+    }
+
+    [Fact]
+    public async Task BuildSimulationAsync_RanksSemanticIntentBeforeUnrelatedItems()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Formas de pagamento", "Aceitamos PIX e cartão.", 100, KnowledgeCategories.Payment),
+            KnowledgeItem.Create(tenantId, "Plano Flow", "A assinatura custa R$ 199 por mês.", 10, KnowledgeCategories.Pricing),
+            KnowledgeItem.Create(tenantId, "Endereço", "Nossa unidade fica no Centro.", 90, KnowledgeCategories.Location)
+        ]);
+
+        var context = await new ContextAssembler(
+            new FakeConversationQueries([]),
+            knowledge).BuildSimulationAsync(
+                tenantId,
+                "Qual é o investimento mensal?",
+                null);
+
+        Assert.Contains("Plano Flow:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Formas de pagamento:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Endereço:", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(

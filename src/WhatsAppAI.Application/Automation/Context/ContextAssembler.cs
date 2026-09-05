@@ -365,22 +365,13 @@ public sealed class ContextAssembler(
         IReadOnlyList<KnowledgeItem> knowledge,
         string query)
     {
-        var queryTerms = ExpandIntentTerms(query);
         var broadCompanyQuestion = IsBroadCompanyQuestion(query);
-
-        if (broadCompanyQuestion)
-        {
-            queryTerms.Add("funcionamento");
-            queryTerms.Add("plataforma");
-            queryTerms.Add("servico");
-            queryTerms.Add("atendimento");
-        }
 
         var ranked = knowledge
             .Select(item => new
             {
                 Item = item,
-                Score = Score(item, queryTerms) + InferredCategoryScore(item, queryTerms)
+                Score = SemanticKnowledgeMatcher.Score(query, item.Title, item.Content, item.Category)
             })
             .Where(result => result.Score > 0)
             .Where(result => !broadCompanyQuestion || IsCompanyOverviewCategory(result.Item.Category))
@@ -399,7 +390,7 @@ public sealed class ContextAssembler(
                 .ToList();
         }
 
-        if (queryTerms.Contains("preco"))
+        if (SemanticKnowledgeMatcher.IsPricingQuery(query))
         {
             var pricingItems = ranked
                 .Where(result => result.Item.Category == KnowledgeCategories.Pricing)
@@ -414,23 +405,6 @@ public sealed class ContextAssembler(
             .Take(MaxKnowledgeItems)
             .Select(result => result.Item)
             .ToList();
-    }
-
-    private static int InferredCategoryScore(KnowledgeItem item, HashSet<string> queryTerms)
-    {
-        var purposeQuestion = queryTerms.Contains("funcionamento") ||
-            queryTerms.Contains("plataforma") || queryTerms.Contains("servico");
-        var pricingQuestion = queryTerms.Contains("preco") || queryTerms.Contains("plano") || queryTerms.Contains("mensalidade");
-        if (!purposeQuestion && !pricingQuestion)
-            return 0;
-
-        return item.Category switch
-        {
-            KnowledgeCategories.Pricing when pricingQuestion => 3,
-            KnowledgeCategories.Service when purposeQuestion => 2,
-            KnowledgeCategories.General when purposeQuestion => 1,
-            _ => 0
-        };
     }
 
     private static bool IsCompanyOverviewCategory(string category) =>
@@ -477,18 +451,6 @@ public sealed class ContextAssembler(
             .Select(result => result.Example)
             .Take(maxExamples)
             .ToList();
-    }
-
-    private static int Score(KnowledgeItem item, HashSet<string> queryTerms)
-    {
-        if (queryTerms.Count == 0)
-            return 0;
-
-        var titleTerms = Tokenize(item.Title);
-        var contentTerms = Tokenize(item.Content);
-        return queryTerms.Sum(term =>
-            (titleTerms.Contains(term) ? 3 : 0) +
-            (contentTerms.Contains(term) ? 1 : 0));
     }
 
     private static HashSet<string> Tokenize(string value)

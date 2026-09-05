@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.32.0
+**Versão:** 0.33.0
 **Data:** 2026-09-05
 
 ## 1. Problema
@@ -276,6 +276,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-073:** oferecer catálogo ampliado de tipos de negócio e tons de conversa; o tipo selecionado deve orientar linguagem, triagem e respostas genéricas do agente, sem substituir fatos específicos da base da empresa.
 - **FR-074:** detectar perguntas genuinamente genéricas sem correspondência no conhecimento da empresa e permitir ao provedor de IA usar conhecimento público ou pesquisa web atual para responder, preservando a prioridade absoluta das informações do tenant.
 - **FR-075:** personalizar cada atendimento com identidade da empresa, nome seguro do contato, etapa de primeiro contato ou continuidade, fila atual e até quatro mensagens recentes, evitando reiniciar o diálogo ou repetir perguntas já respondidas.
+- **FR-076:** selecionar conhecimento do tenant por significado, combinando termos, sinônimos, intenção, categoria e tolerância a pequenas variações de escrita, sem depender de correspondência literal da pergunta.
 
 ## 6. Regras de negócio
 
@@ -322,6 +323,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-041:** o guia do tipo de negócio pode fundamentar somente explicações genéricas e a condução do atendimento; preço, prazo, disponibilidade, política, catálogo e qualquer condição específica exigem perfil, diretriz ou conhecimento cadastrado. O tom altera a forma, nunca os fatos.
 - **BR-042:** conhecimento público ou pesquisa web só pode ser usado quando não houver conhecimento relevante do tenant e a pergunta não solicitar fatos específicos da empresa nem orientação médica, jurídica ou financeira sensível; conteúdo público não pode ser atribuído à empresa nem virar memória institucional automaticamente.
 - **BR-043:** a personalização do atendimento é efêmera e tenant-scoped; o nome do contato deve ser sanitizado, não autoriza inferir gênero ou características pessoais e não cria memória pessoal automática. Estar em fila não desativa a IA enquanto a conversa permanecer em modo automático.
+- **BR-044:** a busca semântica deve operar somente sobre itens ativos do tenant já carregados pelo repositório, priorizar categoria compatível e manter no máximo seis fontes; similaridade isolada ou termo genérico não pode introduzir conhecimento não relacionado.
 
 ## 7. Requisitos não funcionais
 

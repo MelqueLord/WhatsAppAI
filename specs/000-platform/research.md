@@ -24,6 +24,8 @@ O adaptador utiliza Responses API e saída estruturada. O nome do modelo não ap
 
 Itens curtos e ativos são selecionados por categoria/limite e inseridos no contexto. Isso é suficiente para validar o produto. Busca vetorial exige ingestão, chunking, avaliação e operação adicionais; fica condicionada a volume e qualidade observados.
 
+A seleção local pode combinar correspondência lexical, conceitos equivalentes, intenção, categoria e tolerância a pequenas variações de escrita. Esse aprimoramento não cria embeddings, índice vetorial, nova persistência ou dependência operacional e preserva a decisão de manter RAG vetorial fora do MVP.
+
 ## R-006 — Sem n8n no núcleo
 
 Webhooks, filas, política e estado são regras centrais e precisam de testes, versionamento e atomicidade. n8n pode ser usado futuramente em automações periféricas, como notificação interna, desde que a aplicação continue funcionando sem ele.
