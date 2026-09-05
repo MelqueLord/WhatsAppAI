@@ -182,6 +182,45 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             })
             .ToListAsync(cancellationToken);
 
+        var responseMessageIds = messages
+            .Where(message => message.Direction == nameof(MessageDirection.Outbound))
+            .Select(message => message.Id)
+            .ToList();
+        if (responseMessageIds.Count > 0)
+        {
+            var interactions = await context.AiInteractions
+                .Where(interaction => interaction.TenantId == tenantId &&
+                    interaction.ResponseMessageId.HasValue &&
+                    responseMessageIds.Contains(interaction.ResponseMessageId.Value))
+                .Select(interaction => new
+                {
+                    interaction.ResponseMessageId,
+                    interaction.Id,
+                    interaction.FeedbackRating,
+                    interaction.FeedbackNote,
+                    interaction.CorrectedResponse
+                })
+                .ToListAsync(cancellationToken);
+
+            var interactionByMessageId = interactions
+                .Where(interaction => interaction.ResponseMessageId.HasValue)
+                .ToDictionary(interaction => interaction.ResponseMessageId!.Value);
+            messages = messages
+                .Select(message => interactionByMessageId.TryGetValue(message.Id, out var interaction)
+                    ? message with
+                    {
+                        AiInteractionId = interaction.Id,
+                        AiFeedback = interaction.FeedbackRating.HasValue
+                            ? new AiFeedbackDto(
+                                interaction.FeedbackRating.Value.ToString(),
+                                interaction.FeedbackNote,
+                                interaction.CorrectedResponse)
+                            : null
+                    }
+                    : message)
+                .ToList();
+        }
+
         var hasMore = messages.Count > limit;
         if (hasMore) messages.RemoveAt(messages.Count - 1);
 

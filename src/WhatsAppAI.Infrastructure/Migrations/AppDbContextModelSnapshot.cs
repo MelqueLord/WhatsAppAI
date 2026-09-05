@@ -118,6 +118,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
 
+                    b.Property<Guid?>("ResponseMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("response_message_id");
+
                     b.Property<string>("ModelId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -133,6 +137,29 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("response_id");
 
+                    b.Property<string>("FeedbackRating")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("feedback_rating");
+
+                    b.Property<string>("FeedbackNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("feedback_note");
+
+                    b.Property<string>("CorrectedResponse")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("corrected_response");
+
+                    b.Property<Guid?>("FeedbackByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feedback_by_user_id");
+
+                    b.Property<DateTime?>("FeedbackAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("feedback_at");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -142,6 +169,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "ConversationId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "ResponseMessageId")
+                        .IsUnique();
 
                     b.ToTable("ai_interactions", "whatsappai");
                 });

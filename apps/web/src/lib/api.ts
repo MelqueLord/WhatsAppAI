@@ -104,6 +104,12 @@ export interface Message {
   caption?: string
   createdAt: string
   senderName?: string
+  aiInteractionId?: string
+  aiFeedback?: {
+    rating: 'Helpful' | 'NeedsCorrection'
+    note?: string | null
+    correctedResponse?: string | null
+  } | null
 }
 
 export interface CursorPaginationResponse<T> {
@@ -541,6 +547,15 @@ export const api = {
           headers: { 'If-Match': version.toString() },
         }
       ),
+
+    submitAiFeedback: (
+      conversationId: string,
+      responseMessageId: string,
+      data: { rating: 'Helpful' | 'NeedsCorrection'; note?: string; correctedResponse?: string },
+    ) => fetchApi<{ interactionId: string; rating: string; correctionKnowledgeCreated: boolean }>(
+      `/api/conversations/${conversationId}/messages/${responseMessageId}/ai-feedback`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
   },
 
   serviceQueues: {

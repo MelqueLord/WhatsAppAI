@@ -831,6 +831,7 @@ public sealed class AiOrchestrationWorker(
                     AiOutputSafetyPolicy.LimitReply(response.Content),
                     AiReplyDeliveryGuard.CreateIdempotencyKey(
                         message.Id, expectedConversationVersion));
+                interaction.SetResponseMessageId(replyMessage.Id);
 
                 var outboxMessage = OutboxMessage.Create(message.TenantId, replyMessage.Id);
 

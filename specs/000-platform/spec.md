@@ -271,6 +271,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-068:** solicitar, uma única vez por conversa, o aceite padronizado para atendimento automatizado por IA ao contato sem consentimento ativo; ao receber a resposta explícita `SIM`, registrar evidência vinculada à mensagem recebida, confirmar o registro e habilitar os próximos atendimentos automáticos daquele contato no tenant corrente.
 - **FR-069:** permitir o encerramento explícito de uma conversa pelo operador, listá-la separadamente como encerrada sem apagar mensagens, e reabrir a mesma conversa no modo automático quando o cliente enviar nova mensagem, preservando o contexto recente.
 - **FR-070:** manter memória institucional automática por tenant, aproveitando respostas de IA com alta confiança e fundamentadas em conhecimento ativo para orientar atendimentos futuros da mesma empresa, sem compartilhar conteúdo entre tenants.
+- **FR-071:** permitir que Operator ou TenantOwner avalie uma resposta da IA como útil ou necessitando correção; uma correção textual sanitizada pode ser convertida em conhecimento validado do tenant, sem enviar uma nova mensagem automaticamente ao cliente.
 
 ## 6. Regras de negócio
 
@@ -312,6 +313,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-036:** somente a mensagem recebida cujo conteúdo normalizado seja exatamente `SIM` constitui aceite automatizado; a evidência registra a origem WhatsApp e a referência técnica da mensagem, sem registrar seu conteúdo em auditoria. Uma mensagem ambígua não concede consentimento.
 - **BR-037:** encerrar uma conversa altera somente seu estado operacional e remove atribuições ativas; uma nova mensagem do cliente reabre o mesmo registro, retorna ao modo `Automatic` e deixa a IA usar a mensagem atual e até três mensagens anteriores.
 - **BR-038:** memória institucional só pode ser criada a partir de resposta segura, com confiança mínima de 0,8 e ao menos uma fonte ativa do tenant; a pergunta deve ser sanitizada, a memória permanece tenant-scoped e não pode conter credenciais, dados pessoais ou conteúdo de outro tenant.
+- **BR-039:** feedback de IA exige conversa e resposta pertencentes ao tenant corrente, registra o usuário e o horário em auditoria, permite no máximo uma avaliação vigente por resposta e só cria conhecimento corrigido após validação de tamanho e segurança.
 
 ## 7. Requisitos não funcionais
 

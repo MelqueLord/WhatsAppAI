@@ -43,4 +43,11 @@ public sealed record MessageDto
     public string? Caption { get; init; }
     public DateTime CreatedAt { get; init; }
     public string? SenderName { get; init; }
+    public Guid? AiInteractionId { get; init; }
+    public AiFeedbackDto? AiFeedback { get; init; }
 }
+
+public sealed record AiFeedbackDto(
+    string Rating,
+    string? Note,
+    string? CorrectedResponse);

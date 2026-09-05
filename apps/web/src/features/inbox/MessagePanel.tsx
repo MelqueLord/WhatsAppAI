@@ -22,6 +22,8 @@ import {
   WifiOff,
   UserPlus,
   XCircle,
+  ThumbsDown,
+  ThumbsUp,
 } from 'lucide-react'
 
 interface MessagePanelProps {
@@ -46,6 +48,12 @@ export function MessagePanel({
   const [showSaveContact, setShowSaveContact] = useState(false)
   const [contactName, setContactName] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState(conversation.queueId ?? '')
+  const [feedbackDraft, setFeedbackDraft] = useState<{
+    messageId: string
+    rating: 'Helpful' | 'NeedsCorrection'
+  } | null>(null)
+  const [feedbackNote, setFeedbackNote] = useState('')
+  const [correctedResponse, setCorrectedResponse] = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
@@ -157,6 +165,21 @@ export function MessagePanel({
     },
   })
 
+  const feedbackMutation = useMutation({
+    mutationFn: (payload: {
+      responseMessageId: string
+      rating: 'Helpful' | 'NeedsCorrection'
+      note?: string
+      correctedResponse?: string
+    }) => api.conversations.submitAiFeedback(conversation.id, payload.responseMessageId, payload),
+    onSuccess: () => {
+      setFeedbackDraft(null)
+      setFeedbackNote('')
+      setCorrectedResponse('')
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    },
+  })
+
   const {
     isConnected,
     start: startSignalR,
@@ -237,6 +260,27 @@ export function MessagePanel({
           .map((parameter) => parameter.trim())
           .filter(Boolean),
       },
+    })
+  }
+
+  const handleAiFeedback = (messageId: string, rating: 'Helpful' | 'NeedsCorrection') => {
+    if (rating === 'NeedsCorrection') {
+      setFeedbackDraft({ messageId, rating })
+      setFeedbackNote('')
+      setCorrectedResponse('')
+      return
+    }
+
+    feedbackMutation.mutate({ responseMessageId: messageId, rating })
+  }
+
+  const submitCorrection = () => {
+    if (!feedbackDraft || (!feedbackNote.trim() && !correctedResponse.trim())) return
+    feedbackMutation.mutate({
+      responseMessageId: feedbackDraft.messageId,
+      rating: feedbackDraft.rating,
+      note: feedbackNote.trim() || undefined,
+      correctedResponse: correctedResponse.trim() || undefined,
     })
   }
 
@@ -529,6 +573,78 @@ export function MessagePanel({
                         msg.status
                       )}
                   </div>
+
+                  {msg.direction === 'Outbound' && msg.aiInteractionId && (
+                    <div className="mt-1 border-t border-white/10 pt-1.5">
+                      <div className="flex items-center gap-1 text-[10px] text-emerald-100">
+                        <span className="mr-1">Resposta da IA</span>
+                        <button
+                          type="button"
+                          aria-label="Marcar resposta da IA como útil"
+                          title="Resposta útil"
+                          onClick={() => handleAiFeedback(msg.id, 'Helpful')}
+                          disabled={feedbackMutation.isPending}
+                          className={cn(
+                            'rounded p-1 transition-colors hover:bg-white/20 disabled:opacity-50',
+                            msg.aiFeedback?.rating === 'Helpful' && 'bg-white/20',
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Informar correção na resposta da IA"
+                          title="Precisa de correção"
+                          onClick={() => handleAiFeedback(msg.id, 'NeedsCorrection')}
+                          disabled={feedbackMutation.isPending}
+                          className={cn(
+                            'rounded p-1 transition-colors hover:bg-white/20 disabled:opacity-50',
+                            msg.aiFeedback?.rating === 'NeedsCorrection' && 'bg-white/20',
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                        {msg.aiFeedback && <span className="ml-1">Registrado</span>}
+                      </div>
+
+                      {feedbackDraft?.messageId === msg.id && (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={correctedResponse}
+                            onChange={(event) => setCorrectedResponse(event.target.value)}
+                            maxLength={160}
+                            rows={2}
+                            placeholder="Como a IA deveria responder? (até 160 caracteres)"
+                            className="w-full resize-none rounded-lg border border-white/10 bg-[#0b1222] px-2 py-1.5 text-xs text-white placeholder:text-slate-500"
+                          />
+                          <input
+                            value={feedbackNote}
+                            onChange={(event) => setFeedbackNote(event.target.value)}
+                            maxLength={1000}
+                            placeholder="Explique o que precisa melhorar (opcional)"
+                            className="w-full rounded-lg border border-white/10 bg-[#0b1222] px-2 py-1.5 text-xs text-white placeholder:text-slate-500"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFeedbackDraft(null)}
+                              className="rounded-lg px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={submitCorrection}
+                              disabled={feedbackMutation.isPending || (!feedbackNote.trim() && !correctedResponse.trim())}
+                              className="rounded-lg bg-white/20 px-2 py-1 text-[11px] font-medium text-white hover:bg-white/30 disabled:opacity-50"
+                            >
+                              {feedbackMutation.isPending ? 'Salvando…' : 'Salvar correção'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

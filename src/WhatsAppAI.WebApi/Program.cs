@@ -418,6 +418,7 @@ app.MapAiResponseExampleEndpoints();
 app.MapUsageEndpoints();
 app.MapConversationEndpoints();
 app.MapConversationModeEndpoints();
+app.MapAiFeedbackEndpoints();
 app.MapContactEndpoints();
 app.MapMediaEndpoints();
 app.MapWebhookEndpoints();
