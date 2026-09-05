@@ -68,7 +68,7 @@ export function InboxPage() {
   }
 
   return (
-    <div className="inbox-page h-screen flex flex-col bg-[#070b16] text-white">
+    <div className="inbox-page flex h-full min-h-0 flex-col bg-[#070b16] text-white">
       {/* Connection status bar — only shown while SignalR is actively reconnecting. */}
       {isReconnecting && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-center gap-2">
@@ -77,11 +77,11 @@ export function InboxPage() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* Sidebar - Conversation List */}
         <div
           className={`
-            w-full lg:w-[380px] lg:min-w-[380px] border-r border-slate-200 bg-white
+            w-full min-h-0 lg:w-[380px] lg:min-w-[380px] border-r border-slate-200 bg-white
             ${showMobileList ? 'block' : 'hidden lg:block'}
           `}
         >
@@ -94,7 +94,7 @@ export function InboxPage() {
         {/* Main - Message Panel */}
         <div
           className={`
-            flex-1
+            min-h-0 min-w-0 flex-1
             ${!showMobileList ? 'block' : 'hidden lg:block'}
           `}
         >
