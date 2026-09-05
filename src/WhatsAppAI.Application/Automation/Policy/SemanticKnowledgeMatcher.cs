@@ -59,10 +59,20 @@ public static class SemanticKnowledgeMatcher
 
     private static HashSet<string> DetectConcepts(HashSet<string> terms)
     {
-        return ConceptTerms
-            .Where(group => Array.Exists(group.Value, terms.Contains))
-            .Select(group => group.Key)
-            .ToHashSet(StringComparer.Ordinal);
+        var concepts = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var group in ConceptTerms)
+        {
+            foreach (var term in group.Value)
+            {
+                if (!terms.Contains(term))
+                    continue;
+
+                concepts.Add(group.Key);
+                break;
+            }
+        }
+
+        return concepts;
     }
 
     private static int ScoreCategory(string category, HashSet<string> queryConcepts)

@@ -2,7 +2,7 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class BusinessProfileGuidePolicy
 {
-    private static readonly IReadOnlyDictionary<string, string> BusinessGuides =
+    private static readonly Dictionary<string, string> BusinessGuides =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Clínica e saúde"] = "acolha, identifique a necessidade e oriente sobre serviços, preparo e agendamento cadastrados; não forneça diagnóstico ou orientação clínica",
@@ -30,7 +30,7 @@ public static class BusinessProfileGuidePolicy
             ["ONG e projetos sociais"] = "entenda se o contato busca atendimento, participação, doação ou informação e siga os processos cadastrados"
         };
 
-    private static readonly IReadOnlyDictionary<string, string> ToneGuides =
+    private static readonly Dictionary<string, string> ToneGuides =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Profissional e objetivo"] = "seja direto, claro e profissional",
