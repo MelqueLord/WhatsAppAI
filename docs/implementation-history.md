@@ -210,3 +210,17 @@ foram reiniciados sem `down`, prune ou remoção de volume. Depois da estabiliza
 `/health/live` e `/health/ready` retornaram `Healthy`, todos os serviços ficaram
 ativos, a ponte QR permaneceu `healthy`, o volume de sessão continuou presente
 e não houve novos erros de API/worker nos logs recentes.
+
+## 15. Correção do encerramento pela Inbox (2026-09-05)
+
+O botão **Encerrar** passou a buscar a versão atual da conversa antes de enviar
+o comando protegido por `If-Match`. Isso evita que uma mensagem, mudança de fila
+ou alteração de modo ocorrida enquanto o painel estava aberto faça o botão falhar
+silenciosamente por usar uma versão antiga. Se houver uma disputa entre a leitura
+e o comando, a tela atualiza a versão e tenta novamente uma única vez; falhas
+restantes são exibidas ao operador.
+
+Após o sucesso, a conversa é invalidada na lista de abertas e fica disponível no
+filtro **Conversas encerradas**, com status `Closed`, atribuição ativa removida e
+histórico preservado. O backend continua mantendo a proteção de concorrência e
+o retorno automático da conversa quando o cliente enviar nova mensagem.

@@ -54,6 +54,7 @@ export function MessagePanel({
   } | null>(null)
   const [feedbackNote, setFeedbackNote] = useState('')
   const [correctedResponse, setCorrectedResponse] = useState('')
+  const [closeError, setCloseError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
@@ -158,10 +159,36 @@ export function MessagePanel({
   })
 
   const closeMutation = useMutation({
-    mutationFn: () => api.conversations.close(conversation.id, conversation.version),
-    onSuccess: () => {
+    mutationFn: async () => {
+      // The list item can have an older version after a new message, queue
+      // assignment or mode change. Always read the current aggregate before
+      // applying the optimistic-concurrency guarded close operation.
+      const latest = await api.conversations.get(conversation.id)
+
+      try {
+        return await api.conversations.close(conversation.id, latest.version)
+      } catch (error) {
+        // A message may arrive between GET and POST. Refresh once so closing
+        // remains reliable without weakening the backend concurrency guard.
+        if (!(error instanceof Error) || !error.message.toLowerCase().includes('version conflict'))
+          throw error
+
+        const refreshed = await api.conversations.get(conversation.id)
+        return api.conversations.close(conversation.id, refreshed.version)
+      }
+    },
+    onMutate: () => setCloseError(null),
+    onSuccess: (data) => {
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (current) =>
+        current
+          ? { ...current, status: data.status, version: data.version, queueId: undefined }
+          : current,
+      )
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       onConversationClosed?.()
+    },
+    onError: (error) => {
+      setCloseError(error instanceof Error ? error.message : 'Não foi possível encerrar a conversa.')
     },
   })
 
@@ -439,6 +466,12 @@ export function MessagePanel({
               <XCircle className="mr-1 inline h-3.5 w-3.5" />
               {closeMutation.isPending ? 'Encerrando…' : 'Encerrar'}
             </button>
+          )}
+
+          {closeError && (
+            <span role="alert" className="w-full text-right text-[11px] text-red-300">
+              {closeError}
+            </span>
           )}
 
           <button
