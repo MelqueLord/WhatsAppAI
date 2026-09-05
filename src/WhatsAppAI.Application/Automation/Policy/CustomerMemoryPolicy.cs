@@ -69,9 +69,11 @@ public static class CustomerMemoryPolicy
             return false;
         }
 
-        if (UnsafeMarkers.Any(marker =>
-                normalizedKey.Contains(marker, StringComparison.OrdinalIgnoreCase) ||
-                normalizedValue.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+        var keyForValidation = normalizedKey;
+        var valueForValidation = normalizedValue;
+        if (Array.Exists(UnsafeMarkers, marker =>
+                keyForValidation.Contains(marker, StringComparison.OrdinalIgnoreCase) ||
+                valueForValidation.Contains(marker, StringComparison.OrdinalIgnoreCase)))
         {
             error = "A memória contém conteúdo interno ou instruções não permitidas.";
             return false;
