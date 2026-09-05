@@ -39,6 +39,33 @@ public sealed class HumanHandoffRequestPolicyTests
         Assert.True(result.Decision.Confidence >= 0.8);
     }
 
+    [Fact]
+    public void EnsureExplicitRequestIsHandoff_OverridesProviderReply()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Text = "Posso ajudar com isso.",
+                Confidence = 0.95,
+                QueueName = "Suporte"
+            },
+            Content = "Posso ajudar com isso.",
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var result = HumanHandoffRequestPolicy.EnsureExplicitRequestIsHandoff(
+            response,
+            "Quero falar com um atendente");
+
+        Assert.Equal(AiAction.Handoff, result.Decision.Action);
+        Assert.Equal("customer_request", result.Decision.HandoffReason);
+        Assert.Null(result.Decision.QueueName);
+        Assert.Null(result.Content);
+    }
+
     [Theory]
     [InlineData("out_of_scope", "Aceita cartão?", false)]
     [InlineData("customer_request", "Preciso de suporte", true)]

@@ -82,6 +82,28 @@ Não versionar credenciais. Usar `dotnet user-secrets` no backend e um `.env.loc
 3. A memória fica vinculada à empresa e ao contato, expira conforme a finalidade de IA (365 dias por padrão) e pode ser removida pelo Operator ou TenantOwner.
 4. Revogar o consentimento bloqueia a memória no próximo atendimento; a IA não cria memórias automaticamente e a anonimização redige todas as entradas do contato.
 
+## Aprendizado supervisionado por empresa
+
+1. No Inbox, o operador pode marcar uma resposta da IA como útil ou informar uma correção.
+2. Uma resposta útil ensina o agente daquela empresa sobre estilo e fluxo. Uma correção só é aprendida quando a resposta corrigida é informada; uma observação sem resposta não vira exemplo.
+3. Os exemplos aprendidos aparecem em **Exemplos de atendimento** com a etiqueta **Aprendido com operador**. O TenantOwner pode editar, desativar ou reativar cada um.
+4. O aprendizado é isolado por empresa e não altera o modelo global. Preços, horários, políticas e demais fatos continuam dependendo da Base de Conhecimento.
+
+## Decisão de encaminhamento
+
+1. Cadastre somente filas ativas que a IA pode usar e selecione-as na configuração do provedor; palavras-chave e escolhas de fila atribuem a conversa sem desligar a IA.
+2. Enquanto a conversa estiver em uma fila no modo automático, a IA continua respondendo com as diretrizes, a base de conhecimento e o histórico recente.
+3. O modo humano só é ativado por pedido explícito do cliente, risco/lacuna específica que não possa ser respondida com segurança ou ação manual do operador.
+4. Fila inexistente, inativa ou não selecionada é ignorada pelo backend e não altera a conversa.
+
+## Respostas naturais
+
+O agente responde como parte da equipe da empresa: começa pela resposta mais útil, usa o histórico para continuar o assunto, não repete saudações ou perguntas já respondidas e faz no máximo uma pergunta curta de continuidade. O tom selecionado no perfil orienta a forma da conversa, mas não autoriza inventar fatos. Todas as respostas automáticas permanecem limitadas a 160 caracteres.
+
+## Segurança contra informação inventada
+
+Antes de enviar, o backend verifica valores concretos da resposta — preço, horário, prazo, percentual, data, link e contato — contra as informações autorizadas da empresa. Se um valor não estiver cadastrado, ele não é enviado: a conversa segue o handoff seguro. A exceção é uma pergunta genérica com pesquisa pública explicitamente permitida, sem transformar informação pública em fato da empresa.
+
 ## Verificação antes de commit
 
 ```bash

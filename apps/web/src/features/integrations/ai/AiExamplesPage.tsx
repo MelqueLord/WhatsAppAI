@@ -7,6 +7,8 @@ interface AiResponseExample {
   id: string
   customerMessage: string
   idealResponse: string
+  source?: 'Manual' | 'OperatorFeedback'
+  learnedFromOperator?: boolean
   isActive: boolean
   version: number
 }
@@ -94,7 +96,7 @@ export function AiExamplesPage() {
         </div>
 
         <div className="rounded-xl border border-violet-100 bg-violet-50 p-4 text-sm text-violet-950">
-          <p><strong>{activeCount} exemplo(s) ativo(s).</strong> Recomendamos entre 5 e 10 situações reais. A IA usa somente o exemplo mais parecido e apenas para copiar tom e abordagem; preços e regras continuam vindo da Base de Conhecimento.</p>
+          <p><strong>{activeCount} exemplo(s) ativo(s).</strong> Correções aprovadas pelo operador entram aqui como aprendizado supervisionado desta empresa. A IA usa exemplos para copiar tom e abordagem; preços e regras continuam vindo da Base de Conhecimento.</p>
         </div>
 
         {showForm && <section className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
@@ -106,7 +108,7 @@ export function AiExamplesPage() {
         </section>}
 
         <div className="space-y-3">
-          {examples.map((example) => <article key={example.id} className={`bg-white rounded-xl border p-5 ${example.isActive ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}><div className="flex items-start justify-between gap-4"><div className="min-w-0 space-y-2"><div className="flex items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-violet-600">Cliente</span>{!example.isActive && <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full">Inativo</span>}</div><p className="text-sm text-slate-800">{example.customerMessage}</p><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Resposta ideal</p><p className="text-sm text-slate-600">{example.idealResponse}</p></div><div className="flex items-center gap-1"><button onClick={() => startEdit(example)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="Editar"><Edit2 className="w-4 h-4" /></button><button onClick={() => statusMutation.mutate(example)} className={`p-2 rounded-lg ${example.isActive ? 'text-slate-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={example.isActive ? 'Desativar' : 'Reativar'}>{example.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}</button></div></div></article>)}
+          {examples.map((example) => <article key={example.id} className={`bg-white rounded-xl border p-5 ${example.isActive ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}><div className="flex items-start justify-between gap-4"><div className="min-w-0 space-y-2"><div className="flex items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-violet-600">Cliente</span>{example.learnedFromOperator && <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-full">Aprendido com operador</span>}{!example.isActive && <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full">Inativo</span>}</div><p className="text-sm text-slate-800">{example.customerMessage}</p><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Resposta ideal</p><p className="text-sm text-slate-600">{example.idealResponse}</p></div><div className="flex items-center gap-1"><button onClick={() => startEdit(example)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="Editar"><Edit2 className="w-4 h-4" /></button><button onClick={() => statusMutation.mutate(example)} className={`p-2 rounded-lg ${example.isActive ? 'text-slate-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={example.isActive ? 'Desativar' : 'Reativar'}>{example.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}</button></div></div></article>)}
           {examples.length === 0 && <div className="bg-white rounded-xl border border-slate-200 p-12 text-center"><BotMessageSquare className="w-10 h-10 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">Nenhum exemplo cadastrado</p><p className="text-sm text-slate-400 mt-1">Comece com as dúvidas que sua equipe mais responde.</p></div>}
         </div>
       </div>

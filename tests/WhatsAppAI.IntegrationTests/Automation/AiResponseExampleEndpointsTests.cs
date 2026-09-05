@@ -36,6 +36,8 @@ public sealed class AiResponseExampleEndpointsTests(TestWebApplicationFactory fa
         Assert.NotNull(firstList);
         Assert.Single(firstList!);
         Assert.Equal("Quero agendar uma consulta", firstList[0].GetProperty("customerMessage").GetString());
+        Assert.Equal("Manual", firstList[0].GetProperty("source").GetString());
+        Assert.False(firstList[0].GetProperty("learnedFromOperator").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound, crossTenantResponse.StatusCode);
     }
 

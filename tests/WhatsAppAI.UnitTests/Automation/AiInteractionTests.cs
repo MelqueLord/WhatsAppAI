@@ -88,4 +88,17 @@ public class AiInteractionTests
 
         Assert.Equal(3500, interaction.LatencyMs);
     }
+
+    [Fact]
+    public void RecordFeedback_CannotBeRecordedTwice()
+    {
+        var interaction = AiInteraction.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "gpt-4o-mini", "Reply", null, 0.95, 100, 50, 250, null);
+
+        interaction.RecordFeedback(AiFeedbackRating.Helpful, null, null, Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(() =>
+            interaction.RecordFeedback(AiFeedbackRating.Helpful, null, null, Guid.NewGuid()));
+    }
 }

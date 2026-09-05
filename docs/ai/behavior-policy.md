@@ -27,13 +27,23 @@ Quando não houver fato correspondente da empresa, perguntas genuinamente genér
 
 Cada atendimento recebe um contexto efêmero com identidade do tenant, primeiro contato ou continuidade, fila atual, nome seguro do contato e até quatro mensagens recentes. O agente deve continuar do ponto atual, evitar repetição e fazer no máximo uma pergunta útil. O nome não autoriza inferir gênero, preferências ou outras características pessoais.
 
+### Conversa natural
+
+A resposta deve começar pelo que resolve a mensagem atual, reconhecer o contexto quando necessário e usar linguagem simples, cordial e compatível com o tom configurado pela empresa. O agente não deve repetir a pergunta, reiniciar saudações, usar frases burocráticas ou dizer que consultou uma base. Quando faltar uma informação para avançar, deve fazer uma única pergunta específica e útil. Naturalidade altera apenas a forma de dizer: não autoriza inventar fatos, preços, prazos, políticas ou disponibilidade, e a mensagem continua limitada a 160 caracteres.
+
+### Proteção contra informação inventada
+
+Antes do envio, o backend compara valores concretos produzidos pela IA — como preço, horário, prazo, percentual, data, link ou contato — com o contexto autorizado da empresa. Se um valor não estiver presente, a resposta é descartada e a conversa segue o handoff seguro com motivo `out_of_scope`. Uma pesquisa pública só pode liberar essa verificação quando a política de conhecimento público tiver autorizado a pergunta genérica; ela nunca autoriza atribuir fatos públicos à empresa.
+
 ## Transferir para humano
 
-Transferir quando:
+Transferir para humano quando:
 
 - o cliente pedir explicitamente uma pessoa, atendente ou operador;
-- uma palavra-chave de uma fila humana autorizada corresponder à mensagem;
+- houver risco, conteúdo inseguro ou uma lacuna real de informação específica após consultar o contexto autorizado;
 - um operador fizer a transferência manualmente.
+
+Uma palavra-chave ou escolha de fila autorizada não é, sozinha, uma transferência para humano. Ela atribui a conversa à fila, mantém o modo automático e permite que a IA continue respondendo até um operador assumir.
 
 Quando não houver informação confirmada ou a mensagem estiver fora do escopo, a plataforma mantém a IA ativa e responde de modo genérico e seguro, sem inventar fatos. As proteções críticas — conteúdo sensível ou malicioso, falha repetida do provedor e situação fora da janela — continuam podendo exigir handoff seguro.
 

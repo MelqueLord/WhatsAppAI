@@ -45,7 +45,7 @@ Configuração global ou administrada pela plataforma, acessível somente pela i
 `id`, `tenant_id`, `provider`, `model_id`, `api_key_ref`, `credential_scope`, `routing_queue_ids_json`, `routing_tag_ids_json`, `is_active`, `created_at`, `updated_at`, `version`.
 
 Não contém chave em claro. O registro associa o tenant ao provedor/modelo provisionado pela plataforma; `credential_scope` identifica se a credencial é isolada para o tenant/projeto ou compartilhada com rate/budget interno. Múltiplos provedores podem ser provisionados por tenant, mas apenas um fica ativo por vez. Trocar de provedor desativa o anterior sem apagar o histórico ou a referência protegida (**FR-AI-001**, **FR-AI-004**, **BR-AI-001**, **BR-AI-002**). Diretrizes, perfil, filas, tags e handoff permanecem dados de atendimento do tenant.
-`routing_queue_ids_json` contém apenas IDs distintos de filas ativas do mesmo tenant autorizadas para roteamento pela IA (**FR-036**, **BR-016**).
+`routing_queue_ids_json` contém apenas IDs distintos de filas ativas do mesmo tenant autorizadas para roteamento pela IA (**FR-036**, **BR-016**). A seleção atribui a fila sem alterar `Conversation.mode`; o modo `Human` fica reservado para pedido explícito, segurança ou ação do operador (**BR-047**).
 `routing_tag_ids_json` contém apenas IDs distintos de tags ativas do mesmo tenant autorizadas para categorização pela IA (**FR-037**, **BR-017**).
 
 ### Contact
@@ -91,6 +91,12 @@ Status: `Pending|Processing|Processed|Unknown|Dead|Ignored`. Único `(provider, 
 `id`, `tenant_id`, `conversation_id`, `trigger_message_id`, `conversation_version`, `provider`, `model`, `decision`, `confidence`, `handoff_reason`, `input_tokens`, `output_tokens`, `latency_ms`, `status`, `error_code`, timestamps.
 
 Nunca persistir prompt completo, raciocínio interno, resposta bruta do provedor ou conteúdo pessoal não mascarado. Somente os metadados operacionais sanitizados enumerados acima são permitidos (**FR-016**, **NFR-008**).
+
+### AiResponseExample
+
+`id`, `tenant_id`, `customer_message`, `ideal_response`, `source`, `source_interaction_id`, `is_active`, `version`, timestamps.
+
+`source` é `Manual|OperatorFeedback`. Quando a origem é `OperatorFeedback`, `source_interaction_id` identifica a resposta avaliada e possui unicidade por tenant. A pergunta e a resposta são sanitizadas antes da persistência; o exemplo orienta estilo e fluxo, não comprova fatos da empresa (**FR-064**, **FR-078**, **BR-046**).
 
 ### HandoffEvent
 
@@ -191,6 +197,7 @@ erDiagram
 | **FR-017, US-005** | `KnowledgeItem.version/is_active/deactivated_*` implementa edição concorrente e desativação auditável. |
 | **FR-018, BR-007, US-006** | `UsageLedger` preserva unidades e custo menor inteiro com unicidade incluindo tenant. |
 | **FR-019, US-007** | `AuditLog` append-only e permissões de banco impedem alteração/remoção pela aplicação. |
+| **FR-078, BR-046, US-016** | `AiInteraction` registra a avaliação única e `AiResponseExample.source/source_interaction_id` transforma somente feedback aprovado em aprendizado supervisionado isolado por tenant. |
 | **FR-020** | `Tenant.retention_days` governa jobs; auditoria preserva evidência exigida. |
 | **FR-023, US-002** | `Message.media_*` guarda metadados opacos; autorização/download ocorre na WebApi. |
 | **FR-024** | Cursores derivam de chaves tenant-scoped e ordenação estável de `Conversation`/`Message`. |

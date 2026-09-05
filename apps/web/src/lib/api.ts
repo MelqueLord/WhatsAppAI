@@ -570,7 +570,7 @@ export const api = {
       conversationId: string,
       responseMessageId: string,
       data: { rating: 'Helpful' | 'NeedsCorrection'; note?: string; correctedResponse?: string },
-    ) => fetchApi<{ interactionId: string; rating: string; correctionKnowledgeCreated: boolean }>(
+    ) => fetchApi<{ interactionId: string; rating: string; correctionKnowledgeCreated: boolean; supervisedExampleCreated: boolean }>(
       `/api/conversations/${conversationId}/messages/${responseMessageId}/ai-feedback`,
       { method: 'POST', body: JSON.stringify(data) },
     ),

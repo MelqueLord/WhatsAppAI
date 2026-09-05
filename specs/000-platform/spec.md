@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.34.0
+**Versão:** 0.38.0
 **Data:** 2026-09-05
 
 ## 1. Problema
@@ -141,6 +141,17 @@ Como Operator ou TenantOwner, quero registrar fatos confirmados pelo cliente em 
 3. Revogar o consentimento, expirar ou anonimizar o contato remove a memória do contexto da IA sem apagar o histórico operacional restante.
 4. A IA recebe a memória como contexto de personalização, mas não pode criá-la ou alterá-la automaticamente.
 
+### US-016 — Melhorar o agente com aprendizado supervisionado por empresa (P2)
+
+Como TenantOwner, quero que as avaliações e correções aprovadas pelos operadores ensinem o agente da minha empresa, para melhorar respostas futuras sem misturar dados com outras empresas nem treinar um modelo global sem controle.
+
+**Aceite:**
+
+1. Uma avaliação do operador é registrada uma única vez para cada resposta da IA; `Helpful` aprova a resposta enviada como exemplo de estilo e fluxo, e `NeedsCorrection` só aprende quando o operador informa a resposta corrigida.
+2. O exemplo supervisionado é sanitizado, pertence ao tenant e mantém a origem da interação para auditoria; uma observação sem resposta corrigida não vira treinamento.
+3. O contexto da IA recupera exemplos supervisionados relevantes da própria empresa antes de exemplos manuais equivalentes, sem usar exemplos como prova de preço, política, prazo ou disponibilidade.
+4. O TenantOwner pode editar, desativar e reativar o exemplo aprendido na tela de exemplos; a plataforma não executa fine-tuning nem compartilha o conteúdo entre tenants.
+
 ### US-007 — Auditar operação (P2)
 
 Como PlatformAdmin, quero identificar falhas e ações relevantes sem ler segredos ou misturar clientes.
@@ -247,7 +258,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-033:** permitir ao TenantOwner atribuir uma linha API oficial ou QR Code a cada Operator do próprio tenant; a atribuição deve ser validada pela quota e aparecer no `/auth/me` e no painel do operador.
 - **FR-034:** permitir ao PlatformAdmin registrar manualmente o pagamento mensal do tenant; o próximo vencimento é sempre 30 dias após a data do lançamento.
 - **FR-035:** suspender automaticamente o tenant ativo após 35 dias de atraso. A empresa suspensa mantém login e leitura, mas não pode enviar mensagens nem executar automações WhatsApp até a reativação por pagamento.
-- **FR-036:** permitir ao TenantOwner selecionar, entre as filas ativas do próprio tenant, quais podem ser usadas pela IA; quando o cliente escolher ou solicitar uma dessas filas, a IA deve retornar seu nome e o backend deve validar, atribuir a conversa à fila e transferi-la para atendimento humano.
+- **FR-036:** permitir ao TenantOwner selecionar, entre as filas ativas do próprio tenant, quais podem ser usadas pela IA; quando o cliente escolher ou solicitar uma dessas filas, a IA deve retornar seu nome e o backend deve validar e atribuir a conversa à fila, mantendo o modo automático até um operador assumir. Pedido explícito de pessoa, regra de segurança ou transferência manual continuam levando ao atendimento humano.
 - **FR-037:** permitir ao TenantOwner selecionar tags ativas do próprio tenant para categorização pela IA; após cada decisão válida, o backend deve adicionar ao contato somente as tags autorizadas reconhecidas pela IA, sem remover tags existentes.
 - **FR-038:** permitir ao TenantOwner atribuir ou remover uma fila ativa do próprio tenant em cada Operator; sem fila atribuída o atendimento permanece geral, e com fila atribuída o backend deve limitar o Operator às conversas dessa fila.
 - **FR-039:** permitir ao TenantOwner importar até 5.000 contatos por arquivo `.csv` ou `.xlsx` de até 2 MB, usando as colunas obrigatórias `nome` e `contato`, com resultado parcial e isolamento pelo tenant corrente.
@@ -289,6 +300,9 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-075:** personalizar cada atendimento com identidade da empresa, nome seguro do contato, etapa de primeiro contato ou continuidade, fila atual e até quatro mensagens recentes, evitando reiniciar o diálogo ou repetir perguntas já respondidas.
 - **FR-076:** selecionar conhecimento do tenant por significado, combinando termos, sinônimos, intenção, categoria e tolerância a pequenas variações de escrita, sem depender de correspondência literal da pergunta.
 - **FR-077:** permitir memória individual do cliente com consentimento ativo, vinculada ao tenant, contato e evidência de consentimento, para registrar somente fatos curtos confirmados por operador; a memória deve possuir validade, desativação, auditoria sanitizada e ser injetada no contexto da IA apenas enquanto autorizada.
+- **FR-078:** transformar avaliações aprovadas de respostas da IA em exemplos supervisionados tenant-scoped: feedback útil aprende a resposta enviada, correção aprende somente a resposta corrigida, e observação sem resposta não gera exemplo; cada exemplo deve preservar origem, sanitização, ativação e concorrência otimista dos exemplos existentes.
+- **FR-079:** gerar respostas de atendimento naturais, curtas e contextuais, usando o histórico, o tom e a identidade do tenant sem repetir saudações, perguntas já respondidas ou frases burocráticas; a naturalidade não pode alterar fatos autorizados nem ultrapassar 160 caracteres.
+- **FR-080:** validar antes do envio que valores concretos produzidos pela IA — preço, horário, prazo, percentual, data, link ou contato — aparecem no contexto autorizado do tenant; quando não houver correspondência, bloquear a resposta e aplicar handoff seguro, exceto em pesquisa pública explicitamente permitida para pergunta genérica.
 
 ## 6. Regras de negócio
 
@@ -307,7 +321,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-013:** um convite expira exatamente 24 horas após `created_at`, é consumido uma única vez e o reenvio revoga qualquer convite anterior ainda utilizável para a mesma membership/purpose.
 - **BR-014:** o MVP não possui serviço de e-mail; links de ativação são entregues manualmente e nunca registrados em logs ou auditoria.
 - **BR-015:** desativar uma membership rotaciona o marcador de segurança do usuário e invalida sessões; reativar a membership não revalida cookies anteriores.
-- **BR-016:** a IA somente pode encaminhar para filas ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; nome inexistente, fila desativada ou de outro tenant não altera a conversa.
+- **BR-016:** a IA somente pode encaminhar para filas ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; nome inexistente, fila desativada ou de outro tenant não altera a conversa. A atribuição de fila é automática e não muda o modo para `Human`; somente pedido explícito de pessoa, regra de segurança ou ação manual do operador faz isso.
 - **BR-017:** a IA somente pode categorizar com tags ativas explicitamente selecionadas em sua configuração e pertencentes ao tenant corrente; atribuições são idempotentes e nunca removem tags automaticamente.
 - **BR-018:** `assigned_queue_id` nulo representa atendimento geral; quando preenchido, uma conversa só pode ser listada, aberta ou respondida pelo Operator se possuir exatamente essa fila, sem aceitar fila inativa, inexistente ou de outro tenant na configuração.
 - **BR-019:** a importação normaliza `contato` para dígitos em formato internacional de 8 a 15 caracteres, ignora duplicados do arquivo ou já existentes no tenant e nunca atualiza um contato preexistente.
@@ -337,6 +351,10 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-043:** a personalização do atendimento é efêmera e tenant-scoped; o nome do contato deve ser sanitizado, não autoriza inferir gênero ou características pessoais e não cria memória pessoal automática. Estar em fila não desativa a IA enquanto a conversa permanecer em modo automático.
 - **BR-044:** a busca semântica deve operar somente sobre itens ativos do tenant já carregados pelo repositório, priorizar categoria compatível e manter no máximo seis fontes; similaridade isolada ou termo genérico não pode introduzir conhecimento não relacionado.
 - **BR-045:** memória de cliente exige evidência ativa da finalidade padrão de atendimento automatizado por IA no mesmo tenant e contato; revogação ou expiração impede a consulta, o modelo nunca grava memória por conta própria, e valores não podem conter credenciais, dados pessoais identificáveis ou instruções maliciosas.
+- **BR-046:** aprendizado supervisionado é local ao tenant e controlado por operador: no máximo uma avaliação vigente por resposta; somente resposta útil ou correção textual segura cria exemplo ativo; exemplos supervisionados orientam estilo e fluxo, nunca substituem conhecimento factual nem habilitam fine-tuning ou compartilhamento global.
+- **BR-047:** a decisão de encaminhamento segue uma ordem determinística: segurança e pedido explícito de humano vencem; fila autorizada somente atribui a conversa e mantém `Automatic`; resposta apoiada por contexto vence um handoff genérico; fila não autorizada, inexistente ou desativada é ignorada. Uma conversa já em fila continua recebendo respostas da IA até a assunção humana.
+- **BR-048:** a política de conversa natural deve responder primeiro ao pedido atual, aproveitar até o histórico autorizado, evitar repetição e usar no máximo uma pergunta útil; ela modifica somente linguagem e estrutura, nunca cria fatos nem substitui as regras de segurança, handoff ou limite de 160 caracteres.
+- **BR-049:** nenhuma resposta com valor concreto não encontrado nas fontes autorizadas pode ser enfileirada para o cliente. A validação ocorre depois das tentativas de inferência e antes da criação da mensagem/Outbox; quando bloquear, usa `out_of_scope`, preserva pedido humano e segurança, e não impede resposta pública genérica autorizada.
 
 ## 7. Requisitos não funcionais
 

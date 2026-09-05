@@ -12,11 +12,14 @@ public static class HumanHandoffRequestPolicy
     [
         "atendente",
         "atendimento humano",
+        "quero falar com uma pessoa",
         "falar com humano",
         "falar com uma pessoa",
         "falar com alguem",
         "falar com alguém",
-        "operador"
+        "operador",
+        "quero um humano",
+        "quero um operador"
     ];
 
     public static bool IsExplicitHumanRequest(string? messageContent)
@@ -37,6 +40,33 @@ public static class HumanHandoffRequestPolicy
     {
         return decision.HandoffReason is "customer_request" &&
             !IsExplicitHumanRequest(messageContent);
+    }
+
+    public static AiResponse EnsureExplicitRequestIsHandoff(
+        AiResponse response,
+        string? messageContent)
+    {
+        if (!IsExplicitHumanRequest(messageContent))
+            return response;
+
+        // Preserve a stronger safety reason selected by the backend policy,
+        // but never allow a normal Reply or a queue selection to ignore the
+        // customer's explicit request for a human.
+        var preserveSafetyReason = response.Decision.Action == AiAction.Handoff &&
+            response.Decision.HandoffReason is "sensitive_topic" or
+                AiOutputSafetyPolicy.UnsafeContentHandoffReason;
+        var decision = response.Decision with
+        {
+            Action = AiAction.Handoff,
+            HandoffReason = preserveSafetyReason
+                ? response.Decision.HandoffReason
+                : "customer_request",
+            Confidence = Math.Max(response.Decision.Confidence, 0.9),
+            QueueName = null,
+            Text = null
+        };
+
+        return response with { Decision = decision, Content = null };
     }
 
     public static AiResponse KeepConversationAutomatic(AiResponse response)

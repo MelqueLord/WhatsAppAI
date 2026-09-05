@@ -18,6 +18,7 @@ interface AiScenarioResult {
   decision: string
   text?: string | null
   confidence: number
+  queue?: string | null
   handoffReason?: string | null
   fallbackReason?: string | null
   sources?: Array<{ type: string; name: string; detail: string }>
@@ -212,6 +213,9 @@ export function AiScenarioTestsPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Resposta que seria enviada</p>
                   <p className="mt-2 text-sm text-emerald-950 whitespace-pre-wrap">{result.text}</p>
                 </div>
+              )}
+              {result.queue && (
+                <p className="text-sm text-slate-700"><strong>Fila automática:</strong> {result.queue} (a IA continua ativa até um operador assumir)</p>
               )}
               {result.handoffReason && (
                 <p className="text-sm text-slate-700"><strong>Motivo do encaminhamento:</strong> {formatAiReason(result.handoffReason)}</p>

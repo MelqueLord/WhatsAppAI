@@ -14,6 +14,20 @@ public sealed class AiResponseExampleTests
         Assert.Equal("Posso ajudar com o agendamento.", example.IdealResponse);
         Assert.True(example.IsActive);
         Assert.Equal(1u, example.Version);
+        Assert.Equal(AiResponseExampleSource.Manual, example.Source);
+        Assert.Null(example.SourceInteractionId);
+    }
+
+    [Fact]
+    public void CreateFromOperatorFeedback_MarksExampleAsSupervised()
+    {
+        var interactionId = Guid.NewGuid();
+
+        var example = AiResponseExample.CreateFromOperatorFeedback(
+            Guid.NewGuid(), interactionId, "Quanto custa?", "O plano custa conforme a tabela vigente.");
+
+        Assert.Equal(AiResponseExampleSource.OperatorFeedback, example.Source);
+        Assert.Equal(interactionId, example.SourceInteractionId);
     }
 
     [Fact]

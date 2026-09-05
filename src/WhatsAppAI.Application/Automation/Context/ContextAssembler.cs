@@ -93,7 +93,11 @@ public sealed class ContextAssembler(
         {
             SystemPrompt = fullSystemPrompt,
             Messages = messages,
-            RelevantKnowledge = knowledgeTexts
+            RelevantKnowledge = knowledgeTexts,
+            AuthorizedGroundingContext = BuildAuthorizedGroundingContext(
+                systemPrompt,
+                knowledgeTexts,
+                welcomeMessage)
         };
     }
 
@@ -103,7 +107,8 @@ public sealed class ContextAssembler(
         string? systemPrompt,
         CancellationToken cancellationToken = default,
         string? welcomeMessage = null,
-        string? businessName = null)
+        string? businessName = null,
+        IReadOnlyList<RoutingQueueContext>? routingQueues = null)
     {
         var sanitizedMessage = AiContextSanitizer.RedactPersonalData(Limit(message, MaxMessageCharacters));
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
@@ -123,6 +128,7 @@ public sealed class ContextAssembler(
             SystemPrompt = ComposeSystemPrompt(
                 systemPrompt,
                 knowledgeTexts,
+                routingQueues: routingQueues,
                 responseExamples: responseExamples
                     .Select(example => new ResponseExampleContext(example.CustomerMessage, example.IdealResponse))
                     .ToList(),
@@ -131,8 +137,35 @@ public sealed class ContextAssembler(
                 businessName: businessName),
             Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }],
             RelevantKnowledge = knowledgeTexts,
+            AuthorizedGroundingContext = BuildAuthorizedGroundingContext(
+                systemPrompt,
+                knowledgeTexts,
+                welcomeMessage),
             RelevantSources = BuildSimulationSources(systemPrompt, selectedKnowledge, responseExamples)
         };
+    }
+
+    public static IReadOnlyList<string> BuildAuthorizedGroundingContext(
+        string? configuredInstructions,
+        IReadOnlyList<string> knowledgeItems,
+        string? welcomeMessage = null)
+    {
+        var configured = ParseConfiguredInstructions(configuredInstructions);
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
+            parts.Add(configured.ProfileSummary);
+        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
+            parts.Add(configured.CustomDirections);
+
+        parts.AddRange(knowledgeItems);
+        if (!string.IsNullOrWhiteSpace(welcomeMessage))
+            parts.Add(welcomeMessage);
+
+        return parts
+            .Select(AiContextSanitizer.RedactPersonalData)
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToList();
     }
 
     public static string ResolveWelcomeMessage(
@@ -177,7 +210,8 @@ public sealed class ContextAssembler(
         IReadOnlyList<CustomerMemoryContext>? customerMemories = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
+        var fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
+        fixedSuffix += $" {AiGroundingPolicy.BuildInstructions()}";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
@@ -272,12 +306,12 @@ public sealed class ContextAssembler(
 
         if (routingQueues is { Count: > 0 })
         {
-            var items = new List<string> { "Filas autorizadas para transferência humana:" };
+            var items = new List<string> { "Filas autorizadas para roteamento automático:" };
             foreach (var queue in routingQueues.Take(MaxRoutingItems))
                 items.Add(string.IsNullOrWhiteSpace(queue.Description)
                     ? $"- {Limit(queue.Name, 80)}"
                     : $"- {Limit(queue.Name, 60)}: {Limit(queue.Description, 80)}");
-            items.Add("Quando o cliente pedir uma destas filas, use action \"handoff\" e o nome exato em \"queue\". Nunca invente fila.");
+            items.Add("Quando o cliente pedir uma destas filas, informe o nome exato em \"queue\". A fila é apenas roteamento automático: não use action \"handoff\" só por selecionar a fila; o backend atribui a fila e mantém a IA ativa até um operador assumir. Nunca invente fila.");
             dynamicParts.Add((string.Join('\n', items), 300));
         }
 
@@ -475,6 +509,7 @@ public sealed class ContextAssembler(
             })
             .Where(result => result.Score > 0)
             .OrderByDescending(result => result.Score)
+            .ThenByDescending(result => result.Example.Source == AiResponseExampleSource.OperatorFeedback)
             .ThenByDescending(result => result.Example.UpdatedAt ?? result.Example.CreatedAt)
             .Select(result => result.Example)
             .Take(maxExamples)
@@ -566,7 +601,9 @@ public sealed class ContextAssembler(
         sources.AddRange(examples.Select(example => new SimulationSource(
             "exemplo",
             Limit(AiContextSanitizer.RedactPersonalData(example.CustomerMessage), 100),
-            "Exemplo usado para orientar o estilo.")));
+            example.Source == AiResponseExampleSource.OperatorFeedback
+                ? "Exemplo aprovado em feedback de operador; orienta estilo e fluxo."
+                : "Exemplo usado para orientar o estilo.")));
         return sources;
     }
 
@@ -599,6 +636,7 @@ public sealed record ConversationContext
     public required string SystemPrompt { get; init; }
     public required IReadOnlyList<AiMessage> Messages { get; init; }
     public IReadOnlyList<string> RelevantKnowledge { get; init; } = [];
+    public IReadOnlyList<string> AuthorizedGroundingContext { get; init; } = [];
     public IReadOnlyList<SimulationSource> RelevantSources { get; init; } = [];
 }
 

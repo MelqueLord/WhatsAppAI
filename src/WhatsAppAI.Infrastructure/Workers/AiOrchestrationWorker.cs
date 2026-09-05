@@ -145,8 +145,19 @@ public sealed class AiOrchestrationWorker(
                 // explicitly owns the conversation.
                 var activeQueuesForKeyword = await queueRepository.GetActiveByTenantAsync(
                     message.TenantId, cancellationToken);
+                IReadOnlyList<ServiceLine> authorizedQueuesForKeyword = [];
+                if (await dbContext.HasAutomaticDistributionEnabledAsync(
+                        message.TenantId, cancellationToken))
+                {
+                    var keywordCredential = await credentialRepository.GetByTenantAsync(
+                        message.TenantId, cancellationToken);
+                    var configuredQueueIds = keywordCredential?.GetRoutingQueueIds().ToHashSet() ?? [];
+                    authorizedQueuesForKeyword = activeQueuesForKeyword
+                        .Where(queue => configuredQueueIds.Contains(queue.Id))
+                        .ToList();
+                }
                 var keywordQueue = RestoreAutomaticForQueueKeyword(
-                    conversation, activeQueuesForKeyword, message.Content);
+                    conversation, authorizedQueuesForKeyword, message.Content);
                 if (keywordQueue is null)
                 {
                     message.MarkProcessedByAi();
@@ -240,6 +251,24 @@ public sealed class AiOrchestrationWorker(
                             contactTagRepository, includeWaitingResponse: true,
                             cancellationToken: cancellationToken))
                     {
+                        return;
+                    }
+
+                    if (HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content))
+                    {
+                        await PersistAutomaticHandoffAsync(
+                            message.TenantId,
+                            message,
+                            conversation,
+                            "customer_request",
+                            ResolveHandoffMessage(botConfig),
+                            "simple-human-request",
+                            dbContext,
+                            messageRepository,
+                            conversationRepository,
+                            outboxRepository,
+                            handoffEventRepository,
+                            cancellationToken);
                         return;
                     }
 
@@ -420,7 +449,8 @@ public sealed class AiOrchestrationWorker(
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
                     contactTagRepository, includeWaitingResponse: false,
-                    cancellationToken: cancellationToken))
+                    cancellationToken: cancellationToken,
+                    authorizedQueues: routingQueues))
             {
                 return;
             }
@@ -635,10 +665,18 @@ public sealed class AiOrchestrationWorker(
                 response,
                 message.Content,
                 context.RelevantKnowledge);
+            response = AiGroundingPolicy.Validate(
+                response,
+                context.AuthorizedGroundingContext,
+                allowPublicWebSearch);
+            response = HumanHandoffRequestPolicy.EnsureExplicitRequestIsHandoff(
+                response,
+                message.Content);
             var routingResult = QueueRoutingPolicy.Apply(
                 response.Decision,
                 routingQueues.Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name)).ToList(),
-                conversation.QueueId is not null);
+                conversation.QueueId,
+                message.Content);
             response = response with { Decision = routingResult.Decision };
             if (response.Decision.Action == AiAction.Handoff &&
                 routingResult.QueueId is null &&
@@ -706,10 +744,10 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            // Auto-assign queue if AI categorized and conversation has no queue yet.
-            // Queue assignment remains automatic; the selected queue notice is the
-            // only customer-facing response for this routing decision.
-            if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId is null)
+            // Assign or change a queue when AI categorized the conversation.
+            // Queue assignment remains automatic; the selected queue notice is
+            // the only customer-facing response for this routing decision.
+            if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId != routingQueueId)
             {
                 var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
                 if (selectedRoutingQueue is not null)
@@ -928,7 +966,8 @@ public sealed class AiOrchestrationWorker(
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
                     contactTagRepository, includeWaitingResponse: true,
-                    cancellationToken: cancellationToken))
+                    cancellationToken: cancellationToken,
+                    authorizedQueues: routingQueues))
             {
                 return;
             }
@@ -1317,21 +1356,24 @@ public sealed class AiOrchestrationWorker(
         IClientTagRepository tagRepository,
         IContactTagRepository contactTagRepository,
         bool includeWaitingResponse,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<ServiceLine>? authorizedQueues = null)
     {
         if (activeQueues.Count == 0)
+            return false;
+
+        // An explicit human request must reach the human-handoff decision
+        // below. It must not be swallowed by the current queue's waiting
+        // notice or converted into an automatic queue assignment.
+        if (HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content))
             return false;
 
         var currentQueue = conversation.QueueId is Guid currentQueueId
             ? activeQueues.FirstOrDefault(queue => queue.Id == currentQueueId)
             : null;
+        var routingQueues = authorizedQueues ?? activeQueues;
         var selectedQueue = SelectBotRoutingQueue(
-            conversation.QueueId, activeQueues, message.Content);
-        if (selectedQueue is null && HumanHandoffRequestPolicy.IsExplicitHumanRequest(message.Content))
-        {
-            selectedQueue = activeQueues.FirstOrDefault(queue =>
-                HumanHandoffRequestPolicy.IsHumanQueueName(queue.Name));
-        }
+            conversation.QueueId, routingQueues, message.Content);
 
         if (currentQueue is null && selectedQueue is null)
             return false;
@@ -1478,7 +1520,8 @@ public sealed class AiOrchestrationWorker(
         string? messageContent)
     {
         if (conversation.Mode == ConversationMode.Automatic ||
-            !string.IsNullOrWhiteSpace(conversation.AssignedToUserId))
+            !string.IsNullOrWhiteSpace(conversation.AssignedToUserId) ||
+            HumanHandoffRequestPolicy.IsExplicitHumanRequest(messageContent))
             return null;
 
         var selectedQueue = SelectBotRoutingQueue(

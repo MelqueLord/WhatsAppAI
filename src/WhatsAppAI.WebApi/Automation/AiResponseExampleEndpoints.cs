@@ -163,6 +163,8 @@ public static class AiResponseExampleEndpoints
         id = example.Id,
         customerMessage = example.CustomerMessage,
         idealResponse = example.IdealResponse,
+        source = example.Source.ToString(),
+        learnedFromOperator = example.Source == AiResponseExampleSource.OperatorFeedback,
         isActive = example.IsActive,
         version = example.Version,
         createdAt = example.CreatedAt,

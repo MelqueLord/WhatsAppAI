@@ -198,6 +198,16 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("ideal_response");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SourceInteractionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_interaction_id");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -218,6 +228,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "IsActive");
+
+                    b.HasIndex("TenantId", "SourceInteractionId")
+                        .IsUnique();
 
                     b.ToTable("ai_response_examples", "whatsappai");
                 });

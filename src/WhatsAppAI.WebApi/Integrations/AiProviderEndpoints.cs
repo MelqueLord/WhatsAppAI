@@ -8,6 +8,7 @@ using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -503,6 +504,7 @@ public static class AiProviderEndpoints
         IBotConfigurationRepository botConfigRepository,
         ISecretStore secretStore,
         IAiProviderResolver aiProviderResolver,
+        IServiceLineRepository queueRepository,
         ContextAssembler contextAssembler,
         IAuditLogRepository auditLogRepository,
         AppDbContext dbContext,
@@ -529,6 +531,12 @@ public static class AiProviderEndpoints
         var tenant = await dbContext.Tenants.FindAsync(
             [currentTenant.TenantId.Value],
             httpContext.RequestAborted);
+        var routingQueues = await ResolveAuthorizedRoutingQueuesAsync(
+            currentTenant.TenantId.Value,
+            credential,
+            queueRepository,
+            dbContext,
+            httpContext.RequestAborted);
         var welcomeMessage = ContextAssembler.ResolveWelcomeMessage(
             botConfig?.WelcomeMessage,
             credential.SystemPrompt,
@@ -539,7 +547,10 @@ public static class AiProviderEndpoints
             credential.SystemPrompt,
             httpContext.RequestAborted,
             welcomeMessage,
-            tenant?.Name);
+            tenant?.Name,
+            routingQueues
+                .Select(queue => new RoutingQueueContext(queue.Name, queue.Description))
+                .ToList());
         var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
             request.Message,
             simulationContext.RelevantKnowledge);
@@ -595,6 +606,21 @@ public static class AiProviderEndpoints
             response,
             request.Message,
             simulationContext.RelevantKnowledge);
+        response = AiGroundingPolicy.Validate(
+            response,
+            simulationContext.AuthorizedGroundingContext,
+            allowPublicWebSearch);
+        response = HumanHandoffRequestPolicy.EnsureExplicitRequestIsHandoff(
+            response,
+            request.Message);
+        var routingResult = QueueRoutingPolicy.Apply(
+            response.Decision,
+            routingQueues
+                .Select(queue => new RoutingQueueCandidate(queue.Id, queue.Name))
+                .ToList(),
+            null,
+            request.Message);
+        response = response with { Decision = routingResult.Decision };
 
         var userId = Guid.TryParse(httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId)
             ? parsedUserId
@@ -613,6 +639,7 @@ public static class AiProviderEndpoints
             decision = response.Decision.Action.ToString(),
             text = response.Decision.Action == AiAction.Reply ? response.Content : null,
             confidence = response.Decision.Confidence,
+            queue = response.Decision.QueueName,
             handoffReason = response.Decision.Action == AiAction.Handoff ? response.Decision.HandoffReason : null,
             fallbackReason = response.Decision.Action == AiAction.Handoff && response.Decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null,
             sources = simulationContext.RelevantSources
@@ -626,6 +653,25 @@ public static class AiProviderEndpoints
                 detail = source.Detail
             })
         });
+    }
+
+    private static async Task<IReadOnlyList<ServiceLine>> ResolveAuthorizedRoutingQueuesAsync(
+        Guid tenantId,
+        AiProviderCredential credential,
+        IServiceLineRepository queueRepository,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!await dbContext.HasAutomaticDistributionEnabledAsync(tenantId, cancellationToken))
+            return [];
+
+        var configuredQueueIds = credential.GetRoutingQueueIds().ToHashSet();
+        if (configuredQueueIds.Count == 0)
+            return [];
+
+        return (await queueRepository.GetActiveByTenantAsync(tenantId, cancellationToken))
+            .Where(queue => configuredQueueIds.Contains(queue.Id))
+            .ToList();
     }
 
     private static async Task<IResult> RollbackModelAsync(

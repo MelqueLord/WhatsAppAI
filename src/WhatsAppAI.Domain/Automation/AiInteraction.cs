@@ -68,6 +68,8 @@ public sealed class AiInteraction
         string? correctedResponse,
         Guid operatorUserId)
     {
+        if (FeedbackRating.HasValue)
+            throw new InvalidOperationException("Feedback has already been recorded for this response.");
         if (note?.Length > FeedbackNoteMaxLength)
             throw new ArgumentOutOfRangeException(nameof(note));
         if (correctedResponse?.Length > CorrectedResponseMaxLength)

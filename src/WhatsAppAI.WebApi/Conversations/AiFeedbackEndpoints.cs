@@ -7,6 +7,7 @@ using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Automation;
 using WhatsAppAI.Domain.Knowledge;
+using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -70,6 +71,19 @@ public static class AiFeedbackEndpoints
         if (interaction is null)
             return Results.NotFound();
 
+        var responseMessage = await dbContext.Messages
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.TenantId == currentTenant.TenantId.Value &&
+                item.Id == responseMessageId &&
+                item.ConversationId == conversationId &&
+                item.Direction == MessageDirection.Outbound,
+                cancellationToken);
+        if (responseMessage is null)
+            return Results.NotFound();
+
+        if (interaction.FeedbackRating.HasValue)
+            return Results.Conflict(new { error = "Esta resposta já foi avaliada." });
+
         if (rating == AiFeedbackRating.NeedsCorrection &&
             string.IsNullOrWhiteSpace(note) &&
             string.IsNullOrWhiteSpace(correctedResponse))
@@ -78,17 +92,38 @@ public static class AiFeedbackEndpoints
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            if (dbContext.Database.IsNpgsql())
+            {
+                await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT 1 FROM whatsappai.ai_interactions WHERE tenant_id = {currentTenant.TenantId.Value} AND id = {interaction.Id} FOR UPDATE",
+                    cancellationToken);
+                await dbContext.Entry(interaction).ReloadAsync(cancellationToken);
+                if (interaction.FeedbackRating.HasValue)
+                    return Results.Conflict(new { error = "Esta resposta já foi avaliada." });
+            }
+
             interaction.RecordFeedback(rating, note, correctedResponse, currentTenant.UserId.Value);
+
+            var inboundMessage = await dbContext.Messages
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.TenantId == currentTenant.TenantId.Value &&
+                    item.Id == interaction.MessageId &&
+                    item.ConversationId == conversationId &&
+                    item.Direction == MessageDirection.Inbound,
+                    cancellationToken);
+            var supervisedExample = AiSupervisedLearningPolicy.CreateExampleFromFeedback(
+                currentTenant.TenantId.Value,
+                interaction.Id,
+                rating,
+                inboundMessage?.Content,
+                responseMessage.Content,
+                correctedResponse);
+            if (supervisedExample is not null)
+                dbContext.AiResponseExamples.Add(supervisedExample);
 
             KnowledgeItem? correctionKnowledge = null;
             if (!string.IsNullOrWhiteSpace(correctedResponse))
             {
-                var inboundMessage = await dbContext.Messages
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(item => item.TenantId == currentTenant.TenantId.Value &&
-                        item.Id == interaction.MessageId &&
-                        item.ConversationId == conversationId,
-                        cancellationToken);
                 var question = AiContextSanitizer.RedactPersonalData(inboundMessage?.Content);
                 var answer = AiContextSanitizer.RedactPersonalData(correctedResponse);
                 if (!string.IsNullOrWhiteSpace(question) && !string.IsNullOrWhiteSpace(answer))
@@ -118,7 +153,7 @@ public static class AiFeedbackEndpoints
                 "AiResponse.FeedbackRecorded",
                 "AiInteraction",
                 interaction.Id.ToString(),
-                $"rating={rating};correction_knowledge_created={correctionKnowledge is not null}"));
+                $"rating={rating};correction_knowledge_created={correctionKnowledge is not null};supervised_example_created={supervisedExample is not null}"));
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -126,8 +161,13 @@ public static class AiFeedbackEndpoints
             {
                 interactionId = interaction.Id,
                 rating = interaction.FeedbackRating.ToString(),
-                correctionKnowledgeCreated = correctionKnowledge is not null
+                correctionKnowledgeCreated = correctionKnowledge is not null,
+                supervisedExampleCreated = supervisedExample is not null
             });
+        }
+        catch (InvalidOperationException exception) when (exception.Message.Contains("already been recorded", StringComparison.Ordinal))
+        {
+            return Results.Conflict(new { error = "Esta resposta já foi avaliada." });
         }
         catch (ArgumentException exception)
         {

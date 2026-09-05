@@ -81,6 +81,31 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void ComposeSystemPrompt_IncludesNaturalConversationPolicy()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(null);
+
+        Assert.Contains("Naturalidade da conversa", prompt, StringComparison.Ordinal);
+        Assert.Contains("comece pela resposta mais útil", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("não mencione IA", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("natural_conversation", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildAuthorizedGroundingContext_IncludesOnlyAuthorizedTenantSources()
+    {
+        var context = ContextAssembler.BuildAuthorizedGroundingContext(
+            "[PERFIL_EMPRESA]\nHorário de atendimento: das 8h às 18h.\n[/PERFIL_EMPRESA]\nNunca prometa um prazo diferente de 5 dias.",
+            ["Plano Flow: R$ 199 por mês."],
+            "Seja bem-vindo(a)!");
+
+        Assert.Contains(context, item => item.Contains("8h", StringComparison.Ordinal));
+        Assert.Contains(context, item => item.Contains("5 dias", StringComparison.Ordinal));
+        Assert.Contains(context, item => item.Contains("R$ 199", StringComparison.Ordinal));
+        Assert.DoesNotContain(context, item => item.Contains("Regras obrigatórias da plataforma", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task BuildAsync_UsesCurrentAndThreePreviousMessagesAndPreservesMandatoryInstructions()
     {
         var tenantId = Guid.NewGuid();
@@ -726,6 +751,27 @@ public sealed class ContextAssemblerTests
             "O que o sistema faz?");
 
         Assert.Same(example, selected);
+    }
+
+    [Fact]
+    public void SelectRelevantResponseExample_PrioritizesOperatorSupervisionForEqualIntent()
+    {
+        var tenantId = Guid.NewGuid();
+        var manual = AiResponseExample.Create(
+            tenantId,
+            "O que o sistema faz?",
+            "A plataforma ajuda empresas.");
+        var supervised = AiResponseExample.CreateFromOperatorFeedback(
+            tenantId,
+            Guid.NewGuid(),
+            "O que o sistema faz?",
+            "A plataforma centraliza o atendimento no WhatsApp.");
+
+        var selected = ContextAssembler.SelectRelevantResponseExample(
+            [manual, supervised],
+            "Para que serve a ferramenta?");
+
+        Assert.Same(supervised, selected);
     }
 
     [Fact]

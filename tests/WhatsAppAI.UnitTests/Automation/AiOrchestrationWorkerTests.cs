@@ -159,6 +159,24 @@ public sealed class AiOrchestrationWorkerTests
         Assert.Equal("operator-1", conversation.AssignedToUserId);
     }
 
+    [Fact]
+    public void RestoreAutomaticForQueueKeyword_DoesNotOverrideExplicitHumanRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        var supportQueue = ServiceLine.Create(tenantId, "Suporte");
+        supportQueue.SetKeywords("suporte");
+        var conversation = Conversation.Create(tenantId, Guid.NewGuid(), "phone-number-id");
+        conversation.SwitchMode(ConversationMode.Human, conversation.Version);
+
+        var selectedQueue = AiOrchestrationWorker.RestoreAutomaticForQueueKeyword(
+            conversation,
+            [supportQueue],
+            "Quero falar com um atendente de suporte");
+
+        Assert.Null(selectedQueue);
+        Assert.Equal(ConversationMode.Human, conversation.Mode);
+    }
+
     [Theory]
     [InlineData("low_confidence")]
     [InlineData("customer_request")]
