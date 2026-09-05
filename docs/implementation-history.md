@@ -238,3 +238,7 @@ A ponte também mantém nomes recebidos nos eventos `messaging-history.set`,
 `contacts.upsert` e `contacts.update`. Quando disponível, o nome é encaminhado
 ao backend e ao contexto personalizado da IA, que pode usar somente o primeiro
 nome, de forma natural e no máximo uma vez, sem inferir gênero ou outros dados.
+
+O script de publicação também passou a construir explicitamente o perfil
+`production`, garantindo que a imagem atualizada da ponte QR seja incluída no
+deploy e não apenas as imagens sem perfil.

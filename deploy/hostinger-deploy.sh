@@ -13,7 +13,9 @@ done
 
 chmod 600 .env deploy/nginx/certs/privkey.pem
 docker compose --profile production config >/dev/null
-docker compose build
+# Build every service that participates in production, including services that
+# are guarded by the production profile (frontend and WhatsApp Web bridge).
+docker compose --profile production build
 
 # The .NET image runs as the non-root `app` user. Bind-mounted PFX files keep
 # host ownership, so grant access only to that container user.
