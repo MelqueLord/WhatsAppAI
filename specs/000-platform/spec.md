@@ -272,6 +272,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-069:** permitir o encerramento explícito de uma conversa pelo operador, listá-la separadamente como encerrada sem apagar mensagens, e reabrir a mesma conversa no modo automático quando o cliente enviar nova mensagem, preservando o contexto recente.
 - **FR-070:** manter memória institucional automática por tenant, aproveitando respostas de IA com alta confiança e fundamentadas em conhecimento ativo para orientar atendimentos futuros da mesma empresa, sem compartilhar conteúdo entre tenants.
 - **FR-071:** permitir que Operator ou TenantOwner avalie uma resposta da IA como útil ou necessitando correção; uma correção textual sanitizada pode ser convertida em conhecimento validado do tenant, sem enviar uma nova mensagem automaticamente ao cliente.
+- **FR-072:** responder perguntas de atendimento por inferência segura usando, em conjunto, diretrizes, perfil, conhecimento ativo, exemplos e memória institucional da empresa; paráfrases e perguntas gerais sobre o negócio devem recuperar fatos compatíveis antes de considerar transferência.
 
 ## 6. Regras de negócio
 
@@ -300,7 +301,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-023:** em planos comerciais, `official_api_line_count + qr_code_line_count` deve ser exatamente igual ao total de linhas do plano; valores negativos, excesso ou soma incompleta são rejeitados pelo backend.
 - **BR-024:** tokens, custos, orçamento e credenciais são dados técnicos da plataforma e não podem ser retornados nem exibidos para TenantOwner ou Operator; o tenant vê apenas sua franquia e alertas operacionais.
 - **BR-031:** diretrizes, perfil, conhecimento, confiança, filas, tags e handoff são configurações de atendimento do tenant e só podem ser lidos ou alterados no tenant corrente.
-- **BR-032:** a categoria do conhecimento organiza o cadastro e orienta o preenchimento; cada item continua contendo um único fato oficial, e somente itens ativos lexicalmente relevantes podem fundamentar respostas da IA.
+- **BR-032:** a categoria do conhecimento organiza o cadastro e orienta o preenchimento; cada item continua contendo um único fato oficial, e somente itens ativos semanticamente compatíveis com a intenção podem fundamentar respostas da IA. Para perguntas gerais sobre a empresa, itens ativos de serviço, geral e FAQ podem formar um resumo factual limitado.
 - **BR-033:** exemplos de atendimento orientam tom, vocabulário e estrutura, nunca comprovam preço, política, prazo ou disponibilidade; exemplo sem correspondência com a mensagem atual não entra no contexto.
 - **BR-034:** testes de IA por cenário são diagnósticos e não consomem a franquia de respostas, mas podem gerar tokens e custo no provedor; mensagem, prompt e resposta completos do teste não são persistidos, e a auditoria registra somente metadados sanitizados.
 - **BR-025:** o contexto de IA privilegia a mensagem recente e o conhecimento mais relevante; conteúdo adicional é truncado antes da chamada ao provedor e nunca pode remover as regras obrigatórias de segurança, handoff ou formato de saída.
@@ -314,6 +315,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-037:** encerrar uma conversa altera somente seu estado operacional e remove atribuições ativas; uma nova mensagem do cliente reabre o mesmo registro, retorna ao modo `Automatic` e deixa a IA usar a mensagem atual e até três mensagens anteriores.
 - **BR-038:** memória institucional só pode ser criada a partir de resposta segura, com confiança mínima de 0,8 e ao menos uma fonte ativa do tenant; a pergunta deve ser sanitizada, a memória permanece tenant-scoped e não pode conter credenciais, dados pessoais ou conteúdo de outro tenant.
 - **BR-039:** feedback de IA exige conversa e resposta pertencentes ao tenant corrente, registra o usuário e o horário em auditoria, permite no máximo uma avaliação vigente por resposta e só cria conhecimento corrigido após validação de tamanho e segurança.
+- **BR-040:** antes de transferir por baixa confiança ou escopo, o agente deve consultar o contexto autorizado e tentar uma inferência conservadora; só deve responder quando a conclusão for sustentada por fatos compatíveis, mantendo handoff para lacuna real, pedido explícito de humano ou regra de segurança.
 
 ## 7. Requisitos não funcionais
 

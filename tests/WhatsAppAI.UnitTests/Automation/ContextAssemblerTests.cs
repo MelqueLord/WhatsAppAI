@@ -672,6 +672,46 @@ public sealed class ContextAssemblerTests
         Assert.DoesNotContain(context.RelevantSources, source => source.Name == "Endereço");
     }
 
+    [Fact]
+    public async Task BuildAsync_UsesCompanyOverviewFactsForBroadQuestionWithoutSharedWords()
+    {
+        var tenantId = Guid.NewGuid();
+        var knowledge = new FakeKnowledgeRepository(
+        [
+            KnowledgeItem.Create(tenantId, "Atendimento centralizado", "A ferramenta reúne as conversas do WhatsApp para a equipe.", 100, KnowledgeCategories.Service),
+            KnowledgeItem.Create(tenantId, "Política de reembolso", "Solicitações são analisadas pelo setor financeiro.", 100, KnowledgeCategories.Policy)
+        ]);
+        var queries = new FakeConversationQueries(
+        [new MessageDto
+        {
+            Direction = "Inbound",
+            Content = "Pode me contar um pouco sobre o negócio de vocês?",
+            CreatedAt = DateTime.UtcNow
+        }]);
+
+        var context = await new ContextAssembler(queries, knowledge).BuildAsync(
+            tenantId, Guid.NewGuid(), null, cancellationToken: CancellationToken.None);
+
+        Assert.Contains("Atendimento centralizado:", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Política de reembolso:", context.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectRelevantResponseExample_RecognizesIntentParaphrase()
+    {
+        var tenantId = Guid.NewGuid();
+        var example = AiResponseExample.Create(
+            tenantId,
+            "Para que serve a plataforma?",
+            "A plataforma reúne o atendimento da empresa.");
+
+        var selected = ContextAssembler.SelectRelevantResponseExample(
+            [example],
+            "O que o sistema faz?");
+
+        Assert.Same(example, selected);
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(

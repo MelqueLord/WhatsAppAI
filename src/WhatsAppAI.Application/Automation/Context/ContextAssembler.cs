@@ -346,6 +346,15 @@ public sealed class ContextAssembler(
         string query)
     {
         var queryTerms = ExpandIntentTerms(query);
+        var broadCompanyQuestion = IsBroadCompanyQuestion(query);
+
+        if (broadCompanyQuestion)
+        {
+            queryTerms.Add("funcionamento");
+            queryTerms.Add("plataforma");
+            queryTerms.Add("servico");
+            queryTerms.Add("atendimento");
+        }
 
         var ranked = knowledge
             .Select(item => new
@@ -354,10 +363,21 @@ public sealed class ContextAssembler(
                 Score = Score(item, queryTerms) + InferredCategoryScore(item, queryTerms)
             })
             .Where(result => result.Score > 0)
+            .Where(result => !broadCompanyQuestion || IsCompanyOverviewCategory(result.Item.Category))
             .OrderByDescending(result => result.Score)
             .ThenByDescending(result => result.Item.Priority)
             .ThenByDescending(result => result.Item.CreatedAt)
             .ToList();
+
+        if (broadCompanyQuestion && ranked.Count == 0)
+        {
+            return knowledge
+                .Where(item => IsCompanyOverviewCategory(item.Category))
+                .OrderByDescending(item => item.Priority)
+                .ThenByDescending(item => item.CreatedAt)
+                .Take(MaxKnowledgeItems)
+                .ToList();
+        }
 
         if (queryTerms.Contains("preco"))
         {
@@ -393,6 +413,24 @@ public sealed class ContextAssembler(
         };
     }
 
+    private static bool IsCompanyOverviewCategory(string category) =>
+        category is KnowledgeCategories.Service or KnowledgeCategories.General or KnowledgeCategories.Faq;
+
+    private static bool IsBroadCompanyQuestion(string query)
+    {
+        var normalized = NormalizeForIntent(query);
+        return normalized.Contains("o que", StringComparison.Ordinal) ||
+            normalized.Contains("para que serve", StringComparison.Ordinal) ||
+            normalized.Contains("como funciona", StringComparison.Ordinal) ||
+            normalized.Contains("me explica", StringComparison.Ordinal) ||
+            normalized.Contains("sobre a empresa", StringComparison.Ordinal) ||
+            normalized.Contains("sobre o negocio", StringComparison.Ordinal) ||
+            normalized.Contains("negocio de voces", StringComparison.Ordinal) ||
+            normalized.Contains("sobre o atendimento", StringComparison.Ordinal) ||
+            normalized.Contains("quais servicos", StringComparison.Ordinal) ||
+            normalized.Contains("o que voces fazem", StringComparison.Ordinal);
+    }
+
     public static AiResponseExample? SelectRelevantResponseExample(
         IReadOnlyList<AiResponseExample> examples,
         string query)
@@ -403,7 +441,7 @@ public sealed class ContextAssembler(
         string query,
         int maxExamples)
     {
-        var queryTerms = Tokenize(query);
+        var queryTerms = ExpandIntentTerms(query);
         if (queryTerms.Count == 0 || maxExamples <= 0)
             return [];
 
@@ -411,7 +449,7 @@ public sealed class ContextAssembler(
             .Select(example => new
             {
                 Example = example,
-                Score = queryTerms.Count(term => Tokenize(example.CustomerMessage).Contains(term))
+                Score = queryTerms.Count(term => ExpandIntentTerms(example.CustomerMessage).Contains(term))
             })
             .Where(result => result.Score > 0)
             .OrderByDescending(result => result.Score)
@@ -492,6 +530,13 @@ public sealed class ContextAssembler(
             _ => singular
         };
     }
+
+    private static string NormalizeForIntent(string value) =>
+        string.Join(' ', value
+            .Normalize(NormalizationForm.FormD)
+            .Where(character => CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .ToLowerInvariant();
 
     private static IReadOnlyList<SimulationSource> BuildSimulationSources(
         string? systemPrompt,
