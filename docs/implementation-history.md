@@ -203,3 +203,10 @@ volumes são persistentes, mas nenhum volume deve ser removido. Ao final, valide
 `/health/live`, `/health/ready`, o estado dos containers, os logs sanitizados e
 o health da ponte QR. A sessão do WhatsApp deve permanecer no volume
 `whatsapp-ai_whatsapp-web-sessions`.
+
+Execução registrada após o lote: a documentação foi publicada na branch
+`master`, o Compose e a migration foram validados, e os containers em produção
+foram reiniciados sem `down`, prune ou remoção de volume. Depois da estabilização,
+`/health/live` e `/health/ready` retornaram `Healthy`, todos os serviços ficaram
+ativos, a ponte QR permaneceu `healthy`, o volume de sessão continuou presente
+e não houve novos erros de API/worker nos logs recentes.
