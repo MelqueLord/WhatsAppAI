@@ -59,6 +59,10 @@ describe('AiConfigPage', () => {
 
     expect(screen.getByText('1. Identidade')).toBeInTheDocument()
     expect(screen.getByText('Descrição do negócio')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Tecnologia e software' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Pet shop e veterinária' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Didático e paciente' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Calmo e tranquilizador' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /2\. Comportamento/ }))
     expect(screen.getByText('Regras da plataforma')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /3\. Conhecimento/ }))

@@ -1,6 +1,7 @@
 using WhatsAppAI.Application.Automation.Context;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Automation;
@@ -104,7 +105,7 @@ public sealed class ContextAssemblerTests
         Assert.Equal(4, context.Messages.Count);
         Assert.DoesNotContain(context.Messages, message => message.Content.Contains("mensagem-1-", StringComparison.Ordinal));
         Assert.All(context.Messages, message => Assert.True(message.Content.Length <= 180));
-        Assert.True(context.SystemPrompt.Length <= 3_600);
+        Assert.True(context.SystemPrompt.Length <= 7_000);
         Assert.Contains("Boleto:", context.SystemPrompt);
         Assert.DoesNotContain("Quarto item:", context.SystemPrompt);
         Assert.Contains("Retorne somente um objeto JSON válido", context.SystemPrompt);
@@ -710,6 +711,35 @@ public sealed class ContextAssemblerTests
             "O que o sistema faz?");
 
         Assert.Same(example, selected);
+    }
+
+    [Fact]
+    public void BusinessProfileGuidePolicy_UsesSegmentAndToneWithoutCreatingFacts()
+    {
+        var guide = BusinessProfileGuidePolicy.Build(
+            "Tecnologia e software",
+            "Didático e paciente");
+
+        Assert.Contains("funcionalidade", guide, StringComparison.Ordinal);
+        Assert.Contains("etapas curtas", guide, StringComparison.Ordinal);
+        Assert.Contains("nunca como prova de preço", guide, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ComposeSystemPrompt_IncludesBusinessGuideForGenericQuestions()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            """
+            [PERFIL_EMPRESA]
+            Tipo de negócio: Assistência técnica
+            Tom de voz: Ágil e direto
+            [/PERFIL_EMPRESA]
+            """);
+
+        Assert.Contains("Guia seguro de personalização", prompt, StringComparison.Ordinal);
+        Assert.Contains("equipamento, modelo e problema", prompt, StringComparison.Ordinal);
+        Assert.Contains("Não deixe uma pergunta genérica sem resposta", prompt, StringComparison.Ordinal);
+        Assert.Contains("fato específico", prompt, StringComparison.Ordinal);
     }
 
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries

@@ -273,6 +273,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-070:** manter memória institucional automática por tenant, aproveitando respostas de IA com alta confiança e fundamentadas em conhecimento ativo para orientar atendimentos futuros da mesma empresa, sem compartilhar conteúdo entre tenants.
 - **FR-071:** permitir que Operator ou TenantOwner avalie uma resposta da IA como útil ou necessitando correção; uma correção textual sanitizada pode ser convertida em conhecimento validado do tenant, sem enviar uma nova mensagem automaticamente ao cliente.
 - **FR-072:** responder perguntas de atendimento por inferência segura usando, em conjunto, diretrizes, perfil, conhecimento ativo, exemplos e memória institucional da empresa; paráfrases e perguntas gerais sobre o negócio devem recuperar fatos compatíveis antes de considerar transferência.
+- **FR-073:** oferecer catálogo ampliado de tipos de negócio e tons de conversa; o tipo selecionado deve orientar linguagem, triagem e respostas genéricas do agente, sem substituir fatos específicos da base da empresa.
 
 ## 6. Regras de negócio
 
@@ -316,6 +317,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-038:** memória institucional só pode ser criada a partir de resposta segura, com confiança mínima de 0,8 e ao menos uma fonte ativa do tenant; a pergunta deve ser sanitizada, a memória permanece tenant-scoped e não pode conter credenciais, dados pessoais ou conteúdo de outro tenant.
 - **BR-039:** feedback de IA exige conversa e resposta pertencentes ao tenant corrente, registra o usuário e o horário em auditoria, permite no máximo uma avaliação vigente por resposta e só cria conhecimento corrigido após validação de tamanho e segurança.
 - **BR-040:** antes de transferir por baixa confiança ou escopo, o agente deve consultar o contexto autorizado e tentar uma inferência conservadora; só deve responder quando a conclusão for sustentada por fatos compatíveis, mantendo handoff para lacuna real, pedido explícito de humano ou regra de segurança.
+- **BR-041:** o guia do tipo de negócio pode fundamentar somente explicações genéricas e a condução do atendimento; preço, prazo, disponibilidade, política, catálogo e qualquer condição específica exigem perfil, diretriz ou conhecimento cadastrado. O tom altera a forma, nunca os fatos.
 
 ## 7. Requisitos não funcionais
 

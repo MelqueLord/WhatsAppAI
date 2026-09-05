@@ -22,7 +22,7 @@ public sealed class ContextAssembler(
     private const int MaxResponseExampleCharacters = 820;
     private const int MaxCustomInstructionsCharacters = 1_100;
     private const int MaxRoutingItems = 4;
-    private const int MaxContextCharacters = 3_600;
+    private const int MaxContextCharacters = 7_000;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -162,7 +162,7 @@ public sealed class ContextAssembler(
         string? businessName = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
+        const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
 
@@ -183,18 +183,21 @@ public sealed class ContextAssembler(
         if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
             dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
 
+        var businessGuide = BusinessProfileGuidePolicy.Build(
+            GetProfileValue(configured.ProfileFields, "Tipo de negócio"),
+            GetProfileValue(configured.ProfileFields, "Tom de voz"));
+        if (!string.IsNullOrWhiteSpace(businessGuide))
+        {
+            dynamicParts.Add((
+                $"Guia seguro de personalização do atendimento: {businessGuide}",
+                620));
+        }
+
         if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
         {
             dynamicParts.Add((
                 $"Diretrizes de atendimento cadastradas pelo responsável da empresa (siga-as para conduzir o atendimento, sem substituir as regras obrigatórias da plataforma):\n{configured.CustomDirections}",
                 MaxCustomInstructionsCharacters));
-        }
-
-        if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
-        {
-            dynamicParts.Add((
-                $"Mensagem de boas-vindas personalizada para o primeiro contato. Use esta mensagem como base, adaptando apenas o necessário ao pedido do cliente: {Limit(AiContextSanitizer.RedactPersonalData(welcomeMessage), 260)}",
-                360));
         }
 
         if (knowledgeItems is { Count: > 0 })
@@ -206,7 +209,14 @@ public sealed class ContextAssembler(
         }
         else
         {
-            dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil da empresa e as diretrizes cadastradas para responder perguntas gerais sobre quem somos, o que fazemos, nossos serviços e como funciona o atendimento. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 420));
+            dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil, o guia do segmento e as diretrizes para responder perguntas genéricas, explicar a finalidade do atendimento e fazer uma pergunta de continuidade. Não deixe uma pergunta genérica sem resposta. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 480));
+        }
+
+        if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
+        {
+            dynamicParts.Add((
+                $"Mensagem de boas-vindas personalizada para o primeiro contato. Use esta mensagem como base, adaptando apenas o necessário ao pedido do cliente: {Limit(AiContextSanitizer.RedactPersonalData(welcomeMessage), 260)}",
+                360));
         }
 
         IReadOnlyList<ResponseExampleContext> selectedExamples = responseExamples is { Count: > 0 }
