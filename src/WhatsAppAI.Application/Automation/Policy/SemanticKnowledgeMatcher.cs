@@ -14,7 +14,7 @@ public static class SemanticKnowledgeMatcher
         "saber", "se", "tem", "um", "uma", "voces"
     };
 
-    private static readonly IReadOnlyDictionary<string, string[]> ConceptTerms =
+    private static readonly Dictionary<string, string[]> ConceptTerms =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["pricing"] = ["preco", "valor", "custo", "custa", "investimento", "mensal", "mensalidade", "assinatura", "plano", "pacote", "tarifa"],
@@ -55,17 +55,17 @@ public static class SemanticKnowledgeMatcher
     }
 
     public static bool IsPricingQuery(string query) =>
-        DetectConcepts(Tokenize(query)).Contains("pricing", StringComparer.Ordinal);
+        DetectConcepts(Tokenize(query)).Contains("pricing");
 
-    private static HashSet<string> DetectConcepts(IReadOnlySet<string> terms)
+    private static HashSet<string> DetectConcepts(HashSet<string> terms)
     {
         return ConceptTerms
-            .Where(group => group.Value.Any(terms.Contains))
+            .Where(group => Array.Exists(group.Value, terms.Contains))
             .Select(group => group.Key)
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private static int ScoreCategory(string category, IReadOnlySet<string> queryConcepts)
+    private static int ScoreCategory(string category, HashSet<string> queryConcepts)
     {
         if (category.Equals(KnowledgeCategories.Pricing, StringComparison.OrdinalIgnoreCase) && queryConcepts.Contains("pricing"))
             return 8;
@@ -84,7 +84,7 @@ public static class SemanticKnowledgeMatcher
             : 0;
     }
 
-    private static int ScoreFuzzyTerms(IReadOnlySet<string> queryTerms, IReadOnlySet<string> candidateTerms)
+    private static int ScoreFuzzyTerms(HashSet<string> queryTerms, HashSet<string> candidateTerms)
     {
         var matches = queryTerms
             .Where(term => term.Length >= 5)
