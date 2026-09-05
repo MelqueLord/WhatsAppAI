@@ -540,13 +540,19 @@ public static class AiProviderEndpoints
             httpContext.RequestAborted,
             welcomeMessage,
             tenant?.Name);
+        var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
+            request.Message,
+            simulationContext.RelevantKnowledge);
         var simulationRequest = new AiRequest
         {
             ModelId = credential.ModelId,
             ApiKey = apiKey,
-            SystemPrompt = simulationContext.SystemPrompt,
+            SystemPrompt = allowPublicWebSearch
+                ? $"{simulationContext.SystemPrompt}\n\n{PublicKnowledgePolicy.BuildInstruction()}"
+                : simulationContext.SystemPrompt,
             MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
-            Messages = simulationContext.Messages
+            Messages = simulationContext.Messages,
+            AllowPublicWebSearch = allowPublicWebSearch
         };
         var aiProvider = aiProviderResolver.Resolve(credential.Provider);
         var response = await aiProvider.GetResponseAsync(simulationRequest);
@@ -599,17 +605,21 @@ public static class AiProviderEndpoints
             "AI.Simulation",
             "AiProviderCredential",
             credential.Id.ToString(),
-            $"provider={credential.Provider};model={credential.ModelId};decision={decision.Action};confidence={decision.Confidence.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"provider={credential.Provider};model={credential.ModelId};decision={response.Decision.Action};confidence={response.Decision.Confidence.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
             httpContext.Connection.RemoteIpAddress?.ToString()));
 
         return Results.Ok(new
         {
-            decision = decision.Action.ToString(),
-            text = decision.Action == AiAction.Reply ? response.Content : null,
-            confidence = decision.Confidence,
-            handoffReason = decision.Action == AiAction.Handoff ? decision.HandoffReason : null,
-            fallbackReason = decision.Action == AiAction.Handoff && decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null,
-            sources = simulationContext.RelevantSources.Select(source => new
+            decision = response.Decision.Action.ToString(),
+            text = response.Decision.Action == AiAction.Reply ? response.Content : null,
+            confidence = response.Decision.Confidence,
+            handoffReason = response.Decision.Action == AiAction.Handoff ? response.Decision.HandoffReason : null,
+            fallbackReason = response.Decision.Action == AiAction.Handoff && response.Decision.HandoffReason == "low_confidence" ? "A confiança ficou abaixo do limiar configurado." : null,
+            sources = simulationContext.RelevantSources
+                .Concat(allowPublicWebSearch
+                    ? [new SimulationSource("internet", "Conhecimento público", "Pesquisa web permitida somente para esta pergunta genérica.")]
+                    : [])
+                .Select(source => new
             {
                 type = source.Type,
                 name = source.Name,

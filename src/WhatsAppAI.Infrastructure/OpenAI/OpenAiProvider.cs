@@ -27,12 +27,14 @@ public sealed class OpenAiProvider(HttpClient httpClient, ILogger<OpenAiProvider
             messages.Add(new { role = msg.Role, content = msg.Content });
         }
 
-        var payload = new
+        var payload = new Dictionary<string, object>
         {
-            model = request.ModelId,
-            input = messages,
-            max_output_tokens = request.MaxTokens
+            ["model"] = request.ModelId,
+            ["input"] = messages,
+            ["max_output_tokens"] = request.MaxTokens
         };
+        if (request.AllowPublicWebSearch)
+            payload["tools"] = new[] { new { type = "web_search" } };
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses")
         {

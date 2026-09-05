@@ -27,7 +27,7 @@ function ModelEvaluationSection({ provider, modelId, enabled }: { provider: stri
 
 function SimulationSources({ sources }: { sources: SimulationSource[] }) {
   if (sources.length === 0) return null
-  const labels: Record<string, string> = { perfil: 'Perfil', diretrizes: 'Diretrizes', conhecimento: 'Conhecimento', exemplo: 'Exemplo' }
+  const labels: Record<string, string> = { perfil: 'Perfil', diretrizes: 'Diretrizes', conhecimento: 'Conhecimento', exemplo: 'Exemplo', internet: 'Internet' }
   return <section className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6"><h2 className="font-semibold text-slate-900">Dados usados nesta simulação</h2><p className="mt-1 text-xs text-slate-500">Estas são as fontes autorizadas selecionadas para responder à mensagem. Elas não incluem credenciais nem dados pessoais.</p><div className="mt-4 space-y-2">{sources.map((source, index) => <div key={`${source.type}-${source.name}-${index}`} className="flex items-start gap-3 rounded-lg bg-slate-50 p-3"><span className="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-semibold text-violet-700">{labels[source.type] ?? 'Fonte'}</span><div><p className="text-sm font-medium text-slate-800">{source.name}</p><p className="text-xs text-slate-500">{source.detail}</p></div></div>)}</div></section>
 }
 

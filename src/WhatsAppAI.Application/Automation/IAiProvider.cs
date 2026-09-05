@@ -12,6 +12,7 @@ public sealed record AiRequest
     public required IReadOnlyList<AiMessage> Messages { get; init; }
     public string? SystemPrompt { get; init; }
     public int MaxTokens { get; init; } = 1024;
+    public bool AllowPublicWebSearch { get; init; }
 }
 
 public sealed record AiMessage

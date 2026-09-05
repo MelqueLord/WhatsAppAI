@@ -23,6 +23,16 @@ public sealed class GrokProvider(HttpClient httpClient, ILogger<GrokProvider> lo
         };
         messages.AddRange(request.Messages.Select(message => new { role = message.Role, content = message.Content }));
 
+        return request.AllowPublicWebSearch
+            ? await GetWebGroundedResponseAsync(request, messages, cancellationToken)
+            : await GetChatCompletionAsync(request, messages, cancellationToken);
+    }
+
+    private async Task<AiResponse> GetChatCompletionAsync(
+        AiRequest request,
+        List<object> messages,
+        CancellationToken cancellationToken)
+    {
         var payload = new { model = request.ModelId, messages, max_tokens = request.MaxTokens };
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "v1/chat/completions")
         {
@@ -48,6 +58,50 @@ public sealed class GrokProvider(HttpClient httpClient, ILogger<GrokProvider> lo
             Content = decision.Action == AiAction.Reply ? decision.Text : null,
             InputTokens = result.Usage?.PromptTokens ?? 0,
             OutputTokens = result.Usage?.CompletionTokens ?? 0,
+            RawResponseId = result.Id
+        };
+    }
+
+    private async Task<AiResponse> GetWebGroundedResponseAsync(
+        AiRequest request,
+        List<object> messages,
+        CancellationToken cancellationToken)
+    {
+        var payload = new
+        {
+            model = request.ModelId,
+            input = messages,
+            max_output_tokens = request.MaxTokens,
+            tools = new[] { new { type = "web_search" } },
+            include = new[] { "no_inline_citations" }
+        };
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "v1/responses")
+        {
+            Content = JsonContent.Create(payload, options: JsonOptions)
+        };
+        httpRequest.Headers.Add("Authorization", $"Bearer {request.ApiKey}");
+
+        var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogError("Grok Responses API error {StatusCode}", response.StatusCode);
+            throw new InvalidOperationException($"Grok API error ({(int)response.StatusCode} {response.StatusCode})");
+        }
+
+        var result = JsonSerializer.Deserialize<GrokResponsesResponse>(body, JsonOptions)
+            ?? throw new InvalidOperationException("Failed to parse Grok Responses API response");
+        var output = result.Output
+            .SelectMany(item => item.Content)
+            .Select(content => content.Text)
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
+        var decision = AiDecisionJsonParser.Parse(output);
+        return new AiResponse
+        {
+            Decision = decision,
+            Content = decision.Action == AiAction.Reply ? decision.Text : null,
+            InputTokens = result.Usage?.InputTokens ?? 0,
+            OutputTokens = result.Usage?.OutputTokens ?? 0,
             RawResponseId = result.Id
         };
     }
@@ -85,4 +139,13 @@ public sealed class GrokProvider(HttpClient httpClient, ILogger<GrokProvider> lo
     private sealed record Choice { public Message? Message { get; init; } }
     private sealed record Message { public string? Content { get; init; } }
     private sealed record Usage { public int PromptTokens { get; init; } public int CompletionTokens { get; init; } }
+    private sealed record GrokResponsesResponse
+    {
+        public string? Id { get; init; }
+        public List<ResponseOutputItem> Output { get; init; } = [];
+        public ResponsesUsage? Usage { get; init; }
+    }
+    private sealed record ResponseOutputItem { public List<ResponseContentItem> Content { get; init; } = []; }
+    private sealed record ResponseContentItem { public string? Text { get; init; } }
+    private sealed record ResponsesUsage { public int InputTokens { get; init; } public int OutputTokens { get; init; } }
 }

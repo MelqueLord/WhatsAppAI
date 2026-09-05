@@ -742,6 +742,39 @@ public sealed class ContextAssemblerTests
         Assert.Contains("fato específico", prompt, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PublicKnowledgePolicy_AllowsGenericQuestionWithoutCompanyMatch()
+    {
+        Assert.True(PublicKnowledgePolicy.CanUsePublicKnowledge(
+            "Para que serve a automação de atendimento?",
+            []));
+    }
+
+    [Fact]
+    public void PublicKnowledgePolicy_PrefersRelevantCompanyKnowledge()
+    {
+        Assert.False(PublicKnowledgePolicy.CanUsePublicKnowledge(
+            "Para que serve a automação de atendimento?",
+            ["A empresa automatiza o atendimento pelo WhatsApp."]));
+    }
+
+    [Fact]
+    public void PublicKnowledgePolicy_RecognizesGenericComparisonPhrase()
+    {
+        Assert.True(PublicKnowledgePolicy.CanUsePublicKnowledge(
+            "É uma solução para WhatsApp?",
+            []));
+    }
+
+    [Theory]
+    [InlineData("Qual é o preço do plano?")]
+    [InlineData("Qual é o horário de funcionamento?")]
+    [InlineData("Qual medicamento devo tomar para esse sintoma?")]
+    public void PublicKnowledgePolicy_BlocksSpecificOrSensitiveQuestions(string message)
+    {
+        Assert.False(PublicKnowledgePolicy.CanUsePublicKnowledge(message, []));
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(

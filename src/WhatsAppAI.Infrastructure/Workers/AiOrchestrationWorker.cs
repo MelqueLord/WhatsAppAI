@@ -497,14 +497,20 @@ public sealed class AiOrchestrationWorker(
                 welcomeMessage,
                 isFirstInbound,
                 tenant?.Name);
+            var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
+                message.Content,
+                context.RelevantKnowledge);
 
             var request = new AiRequest
             {
                 ModelId = credential.ModelId,
                 ApiKey = apiKey,
                 Messages = context.Messages,
-                SystemPrompt = context.SystemPrompt,
-                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120)
+                SystemPrompt = allowPublicWebSearch
+                    ? $"{context.SystemPrompt}\n\n{PublicKnowledgePolicy.BuildInstruction()}"
+                    : context.SystemPrompt,
+                MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
+                AllowPublicWebSearch = allowPublicWebSearch
             };
 
             var pricing = await pricingRepository.GetActiveAsync(
