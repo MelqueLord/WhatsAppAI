@@ -80,6 +80,7 @@ async function getSession(tenantId) {
     phoneNumber: null,
     sock: null,
     conversations: new Map(),
+    contactNames: new Map(),
     messages: new Map(),
     seenMessageIds: new Set(),
     connecting: null,
@@ -139,9 +140,24 @@ async function initializeSession(tenantId, session) {
     })
 
     sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
-      const names = new Map((contacts ?? []).map((c) => [c.id, c.name || c.notify || c.verifiedName]))
+      const names = new Map((contacts ?? []).map((c) => [c.id, getWhatsAppContactName(c)]))
       for (const chat of chats ?? []) upsertConversation(session, chat.id, names.get(chat.id), chat.conversationTimestamp)
       for (const message of messages ?? []) addMessage(session, message, false)
+      void saveSnapshot(session)
+    })
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+      for (const contact of contacts ?? []) {
+        upsertConversation(session, contact.id, getWhatsAppContactName(contact))
+      }
+      void saveSnapshot(session)
+    })
+
+    sock.ev.on('contacts.update', (contacts) => {
+      for (const contact of contacts ?? []) {
+        upsertConversation(session, contact.id, getWhatsAppContactName(contact))
+      }
+      void saveSnapshot(session)
     })
 
     sock.ev.on('messages.upsert', ({ messages, type }) => {
@@ -309,10 +325,12 @@ const server = app.listen(port, () => {
 function upsertConversation(session, jid, name, timestamp) {
   if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
   const existing = session.conversations.get(jid)
+  const contactName = resolveContactName(session, jid, name)
+  if (contactName) session.contactNames.set(jid, contactName)
   session.conversations.set(jid, {
     id: encodeURIComponent(jid),
     contactId: jid,
-    contactName: name || existing?.contactName || jid.split('@')[0],
+    contactName: contactName || existing?.contactName || jid.split('@')[0],
     contactPhone: jid.split('@')[0],
     mode: existing?.mode ?? 'Automatic',
     status: 'Open',
@@ -320,6 +338,29 @@ function upsertConversation(session, jid, name, timestamp) {
     lastMessageAt: timestamp ? new Date(Number(timestamp) * 1000).toISOString() : existing?.lastMessageAt,
     isWindowOpen: true,
   })
+  return contactName
+}
+
+function getWhatsAppContactName(contact) {
+  return normalizeContactName(contact?.name || contact?.notify || contact?.verifiedName)
+}
+
+function resolveContactName(session, jid, candidate) {
+  const incomingName = normalizeContactName(candidate)
+  if (incomingName) return incomingName
+
+  const knownName = normalizeContactName(
+    session.contactNames.get(jid) || session.conversations.get(jid)?.contactName,
+  )
+  const phonePart = jid.split('@')[0]
+  return knownName && knownName !== phonePart ? knownName : null
+}
+
+function normalizeContactName(value) {
+  if (typeof value !== 'string') return null
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (!normalized) return null
+  return normalized.slice(0, 200).trim()
 }
 
 function addMessage(session, msg, isLiveInbound = false) {
@@ -345,7 +386,7 @@ function addMessage(session, msg, isLiveInbound = false) {
     '[midia]'
 
   const createdAt = new Date(Number(msg.messageTimestamp ?? Date.now() / 1000) * 1000).toISOString()
-  upsertConversation(session, jid, msg.pushName, Number(msg.messageTimestamp ?? Date.now() / 1000))
+  const contactName = upsertConversation(session, jid, msg.pushName, Number(msg.messageTimestamp ?? Date.now() / 1000))
 
   const conv = session.conversations.get(jid)
   if (conv) {
@@ -362,16 +403,16 @@ function addMessage(session, msg, isLiveInbound = false) {
     type: 'Text',
     content: text,
     createdAt,
-    senderName: msg.pushName,
+    senderName: contactName ?? msg.pushName,
   })
   session.messages.set(key, list)
   void saveSnapshot(session)
   if (!msg.key?.fromMe && isLiveInbound) {
-    void forwardInboundMessage(session, msg, text, createdAt)
+    void forwardInboundMessage(session, msg, text, createdAt, contactName)
   }
 }
 
-async function forwardInboundMessage(session, msg, text, createdAt) {
+async function forwardInboundMessage(session, msg, text, createdAt, contactName) {
   const match = session.tenantId.match(/^(.+)-qr-(\d+)$/)
   if (!match || !msg.key?.id) return
 
@@ -392,7 +433,7 @@ async function forwardInboundMessage(session, msg, text, createdAt) {
           },
           contacts: [{
             wa_id: phoneNumber,
-            profile: { name: msg.pushName },
+            profile: { name: contactName },
           }],
           messages: [{
             from: phoneNumber,

@@ -189,21 +189,14 @@ public sealed class WebhookProcessingWorker(
                     {
                         foreach (var whatsappMessage in change.Value.Messages)
                         {
-                            var matchedContact = change.Value.Contacts?.Find(c =>
-                                c.WaId is not null &&
-                                whatsappMessage.From is not null &&
-                                whatsappMessage.From.TrimStart('+').EndsWith(c.WaId.TrimStart('+')))
-                                ?? change.Value.Contacts?.Find(_ => true);
-                            // Use push_name from the message as fallback when contacts array has no profile name
-                            if (matchedContact is not null && matchedContact.Profile?.Name is null && whatsappMessage.PushName is not null)
-                                matchedContact = new WebhookContact { WaId = matchedContact.WaId, Profile = new WebhookProfile { Name = whatsappMessage.PushName } };
-                            else if (matchedContact is null && whatsappMessage.PushName is not null)
-                                matchedContact = new WebhookContact { WaId = whatsappMessage.From, Profile = new WebhookProfile { Name = whatsappMessage.PushName } };
+                            var contactName = ResolveWhatsAppContactName(
+                                whatsappMessage,
+                                change.Value.Contacts);
                             await ProcessInboundMessageAsync(
                                 tenantId,
                                 whatsappMessage,
                                 change.Value.Metadata?.PhoneNumberId ?? webhookEvent.PhoneNumberId,
-                                matchedContact,
+                                contactName,
                                 contactRepository,
                                 conversationRepository,
                                 messageRepository,
@@ -239,7 +232,7 @@ public sealed class WebhookProcessingWorker(
         Guid tenantId,
         WebhookMessage whatsappMessage,
         string phoneNumberId,
-        WebhookContact? webhookContact,
+        string? contactName,
         IContactRepository contactRepository,
         IConversationRepository conversationRepository,
         IMessageRepository messageRepository,
@@ -266,13 +259,13 @@ public sealed class WebhookProcessingWorker(
         var contact = await contactRepository.GetByPhoneAsync(tenantId, phoneNumber, cancellationToken);
         if (contact is null)
         {
-            contact = Contact.Create(tenantId, phoneNumber, webhookContact?.Profile?.Name);
+            contact = Contact.Create(tenantId, phoneNumber, contactName);
             await contactRepository.AddAsync(contact, cancellationToken);
             contact = await contactRepository.GetByPhoneAsync(tenantId, phoneNumber, cancellationToken) ?? contact;
         }
         else
         {
-            contact.UpdateName(webhookContact?.Profile?.Name);
+            contact.UpdateNameFromWhatsApp(contactName);
             contact.RecordMessage();
         }
 
@@ -362,6 +355,29 @@ public sealed class WebhookProcessingWorker(
             ? string.Concat(normalized.AsSpan(0, 4), "9", normalized.AsSpan(4))
             : normalized;
     }
+
+    internal static string? ResolveWhatsAppContactName(
+        WebhookMessage whatsappMessage,
+        IReadOnlyList<WebhookContact>? contacts)
+    {
+        var messageName = FirstNonBlank(whatsappMessage.PushName, whatsappMessage.AlternatePushName);
+        if (messageName is not null)
+            return messageName;
+
+        if (string.IsNullOrWhiteSpace(whatsappMessage.From) || contacts is null)
+            return null;
+
+        var sender = NormalizePhoneNumber(whatsappMessage.From);
+        var matchedContact = contacts.FirstOrDefault(contact =>
+            !string.IsNullOrWhiteSpace(contact.WaId) &&
+            NormalizePhoneNumber(contact.WaId) == sender);
+
+        return FirstNonBlank(matchedContact?.Profile?.Name);
+    }
+
+    private static string? FirstNonBlank(params string?[] values) =>
+        values.Select(value => value?.Trim())
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private async Task ProcessStatusUpdateAsync(
         WebhookStatus status,

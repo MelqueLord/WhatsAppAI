@@ -23,18 +23,26 @@ public sealed class Contact
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             PhoneNumber = phoneNumber,
-            Name = name,
+            Name = NormalizeName(name),
             CreatedAt = DateTime.UtcNow
         };
     }
 
     public void UpdateName(string? name)
     {
-        if (name is not null && name != Name)
+        var normalizedName = NormalizeName(name);
+        if (normalizedName is not null && normalizedName != Name)
         {
-            Name = name;
+            Name = normalizedName;
             UpdatedAt = DateTime.UtcNow;
         }
+    }
+
+    public void UpdateNameFromWhatsApp(string? name)
+    {
+        // A missing profile name must never erase a name already known by the
+        // tenant. A later valid WhatsApp profile name may refresh an import.
+        UpdateName(name);
     }
 
     public void UpdatePhoneNumber(string phoneNumber)
@@ -63,5 +71,25 @@ public sealed class Contact
         Name = null;
         ProfilePictureUrl = null;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? NormalizeName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var withoutControlCharacters = new string(name
+            .Where(character => !char.IsControl(character))
+            .ToArray());
+        var normalized = string.Join(' ', withoutControlCharacters
+            .Trim()
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+        return normalized.Length switch
+        {
+            0 => null,
+            <= 200 => normalized,
+            _ => normalized[..200].TrimEnd()
+        };
     }
 }

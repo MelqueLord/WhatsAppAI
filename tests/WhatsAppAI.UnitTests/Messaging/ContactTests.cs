@@ -25,6 +25,14 @@ public class ContactTests
     }
 
     [Fact]
+    public void Create_NormalizesWhatsAppName()
+    {
+        var contact = Contact.Create(Guid.NewGuid(), "+5511999999999", "  Maria\t da  Silva  ");
+
+        Assert.Equal("Maria da Silva", contact.Name);
+    }
+
+    [Fact]
     public void Create_SetsCreatedAt()
     {
         var before = DateTime.UtcNow;
@@ -60,6 +68,26 @@ public class ContactTests
         contact.UpdateName(null);
 
         Assert.Equal("John", contact.Name);
+    }
+
+    [Fact]
+    public void UpdateNameFromWhatsApp_TrimsAndRefreshesImportedName()
+    {
+        var contact = Contact.Create(Guid.NewGuid(), "+5511999999999", "Nome importado");
+
+        contact.UpdateNameFromWhatsApp("  Maria da Silva  ");
+
+        Assert.Equal("Maria da Silva", contact.Name);
+    }
+
+    [Fact]
+    public void UpdateNameFromWhatsApp_DoesNotEraseNameWhenWhatsAppOmitsIt()
+    {
+        var contact = Contact.Create(Guid.NewGuid(), "+5511999999999", "Maria");
+
+        contact.UpdateNameFromWhatsApp("   ");
+
+        Assert.Equal("Maria", contact.Name);
     }
 
     [Fact]

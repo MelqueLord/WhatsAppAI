@@ -91,6 +91,10 @@ public sealed class WebhookMessage
     [JsonPropertyName("name")]
     public string? PushName { get; set; }
 
+    // Some WhatsApp bridges preserve Baileys' original field name.
+    [JsonPropertyName("push_name")]
+    public string? AlternatePushName { get; set; }
+
     [JsonPropertyName("text")]
     public WebhookText? Text { get; set; }
 

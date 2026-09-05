@@ -843,6 +843,7 @@ public sealed class ContextAssemblerTests
             new CustomerServiceContext("Maria da Silva", true, "Comercial"));
 
         Assert.Contains("continue do ponto atual", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Maria da Silva", prompt, StringComparison.Ordinal);
         Assert.Contains("primeiro nome", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("fila Comercial", prompt, StringComparison.Ordinal);
         Assert.Contains("modo automático", prompt, StringComparison.Ordinal);

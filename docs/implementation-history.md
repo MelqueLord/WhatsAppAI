@@ -224,3 +224,17 @@ Após o sucesso, a conversa é invalidada na lista de abertas e fica disponível
 filtro **Conversas encerradas**, com status `Closed`, atribuição ativa removida e
 histórico preservado. O backend continua mantendo a proteção de concorrência e
 o retorno automático da conversa quando o cliente enviar nova mensagem.
+
+## 16. Nome do contato vindo do WhatsApp (2026-09-05)
+
+O recebimento de contatos passou a priorizar o nome enviado pelo WhatsApp na
+mensagem e no catálogo de contatos da ponte QR. A associação do perfil agora é
+feita pelo número exato do remetente; um contato diferente no mesmo lote nunca
+é usado como fallback. Atualizações de nome válidas podem corrigir um nome
+importado anteriormente, enquanto eventos sem nome preservam o último nome
+conhecido.
+
+A ponte também mantém nomes recebidos nos eventos `messaging-history.set`,
+`contacts.upsert` e `contacts.update`. Quando disponível, o nome é encaminhado
+ao backend e ao contexto personalizado da IA, que pode usar somente o primeiro
+nome, de forma natural e no máximo uma vez, sem inferir gênero ou outros dados.
