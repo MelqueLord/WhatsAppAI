@@ -64,6 +64,18 @@ public partial class AddConsentedCustomerMemory : Migration
             schema: "whatsappai",
             table: "customer_memories",
             columns: new[] { "tenant_id", "consent_evidence_id" });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_customer_memories_contact_id",
+            schema: "whatsappai",
+            table: "customer_memories",
+            column: "contact_id");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_customer_memories_consent_evidence_id",
+            schema: "whatsappai",
+            table: "customer_memories",
+            column: "consent_evidence_id");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

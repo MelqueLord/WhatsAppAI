@@ -1985,6 +1985,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ConsentEvidenceId");
+
+                    b.HasIndex("ContactId");
+
                     b.HasIndex("TenantId", "ConsentEvidenceId");
 
                     b.HasIndex("TenantId", "ContactId", "IsActive", "ExpiresAt");
