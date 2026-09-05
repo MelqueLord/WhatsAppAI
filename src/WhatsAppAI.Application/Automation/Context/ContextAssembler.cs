@@ -33,7 +33,8 @@ public sealed class ContextAssembler(
         CancellationToken cancellationToken = default,
         string? welcomeMessage = null,
         bool isFirstInbound = false,
-        string? businessName = null)
+        string? businessName = null,
+        CustomerServiceContext? customerContext = null)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
@@ -74,7 +75,8 @@ public sealed class ContextAssembler(
                 .ToList(),
             welcomeMessage: welcomeMessage,
             isFirstInbound: isFirstInbound,
-            businessName: businessName);
+            businessName: businessName,
+            customerContext: customerContext);
 
         return new ConversationContext
         {
@@ -159,7 +161,8 @@ public sealed class ContextAssembler(
         IReadOnlyList<ResponseExampleContext>? responseExamples = null,
         string? welcomeMessage = null,
         bool isFirstInbound = false,
-        string? businessName = null)
+        string? businessName = null,
+        CustomerServiceContext? customerContext = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
         const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
@@ -210,6 +213,13 @@ public sealed class ContextAssembler(
         else
         {
             dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil, o guia do segmento e as diretrizes para responder perguntas genéricas, explicar a finalidade do atendimento e fazer uma pergunta de continuidade. Não deixe uma pergunta genérica sem resposta. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 480));
+        }
+
+        if (customerContext is not null)
+        {
+            dynamicParts.Add((
+                CustomerServicePersonalizationPolicy.Build(customerContext),
+                760));
         }
 
         if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
@@ -591,6 +601,7 @@ public sealed class ContextAssembler(
 public sealed record RoutingQueueContext(string Name, string? Description);
 public sealed record RoutingTagContext(string Name, string? Description);
 public sealed record ResponseExampleContext(string CustomerMessage, string IdealResponse);
+public sealed record CustomerServiceContext(string? DisplayName, bool IsReturning, string? QueueName);
 
 public sealed record ConversationContext
 {

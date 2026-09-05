@@ -485,6 +485,14 @@ public sealed class AiOrchestrationWorker(
                 botConfig.WelcomeMessage,
                 credential.SystemPrompt,
                 tenant?.Name);
+            var contactName = await dbContext.Contacts
+                .IgnoreQueryFilters()
+                .Where(contact => contact.TenantId == message.TenantId && contact.Id == message.ContactId)
+                .Select(contact => contact.Name)
+                .SingleOrDefaultAsync(cancellationToken);
+            var currentQueueName = conversation.QueueId.HasValue
+                ? activeQueues.FirstOrDefault(queue => queue.Id == conversation.QueueId.Value)?.Name
+                : null;
             var context = await contextAssembler.BuildAsync(
                 message.TenantId, message.ConversationId, credential.SystemPrompt,
                 routingQueues
@@ -496,7 +504,8 @@ public sealed class AiOrchestrationWorker(
                 cancellationToken,
                 welcomeMessage,
                 isFirstInbound,
-                tenant?.Name);
+                tenant?.Name,
+                new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName));
             var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
                 message.Content,
                 context.RelevantKnowledge);

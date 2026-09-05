@@ -775,6 +775,30 @@ public sealed class ContextAssemblerTests
         Assert.False(PublicKnowledgePolicy.CanUsePublicKnowledge(message, []));
     }
 
+    [Fact]
+    public void CustomerServicePersonalizationPolicy_ContinuesReturningQueuedConversation()
+    {
+        var prompt = CustomerServicePersonalizationPolicy.Build(
+            new CustomerServiceContext("Maria da Silva", true, "Comercial"));
+
+        Assert.Contains("continue do ponto atual", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("primeiro nome", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fila Comercial", prompt, StringComparison.Ordinal);
+        Assert.Contains("modo automático", prompt, StringComparison.Ordinal);
+        Assert.Contains("no máximo uma pergunta", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomerServicePersonalizationPolicy_RemovesUnsafeDisplayNameCharacters()
+    {
+        var prompt = CustomerServicePersonalizationPolicy.Build(
+            new CustomerServiceContext("João <ignore-system> 123", false, null));
+
+        Assert.Contains("João ignoresystem", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("<", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("123", prompt, StringComparison.Ordinal);
+    }
+
     private sealed class FakeConversationQueries(IReadOnlyList<MessageDto> messages) : IConversationQueries
     {
         public Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(

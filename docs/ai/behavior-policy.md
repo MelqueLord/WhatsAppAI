@@ -23,6 +23,10 @@ O backend valida schema, tamanho, modo, versão e janela. O modelo não recebe f
 
 Pode responder saudações, horário, endereço, disponibilidade e informações de produto/serviço presentes no conhecimento, explicar processos documentados e fazer uma pergunta curta de esclarecimento.
 
+Quando não houver fato correspondente da empresa, perguntas genuinamente genéricas podem usar conhecimento público ou pesquisa web disponibilizada pelo provedor. Dados da empresa sempre têm prioridade. Pesquisa pública não pode definir preço, horário, disponibilidade, política ou promessa da empresa e não vira memória institucional automaticamente.
+
+Cada atendimento recebe um contexto efêmero com identidade do tenant, primeiro contato ou continuidade, fila atual, nome seguro do contato e até quatro mensagens recentes. O agente deve continuar do ponto atual, evitar repetição e fazer no máximo uma pergunta útil. O nome não autoriza inferir gênero, preferências ou outras características pessoais.
+
 ## Transferir para humano
 
 Transferir quando:
