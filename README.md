@@ -4,7 +4,7 @@ Nome provisório de um SaaS multiempresa para centralizar atendimentos do WhatsA
 
 ## Estado do projeto
 
-O pacote SDD inicial foi implementado. O backlog em `specs/000-platform/tasks.md` esta marcado como concluido ate `T144`, cobrindo bootstrap, identidade/tenancy, WhatsApp, inbox, resposta humana, IA segura, conhecimento, uso/auditoria, producao/piloto e sistema de planos.
+O pacote SDD inicial e os incrementos posteriores foram implementados. O backlog em `specs/000-platform/tasks.md` esta marcado como concluido ate `T240`, cobrindo bootstrap, identidade/tenancy, WhatsApp, inbox, resposta humana, IA segura, conhecimento, memoria, aprendizado supervisionado, uso/auditoria, producao/piloto e sistema de planos.
 
 Implementado:
 
@@ -13,12 +13,13 @@ Implementado:
 - Persistencia PostgreSQL via Npgsql, com Supabase gerenciado ou Docker em producao propria.
 - Docker, Nginx, scripts de backup/restore, observabilidade, runbooks e testes unitarios/integracao/arquitetura.
 
-Atualizacao de readiness (2026-08-21):
+Atualizacao de readiness (2026-09-05):
 
 - P0 implementado em codigo/configuracao: cookies e CSRF em producao, remocao de `cookies.txt`, compose com segredos obrigatorios, nginx por template e migration bundle com servico `migrate`.
-- Validacao local executada: `dotnet restore` e `dotnet build -c Release` ok; `npm run build` ok.
-- Pendencias atuais: 3 testes .NET falhando, 23 erros de lint frontend, 1 teste frontend falhando e 8 testes de webhook ainda ignorados.
-- Validacao operacional de deploy continua pendente em host com Docker/TLS (`docker compose --profile production config`, `nginx -t` e smoke HTTPS/SignalR).
+- IA por empresa consolidada ate T240: diretrizes, perfil, conhecimento ativo, exemplos manuais/supervisionados, memoria consentida, inferencia segura, filas automaticas, respostas naturais e validacao contra fatos inventados.
+- A producao Hostinger usa `/opt/atenz/WhatsAppAI` na branch `master`, com PostgreSQL e sessoes QR persistentes; atualizacoes nao removem volumes.
+- A validacao operacional inclui `docker compose config --quiet`, build, migration, health checks HTTPS e conferencia da ponte WhatsApp antes e depois da recriacao controlada.
+- Pendencias conhecidas: o ambiente local desta maquina ainda exige o SDK .NET 10.0.302 definido em `global.json`; lint/testes preexistentes permanecem registrados em `docs/implementation-history.md`.
 
 ## Premissas fechadas
 

@@ -178,3 +178,28 @@ O commit documental posterior a este registro apenas sincroniza o histórico; n�
 - **T238:** respostas naturais e contextualizadas.
 - **T239:** proteção contra informação inventada antes do envio.
 - **T240:** este histórico consolidado e runbook de atualização segura em produção.
+
+## 14. Exemplos de IA e atualização controlada (2026-09-05)
+
+Antes de alimentar a tela de exemplos, a produção foi consultada por empresa:
+
+- foram lidos somente itens ativos da base de conhecimento do tenant ATENZ;
+- itens inativos, como a informação de formas de pagamento sem conteúdo factual,
+  não foram usados;
+- os quatro exemplos manuais existentes foram preservados;
+- nove exemplos novos foram incluídos para intenções distintas de IA, recursos,
+  múltiplas linhas, conexão, contratação, preços, planos e funcionamento;
+- o lote ficou idempotente por mensagem normalizada, com origem `Manual`, e foi
+  registrado em auditoria;
+- o resultado ficou com 14 exemplos ativos e respostas de no máximo 144
+  caracteres, portanto abaixo do limite operacional de 160.
+
+Para publicar essa atualização na Hostinger, a sequência segura é: atualizar a
+branch `master`, validar o Compose, construir as imagens, executar `migrate`,
+recriar os serviços sem estado (`api`, `worker`, `frontend` e `nginx`) e então
+reiniciar o conjunto necessário para eliminar estado de processo. PostgreSQL e
+a ponte `whatsapp-web` podem ser reiniciados sem perda de dados porque seus
+volumes são persistentes, mas nenhum volume deve ser removido. Ao final, valide
+`/health/live`, `/health/ready`, o estado dos containers, os logs sanitizados e
+o health da ponte QR. A sessão do WhatsApp deve permanecer no volume
+`whatsapp-ai_whatsapp-web-sessions`.
