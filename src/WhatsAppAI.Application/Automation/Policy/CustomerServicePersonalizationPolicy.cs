@@ -1,4 +1,5 @@
 using System.Text;
+using WhatsAppAI.Application.Automation.Context;
 
 namespace WhatsAppAI.Application.Automation.Policy;
 
