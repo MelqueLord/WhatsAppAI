@@ -148,7 +148,25 @@ Não executar em produção `docker compose down -v`, `docker system prune` ou r
 
 Antes de abrir uma nova frente, consultar também `docs/runbooks/implemented-flows.md`, `docs/ai/behavior-policy.md`, `docs/architecture/architecture.md`, `docs/security/` e `specs/000-platform/`.
 
-## 12. Rastreamento das últimas entregas
+## 12. Registro da publicação atual
+
+Em 2026-09-05, a Hostinger foi atualizada a partir da branch `master` até o commit `de4107b` em `/opt/atenz/WhatsAppAI`.
+
+Resultado operacional da publicação:
+
+- build de `api`, `worker` e `frontend` concluído com sucesso;
+- migration executada sem alterações pendentes no banco;
+- `api`, `worker`, `frontend` e `nginx` recriados com as imagens novas;
+- `postgres` não foi recriado;
+- `whatsapp-web` não foi recriado e permaneceu saudável;
+- `.env`, PFX e o volume `whatsapp-ai_whatsapp-web-sessions` permaneceram presentes;
+- `/health/live` e `/health/ready` retornaram `Healthy`;
+- `/api/auth/csrf` retornou HTTP 200 sem expor o token no registro;
+- não foram encontrados erros recentes em API/worker após a subida.
+
+O commit documental posterior a este registro apenas sincroniza o histórico; não altera o binário nem exige novo restart dos containers.
+
+## 13. Rastreamento das últimas entregas
 
 - **T225–T226:** finalidade e consentimento padrão para IA.
 - **T227:** encerramento, fila de encerradas e retomada da conversa.
