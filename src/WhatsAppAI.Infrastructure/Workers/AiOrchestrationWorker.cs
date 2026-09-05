@@ -151,9 +151,9 @@ public sealed class AiOrchestrationWorker(
                 {
                     var keywordCredential = await credentialRepository.GetByTenantAsync(
                         message.TenantId, cancellationToken);
-                    var configuredQueueIds = keywordCredential?.GetRoutingQueueIds().ToHashSet() ?? [];
+                    var keywordQueueIds = keywordCredential?.GetRoutingQueueIds().ToHashSet() ?? [];
                     authorizedQueuesForKeyword = activeQueuesForKeyword
-                        .Where(queue => configuredQueueIds.Contains(queue.Id))
+                        .Where(queue => keywordQueueIds.Contains(queue.Id))
                         .ToList();
                 }
                 var keywordQueue = RestoreAutomaticForQueueKeyword(
