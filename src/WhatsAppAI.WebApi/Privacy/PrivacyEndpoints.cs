@@ -289,12 +289,28 @@ public static class PrivacyEndpoints
                 x.CreatedAt
             })
             .ToListAsync(cancellationToken);
+        var customerMemories = await dbContext.CustomerMemories
+            .IgnoreQueryFilters()
+            .Where(x => x.ContactId == request.ContactId && x.TenantId == tenantId)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new
+            {
+                x.Id,
+                x.Key,
+                x.Value,
+                source = x.Source.ToString(),
+                x.ExpiresAt,
+                x.IsActive,
+                x.CreatedAt,
+                x.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
 
         AddAudit(dbContext, currentTenant, "Privacy.DataExported", "DataSubjectRequest", request.Id);
         if (request.Status == DataSubjectRequestStatus.Open)
             request.Complete(currentTenant.UserId!.Value);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return Results.Ok(new { requestId = request.Id, exportedAt = DateTime.UtcNow, contact, conversations, messages });
+        return Results.Ok(new { requestId = request.Id, exportedAt = DateTime.UtcNow, contact, conversations, messages, customerMemories });
     }
 
     private static async Task<IResult> EraseRequestAsync(
@@ -330,12 +346,17 @@ public static class PrivacyEndpoints
         var evidence = await dbContext.ConsentEvidence
             .Where(x => x.ContactId == contact.Id && x.TenantId == tenantId)
             .ToListAsync(cancellationToken);
+        var customerMemories = await dbContext.CustomerMemories
+            .Where(x => x.ContactId == contact.Id && x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
 
         contact.Anonymize();
         foreach (var message in messages)
             message.RedactPersonalData();
         foreach (var item in evidence)
             item.RedactReference();
+        foreach (var memory in customerMemories)
+            memory.Redact();
         request.Complete(currentTenant.UserId!.Value);
         AddAudit(dbContext, currentTenant, "Privacy.DataErased", "DataSubjectRequest", request.Id);
         await dbContext.SaveChangesAsync(cancellationToken);

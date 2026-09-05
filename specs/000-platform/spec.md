@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.33.0
+**Versão:** 0.34.0
 **Data:** 2026-09-05
 
 ## 1. Problema
@@ -129,6 +129,17 @@ Como Operator, quero encerrar uma conversa quando o atendimento terminar e permi
 2. O encerramento preserva a conversa e todas as suas mensagens, sem apagar histórico nem derrubar a conexão WhatsApp.
 3. Uma nova mensagem do cliente reabre a mesma conversa no modo automático, remove a atribuição humana e mantém o histórico disponível para a IA.
 4. Ao retomar, o contexto automático considera a mensagem recebida e até três mensagens anteriores, usando as diretrizes, o perfil e o conhecimento do tenant para guiar o atendimento.
+
+### US-015 — Personalizar atendimento com memória consentida (P2)
+
+Como Operator ou TenantOwner, quero registrar fatos confirmados pelo cliente em uma memória individual, para que a IA personalize atendimentos futuros sem misturar empresas nem guardar informações sem autorização.
+
+**Aceite:**
+
+1. A memória pertence simultaneamente ao tenant e ao contato e só pode ser consultada enquanto existir consentimento ativo para atendimento automatizado por IA.
+2. O operador pode salvar, consultar e desativar um fato curto, com validade e auditoria sem registrar o valor completo no log.
+3. Revogar o consentimento, expirar ou anonimizar o contato remove a memória do contexto da IA sem apagar o histórico operacional restante.
+4. A IA recebe a memória como contexto de personalização, mas não pode criá-la ou alterá-la automaticamente.
 
 ### US-007 — Auditar operação (P2)
 
@@ -277,6 +288,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-074:** detectar perguntas genuinamente genéricas sem correspondência no conhecimento da empresa e permitir ao provedor de IA usar conhecimento público ou pesquisa web atual para responder, preservando a prioridade absoluta das informações do tenant.
 - **FR-075:** personalizar cada atendimento com identidade da empresa, nome seguro do contato, etapa de primeiro contato ou continuidade, fila atual e até quatro mensagens recentes, evitando reiniciar o diálogo ou repetir perguntas já respondidas.
 - **FR-076:** selecionar conhecimento do tenant por significado, combinando termos, sinônimos, intenção, categoria e tolerância a pequenas variações de escrita, sem depender de correspondência literal da pergunta.
+- **FR-077:** permitir memória individual do cliente com consentimento ativo, vinculada ao tenant, contato e evidência de consentimento, para registrar somente fatos curtos confirmados por operador; a memória deve possuir validade, desativação, auditoria sanitizada e ser injetada no contexto da IA apenas enquanto autorizada.
 
 ## 6. Regras de negócio
 
@@ -324,6 +336,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-042:** conhecimento público ou pesquisa web só pode ser usado quando não houver conhecimento relevante do tenant e a pergunta não solicitar fatos específicos da empresa nem orientação médica, jurídica ou financeira sensível; conteúdo público não pode ser atribuído à empresa nem virar memória institucional automaticamente.
 - **BR-043:** a personalização do atendimento é efêmera e tenant-scoped; o nome do contato deve ser sanitizado, não autoriza inferir gênero ou características pessoais e não cria memória pessoal automática. Estar em fila não desativa a IA enquanto a conversa permanecer em modo automático.
 - **BR-044:** a busca semântica deve operar somente sobre itens ativos do tenant já carregados pelo repositório, priorizar categoria compatível e manter no máximo seis fontes; similaridade isolada ou termo genérico não pode introduzir conhecimento não relacionado.
+- **BR-045:** memória de cliente exige evidência ativa da finalidade padrão de atendimento automatizado por IA no mesmo tenant e contato; revogação ou expiração impede a consulta, o modelo nunca grava memória por conta própria, e valores não podem conter credenciais, dados pessoais identificáveis ou instruções maliciosas.
 
 ## 7. Requisitos não funcionais
 

@@ -55,6 +55,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<BroadcastRecipient> BroadcastRecipients => Set<BroadcastRecipient>();
     public DbSet<ProcessingPurpose> ProcessingPurposes => Set<ProcessingPurpose>();
     public DbSet<ConsentEvidence> ConsentEvidence => Set<ConsentEvidence>();
+    public DbSet<CustomerMemory> CustomerMemories => Set<CustomerMemory>();
     public DbSet<DataSubjectRequest> DataSubjectRequests => Set<DataSubjectRequest>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -121,6 +122,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<ProcessingPurpose>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<ConsentEvidence>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<CustomerMemory>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<DataSubjectRequest>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);

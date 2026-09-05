@@ -698,6 +698,21 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void ComposeSystemPrompt_IncludesOnlyAuthorizedCustomerMemoryAsPersonalization()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            null,
+            customerMemories:
+            [
+                new CustomerMemoryContext("preferência", "Cliente prefere atendimento pela manhã.")
+            ]);
+
+        Assert.Contains("Memória autorizada deste contato", prompt, StringComparison.Ordinal);
+        Assert.Contains("Cliente prefere atendimento pela manhã.", prompt, StringComparison.Ordinal);
+        Assert.Contains("nunca como fonte de fatos da empresa", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SelectRelevantResponseExample_RecognizesIntentParaphrase()
     {
         var tenantId = Guid.NewGuid();

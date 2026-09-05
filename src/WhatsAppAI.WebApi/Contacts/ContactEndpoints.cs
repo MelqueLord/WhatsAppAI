@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Application.Contacts;
+using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -31,6 +34,15 @@ public static class ContactEndpoints
 
         group.MapPut("/{contactId:guid}", UpdateContactAsync)
             .WithName("UpdateContact");
+
+        group.MapGet("/{contactId:guid}/memory", ListCustomerMemoryAsync)
+            .WithName("ListCustomerMemory");
+
+        group.MapPost("/{contactId:guid}/memory", SaveCustomerMemoryAsync)
+            .WithName("SaveCustomerMemory");
+
+        group.MapDelete("/{contactId:guid}/memory/{memoryId:guid}", DeactivateCustomerMemoryAsync)
+            .WithName("DeactivateCustomerMemory");
 
         group.MapPost("/{contactId:guid}/start-conversation", StartConversationAsync)
             .WithName("StartConversation");
@@ -335,6 +347,207 @@ public static class ContactEndpoints
 
         return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
     }
+
+    private static async Task<IResult> ListCustomerMemoryAsync(
+        Guid contactId,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!CanManageMemory(currentTenant))
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId!.Value;
+        var contactExists = await dbContext.Contacts
+            .AnyAsync(contact => contact.Id == contactId && contact.TenantId == tenantId, cancellationToken);
+        if (!contactExists)
+            return Results.NotFound();
+
+        var consent = await GetActiveAiConsentAsync(dbContext, tenantId, contactId, cancellationToken);
+        var now = DateTime.UtcNow;
+        IReadOnlyList<CustomerMemoryResponse> memories = consent is null
+            ? []
+            : (await dbContext.CustomerMemories
+                .Where(memory =>
+                    memory.TenantId == tenantId &&
+                    memory.ContactId == contactId &&
+                    memory.IsActive &&
+                    memory.ExpiresAt > now)
+                .OrderByDescending(memory => memory.UpdatedAt ?? memory.CreatedAt)
+                .ToListAsync(cancellationToken))
+                .Select(ToCustomerMemoryResponse)
+                .ToList();
+
+        return Results.Ok(new
+        {
+            consentGranted = consent is not null,
+            consentGrantedAt = consent?.GrantedAt,
+            consentPurpose = AiConsentOptInPolicy.DefaultPurposeName,
+            items = memories
+        });
+    }
+
+    private static async Task<IResult> SaveCustomerMemoryAsync(
+        Guid contactId,
+        [FromBody] SaveCustomerMemoryRequest request,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!CanManageMemory(currentTenant))
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId!.Value;
+        var contactExists = await dbContext.Contacts
+            .AnyAsync(contact => contact.Id == contactId && contact.TenantId == tenantId, cancellationToken);
+        if (!contactExists)
+            return Results.NotFound();
+
+        var consent = await GetActiveAiConsentAsync(dbContext, tenantId, contactId, cancellationToken);
+        if (consent is null)
+        {
+            return Results.Conflict(new
+            {
+                code = "consent_required",
+                error = "O contato precisa autorizar o atendimento automatizado respondendo SIM antes de salvar uma memória."
+            });
+        }
+
+        if (!CustomerMemoryPolicy.TryNormalize(
+                request.Key,
+                request.Value,
+                out var key,
+                out var value,
+                out var validationError))
+        {
+            return Results.BadRequest(new { error = validationError });
+        }
+
+        var now = DateTime.UtcNow;
+        var expiresAt = request.ExpiresAt.HasValue
+            ? ToUtc(request.ExpiresAt.Value)
+            : now.AddDays(consent.ProcessingPurpose.RetentionDays);
+        var maximumExpiration = now.AddDays(consent.ProcessingPurpose.RetentionDays);
+        if (expiresAt <= now || expiresAt > maximumExpiration)
+        {
+            return Results.BadRequest(new
+            {
+                error = $"A validade deve estar entre agora e {consent.ProcessingPurpose.RetentionDays} dias."
+            });
+        }
+
+        var memory = await dbContext.CustomerMemories
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item =>
+                item.TenantId == tenantId &&
+                item.ContactId == contactId &&
+                item.Key == key,
+                cancellationToken);
+
+        if (memory is null)
+        {
+            memory = CustomerMemory.Create(
+                tenantId,
+                contactId,
+                consent.Id,
+                key,
+                value,
+                CustomerMemorySource.OperatorConfirmed,
+                expiresAt,
+                currentTenant.UserId!.Value);
+            dbContext.CustomerMemories.Add(memory);
+        }
+        else
+        {
+            memory.Replace(
+                consent.Id,
+                value,
+                CustomerMemorySource.OperatorConfirmed,
+                expiresAt);
+        }
+
+        dbContext.AuditLogs.Add(AuditLog.Create(
+            tenantId,
+            currentTenant.UserId,
+            "CustomerMemory.Saved",
+            "CustomerMemory",
+            memory.Id.ToString(),
+            "source=operator-confirmed"));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(ToCustomerMemoryResponse(memory));
+    }
+
+    private static async Task<IResult> DeactivateCustomerMemoryAsync(
+        Guid contactId,
+        Guid memoryId,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!CanManageMemory(currentTenant))
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId!.Value;
+        var memory = await dbContext.CustomerMemories
+            .FirstOrDefaultAsync(item =>
+                item.Id == memoryId &&
+                item.ContactId == contactId &&
+                item.TenantId == tenantId,
+                cancellationToken);
+        if (memory is null)
+            return Results.NotFound();
+
+        memory.Deactivate();
+        dbContext.AuditLogs.Add(AuditLog.Create(
+            tenantId,
+            currentTenant.UserId,
+            "CustomerMemory.Deactivated",
+            "CustomerMemory",
+            memory.Id.ToString(),
+            "source=operator"));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static Task<ConsentEvidence?> GetActiveAiConsentAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        Guid contactId,
+        CancellationToken cancellationToken) =>
+        dbContext.ConsentEvidence
+            .Include(evidence => evidence.ProcessingPurpose)
+            .Where(evidence =>
+                evidence.TenantId == tenantId &&
+                evidence.ContactId == contactId &&
+                evidence.RevokedAt == null &&
+                evidence.ProcessingPurpose.TenantId == tenantId &&
+                evidence.ProcessingPurpose.IsActive &&
+                evidence.ProcessingPurpose.Name == AiConsentOptInPolicy.DefaultPurposeName)
+            .OrderByDescending(evidence => evidence.GrantedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    private static CustomerMemoryResponse ToCustomerMemoryResponse(CustomerMemory memory) => new(
+        memory.Id,
+        memory.Key,
+        memory.Value,
+        memory.Source.ToString(),
+        memory.ExpiresAt,
+        memory.CreatedAt,
+        memory.UpdatedAt);
+
+    private static bool CanManageMemory(ICurrentTenant currentTenant) =>
+        currentTenant.TenantId.HasValue &&
+        currentTenant.UserId.HasValue &&
+        (currentTenant.UserRole is "TenantOwner" or "Operator" ||
+         currentTenant.IsPlatformAdmin && currentTenant.SupportSession is not null);
+
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 }
 
 public sealed class CreateContactRequest
@@ -362,3 +575,14 @@ public sealed class ContactResponse
     public Guid? ConversationId { get; init; }
     public string? Message { get; init; }
 }
+
+public sealed record SaveCustomerMemoryRequest(string Key, string Value, DateTime? ExpiresAt);
+
+public sealed record CustomerMemoryResponse(
+    Guid Id,
+    string Key,
+    string Value,
+    string Source,
+    DateTime ExpiresAt,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);

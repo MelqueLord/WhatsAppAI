@@ -63,6 +63,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IAiProviderCredentialRepository, AiProviderCredentialRepository>();
         services.AddScoped<IAiResponseExampleRepository, AiResponseExampleRepository>();
         services.AddScoped<IKnowledgeItemRepository, KnowledgeItemRepository>();
+        services.AddScoped<ICustomerMemoryRepository, CustomerMemoryRepository>();
         services.AddScoped<IClientTagRepository, ClientTagRepository>();
         services.AddScoped<IContactTagRepository, ContactTagRepository>();
         services.AddScoped<IBotConfigurationRepository, BotConfigurationRepository>();

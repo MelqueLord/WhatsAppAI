@@ -505,7 +505,8 @@ public sealed class AiOrchestrationWorker(
                 welcomeMessage,
                 isFirstInbound,
                 tenant?.Name,
-                new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName));
+                new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName),
+                contactId: message.ContactId);
             var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
                 message.Content,
                 context.RelevantKnowledge);

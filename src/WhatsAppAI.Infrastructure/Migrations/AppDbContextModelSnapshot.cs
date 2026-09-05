@@ -1914,6 +1914,74 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.ToTable("consent_evidence", "whatsappai");
                 });
 
+            modelBuilder.Entity("WhatsAppAI.Domain.Privacy.CustomerMemory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConsentEvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consent_evidence_id");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("memory_key");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("memory_value");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ConsentEvidenceId");
+
+                    b.HasIndex("TenantId", "ContactId", "IsActive", "ExpiresAt");
+
+                    b.HasIndex("TenantId", "ContactId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("customer_memories", "whatsappai");
+                });
+
             modelBuilder.Entity("WhatsAppAI.Domain.Privacy.DataSubjectRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2396,6 +2464,21 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ProcessingPurpose");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Privacy.CustomerMemory", b =>
+                {
+                    b.HasOne("WhatsAppAI.Domain.Messaging.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("ContactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WhatsAppAI.Domain.Privacy.ConsentEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("ConsentEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Privacy.DataSubjectRequest", b =>

@@ -11,7 +11,8 @@ namespace WhatsAppAI.Application.Automation.Context;
 public sealed class ContextAssembler(
     IConversationQueries conversationQueries,
     IKnowledgeItemRepository knowledgeRepository,
-    IAiResponseExampleRepository? responseExampleRepository = null)
+    IAiResponseExampleRepository? responseExampleRepository = null,
+    ICustomerMemoryRepository? customerMemoryRepository = null)
 {
     private const int MaxMessages = 4;
     private const int MaxMessageCharacters = 180;
@@ -34,7 +35,8 @@ public sealed class ContextAssembler(
         string? welcomeMessage = null,
         bool isFirstInbound = false,
         string? businessName = null,
-        CustomerServiceContext? customerContext = null)
+        CustomerServiceContext? customerContext = null,
+        Guid? contactId = null)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
@@ -64,6 +66,14 @@ public sealed class ContextAssembler(
                 await responseExampleRepository.GetActiveByTenantAsync(tenantId, cancellationToken),
                 query,
                 MaxResponseExamples);
+        IReadOnlyList<CustomerMemoryContext> customerMemories = customerMemoryRepository is null || !contactId.HasValue
+            ? []
+            : (await customerMemoryRepository.GetActiveByContactAsync(
+                tenantId,
+                contactId.Value,
+                cancellationToken))
+                .Select(memory => new CustomerMemoryContext(memory.Key, memory.Value))
+                .ToList();
 
         var fullSystemPrompt = ComposeSystemPrompt(
             systemPrompt,
@@ -76,7 +86,8 @@ public sealed class ContextAssembler(
             welcomeMessage: welcomeMessage,
             isFirstInbound: isFirstInbound,
             businessName: businessName,
-            customerContext: customerContext);
+            customerContext: customerContext,
+            customerMemories: customerMemories);
 
         return new ConversationContext
         {
@@ -162,7 +173,8 @@ public sealed class ContextAssembler(
         string? welcomeMessage = null,
         bool isFirstInbound = false,
         string? businessName = null,
-        CustomerServiceContext? customerContext = null)
+        CustomerServiceContext? customerContext = null,
+        IReadOnlyList<CustomerMemoryContext>? customerMemories = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
         const string fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como um funcionário treinado da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
@@ -220,6 +232,22 @@ public sealed class ContextAssembler(
             dynamicParts.Add((
                 CustomerServicePersonalizationPolicy.Build(customerContext),
                 760));
+        }
+
+        if (customerMemories is { Count: > 0 })
+        {
+            var items = new List<string>
+            {
+                "Memória autorizada deste contato (fatos confirmados e válidos; use somente para personalizar o atendimento, nunca como fonte de fatos da empresa):"
+            };
+            foreach (var memory in customerMemories.Take(4))
+            {
+                var key = Limit(AiContextSanitizer.RedactPersonalData(memory.Key), 60);
+                var value = Limit(AiContextSanitizer.RedactPersonalData(memory.Value), 160);
+                items.Add($"- {key}: {value}");
+            }
+
+            dynamicParts.Add((string.Join('\n', items), 900));
         }
 
         if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
@@ -564,6 +592,7 @@ public sealed record RoutingQueueContext(string Name, string? Description);
 public sealed record RoutingTagContext(string Name, string? Description);
 public sealed record ResponseExampleContext(string CustomerMessage, string IdealResponse);
 public sealed record CustomerServiceContext(string? DisplayName, bool IsReturning, string? QueueName);
+public sealed record CustomerMemoryContext(string Key, string Value);
 
 public sealed record ConversationContext
 {

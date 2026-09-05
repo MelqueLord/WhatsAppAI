@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: WhatsApp AI Manager API
-  version: 0.3.0
+  version: 0.34.0
   description: Contrato inicial do MVP. Endpoints autenticados usam sessão em cookie.
   license:
     name: Proprietary
@@ -307,6 +307,80 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/Problem' }
+  /contacts/{contactId}/memory:
+    get:
+      tags: [Contacts]
+      operationId: listCustomerMemory
+      summary: Consultar memória consentida do contato
+      description: Retorna somente memórias ativas e não expiradas quando a finalidade padrão de atendimento por IA possui consentimento vigente.
+      x-required-role: TenantOwner ou Operator
+      x-tenant-scoped: true
+      x-requirements: [US-015, FR-077, BR-045]
+      parameters:
+        - in: path
+          name: contactId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Estado do consentimento e memórias disponíveis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerMemoryList' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Contacts]
+      operationId: saveCustomerMemory
+      summary: Salvar fato confirmado na memória do contato
+      description: Exige consentimento ativo do contato; a gravação é manual e não pode ser feita pelo modelo de IA.
+      x-required-role: TenantOwner ou Operator
+      x-tenant-scoped: true
+      x-requirements: [US-015, FR-077, BR-045]
+      parameters:
+        - in: path
+          name: contactId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerMemoryInput' }
+      responses:
+        '200':
+          description: Memória criada ou atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerMemory' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /contacts/{contactId}/memory/{memoryId}:
+    delete:
+      tags: [Contacts]
+      operationId: deactivateCustomerMemory
+      summary: Desativar memória do contato
+      description: Desativa a entrada sem apagar o histórico da conversa.
+      x-required-role: TenantOwner ou Operator
+      x-tenant-scoped: true
+      x-requirements: [US-015, FR-077, BR-045]
+      parameters:
+        - in: path
+          name: contactId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: memoryId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      responses:
+        '204': { description: Memória desativada }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /admin/tenants/{tenantId}/status:
     put:
       tags: [Administration]
@@ -805,6 +879,34 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/ContactImportError' }
+    CustomerMemory:
+      type: object
+      required: [id, key, value, source, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string, maxLength: 80 }
+        value: { type: string, maxLength: 160 }
+        source: { type: string, enum: [CustomerConfirmed, OperatorConfirmed] }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    CustomerMemoryInput:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 80 }
+        value: { type: string, minLength: 1, maxLength: 160 }
+        expiresAt: { type: string, format: date-time, nullable: true }
+    CustomerMemoryList:
+      type: object
+      required: [consentGranted, consentPurpose, items]
+      properties:
+        consentGranted: { type: boolean }
+        consentGrantedAt: { type: string, format: date-time, nullable: true }
+        consentPurpose: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CustomerMemory' }
     AntiforgeryToken:
       type: object
       required: [token]

@@ -75,6 +75,13 @@ A API key é criptografada no banco via `ISecretStore`. O endpoint `GET /api/int
 
 Não versionar credenciais. Usar `dotnet user-secrets` no backend e um `.env.local` ignorado para valores públicos do frontend. Tokens Meta/OpenAI nunca devem estar no bundle da SPA.
 
+## Memória do cliente com consentimento
+
+1. O contato deve responder exatamente `SIM` quando receber a solicitação de consentimento para atendimento automatizado por IA.
+2. Em **Contatos > Editar**, use **Memória do cliente** para registrar somente um fato curto confirmado pelo cliente, como preferência de atendimento.
+3. A memória fica vinculada à empresa e ao contato, expira conforme a finalidade de IA (365 dias por padrão) e pode ser removida pelo Operator ou TenantOwner.
+4. Revogar o consentimento bloqueia a memória no próximo atendimento; a IA não cria memórias automaticamente e a anonimização redige todas as entradas do contato.
+
 ## Verificação antes de commit
 
 ```bash

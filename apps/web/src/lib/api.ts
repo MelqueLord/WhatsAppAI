@@ -56,6 +56,7 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     }
     throw new Error(message || `HTTP ${response.status}`)
   }
+  if (response.status === 204) return undefined as T
   return response.json()
 }
 
@@ -318,6 +319,23 @@ export interface ContactImportResult {
   skipped: number
   invalid: number
   errors: Array<{ row: number; code: string; message: string }>
+}
+
+export interface CustomerMemory {
+  id: string
+  key: string
+  value: string
+  source: string
+  expiresAt: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface CustomerMemoryListResponse {
+  consentGranted: boolean
+  consentGrantedAt?: string
+  consentPurpose: string
+  items: CustomerMemory[]
 }
 
 export interface CreateTenantResponse {
@@ -652,6 +670,22 @@ export const api = {
           method: 'POST',
         }
       ),
+
+    memory: {
+      list: (id: string) =>
+        fetchApi<CustomerMemoryListResponse>(`/api/contacts/${id}/memory`),
+
+      save: (id: string, data: { key: string; value: string; expiresAt?: string }) =>
+        fetchApi<CustomerMemory>(`/api/contacts/${id}/memory`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+
+      remove: (id: string, memoryId: string) =>
+        fetchApi<void>(`/api/contacts/${id}/memory/${memoryId}`, {
+          method: 'DELETE',
+        }),
+    },
   },
 
   tags: {
