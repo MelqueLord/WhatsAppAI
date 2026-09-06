@@ -19,6 +19,11 @@ internal static class AiReplyDeliveryGuard
         "consent-confirmation:"
     ];
 
+    public static bool IsAutomationOwned(Conversation? conversation) =>
+        conversation is not null &&
+        conversation.Status == ConversationStatus.Open &&
+        conversation.Mode == ConversationMode.Automatic;
+
     public static string CreateIdempotencyKey(Guid inboundMessageId, uint conversationVersion) =>
         $"ai:{inboundMessageId}:v{conversationVersion}";
 
@@ -82,7 +87,7 @@ internal static class AiReplyDeliveryGuard
         uint expectedVersion,
         DateTime utcNow) =>
         conversation is not null &&
+        IsAutomationOwned(conversation) &&
         conversation.Version == expectedVersion &&
-        conversation.Mode == ConversationMode.Automatic &&
         conversation.IsWindowOpen(utcNow);
 }

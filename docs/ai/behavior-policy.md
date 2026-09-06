@@ -45,6 +45,8 @@ Transferir para humano quando:
 
 Uma palavra-chave ou escolha de fila autorizada não é, sozinha, uma transferência para humano. Ela atribui a conversa à fila, mantém o modo automático e permite que a IA continue respondendo até um operador assumir.
 
+Depois que um operador assume ou pausa a conversa, nenhuma palavra-chave ou nova mensagem do cliente devolve o controle ao BOT. A retomada automática ocorre apenas pela reabertura de uma conversa encerrada; qualquer outra retomada exige ação explícita do operador.
+
 Quando não houver informação confirmada ou a mensagem estiver fora do escopo, a plataforma mantém a IA ativa e responde de modo genérico e seguro, sem inventar fatos. As proteções críticas — conteúdo sensível ou malicioso, falha repetida do provedor e situação fora da janela — continuam podendo exigir handoff seguro.
 
 ## Proibições

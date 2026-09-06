@@ -137,40 +137,18 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            if (conversation.Mode != ConversationMode.Automatic)
+            // Human takeover and pause are terminal for this inbound automation pass.
+            // Queue keywords may route only while the bot already owns the conversation;
+            // customer text must never silently take control back from an operator.
+            if (!AiReplyDeliveryGuard.IsAutomationOwned(conversation))
             {
-                // An authorized queue keyword is a new automatic routing request.
-                // It may recover a conversation left in Human mode by a previous
-                // automatic handoff, but it must never override an operator who
-                // explicitly owns the conversation.
-                var activeQueuesForKeyword = await queueRepository.GetActiveByTenantAsync(
-                    message.TenantId, cancellationToken);
-                IReadOnlyList<ServiceLine> authorizedQueuesForKeyword = [];
-                if (await dbContext.HasAutomaticDistributionEnabledAsync(
-                        message.TenantId, cancellationToken))
-                {
-                    var keywordCredential = await credentialRepository.GetByTenantAsync(
-                        message.TenantId, cancellationToken);
-                    var keywordQueueIds = keywordCredential?.GetRoutingQueueIds().ToHashSet() ?? [];
-                    authorizedQueuesForKeyword = activeQueuesForKeyword
-                        .Where(queue => keywordQueueIds.Contains(queue.Id))
-                        .ToList();
-                }
-                var keywordQueue = RestoreAutomaticForQueueKeyword(
-                    conversation, authorizedQueuesForKeyword, message.Content);
-                if (keywordQueue is null)
-                {
-                    message.MarkProcessedByAi();
-                    await messageRepository.UpdateAsync(message, cancellationToken);
-                    return;
-                }
-
-                dbContext.Set<Conversation>().Update(conversation);
-                await dbContext.SaveChangesAsync(cancellationToken);
+                message.MarkProcessedByAi();
+                await messageRepository.UpdateAsync(message, cancellationToken);
                 logger.LogInformation(
-                    "Authorized queue keyword {QueueName} restored conversation {ConversationId} to automatic mode",
-                    keywordQueue.Name,
-                    conversation.Id);
+                    "Automation skipped because conversation {ConversationId} is owned by mode {ConversationMode}",
+                    conversation.Id,
+                    conversation.Mode);
+                return;
             }
 
             var expectedConversationVersion = conversation.Version;
@@ -1512,28 +1490,6 @@ public sealed class AiOrchestrationWorker(
         return assignedQueueId is Guid queueId
             ? matchingQueues.FirstOrDefault(queue => queue.Id == queueId) ?? matchingQueues[0]
             : matchingQueues[0];
-    }
-
-    internal static ServiceLine? RestoreAutomaticForQueueKeyword(
-        Conversation conversation,
-        IReadOnlyList<ServiceLine> activeQueues,
-        string? messageContent)
-    {
-        if (conversation.Mode == ConversationMode.Automatic ||
-            !string.IsNullOrWhiteSpace(conversation.AssignedToUserId) ||
-            HumanHandoffRequestPolicy.IsExplicitHumanRequest(messageContent))
-            return null;
-
-        var selectedQueue = SelectBotRoutingQueue(
-            conversation.QueueId,
-            activeQueues,
-            messageContent);
-        if (selectedQueue is null)
-            return null;
-
-        conversation.SwitchMode(ConversationMode.Automatic, conversation.Version);
-        conversation.AssignQueue(selectedQueue.Id);
-        return selectedQueue;
     }
 
     internal static async Task<bool> RegisterAutomaticHandoffAsync(

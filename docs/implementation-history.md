@@ -242,3 +242,15 @@ nome, de forma natural e no máximo uma vez, sem inferir gênero ou outros dados
 O script de publicação também passou a construir explicitamente o perfil
 `production`, garantindo que a imagem atualizada da ponte QR seja incluída no
 deploy e não apenas as imagens sem perfil.
+
+## 17. Proteção definitiva do takeover humano (T242)
+
+O worker deixou de interpretar palavra-chave de fila como autorização para
+retomar uma conversa em `Human` ou `Paused`. A fila continua sendo atribuída ou
+alterada normalmente enquanto a conversa está em `Automatic`, mas uma mensagem
+do cliente nunca remove o controle de um operador nem desfaz uma pausa.
+
+O mesmo predicado de ownership agora protege a entrada do worker e a entrega da
+resposta, reduzindo divergência entre processamento e Outbox. Os testes cobrem
+os três estados operacionais. A retomada automática permanece restrita ao fluxo
+documentado de reabertura de uma conversa encerrada.

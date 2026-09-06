@@ -37,6 +37,37 @@ public sealed class AiReplyDeliveryGuardTests
             conversation, expectedVersion, DateTime.UtcNow));
     }
 
+    [Theory]
+    [InlineData(ConversationMode.Human)]
+    [InlineData(ConversationMode.Paused)]
+    public void IsAutomationOwned_BlocksEveryNonAutomaticMode(ConversationMode mode)
+    {
+        var conversation = CreateConversationWithOpenWindow();
+        conversation.SwitchMode(
+            mode,
+            conversation.Version,
+            mode == ConversationMode.Human ? "operator-1" : null);
+
+        Assert.False(AiReplyDeliveryGuard.IsAutomationOwned(conversation));
+    }
+
+    [Fact]
+    public void IsAutomationOwned_AllowsOpenAutomaticConversation()
+    {
+        var conversation = CreateConversationWithOpenWindow();
+
+        Assert.True(AiReplyDeliveryGuard.IsAutomationOwned(conversation));
+    }
+
+    [Fact]
+    public void IsAutomationOwned_BlocksClosedAutomaticConversation()
+    {
+        var conversation = CreateConversationWithOpenWindow();
+        conversation.Close(conversation.Version);
+
+        Assert.False(AiReplyDeliveryGuard.IsAutomationOwned(conversation));
+    }
+
     [Fact]
     public void CanSend_BlocksClosedWindow()
     {
