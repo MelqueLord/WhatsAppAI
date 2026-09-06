@@ -158,7 +158,10 @@ export function BotConfigPage() {
       }
       return res.json()
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot-config'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bot-config'] })
+      queryClient.invalidateQueries({ queryKey: ['ai-config'] })
+    },
   })
 
   const saveMutation = useMutation({
