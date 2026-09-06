@@ -1,6 +1,6 @@
 # Guia de funcionamento implementado
 
-**Atualizado em:** 2026-08-28  
+**Atualizado em:** 2026-09-06
 **Escopo:** comportamento atualmente implementado no monólito WhatsAppAI.  
 **Fonte:** código, testes e migrações presentes no repositório.
 
@@ -9,9 +9,9 @@ Este documento é um mapa operacional para consulta. Ele descreve o que já func
 ## 1. Limites do produto
 
 - O MVP automatiza atendimento por WhatsApp; não é CRM de funil, agenda, catálogo, campanha ou construtor de bot.
-- BOT e IA continuam módulos operacionais separados e mutuamente exclusivos no atendimento. Os códigos legados **BOT** e **IA + BOT** são preservados; novas empresas usam os planos comerciais **STAR**, **FLOW** ou **SCALA**, que combinam os módulos autorizados sem fundir suas telas ou configurações.
+- BOT e IA continuam com telas e configurações separadas, mas o BOT é a automação principal e a IA é a estratégia inteligente executada dentro dele. Os códigos legados **BOT** e **IA + BOT** são preservados; novas empresas usam **STAR**, **FLOW** ou **SCALA**.
 - As telas `/bot` e `/integrations/ai` permanecem separadas. Ambas alteram a configuração operacional do tenant, mas não duplicam o fluxo de atendimento.
-- O modo do `BotConfiguration` é a fonte única de exclusividade: `Manual`, `SimpleAutoReply` ou `AiPowered`. Ativar BOT simples desativa IA operacional; ativar IA coloca o BOT em `AiPowered`.
+- O modo do `BotConfiguration` escolhe uma única estratégia por mensagem: `Manual`, `SimpleAutoReply` ou `AiPowered`. Em `AiPowered`, BOT e IA estão ativos; desligar somente a IA mantém `SimpleAutoReply` nos planos com BOT; desligar o BOT pausa toda automação.
 - A base de conhecimento usa recuperação lexical determinística (termos da mensagem, título com peso 3 e conteúdo com peso 1). RAG vetorial não faz parte do MVP.
 
 Referências: `specs/000-platform/spec.md`, `docs/ai/behavior-policy.md` e `docs/architecture/architecture.md`.

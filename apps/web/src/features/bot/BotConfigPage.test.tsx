@@ -44,14 +44,27 @@ describe('BotConfigPage', () => {
     expect(fetch).not.toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.anything())
   })
 
-  it('formats the inactive status as a single message with emphasized status', async () => {
+  it('shows the BOT as active while the AI strategy is active', async () => {
     renderPage()
 
-    const message = await screen.findByText((_, element) =>
-      element?.tagName === 'P' &&
-      element.textContent === 'O bot está inativo. As mensagens automáticas não serão enviadas.')
+    expect(await screen.findByRole('button', { name: 'Bot ativo' })).toBeInTheDocument()
+    expect(screen.getByText('O BOT está ativo com IA. A IA responde dentro do fluxo do BOT, sem duplicar mensagens.')).toBeInTheDocument()
+    expect(screen.queryByText('inativo', { selector: 'strong' })).not.toBeInTheDocument()
+  })
 
-    expect(message).toBeInTheDocument()
-    expect(screen.getByText('inativo', { selector: 'strong' })).toBeInTheDocument()
+  it('reactivates the BOT without replacing the active AI strategy', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => {
+      if (url.includes('/api/bot-config') && options?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: async () => ({ enabled: true, mode: 'AiPowered', version: 4 }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ configured: true, mode: 'AiPowered', enabled: false, version: 3, welcomeMessage: 'Olá', flowSteps: [] }) })
+    }))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Bot inativo' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/bot-config/toggle', expect.objectContaining({ method: 'POST' })))
+
+    const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => url === '/api/bot-config/toggle')
+    expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ enabled: true, mode: 'AiPowered' })
   })
 })

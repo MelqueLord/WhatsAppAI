@@ -250,22 +250,42 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
             Content = JsonContent.Create(new { enabled = true })
         };
         enableRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
-        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(enableRequest)).StatusCode);
+        var enableResponse = await client.SendAsync(enableRequest);
+        Assert.Equal(HttpStatusCode.OK, enableResponse.StatusCode);
+        var enabledState = await enableResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(enabledState.GetProperty("aiActive").GetBoolean());
+        Assert.True(enabledState.GetProperty("botActive").GetBoolean());
+        Assert.Equal("AiPowered", enabledState.GetProperty("mode").GetString());
+        var enabledVersion = enabledState.GetProperty("botVersion").GetUInt32();
 
         using var disableRequest = new HttpRequestMessage(
             HttpMethod.Post, "/api/integrations/ai/toggle")
         {
             Content = JsonContent.Create(new { enabled = false })
         };
-        disableRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
-        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(disableRequest)).StatusCode);
+        disableRequest.Headers.TryAddWithoutValidation("If-Match-Bot", enabledVersion.ToString());
+        var disableResponse = await client.SendAsync(disableRequest);
+        Assert.Equal(HttpStatusCode.OK, disableResponse.StatusCode);
+        var disabledState = await disableResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(disabledState.GetProperty("aiActive").GetBoolean());
+        Assert.True(disabledState.GetProperty("botActive").GetBoolean());
+        Assert.Equal("SimpleAutoReply", disabledState.GetProperty("mode").GetString());
+
+        await using (var verificationDb = await _factory.GetDbContextAsync())
+        {
+            var botConfig = await verificationDb.BotConfigurations.IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(config => config.TenantId == tenantId);
+            Assert.True(botConfig.Enabled);
+            Assert.Equal(BotMode.SimpleAutoReply, botConfig.Mode);
+        }
 
         using var staleRequest = new HttpRequestMessage(
             HttpMethod.Post, "/api/integrations/ai/toggle")
         {
             Content = JsonContent.Create(new { enabled = true })
         };
-        staleRequest.Headers.TryAddWithoutValidation("If-Match-Bot", "0");
+        staleRequest.Headers.TryAddWithoutValidation("If-Match-Bot", enabledVersion.ToString());
         Assert.Equal(HttpStatusCode.Conflict, (await client.SendAsync(staleRequest)).StatusCode);
     }
 

@@ -128,7 +128,7 @@ Planos comerciais selecionáveis: `STAR` (1 linha, 2 operadores, IA), `FLOW` (2 
 
 `id`, `tenant_id`, `mode`, `welcome_message`, `fallback_message`, `max_tokens_per_response`, `is_active`, `version`, timestamps.
 
-Modos: `Manual|SimpleAutoReply|AiPowered`. Configuração por tenant; `Manual` desabilita automação, `SimpleAutoReply` usa mensagem fixa, `AiPowered` usa IA com conhecimento. Versão controla concorrência otimista.
+Modos: `Manual|SimpleAutoReply|AiPowered`. Configuração por tenant; `Enabled` é o controle principal da automação, `Manual` não responde, `SimpleAutoReply` usa mensagem fixa e `AiPowered` mantém o BOT ativo usando IA com conhecimento. As estratégias são exclusivas apenas para garantir uma resposta por mensagem. Desligar somente a IA usa `SimpleAutoReply` quando o plano possui BOT; desligar o BOT pausa qualquer estratégia. Versão controla concorrência otimista (**FR-081**, **BR-050**).
 
 ### ClientTag
 

@@ -4,7 +4,7 @@
 **Depende de:** Plataforma base (T001-T075), Sistema de Planos (T090-T116)
 **Refs:** US-004, FR-013, FR-014, FR-021, BR-008
 
-> **Correção de decisão (2026-08-27/2026-08-31):** BOT e IA são configurações separadas. O plano BOT deve operar sem provedor de IA; o plano BOT + IA usa provedor e credencial administrados pelo PlatformAdmin. Diretrizes, perfil, conhecimento, confiança e handoff permanecem configuráveis no tenant porque definem o atendimento daquela empresa. A separação deve ser preservada na UI, nos contratos e nas permissões.
+> **Correção de decisão (2026-08-27/2026-08-31/2026-09-06):** BOT e IA são configurações separadas, mas o BOT é o controle principal da automação e a IA é uma estratégia executada dentro dele. O plano BOT deve operar sem provedor de IA; o plano BOT + IA usa provedor e credencial administrados pelo PlatformAdmin. As estratégias `SimpleAutoReply` e `AiPowered` permanecem exclusivas internamente para impedir respostas duplicadas, sem fazer os controles BOT e IA parecerem concorrentes.
 
 ## 1. Problema
 
@@ -68,6 +68,7 @@ Como PlatformAdmin, quero testar a conexão com o provedor de IA configurado par
 - **FR-AI-009:** as diretrizes da IA devem permitir selecionar tags ativas do tenant para categorização automática do contato conforme o conteúdo da conversa.
 - **FR-AI-010:** o consumo real de tokens deve ser registrado por tenant, provedor e modelo, separando entrada e saída para permitir estimativa de custo sem expor prompts ou credenciais.
 - **FR-AI-011:** o cálculo de custo deve usar a versão de preço vigente para o provedor/modelo e gravar `cost_minor_units`, `currency` e `price_version` em cada métrica de tokens.
+- **FR-AI-014:** ativar IA deve habilitar o BOT em `AiPowered`; desativar IA deve manter o BOT em `SimpleAutoReply` quando o plano possuir essa capacidade, e somente planos sem BOT retornam a `Manual`.
 
 ## 5. Regras de negócio
 
@@ -79,6 +80,7 @@ Como PlatformAdmin, quero testar a conexão com o provedor de IA configurado par
 - **BR-AI-006:** o PlatformAdmin controla franquia, orçamento, limites técnicos e custo por empresa; tokens servem para medir o custo real e podem bloquear o uso quando o orçamento for atingido, sem substituir o limite comercial de respostas.
 - **BR-AI-007:** falhas transitórias têm no máximo três tentativas por mensagem; o circuit breaker é isolado por tenant/provedor e uma abertura impede novas chamadas até a janela de recuperação.
 - **BR-AI-008:** alterações de provedor e diretrizes que também atualizam o BOT validam todas as versões antes da primeira escrita e persistem configuração e auditoria atomicamente.
+- **BR-AI-009:** apenas uma estratégia automática responde a cada mensagem; o estado `AiPowered` representa BOT ativo com IA, não BOT desligado.
 - **FR-AI-012:** nenhum modelo pode ser ativado sem avaliação aprovada; uma avaliação aprovada pode indicar modelo de rollback, que só é aplicado após validação e concorrência otimista.
 - **FR-AI-013:** identificadores, nomes e modelos de provedores devem vir de um catálogo único no Application; API, política de modelos, DI e frontend não podem manter listas divergentes.
 

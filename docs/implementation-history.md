@@ -1,6 +1,6 @@
 # Histórico consolidado de implementação
 
-**Atualizado em:** 2026-09-05
+**Atualizado em:** 2026-09-06
 **Escopo:** resumo do que foi implementado no projeto WhatsAppAI até esta data.
 **Fonte de verdade:** código, testes, migrations, especificação e ADRs versionados.
 
@@ -46,7 +46,7 @@ O fluxo principal é: receber webhook, persistir a mensagem, carregar o contexto
 
 ## 4. BOT, filas e atendimento humano
 
-- Modos `Manual`, `SimpleAutoReply` e `AiPowered`, com exclusividade operacional preservada.
+- BOT como controle principal e `SimpleAutoReply`/`AiPowered` como estratégias exclusivas por mensagem: a IA ativa mantém o BOT ativo, e desligar somente a IA preserva respostas fixas nos planos com BOT.
 - Saudação, retorno, fallback, mensagem offline, handoff, transferência, etapas e palavras-chave configuráveis.
 - Horário de atendimento por dia e fuso horário, com resposta fora do expediente quando configurada.
 - Filas e tags autorizadas por empresa, com validação de plano e escopo.

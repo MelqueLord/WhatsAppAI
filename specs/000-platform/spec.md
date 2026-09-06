@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.38.0
-**Data:** 2026-09-05
+**Versão:** 0.39.0
+**Data:** 2026-09-06
 
 ## 1. Problema
 
@@ -303,6 +303,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-078:** transformar avaliações aprovadas de respostas da IA em exemplos supervisionados tenant-scoped: feedback útil aprende a resposta enviada, correção aprende somente a resposta corrigida, e observação sem resposta não gera exemplo; cada exemplo deve preservar origem, sanitização, ativação e concorrência otimista dos exemplos existentes.
 - **FR-079:** gerar respostas de atendimento naturais, curtas e contextuais, usando o histórico, o tom e a identidade do tenant sem repetir saudações, perguntas já respondidas ou frases burocráticas; a naturalidade não pode alterar fatos autorizados nem ultrapassar 160 caracteres.
 - **FR-080:** validar antes do envio que valores concretos produzidos pela IA — preço, horário, prazo, percentual, data, link ou contato — aparecem no contexto autorizado do tenant; quando não houver correspondência, bloquear a resposta e aplicar handoff seguro, exceto em pesquisa pública explicitamente permitida para pergunta genérica.
+- **FR-081:** apresentar o BOT como controle principal da automação e a IA como sua estratégia inteligente: ativar IA também mantém o BOT ativo; desativar IA em plano com BOT troca para respostas fixas sem interromper a automação; desligar o BOT pausa qualquer estratégia automática.
 
 ## 6. Regras de negócio
 
@@ -355,6 +356,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-047:** a decisão de encaminhamento segue uma ordem determinística: segurança e pedido explícito de humano vencem; fila autorizada somente atribui a conversa e mantém `Automatic`; resposta apoiada por contexto vence um handoff genérico; fila não autorizada, inexistente ou desativada é ignorada. Uma conversa já em fila continua recebendo respostas da IA até a assunção humana.
 - **BR-048:** a política de conversa natural deve responder primeiro ao pedido atual, aproveitar até o histórico autorizado, evitar repetição e usar no máximo uma pergunta útil; ela modifica somente linguagem e estrutura, nunca cria fatos nem substitui as regras de segurança, handoff ou limite de 160 caracteres.
 - **BR-049:** nenhuma resposta com valor concreto não encontrado nas fontes autorizadas pode ser enfileirada para o cliente. A validação ocorre depois das tentativas de inferência e antes da criação da mensagem/Outbox; quando bloquear, usa `out_of_scope`, preserva pedido humano e segurança, e não impede resposta pública genérica autorizada.
+- **BR-050:** `SimpleAutoReply` e `AiPowered` são estratégias internas mutuamente exclusivas para garantir uma única resposta por mensagem, mas não são recursos concorrentes na interface: em `AiPowered`, BOT e IA aparecem ativos; ao desligar somente a IA, planos com capacidade de BOT permanecem habilitados em `SimpleAutoReply`, enquanto planos sem BOT retornam a `Manual`.
 
 ## 7. Requisitos não funcionais
 

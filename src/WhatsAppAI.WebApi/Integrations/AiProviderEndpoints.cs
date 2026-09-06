@@ -388,7 +388,7 @@ public static class AiProviderEndpoints
                 if (expectedVersion != 0)
                     return Results.Conflict(new { error = "A configuração do BOT foi alterada por outro usuário." });
                 if (!request.Enabled)
-                    return Results.Ok(new { aiActive = false, botVersion = 0U });
+                    return Results.Ok(new { aiActive = false, botActive = false, mode = BotMode.Manual.ToString(), botVersion = 0U });
 
                 var credential = await credentialRepository.GetByTenantAsync(tenantId, httpContext.RequestAborted);
                 if (credential is null)
@@ -416,10 +416,26 @@ public static class AiProviderEndpoints
                     if (await evaluationRepository.GetApprovedForModelAsync(
                             tenantId, credential.Provider, credential.ModelId, httpContext.RequestAborted) is null)
                         return Results.BadRequest(new { error = "O modelo precisa de uma avaliação aprovada antes da ativação.", code = "model_evaluation_required" });
-                }
 
-                botConfig.UpdateMode(request.Enabled ? BotMode.AiPowered : BotMode.Manual);
-                botConfig.Toggle(request.Enabled);
+                    if (botConfig.Mode != BotMode.AiPowered)
+                        botConfig.UpdateMode(BotMode.AiPowered);
+                    if (!botConfig.Enabled)
+                        botConfig.Toggle(true);
+                }
+                else if (await dbContext.HasBotEnabledAsync(tenantId, httpContext.RequestAborted))
+                {
+                    if (botConfig.Mode != BotMode.SimpleAutoReply)
+                        botConfig.UpdateMode(BotMode.SimpleAutoReply);
+                    if (!botConfig.Enabled)
+                        botConfig.Toggle(true);
+                }
+                else
+                {
+                    if (botConfig.Mode != BotMode.Manual)
+                        botConfig.UpdateMode(BotMode.Manual);
+                    if (botConfig.Enabled)
+                        botConfig.Toggle(false);
+                }
                 await botConfigRepository.UpdateAsync(botConfig, httpContext.RequestAborted);
                 await auditLogRepository.AddAsync(AuditLog.Create(
                     tenantId, currentTenant.UserId, "AI.ModeChanged", "BotConfiguration", botConfig.Id.ToString(),
@@ -427,7 +443,13 @@ public static class AiProviderEndpoints
             }
 
             await transaction.CommitAsync(httpContext.RequestAborted);
-            return Results.Ok(new { aiActive = request.Enabled, botVersion = botConfig.Version });
+            return Results.Ok(new
+            {
+                aiActive = botConfig.Enabled && botConfig.Mode == BotMode.AiPowered,
+                botActive = botConfig.Enabled && botConfig.Mode != BotMode.Manual,
+                mode = botConfig.Mode.ToString(),
+                botVersion = botConfig.Version
+            });
         }
         catch (DbUpdateConcurrencyException)
         {

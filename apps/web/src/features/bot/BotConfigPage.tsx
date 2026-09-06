@@ -143,11 +143,14 @@ export function BotConfigPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
+      const activationMode = config?.mode && config.mode !== 'Manual'
+        ? config.mode
+        : 'SimpleAutoReply'
       const res = await fetchWithCsrf('/api/bot-config/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',
-        body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
+        body: JSON.stringify({ enabled, mode: enabled ? activationMode : undefined }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null
@@ -222,7 +225,7 @@ export function BotConfigPage() {
 
   const effectiveSteps = config?.flowSteps?.length ? config.flowSteps : []
   const steps = flowSteps ?? effectiveSteps
-  const isBotActive = config?.enabled === true && config.mode === 'SimpleAutoReply'
+  const isBotActive = config?.enabled === true && config.mode !== 'Manual'
 
   const val = (local: string | undefined, remote: string | null | undefined) =>
     local ?? remote ?? ''
@@ -277,7 +280,9 @@ export function BotConfigPage() {
         {user?.aiEnabled && (
           <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-lg text-sm text-violet-800">
             <Info className="w-4 h-4 flex-shrink-0" />
-            O BOT e a IA são mutuamente exclusivos: ativar o BOT desativa a IA, e ativar a IA desativa o BOT.
+            {config?.mode === 'AiPowered' && isBotActive
+              ? 'O BOT está ativo com IA. A IA responde dentro do fluxo do BOT, sem duplicar mensagens.'
+              : 'O BOT é a automação principal. Sem IA, ele continua usando respostas fixas; desligar o BOT pausa toda automação.'}
           </div>
         )}
 
