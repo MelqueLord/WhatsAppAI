@@ -205,6 +205,12 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
+            var withinBusinessHours = BusinessHoursPolicy.IsOpen(
+                botConfig.BusinessHoursEnabled,
+                botConfig.BusinessHoursJson,
+                botConfig.TimeZoneId,
+                DateTime.UtcNow);
+
             // Handle SimpleAutoReply mode
             if (botConfig.Mode == BotMode.SimpleAutoReply)
             {
@@ -220,6 +226,17 @@ public sealed class AiOrchestrationWorker(
 
                 try
                 {
+                    // Outside-hours behavior has priority over queue keywords and human requests.
+                    // The notice must not silently transfer the conversation to Human; subsequent
+                    // customer messages remain eligible for the same automatic notice.
+                    if (ShouldSendOutsideBusinessHoursNotice(withinBusinessHours, botConfig.OfflineMessage))
+                    {
+                        await EnqueueOutsideBusinessHoursNoticeAsync(
+                            message, conversation, expectedConversationVersion, botConfig.OfflineMessage!,
+                            dbContext, messageRepository, cancellationToken);
+                        return;
+                    }
+
                     IReadOnlyList<ServiceLine> simpleModeQueues =
                         await queueRepository.GetActiveByTenantAsync(message.TenantId, cancellationToken);
                     if (await HandleAutomaticQueueMessageAsync(
@@ -250,11 +267,6 @@ public sealed class AiOrchestrationWorker(
                         return;
                     }
 
-                    var withinBusinessHours = BusinessHoursPolicy.IsOpen(
-                        botConfig.BusinessHoursEnabled,
-                        botConfig.BusinessHoursJson,
-                        botConfig.TimeZoneId,
-                        DateTime.UtcNow);
                     string? replyContent;
                     if (!withinBusinessHours)
                     {
@@ -314,12 +326,7 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            var withinBusinessHoursForAi = BusinessHoursPolicy.IsOpen(
-                botConfig.BusinessHoursEnabled,
-                botConfig.BusinessHoursJson,
-                botConfig.TimeZoneId,
-                DateTime.UtcNow);
-            if (!withinBusinessHoursForAi)
+            if (!withinBusinessHours)
             {
                 if (string.IsNullOrWhiteSpace(botConfig.OfflineMessage))
                 {
@@ -339,20 +346,9 @@ public sealed class AiOrchestrationWorker(
                     return;
                 }
 
-                var offlineMessage = Message.CreateOutbound(
-                    message.TenantId,
-                    message.ConversationId,
-                    message.ContactId,
-                    MessageType.Text,
-                    AiOutputSafetyPolicy.LimitReply(botConfig.OfflineMessage),
-                    AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                        "outside-business-hours", message.Id, expectedConversationVersion));
-                var offlineOutbox = OutboxMessage.Create(message.TenantId, offlineMessage.Id);
-                message.MarkProcessedByAi();
-                dbContext.Set<Message>().Add(offlineMessage);
-                dbContext.Set<OutboxMessage>().Add(offlineOutbox);
-                dbContext.Set<Message>().Update(message);
-                await dbContext.SaveChangesAsync(cancellationToken);
+                await EnqueueOutsideBusinessHoursNoticeAsync(
+                    message, conversation, expectedConversationVersion, botConfig.OfflineMessage!,
+                    dbContext, messageRepository, cancellationToken);
                 logger.LogInformation("AI sent outside-hours message for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -1269,6 +1265,43 @@ public sealed class AiOrchestrationWorker(
             expectedConversationVersion is uint version
                 ? AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey("ai-unavailable", message.Id, version)
                 : $"ai-unavailable:{message.Id}");
+    }
+
+    internal static bool ShouldSendOutsideBusinessHoursNotice(bool withinBusinessHours, string? offlineMessage) =>
+        !withinBusinessHours && !string.IsNullOrWhiteSpace(offlineMessage);
+
+    private static async Task EnqueueOutsideBusinessHoursNoticeAsync(
+        Message message,
+        Conversation conversation,
+        uint expectedConversationVersion,
+        string offlineMessage,
+        AppDbContext dbContext,
+        IMessageRepository messageRepository,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
+        if (!AiReplyDeliveryGuard.CanSend(
+                conversation, expectedConversationVersion, DateTime.UtcNow))
+        {
+            message.MarkProcessedByAi();
+            await messageRepository.UpdateAsync(message, cancellationToken);
+            return;
+        }
+
+        var outboundMessage = Message.CreateOutbound(
+            message.TenantId,
+            message.ConversationId,
+            message.ContactId,
+            MessageType.Text,
+            AiOutputSafetyPolicy.LimitReply(offlineMessage),
+            AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
+                "outside-business-hours", message.Id, expectedConversationVersion));
+        var outboxMessage = OutboxMessage.Create(message.TenantId, outboundMessage.Id);
+        message.MarkProcessedByAi();
+        dbContext.Set<Message>().Add(outboundMessage);
+        dbContext.Set<OutboxMessage>().Add(outboxMessage);
+        dbContext.Set<Message>().Update(message);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     internal static string ResolveHandoffMessage(BotConfiguration? botConfig)

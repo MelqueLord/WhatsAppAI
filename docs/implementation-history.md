@@ -262,3 +262,16 @@ desativação é rejeitada, expor o estado do toggle para leitores de tela e
 mostrar contador de caracteres nos campos de resposta. Mensagens do BOT e
 respostas de menu ficam limitadas a 160 caracteres no navegador e o backend
 revalida o mesmo limite antes de persistir.
+
+## 19. Aviso fora do horário preserva automação (T244)
+
+O fluxo do BOT agora verifica o horário de atendimento antes de interpretar
+palavras-chave de fila ou pedidos de atendimento humano. Fora do expediente,
+quando há uma mensagem configurada, ela é enfileirada como aviso automático e
+a conversa permanece em `Automatic`, preservando o histórico e permitindo que
+as mensagens seguintes continuem recebendo o comportamento configurado.
+
+O aviso é revalidado antes da criação da Outbox para respeitar takeover humano,
+mudança de versão e janela de atendimento. A regra foi compartilhada com o
+fluxo de IA e coberta por teste de regressão, sem apagar sessão ou histórico do
+WhatsApp.

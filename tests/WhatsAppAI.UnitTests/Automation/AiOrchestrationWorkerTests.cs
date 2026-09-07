@@ -12,6 +12,21 @@ namespace WhatsAppAI.UnitTests.Automation;
 
 public sealed class AiOrchestrationWorkerTests
 {
+    [Theory]
+    [InlineData(false, "Estamos fora do horário de atendimento.", true)]
+    [InlineData(false, "", false)]
+    [InlineData(true, "Estamos fora do horário de atendimento.", false)]
+    public void ShouldSendOutsideBusinessHoursNotice_PrioritizesConfiguredNotice(
+        bool withinBusinessHours,
+        string? offlineMessage,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            AiOrchestrationWorker.ShouldSendOutsideBusinessHoursNotice(
+                withinBusinessHours, offlineMessage));
+    }
+
     [Fact]
     public void ApplyUnavailableAiFallback_FinalizesInboundAndCreatesFallbackMessage()
     {
