@@ -275,3 +275,18 @@ O aviso é revalidado antes da criação da Outbox para respeitar takeover human
 mudança de versão e janela de atendimento. A regra foi compartilhada com o
 fluxo de IA e coberta por teste de regressão, sem apagar sessão ou histórico do
 WhatsApp.
+
+## 20. Auditoria operacional e formulário administrativo (T245)
+
+Na auditoria geral, a produção foi verificada sem alterar dados: API e ready
+responderam 200, todos os containers estavam ativos, as duas sessões QR tinham
+lease válido, o proxy passou no teste de configuração e a sessão persistente do
+WhatsApp permaneceu montada. Não houve erro recente de aplicação, webhook com
+retry ou outbox falho nas últimas 24 horas. Três outboxes antigos foram
+classificados como falhas históricas de indisponibilidade da ponte QR, todas de
+5 de setembro, sem recorrência recente.
+
+Também foi corrigida a tela administrativa de configuração da IA. O formulário
+agora nasce com a configuração da empresa selecionada em um componente isolado,
+sem sincronização de estado por `useEffect`; isso remove renderizações em
+cascata e evita reaproveitar a API key digitada ao trocar de empresa.

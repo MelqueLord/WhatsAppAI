@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Building2,
@@ -47,11 +47,6 @@ export function AdminTenantsPage() {
   const [quotaAlertsTarget, setQuotaAlertsTarget] = useState<Tenant | null>(null)
   const [aiUsageTarget, setAiUsageTarget] = useState<Tenant | null>(null)
   const [aiConfigTarget, setAiConfigTarget] = useState<Tenant | null>(null)
-  const [aiProvider, setAiProvider] = useState('')
-  const [aiModel, setAiModel] = useState('')
-  const [aiApiKey, setAiApiKey] = useState('')
-  const [aiCredentialScope, setAiCredentialScope] = useState<'TenantProject' | 'SharedPlatform'>('TenantProject')
-  const [aiConnectionResult, setAiConnectionResult] = useState<{ success: boolean; error?: string } | null>(null)
 
   const { data: tenants, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenants'],
@@ -91,30 +86,6 @@ export function AdminTenantsPage() {
     queryFn: () => api.admin.tenants.aiConfig(aiConfigTarget!.id),
     enabled: aiConfigTarget !== null,
   })
-
-  const saveAiConfigMutation = useMutation({
-    mutationFn: () => api.admin.tenants.saveAiConfig(aiConfigTarget!.id, { provider: aiProvider, modelId: aiModel, apiKey: aiApiKey, credentialScope: aiCredentialScope }, aiConfig?.version ?? 0),
-    onSuccess: () => {
-      setAiApiKey('')
-      setAiConnectionResult(null)
-      queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-config'] })
-      queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-usage'] })
-    },
-  })
-
-  const testAiConnectionMutation = useMutation({
-    mutationFn: () => api.admin.tenants.testAiConnection(aiConfigTarget!.id),
-    onSuccess: setAiConnectionResult,
-  })
-
-  useEffect(() => {
-    if (!aiConfig) return
-    setAiProvider(aiConfig.provider ?? aiProviders[0]?.id ?? '')
-    setAiModel(aiConfig.modelId ?? '')
-    setAiCredentialScope(aiConfig.credentialScope ?? 'TenantProject')
-    setAiApiKey('')
-    setAiConnectionResult(null)
-  }, [aiConfig, aiProviders])
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; ownerEmail: string; ownerDisplayName?: string; planCode: string; officialApiLineCount: number; qrCodeLineCount: number; operatorLimit: number; monthlyAiResponseLimit: number }) =>
@@ -692,8 +663,6 @@ export function AdminTenantsPage() {
                           <button
                             onClick={() => {
                               setAiConfigTarget(tenant)
-                              setAiConnectionResult(null)
-                              setAiApiKey('')
                             }}
                             className="inline-flex shrink-0 items-center text-xs text-cyan-700 hover:text-cyan-800 font-medium"
                             aria-label={`Configurar IA de ${tenant.name}`}
@@ -939,52 +908,33 @@ export function AdminTenantsPage() {
       )}
 
       {aiConfigTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Configurar IA da empresa</h2>
-                <p className="mt-1 text-sm text-slate-500">{aiConfigTarget.name} · credencial administrada pela plataforma</p>
-              </div>
-              <button onClick={() => setAiConfigTarget(null)} className="rounded-lg p-2 hover:bg-slate-100" title="Fechar"><X className="h-5 w-5 text-slate-400" /></button>
-            </div>
-            {isAiConfigLoading ? (
-              <div className="flex items-center justify-center py-10 text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando configuração...</div>
-            ) : (
-              <div className="mt-5 space-y-4">
-                <label className="block text-sm font-medium text-slate-700">Provedor
-                  <select value={aiProvider} onChange={(event) => { setAiProvider(event.target.value); setAiModel('') }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="">Selecione...</option>
-                    {aiProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                {aiProvidersError && <p className="text-sm text-red-600">Não foi possível carregar o catálogo de provedores. Verifique a sessão de administrador e atualize a tela.</p>}
-                <label className="block text-sm font-medium text-slate-700">Modelo
-                  <select value={aiModel} onChange={(event) => setAiModel(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="">Selecione...</option>
-                    {(aiProviders.find((item) => item.id === aiProvider)?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                <label className="block text-sm font-medium text-slate-700">API Key do provedor
-                  <input type="password" value={aiApiKey} onChange={(event) => setAiApiKey(event.target.value)} placeholder="Informe para cadastrar ou rotacionar" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" />
-                </label>
-                <label className="block text-sm font-medium text-slate-700">Uso da credencial
-                  <select value={aiCredentialScope} onChange={(event) => setAiCredentialScope(event.target.value as 'TenantProject' | 'SharedPlatform')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="TenantProject">Chave exclusiva desta empresa (recomendado)</option>
-                    <option value="SharedPlatform">Chave interna compartilhada pela plataforma</option>
-                  </select>
-                </label>
-                <p className="text-xs text-slate-500">Escolha quem utiliza esta chave. No modo exclusivo, a empresa usa uma referência de segredo própria. O modo compartilhado só deve ser usado para uma chave interna comum administrada por você. A chave nunca é exibida novamente.</p>
-                <div className="flex flex-wrap justify-end gap-3">
-                  <button onClick={() => testAiConnectionMutation.mutate()} disabled={testAiConnectionMutation.isPending || !aiConfig?.configured} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{testAiConnectionMutation.isPending ? 'Testando...' : 'Testar conexão atual'}</button>
-                  <button onClick={() => saveAiConfigMutation.mutate()} disabled={saveAiConfigMutation.isPending || !aiProvider || !aiModel || !aiApiKey.trim()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saveAiConfigMutation.isPending ? 'Salvando...' : 'Salvar credencial'}</button>
+        isAiConfigLoading || !aiConfig ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Configurar IA da empresa</h2>
+                  <p className="mt-1 text-sm text-slate-500">{aiConfigTarget.name} · credencial administrada pela plataforma</p>
                 </div>
-                {(saveAiConfigMutation.isError || testAiConnectionMutation.isError) && <p className="text-sm text-red-600">Não foi possível concluir a operação. Atualize a tela e tente novamente.</p>}
-                {aiConnectionResult && <p className={`text-sm ${aiConnectionResult.success ? 'text-emerald-700' : 'text-red-600'}`}>{aiConnectionResult.success ? 'Conexão validada com sucesso.' : aiConnectionResult.error ?? 'Falha na conexão.'}</p>}
+                <button onClick={() => setAiConfigTarget(null)} className="rounded-lg p-2 hover:bg-slate-100" title="Fechar"><X className="h-5 w-5 text-slate-400" /></button>
               </div>
-            )}
+              <div className="flex items-center justify-center py-10 text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando configuração...</div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <AdminAiConfigModal
+            key={aiConfigTarget.id}
+            target={aiConfigTarget}
+            aiConfig={aiConfig}
+            aiProviders={aiProviders}
+            aiProvidersError={aiProvidersError}
+            onClose={() => setAiConfigTarget(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-config'] })
+              queryClient.invalidateQueries({ queryKey: ['admin', 'tenant-ai-usage'] })
+            }}
+          />
+        )
       )}
 
       {showCreateForm && (
@@ -1313,6 +1263,94 @@ export function AdminTenantsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+type AdminAiConfigModalProps = {
+  target: Tenant
+  aiConfig: AdminTenantAiConfig
+  aiProviders: AiProviderInfo[]
+  aiProvidersError: Error | null
+  onClose: () => void
+  onSaved: () => void
+}
+
+function AdminAiConfigModal({
+  target,
+  aiConfig,
+  aiProviders,
+  aiProvidersError,
+  onClose,
+  onSaved,
+}: AdminAiConfigModalProps) {
+  const [aiProvider, setAiProvider] = useState(aiConfig.provider ?? aiProviders[0]?.id ?? '')
+  const [aiModel, setAiModel] = useState(aiConfig.modelId ?? '')
+  const [aiApiKey, setAiApiKey] = useState('')
+  const [aiCredentialScope, setAiCredentialScope] = useState<'TenantProject' | 'SharedPlatform'>(aiConfig.credentialScope ?? 'TenantProject')
+  const [aiConnectionResult, setAiConnectionResult] = useState<{ success: boolean; error?: string } | null>(null)
+
+  const saveAiConfigMutation = useMutation({
+    mutationFn: () => api.admin.tenants.saveAiConfig(target.id, {
+      provider: aiProvider,
+      modelId: aiModel,
+      apiKey: aiApiKey,
+      credentialScope: aiCredentialScope,
+    }, aiConfig.version ?? 0),
+    onSuccess: () => {
+      setAiApiKey('')
+      setAiConnectionResult(null)
+      onSaved()
+    },
+  })
+
+  const testAiConnectionMutation = useMutation({
+    mutationFn: () => api.admin.tenants.testAiConnection(target.id),
+    onSuccess: setAiConnectionResult,
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-800 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Configurar IA da empresa</h2>
+            <p className="mt-1 text-sm text-slate-500">{target.name} · credencial administrada pela plataforma</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100" title="Fechar"><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        <div className="mt-5 space-y-4">
+          <label className="block text-sm font-medium text-slate-700">Provedor
+            <select value={aiProvider} onChange={(event) => { setAiProvider(event.target.value); setAiModel('') }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="">Selecione...</option>
+              {aiProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+          {aiProvidersError && <p className="text-sm text-red-600">Não foi possível carregar o catálogo de provedores. Verifique a sessão de administrador e atualize a tela.</p>}
+          <label className="block text-sm font-medium text-slate-700">Modelo
+            <select value={aiModel} onChange={(event) => setAiModel(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="">Selecione...</option>
+              {(aiProviders.find((item) => item.id === aiProvider)?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-slate-700">API Key do provedor
+            <input type="password" value={aiApiKey} onChange={(event) => setAiApiKey(event.target.value)} placeholder="Informe para cadastrar ou rotacionar" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="new-password" />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">Uso da credencial
+            <select value={aiCredentialScope} onChange={(event) => setAiCredentialScope(event.target.value as 'TenantProject' | 'SharedPlatform')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="TenantProject">Chave exclusiva desta empresa (recomendado)</option>
+              <option value="SharedPlatform">Chave interna compartilhada pela plataforma</option>
+            </select>
+          </label>
+          <p className="text-xs text-slate-500">Escolha quem utiliza esta chave. No modo exclusivo, a empresa usa uma referência de segredo própria. O modo compartilhado só deve ser usado para uma chave interna comum administrada por você. A chave nunca é exibida novamente.</p>
+          <div className="flex flex-wrap justify-end gap-3">
+            <button onClick={() => testAiConnectionMutation.mutate()} disabled={testAiConnectionMutation.isPending || !aiConfig.configured} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{testAiConnectionMutation.isPending ? 'Testando...' : 'Testar conexão atual'}</button>
+            <button onClick={() => saveAiConfigMutation.mutate()} disabled={saveAiConfigMutation.isPending || !aiProvider || !aiModel || !aiApiKey.trim()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saveAiConfigMutation.isPending ? 'Salvando...' : 'Salvar credencial'}</button>
+          </div>
+          {(saveAiConfigMutation.isError || testAiConnectionMutation.isError) && <p className="text-sm text-red-600">Não foi possível concluir a operação. Atualize a tela e tente novamente.</p>}
+          {aiConnectionResult && <p className={`text-sm ${aiConnectionResult.success ? 'text-emerald-700' : 'text-red-600'}`}>{aiConnectionResult.success ? 'Conexão validada com sucesso.' : aiConnectionResult.error ?? 'Falha na conexão.'}</p>}
+        </div>
+      </div>
     </div>
   )
 }
