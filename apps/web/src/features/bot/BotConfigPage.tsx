@@ -9,6 +9,8 @@ import {
   ToggleLeft, ToggleRight, Info,
 } from 'lucide-react'
 
+const MAX_BOT_MESSAGE_LENGTH = 160
+
 interface FlowStep {
   id: string
   title: string
@@ -88,11 +90,15 @@ export function MessageField({
       </div>
       <textarea
         rows={2}
+        maxLength={MAX_BOT_MESSAGE_LENGTH}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
       />
+      <p className={`mt-1 text-right text-[11px] ${value.length >= MAX_BOT_MESSAGE_LENGTH ? 'text-amber-600' : 'text-slate-400'}`}>
+        {value.length}/{MAX_BOT_MESSAGE_LENGTH}
+      </p>
     </div>
   )
 }
@@ -256,6 +262,7 @@ export function BotConfigPage() {
           <button
             onClick={() => toggleMutation.mutate(!isBotActive)}
             disabled={toggleMutation.isPending || !config?.configured}
+            aria-pressed={isBotActive}
             title={!config?.configured ? 'Salve a configuração antes de ativar' : undefined}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors
               ${isBotActive
@@ -272,6 +279,16 @@ export function BotConfigPage() {
             {isBotActive ? 'Bot ativo' : 'Bot inativo'}
           </button>
         </div>
+
+        {toggleMutation.isError && (
+          <div role="alert" className="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Não foi possível alterar o status do BOT.</p>
+              <p className="mt-0.5">{(toggleMutation.error as Error).message || 'Tente novamente.'}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Status banner when inactive ── */}
         {!isBotActive && config?.configured && (
@@ -510,11 +527,15 @@ export function BotConfigPage() {
                           <label className="block text-xs font-medium text-slate-600 mb-1">Resposta automática</label>
                           <textarea
                             rows={3}
+                            maxLength={MAX_BOT_MESSAGE_LENGTH}
                             value={step.response}
                             onChange={(e) => updateStep(step.id, { response: e.target.value })}
                             placeholder="Para obter a segunda via do boleto, acesse o link..."
                             className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                           />
+                          <p className={`mt-1 text-right text-[11px] ${step.response.length >= MAX_BOT_MESSAGE_LENGTH ? 'text-amber-600' : 'text-slate-400'}`}>
+                            {step.response.length}/{MAX_BOT_MESSAGE_LENGTH}
+                          </p>
                         </div>
                       </div>
                     )}

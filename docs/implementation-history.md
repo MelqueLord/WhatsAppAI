@@ -254,3 +254,11 @@ O mesmo predicado de ownership agora protege a entrada do worker e a entrega da
 resposta, reduzindo divergência entre processamento e Outbox. Os testes cobrem
 os três estados operacionais. A retomada automática permanece restrita ao fluxo
 documentado de reabertura de uma conversa encerrada.
+
+## 18. Tela do BOT pronta para operação (T243)
+
+A tela passou a exibir o motivo retornado pelo backend quando a ativação ou
+desativação é rejeitada, expor o estado do toggle para leitores de tela e
+mostrar contador de caracteres nos campos de resposta. Mensagens do BOT e
+respostas de menu ficam limitadas a 160 caracteres no navegador e o backend
+revalida o mesmo limite antes de persistir.

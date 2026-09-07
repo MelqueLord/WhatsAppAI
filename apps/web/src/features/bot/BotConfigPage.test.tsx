@@ -67,4 +67,27 @@ describe('BotConfigPage', () => {
     const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => url === '/api/bot-config/toggle')
     expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ enabled: true, mode: 'AiPowered' })
   })
+
+  it('shows a clear error when activation is rejected by the server', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (url.includes('/api/bot-config/toggle')) {
+        return Promise.resolve({ ok: false, status: 400, json: async () => ({ error: 'O modelo precisa de uma avaliação aprovada antes da ativação.' }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ configured: true, mode: 'AiPowered', enabled: false, version: 3, flowSteps: [] }) })
+    }))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Bot inativo' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('avaliação aprovada')
+  })
+
+  it('exposes the 160-character limit for bot messages', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Saudações')).toBeInTheDocument())
+
+    const messageFields = screen.getAllByRole('textbox').filter((field) => field.tagName === 'TEXTAREA')
+    expect(messageFields.length).toBeGreaterThan(0)
+    messageFields.forEach((field) => expect(field).toHaveAttribute('maxlength', '160'))
+  })
 })

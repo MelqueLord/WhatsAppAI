@@ -12,6 +12,8 @@ namespace WhatsAppAI.WebApi.Bot;
 
 public static class BotConfigurationEndpoints
 {
+    private const int MaxBotMessageLength = 160;
+
     public static IEndpointRouteBuilder MapBotConfigurationEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/bot-config")
@@ -70,6 +72,16 @@ public static class BotConfigurationEndpoints
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
         if (!Enum.TryParse<BotMode>(request.Mode, true, out var mode))
             return Results.BadRequest(new { error = "Invalid mode. Use: Manual, SimpleAutoReply or AiPowered" });
+        if (!TryValidateMessages(
+                request.WelcomeMessage,
+                request.ReturningMessage,
+                request.OfflineMessage,
+                request.FallbackMessage,
+                request.HandoffMessage,
+                request.QueueTransferMessage,
+                request.MediaMessage,
+                out var messageError))
+            return Results.BadRequest(new { error = messageError });
         if (!TryValidateFlowSteps(request.FlowSteps, out var flowError))
             return Results.BadRequest(new { error = flowError });
         var businessHoursJson = SerializeBusinessHours(request.BusinessHours);
@@ -201,6 +213,16 @@ public static class BotConfigurationEndpoints
 
         var config = await repo.GetByTenantAsync(currentTenant.TenantId.Value);
         if (config is null) return Results.BadRequest(new { error = "Bot not configured." });
+        if (!TryValidateMessages(
+                request.WelcomeMessage,
+                request.ReturningMessage,
+                request.OfflineMessage,
+                request.FallbackMessage,
+                request.HandoffMessage,
+                request.QueueTransferMessage,
+                request.MediaMessage,
+                out var messageError))
+            return Results.BadRequest(new { error = messageError });
         if (!uint.TryParse(httpContext.Request.Headers["If-Match"].FirstOrDefault(), out var expectedVersion))
             return Results.BadRequest(new { error = "If-Match header com a versão é obrigatório." });
         if (config.Version != expectedVersion)
@@ -326,12 +348,43 @@ public static class BotConfigurationEndpoints
             if (step.ValueKind != JsonValueKind.Object ||
                 !step.TryGetProperty("title", out var title) || title.ValueKind != JsonValueKind.String || title.GetString()!.Trim().Length is 0 or > 200 ||
                 !step.TryGetProperty("keywords", out var keywords) || keywords.ValueKind != JsonValueKind.String || keywords.GetString()!.Length > 500 ||
-                !step.TryGetProperty("response", out var response) || response.ValueKind != JsonValueKind.String || response.GetString()!.Trim().Length is 0 or > 4000)
+                !step.TryGetProperty("response", out var response) || response.ValueKind != JsonValueKind.String || response.GetString()!.Trim().Length is 0 or > MaxBotMessageLength)
             {
                 error = "Cada opção deve ter título, palavras-chave e resposta válidos.";
                 return false;
             }
         }
+        return true;
+    }
+
+    private static bool TryValidateMessages(
+        string? welcomeMessage,
+        string? returningMessage,
+        string? offlineMessage,
+        string? fallbackMessage,
+        string? handoffMessage,
+        string? queueTransferMessage,
+        string? mediaMessage,
+        out string error)
+    {
+        var messages = new[]
+        {
+            (Name: "Primeiro contato", Value: welcomeMessage),
+            (Name: "Cliente recorrente", Value: returningMessage),
+            (Name: "Fora do horário", Value: offlineMessage),
+            (Name: "Resposta padrão", Value: fallbackMessage),
+            (Name: "Transferência para atendente", Value: handoffMessage),
+            (Name: "Transferência para fila", Value: queueTransferMessage),
+            (Name: "Recebimento de mídia", Value: mediaMessage)
+        };
+        var invalid = messages.FirstOrDefault(message => message.Value?.Length > MaxBotMessageLength);
+        if (invalid.Value is not null)
+        {
+            error = $"{invalid.Name} deve ter no máximo {MaxBotMessageLength} caracteres.";
+            return false;
+        }
+
+        error = string.Empty;
         return true;
     }
 }
