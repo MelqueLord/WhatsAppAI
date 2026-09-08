@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { Fragment, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
-import { cn, formatMessageTimestamp } from '../../lib/utils'
+import { cn, formatDate, formatTime, isSameCalendarDay } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
 import { useAuth } from '../../lib/auth'
 import {
@@ -538,17 +538,32 @@ export function MessagePanel({
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl space-y-2">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  'flex',
-                  msg.direction ===
-                    'Outbound'
-                    ? 'justify-end'
-                    : 'justify-start'
-                )}
-              >
+            {messages.map((msg, index) => {
+              const previousMessage = messages[index - 1]
+              const isNewDay = !previousMessage
+                || !isSameCalendarDay(previousMessage.createdAt, msg.createdAt)
+
+              return (
+                <Fragment key={msg.id}>
+                  {isNewDay && (
+                    <div className="flex justify-center py-2">
+                      <time
+                        dateTime={msg.createdAt}
+                        className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-300"
+                      >
+                        {formatDate(msg.createdAt)}
+                      </time>
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      'flex',
+                      msg.direction ===
+                        'Outbound'
+                        ? 'justify-end'
+                        : 'justify-start'
+                    )}
+                  >
                 <div
                   className={cn(
                     'min-w-0 max-w-[88%] px-3.5 py-2.5 rounded-2xl sm:max-w-[75%]',
@@ -587,7 +602,7 @@ export function MessagePanel({
                   >
                     <time
                       dateTime={msg.createdAt}
-                      title={formatMessageTimestamp(msg.createdAt)}
+                      title={formatDate(msg.createdAt)}
                       className={cn(
                         'text-[10px]',
 
@@ -597,7 +612,7 @@ export function MessagePanel({
                           : 'text-slate-400'
                       )}
                     >
-                      {formatMessageTimestamp(msg.createdAt)}
+                      {formatTime(msg.createdAt)}
                     </time>
 
                     {msg.direction ===
@@ -679,8 +694,10 @@ export function MessagePanel({
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+                  </div>
+                </Fragment>
+              )
+            })}
 
             <div
               ref={messagesEndRef}

@@ -10,15 +10,13 @@ export function formatTime(date: Date | string): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function formatMessageTimestamp(date: Date | string): string {
-  const d = new Date(date)
-  return d.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+export function isSameCalendarDay(first: Date | string, second: Date | string): boolean {
+  const firstDate = new Date(first)
+  const secondDate = new Date(second)
+
+  return firstDate.getFullYear() === secondDate.getFullYear()
+    && firstDate.getMonth() === secondDate.getMonth()
+    && firstDate.getDate() === secondDate.getDate()
 }
 
 export function formatDate(date: Date | string): string {

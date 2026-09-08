@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessagePanel } from './MessagePanel'
 import type { Conversation } from '../../lib/api'
-import { formatMessageTimestamp } from '../../lib/utils'
+import { formatDate, formatTime } from '../../lib/utils'
 
 const apiMock = vi.hoisted(() => ({
   conversations: {
@@ -111,11 +111,20 @@ describe('MessagePanel conversation closing', () => {
     })
   })
 
-  it('shows the full date and time for received and sent messages', async () => {
+  it('groups messages by date and shows the time in each message', async () => {
+    const previousDayAt = '2026-09-07T15:29:00.000Z'
     const receivedAt = '2026-09-08T15:30:00.000Z'
     const sentAt = '2026-09-08T15:31:00.000Z'
     apiMock.conversations.getMessages.mockResolvedValue({
       items: [
+        {
+          id: 'previous-day-message',
+          direction: 'Inbound',
+          status: 'Delivered',
+          type: 'Text',
+          content: 'Mensagem de ontem',
+          createdAt: previousDayAt,
+        },
         {
           id: 'sent-message',
           direction: 'Outbound',
@@ -138,7 +147,11 @@ describe('MessagePanel conversation closing', () => {
 
     renderPanel()
 
-    expect(await screen.findByText(formatMessageTimestamp(receivedAt))).toBeInTheDocument()
-    expect(screen.getByText(formatMessageTimestamp(sentAt))).toBeInTheDocument()
+    expect(await screen.findByText(formatDate(receivedAt))).toBeInTheDocument()
+    expect(screen.getAllByText(formatDate(receivedAt))).toHaveLength(1)
+    expect(screen.getAllByText(formatDate(previousDayAt))).toHaveLength(1)
+    expect(screen.getAllByText(formatTime(previousDayAt))).toHaveLength(1)
+    expect(screen.getAllByText(formatTime(receivedAt))).toHaveLength(1)
+    expect(screen.getAllByText(formatTime(sentAt))).toHaveLength(1)
   })
 })
