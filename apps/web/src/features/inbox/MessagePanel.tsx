@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
-import { cn, formatTime } from '../../lib/utils'
+import { cn, formatMessageTimestamp } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
 import { useAuth } from '../../lib/auth'
 import {
@@ -585,7 +585,9 @@ export function MessagePanel({
                         : 'justify-start'
                     )}
                   >
-                    <span
+                    <time
+                      dateTime={msg.createdAt}
+                      title={formatMessageTimestamp(msg.createdAt)}
                       className={cn(
                         'text-[10px]',
 
@@ -595,10 +597,8 @@ export function MessagePanel({
                           : 'text-slate-400'
                       )}
                     >
-                      {formatTime(
-                        msg.createdAt
-                      )}
-                    </span>
+                      {formatMessageTimestamp(msg.createdAt)}
+                    </time>
 
                     {msg.direction ===
                       'Outbound' &&
