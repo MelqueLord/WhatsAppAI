@@ -136,6 +136,10 @@ export function MessagePanel({
         queryKey: ['conversations'],
       })
     },
+
+    onError: (error) => {
+      setSendError(error instanceof Error ? error.message : 'Não foi possível enviar a mensagem.')
+    },
   })
 
   const modeMutation = useMutation({
@@ -257,10 +261,6 @@ export function MessagePanel({
         queryKey: ['conversations'],
       })
     },
-    onError: (error) => {
-      setSendError(error instanceof Error ? error.message : 'Não foi possível enviar a mensagem.')
-    },
-
     onStatusUpdate: () => {
       queryClient.invalidateQueries({
         queryKey: [
