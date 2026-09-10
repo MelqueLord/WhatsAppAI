@@ -15,7 +15,6 @@ using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
-using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -195,13 +194,6 @@ public sealed class AiOrchestrationWorker(
                 logger.LogInformation("Bot in Manual mode for tenant {TenantId}, skipping", message.TenantId);
                 message.MarkProcessedByAi();
                 await messageRepository.UpdateAsync(message, cancellationToken);
-                return;
-            }
-
-            if (await HandleConsentOptInAsync(
-                    message, conversation, expectedConversationVersion, dbContext,
-                    messageRepository, outboxRepository, cancellationToken))
-            {
                 return;
             }
 
@@ -426,32 +418,6 @@ public sealed class AiOrchestrationWorker(
                     cancellationToken: cancellationToken,
                     authorizedQueues: routingQueues))
             {
-                return;
-            }
-
-            var purposes = await dbContext.ProcessingPurposes
-                .IgnoreQueryFilters()
-                .Where(purpose => purpose.TenantId == message.TenantId && purpose.IsActive)
-                .ToListAsync(cancellationToken);
-            var consentPurposeIds = purposes
-                .Where(purpose => purpose.LegalBasis == WhatsAppAI.Domain.Privacy.LegalBasis.Consent)
-                .Select(purpose => purpose.Id)
-                .ToList();
-            List<WhatsAppAI.Domain.Privacy.ConsentEvidence> consents = consentPurposeIds.Count == 0
-                ? []
-                : await dbContext.ConsentEvidence
-                    .IgnoreQueryFilters()
-                    .Where(consent => consent.TenantId == message.TenantId &&
-                        consent.ContactId == message.ContactId &&
-                        consentPurposeIds.Contains(consent.ProcessingPurposeId))
-                    .ToListAsync(cancellationToken);
-            if (!AiDataProcessingPolicy.IsAuthorized(message.TenantId, message.ContactId, purposes, consents))
-            {
-                await PersistAutomaticHandoffAsync(
-                    message.TenantId, message, conversation, "data_processing_not_authorized", null, "ai-data-policy",
-                    dbContext, messageRepository, conversationRepository, outboxRepository,
-                    handoffEventRepository, cancellationToken);
-                logger.LogInformation("AI data processing is not authorized for tenant {TenantId}", message.TenantId);
                 return;
             }
 
@@ -1004,114 +970,6 @@ public sealed class AiOrchestrationWorker(
             }
             logger.LogWarning("AI retries exhausted; conversation {ConversationId} transferred to human", message.ConversationId);
         }
-    }
-
-    private async Task<bool> HandleConsentOptInAsync(
-        Message message,
-        Conversation conversation,
-        uint expectedConversationVersion,
-        AppDbContext dbContext,
-        IMessageRepository messageRepository,
-        IOutboxMessageRepository outboxRepository,
-        CancellationToken cancellationToken)
-    {
-        var isAuthorizedByAnotherLegalBasis = await dbContext.ProcessingPurposes
-            .IgnoreQueryFilters()
-            .AnyAsync(item =>
-                item.TenantId == message.TenantId &&
-                item.IsActive &&
-                item.LegalBasis != LegalBasis.Consent,
-                cancellationToken);
-        if (isAuthorizedByAnotherLegalBasis)
-            return false;
-
-        var purpose = await dbContext.ProcessingPurposes
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(item =>
-                item.TenantId == message.TenantId &&
-                item.IsActive &&
-                item.LegalBasis == LegalBasis.Consent &&
-                item.Name == AiConsentOptInPolicy.DefaultPurposeName,
-                cancellationToken);
-        if (purpose is null)
-            return false;
-
-        var isAuthorized = await dbContext.ConsentEvidence
-            .IgnoreQueryFilters()
-            .AnyAsync(item =>
-                item.TenantId == message.TenantId &&
-                item.ContactId == message.ContactId &&
-                item.ProcessingPurposeId == purpose.Id &&
-                !item.RevokedAt.HasValue,
-                cancellationToken);
-        if (isAuthorized)
-            return false;
-
-        if (AiConsentOptInPolicy.IsAccepted(message.Content))
-        {
-            var evidence = ConsentEvidence.Create(
-                message.TenantId,
-                message.ContactId,
-                purpose,
-                "WhatsAppOptIn",
-                message.ExternalId,
-                message.CreatedAt,
-                purpose.CreatedByUserId);
-            var confirmation = Message.CreateOutbound(
-                message.TenantId,
-                message.ConversationId,
-                message.ContactId,
-                MessageType.Text,
-                AiOutputSafetyPolicy.LimitReply(AiConsentOptInPolicy.ConfirmationMessage),
-                AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-                    "consent-confirmation", message.Id, expectedConversationVersion));
-
-            message.MarkProcessedByAi();
-            dbContext.ConsentEvidence.Add(evidence);
-            dbContext.Messages.Add(confirmation);
-            dbContext.OutboxMessages.Add(OutboxMessage.Create(message.TenantId, confirmation.Id));
-            dbContext.AuditLogs.Add(AuditLog.Create(
-                message.TenantId,
-                null,
-                "Privacy.ConsentRecordedByContact",
-                "ConsentEvidence",
-                evidence.Id.ToString()));
-            dbContext.Messages.Update(message);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("AI consent recorded from WhatsApp for contact {ContactId}", message.ContactId);
-            return true;
-        }
-
-        var consentRequestPrefix = $"consent-request:{conversation.Id}:";
-        var requestIdempotencyKey = AiReplyDeliveryGuard.CreateAutomatedIdempotencyKey(
-            "consent-request", message.Id, expectedConversationVersion);
-        var requestAlreadyQueued = await dbContext.Messages
-            .IgnoreQueryFilters()
-            .AnyAsync(item =>
-                item.TenantId == message.TenantId &&
-                item.ConversationId == message.ConversationId &&
-                item.IdempotencyKey != null &&
-                item.IdempotencyKey.StartsWith(consentRequestPrefix) &&
-                item.Status != MessageStatus.Failed,
-                cancellationToken);
-        if (!requestAlreadyQueued && AiReplyDeliveryGuard.CanSend(conversation, expectedConversationVersion, DateTime.UtcNow))
-        {
-            var request = Message.CreateOutbound(
-                message.TenantId,
-                message.ConversationId,
-                message.ContactId,
-                MessageType.Text,
-                AiOutputSafetyPolicy.LimitReply(AiConsentOptInPolicy.RequestMessage),
-                requestIdempotencyKey);
-            dbContext.Messages.Add(request);
-            dbContext.OutboxMessages.Add(OutboxMessage.Create(message.TenantId, request.Id));
-        }
-
-        message.MarkProcessedByAi();
-        dbContext.Messages.Update(message);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("AI consent requested for contact {ContactId}", message.ContactId);
-        return true;
     }
 
     private static async Task FinalizeUnavailableAiAsync(
