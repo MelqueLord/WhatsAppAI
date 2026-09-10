@@ -85,9 +85,7 @@ public static class ConversationEndpoints
                 return Results.Ok(new CursorPaginationResponse<ConversationDto>());
 
             selectedMembership.LoadAssignedLinesFromJson();
-            queueId = requestedStatus == ConversationStatus.Closed
-                ? null
-                : selectedMembership.AssignedQueueId;
+            queueId = selectedMembership.AssignedQueueId;
             phoneNumberIds = await ResolvePhoneNumberIdsAsync(
                 selectedMembership, currentTenant.TenantId.Value, accountRepository);
             if (phoneNumberIds.Count == 0)
@@ -101,9 +99,7 @@ public static class ConversationEndpoints
             var membership = await membershipRepository.GetByUserAndTenantAsync(
                 currentTenant.UserId.Value, currentTenant.TenantId.Value);
             membership?.LoadAssignedLinesFromJson();
-            queueId = requestedStatus == ConversationStatus.Closed
-                ? null
-                : membership?.AssignedQueueId;
+            queueId = membership?.AssignedQueueId;
 
             // If the operator requested a specific line tab, resolve only that line
             if (!string.IsNullOrWhiteSpace(lineConnectionType) && lineNumber is not null &&
@@ -408,8 +404,7 @@ public static class ConversationEndpoints
 
         var includeManual = phoneNumberIds.Exists(p =>
             p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) && p.EndsWith(":1"));
-        var canAccessQueue = conversation.Status == ConversationStatus.Closed ||
-            membership.CanAccessQueue(conversation.QueueId);
+        var canAccessQueue = membership.CanAccessQueue(conversation.QueueId);
         return canAccessQueue &&
             phoneNumberIds.Count > 0 &&
             (phoneNumberIds.Contains(conversation.PhoneNumberId) ||

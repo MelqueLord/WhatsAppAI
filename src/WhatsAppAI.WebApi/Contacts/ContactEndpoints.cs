@@ -161,7 +161,8 @@ public static class ContactEndpoints
     private static async Task<IResult> CreateContactAsync(
         [FromBody] CreateContactRequest request,
         ICurrentTenant currentTenant,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -186,6 +187,25 @@ public static class ContactEndpoints
                 await dbContext.SaveChangesAsync();
             }
 
+            if (request.StartConversation)
+            {
+                var conversation = await EnsureDirectConversationAsync(
+                    currentTenant.TenantId.Value,
+                    existing,
+                    dbContext,
+                    httpContext.RequestAborted);
+
+                return Results.Ok(new ContactResponse
+                {
+                    Id = existing.Id,
+                    PhoneNumber = existing.PhoneNumber,
+                    Name = existing.Name,
+                    CreatedAt = existing.CreatedAt,
+                    ConversationId = conversation.Id,
+                    Message = "Contact already exists and conversation started"
+                });
+            }
+
             return Results.Ok(new ContactResponse
             {
                 Id = existing.Id,
@@ -207,15 +227,11 @@ public static class ContactEndpoints
         // Start conversation if requested
         if (request.StartConversation)
         {
-            var conversation = Conversation.Create(
+            var conversation = await EnsureDirectConversationAsync(
                 currentTenant.TenantId.Value,
-                contact.Id,
-                "manual",
-                ConversationMode.Human);
-            conversation.RecordMessage();
-
-            dbContext.Conversations.Add(conversation);
-            await dbContext.SaveChangesAsync();
+                contact,
+                dbContext,
+                httpContext.RequestAborted);
 
             return Results.Created($"/api/contacts/{contact.Id}", new ContactResponse
             {
@@ -317,7 +333,8 @@ public static class ContactEndpoints
     private static async Task<IResult> StartConversationAsync(
         Guid contactId,
         ICurrentTenant currentTenant,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        HttpContext httpContext)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -330,27 +347,49 @@ public static class ContactEndpoints
         if (contact is null)
             return Results.NotFound();
 
-        // Check if conversation already exists
-        var existingConversation = await dbContext.Conversations
-            .FirstOrDefaultAsync(c =>
-                c.ContactId == contactId &&
-                c.TenantId == currentTenant.TenantId.Value &&
-                c.Status == ConversationStatus.Open);
-
-        if (existingConversation is not null)
-            return Results.Ok(new { conversationId = existingConversation.Id, message = "Conversation already exists" });
-
-        var conversation = Conversation.Create(
+        var conversation = await EnsureDirectConversationAsync(
             currentTenant.TenantId.Value,
+            contact,
+            dbContext,
+            httpContext.RequestAborted);
+
+        return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
+    }
+
+    private static async Task<Conversation> EnsureDirectConversationAsync(
+        Guid tenantId,
+        Contact contact,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await dbContext.Conversations
+            .FirstOrDefaultAsync(c =>
+                c.TenantId == tenantId &&
+                c.ContactId == contact.Id &&
+                c.PhoneNumberId == "manual",
+                cancellationToken);
+
+        if (conversation is not null)
+        {
+            if (conversation.Status == ConversationStatus.Closed)
+            {
+                conversation.Reopen();
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            return conversation;
+        }
+
+        conversation = Conversation.Create(
+            tenantId,
             contact.Id,
             "manual",
             ConversationMode.Human);
         conversation.RecordMessage();
 
         dbContext.Conversations.Add(conversation);
-        await dbContext.SaveChangesAsync();
-
-        return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return conversation;
     }
 
     private static async Task<IResult> DeleteContactAsync(
