@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect } from 'react'
+import type { ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
@@ -41,6 +42,7 @@ export function MessagePanel({
   const queuesEnabled = user?.automaticDistributionEnabled === true
   const tagsEnabled = user?.tagsEnabled === true
   const [message, setMessage] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateLanguage, setTemplateLanguage] = useState('pt_BR')
   const [templateParameters, setTemplateParameters] = useState('')
@@ -60,6 +62,7 @@ export function MessagePanel({
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
   const isPhoneNumber = /^\+?\d+$/.test(
@@ -298,6 +301,12 @@ export function MessagePanel({
     sendMutation.mutate({ content: message })
 
     setMessage('')
+  }
+
+  const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setSelectedFile(file)
+    event.target.value = ''
   }
 
   const handleTemplateSend = () => {
@@ -846,7 +855,23 @@ export function MessagePanel({
             )}
           </div>
 
-          <button className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            onChange={handleFileSelected}
+            aria-label="Selecionar arquivo"
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!isConversationOpen || sendMutation.isPending}
+            aria-label="Anexar arquivo"
+            title="Anexar arquivo"
+            className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Paperclip className="w-5 h-5 text-slate-400" />
           </button>
 
@@ -890,6 +915,21 @@ export function MessagePanel({
             )}
           </button>
         </div>
+
+        {selectedFile && (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#10223f] px-3 py-2 text-xs text-slate-200">
+            <span className="min-w-0 truncate">{selectedFile.name}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedFile(null)}
+              className="shrink-0 rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+              aria-label="Remover arquivo selecionado"
+              title="Remover arquivo"
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Save Contact Modal */}

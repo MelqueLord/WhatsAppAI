@@ -162,7 +162,9 @@ public static class ContactEndpoints
         [FromBody] CreateContactRequest request,
         ICurrentTenant currentTenant,
         AppDbContext dbContext,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -189,9 +191,16 @@ public static class ContactEndpoints
 
             if (request.StartConversation)
             {
+                var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
+                    currentTenant, accountRepository, membershipRepository,
+                    currentTenant.TenantId.Value, httpContext.RequestAborted);
+                if (phoneNumberId is null)
+                    return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
+
                 var conversation = await EnsureDirectConversationAsync(
                     currentTenant.TenantId.Value,
                     existing,
+                    phoneNumberId,
                     dbContext,
                     httpContext.RequestAborted);
 
@@ -227,9 +236,16 @@ public static class ContactEndpoints
         // Start conversation if requested
         if (request.StartConversation)
         {
+            var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
+                currentTenant, accountRepository, membershipRepository,
+                currentTenant.TenantId.Value, httpContext.RequestAborted);
+            if (phoneNumberId is null)
+                return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
+
             var conversation = await EnsureDirectConversationAsync(
                 currentTenant.TenantId.Value,
                 contact,
+                phoneNumberId,
                 dbContext,
                 httpContext.RequestAborted);
 
@@ -334,7 +350,9 @@ public static class ContactEndpoints
         Guid contactId,
         ICurrentTenant currentTenant,
         AppDbContext dbContext,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -347,9 +365,16 @@ public static class ContactEndpoints
         if (contact is null)
             return Results.NotFound();
 
+        var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
+            currentTenant, accountRepository, membershipRepository,
+            currentTenant.TenantId.Value, httpContext.RequestAborted);
+        if (phoneNumberId is null)
+            return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
+
         var conversation = await EnsureDirectConversationAsync(
             currentTenant.TenantId.Value,
             contact,
+            phoneNumberId,
             dbContext,
             httpContext.RequestAborted);
 
@@ -359,6 +384,7 @@ public static class ContactEndpoints
     private static async Task<Conversation> EnsureDirectConversationAsync(
         Guid tenantId,
         Contact contact,
+        string phoneNumberId,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
@@ -366,11 +392,14 @@ public static class ContactEndpoints
             .FirstOrDefaultAsync(c =>
                 c.TenantId == tenantId &&
                 c.ContactId == contact.Id &&
-                c.PhoneNumberId == "manual",
+                (c.PhoneNumberId == phoneNumberId || c.PhoneNumberId == "manual"),
                 cancellationToken);
 
         if (conversation is not null)
         {
+            if (conversation.PhoneNumberId == "manual")
+                conversation.SetPhoneNumberId(phoneNumberId);
+
             if (conversation.Status == ConversationStatus.Closed)
             {
                 conversation.Reopen();
@@ -383,13 +412,58 @@ public static class ContactEndpoints
         conversation = Conversation.Create(
             tenantId,
             contact.Id,
-            "manual",
+            phoneNumberId,
             ConversationMode.Human);
         conversation.RecordMessage();
 
         dbContext.Conversations.Add(conversation);
         await dbContext.SaveChangesAsync(cancellationToken);
         return conversation;
+    }
+
+    private static async Task<string?> ResolveOutboundPhoneNumberIdAsync(
+        ICurrentTenant currentTenant,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var accounts = (await accountRepository.GetAllByTenantAsync(tenantId, cancellationToken))
+            .Where(account => account.IsActive && !string.IsNullOrWhiteSpace(account.PhoneNumberId))
+            .ToList();
+
+        if (accounts.Count == 0)
+            return null;
+
+        if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value, tenantId);
+            if (membership is not null)
+            {
+                membership.LoadAssignedLinesFromJson();
+                var assignedLines = membership.AssignedLines.Count > 0
+                    ? membership.AssignedLines
+                    : membership.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
+                        ? [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)]
+                        : [];
+
+                foreach (var line in assignedLines)
+                {
+                    var assignedAccount = accounts.FirstOrDefault(account =>
+                        account.ConnectionType == line.ConnectionType &&
+                        account.LineNumber == line.LineNumber);
+                    if (assignedAccount is not null)
+                        return assignedAccount.PhoneNumberId;
+                }
+            }
+        }
+
+        return accounts
+            .OrderBy(account => account.LineNumber)
+            .ThenBy(account => account.ConnectionType)
+            .Select(account => account.PhoneNumberId)
+            .FirstOrDefault();
     }
 
     private static async Task<IResult> DeleteContactAsync(
