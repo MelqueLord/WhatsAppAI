@@ -45,6 +45,8 @@ export function MessagePanel({
   const [templateLanguage, setTemplateLanguage] = useState('pt_BR')
   const [templateParameters, setTemplateParameters] = useState('')
   const [modeOverride, setModeOverride] = useState<string | null>(null)
+  const [modeError, setModeError] = useState<string | null>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showSaveContact, setShowSaveContact] = useState(false)
   const [contactName, setContactName] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState(conversation.queueId ?? '')
@@ -133,19 +135,36 @@ export function MessagePanel({
   })
 
   const modeMutation = useMutation({
-    mutationFn: (newMode: string) =>
-      api.conversations.switchMode(
-        conversation.id,
-        newMode,
-        conversation.version
-      ),
+    mutationFn: async (newMode: string) => {
+      // The selected conversation may be older than the row refreshed by
+      // SignalR. Read the aggregate immediately before the concurrency-guarded
+      // mode change so a recent message or queue update does not cause a
+      // silent 409 conflict.
+      const latest = await api.conversations.get(conversation.id)
+      return api.conversations.switchMode(conversation.id, newMode, latest.version)
+    },
+
+    onMutate: (newMode) => {
+      setModeOverride(newMode)
+      setModeError(null)
+    },
 
     onSuccess: (data) => {
       setModeOverride(data.mode)
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (current) =>
+        current
+          ? { ...current, mode: data.mode, version: data.version }
+          : current,
+      )
 
       queryClient.invalidateQueries({
         queryKey: ['conversations'],
       })
+    },
+
+    onError: (error) => {
+      setModeOverride(null)
+      setModeError(error instanceof Error ? error.message : 'Não foi possível alterar o modo da conversa.')
     },
   })
 
@@ -326,6 +345,21 @@ export function MessagePanel({
     modeMutation.mutate(newMode)
   }
 
+  const insertEmoji = (emoji: string) => {
+    const input = messageInputRef.current
+    const start = input?.selectionStart ?? message.length
+    const end = input?.selectionEnd ?? message.length
+    const nextMessage = `${message.slice(0, start)}${emoji}${message.slice(end)}`
+
+    setMessage(nextMessage)
+    setShowEmojiPicker(false)
+    requestAnimationFrame(() => {
+      input?.focus()
+      const cursor = start + emoji.length
+      input?.setSelectionRange(cursor, cursor)
+    })
+  }
+
   const getStatusIcon = (
     status: string
   ) => {
@@ -480,6 +514,12 @@ export function MessagePanel({
           {closeError && (
             <span role="alert" className="w-full text-right text-[11px] text-red-300">
               {closeError}
+            </span>
+          )}
+
+          {modeError && (
+            <span role="alert" className="w-full text-right text-[11px] text-red-300">
+              {modeError}
             </span>
           )}
 
@@ -774,9 +814,37 @@ export function MessagePanel({
         )}
 
         <div className="flex items-center gap-2">
-          <button className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors">
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker((visible) => !visible)}
+              disabled={!isConversationOpen || sendMutation.isPending}
+              aria-label="Abrir emojis"
+              aria-expanded={showEmojiPicker}
+              className="rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
             <Smile className="w-5 h-5 text-slate-400" />
-          </button>
+            </button>
+            {showEmojiPicker && (
+              <div
+                role="dialog"
+                aria-label="Seletor de emojis"
+                className="absolute bottom-full left-0 z-20 mb-2 grid w-64 grid-cols-8 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
+              >
+                {['😀', '😂', '😍', '😊', '😉', '😎', '🤔', '😢', '😡', '😅', '🙌', '👏', '🙏', '👍', '👎', '❤️', '🔥', '✨', '🎉', '💯', '✅', '❌', '📌', '🎁', '☀️', '🌙', '🐶', '☕', '🍕', '🚀', '💬', '🙂'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => insertEmoji(emoji)}
+                    className="rounded-lg p-1.5 text-xl leading-none hover:bg-slate-100"
+                    aria-label={`Inserir ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors">
             <Paperclip className="w-5 h-5 text-slate-400" />

@@ -100,6 +100,7 @@ export function InboxPage() {
         >
           {selectedConversation ? (
             <MessagePanel
+              key={selectedConversation.id}
               conversation={selectedConversation}
               onBack={handleBack}
               onConversationClosed={handleBack}
