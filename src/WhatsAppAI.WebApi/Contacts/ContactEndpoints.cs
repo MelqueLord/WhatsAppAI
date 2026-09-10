@@ -4,6 +4,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Domain.Audit;
+using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Infrastructure.Identity;
