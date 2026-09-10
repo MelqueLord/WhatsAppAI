@@ -52,6 +52,17 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         return SendWhatsAppWebMessageAsync(parts[1], parts[2], recipientPhone, text, cancellationToken);
     }
 
+    public Task<SendMessageResult> SendMediaMessageAsync(
+        string phoneNumberId, string accessToken, string recipientPhone,
+        string mediaType, string mediaContent, string? caption, string? fileName,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SendMessageResult
+        {
+            IsSuccess = false,
+            IsRetryable = false,
+            ErrorMessage = "Media sending is not available yet."
+        });
+
     public Task<SendMessageResult> SendTemplateMessageAsync(
         string phoneNumberId,
         string accessToken,
