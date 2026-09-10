@@ -35,6 +35,9 @@ public static class ContactEndpoints
         group.MapPut("/{contactId:guid}", UpdateContactAsync)
             .WithName("UpdateContact");
 
+        group.MapDelete("/{contactId:guid}", DeleteContactAsync)
+            .WithName("DeleteContact");
+
         group.MapGet("/{contactId:guid}/memory", ListCustomerMemoryAsync)
             .WithName("ListCustomerMemory");
 
@@ -122,7 +125,9 @@ public static class ContactEndpoints
         }
 
         var query = dbContext.Contacts
-            .Where(c => c.TenantId == currentTenant.TenantId.Value);
+            .Where(c =>
+                c.TenantId == currentTenant.TenantId.Value &&
+                !c.PhoneNumber.StartsWith("anon-"));
 
         if (queueContactIds is not null)
             query = query.Where(c => queueContactIds.Contains(c.Id));
@@ -346,6 +351,53 @@ public static class ContactEndpoints
         await dbContext.SaveChangesAsync();
 
         return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
+    }
+
+    private static async Task<IResult> DeleteContactAsync(
+        Guid contactId,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        var tenantId = currentTenant.TenantId.Value;
+        var contact = await dbContext.Contacts
+            .FirstOrDefaultAsync(c => c.Id == contactId && c.TenantId == tenantId, cancellationToken);
+        if (contact is null || contact.PhoneNumber.StartsWith("anon-"))
+            return Results.NotFound();
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var messages = await dbContext.Messages
+            .Where(x => x.ContactId == contactId && x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+        var evidence = await dbContext.ConsentEvidence
+            .Where(x => x.ContactId == contactId && x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+        var memories = await dbContext.CustomerMemories
+            .Where(x => x.ContactId == contactId && x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
+        contact.Anonymize();
+        foreach (var message in messages)
+            message.RedactPersonalData();
+        foreach (var item in evidence)
+            item.RedactReference();
+        foreach (var memory in memories)
+            memory.Redact();
+
+        dbContext.AuditLogs.Add(AuditLog.Create(
+            tenantId,
+            currentTenant.UserId,
+            "Contact.Anonymized",
+            "Contact",
+            contactId.ToString()));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> ListCustomerMemoryAsync(

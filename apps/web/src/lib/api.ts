@@ -654,6 +654,9 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
+    delete: (id: string) =>
+      fetchApi<void>(`/api/contacts/${id}`, { method: 'DELETE' }),
+
     import: (file: File) => {
       const data = new FormData()
       data.append('file', file)

@@ -446,7 +446,7 @@ public static class AiProviderEndpoints
             return Results.Ok(new
             {
                 aiActive = botConfig.Enabled && botConfig.Mode == BotMode.AiPowered,
-                botActive = botConfig.Enabled && botConfig.Mode != BotMode.Manual,
+                botActive = botConfig.Enabled && botConfig.Mode == BotMode.SimpleAutoReply,
                 mode = botConfig.Mode.ToString(),
                 botVersion = botConfig.Version
             });

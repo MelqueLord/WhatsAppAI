@@ -127,8 +127,13 @@ public sealed class BroadcastDispatchWorker(
             }
 
             // Get WhatsApp account for this line
-            var account = await whatsAppAccountRepo.GetByPhoneNumberIdAsync(
-                broadcast.LinePhoneNumberId, ct);
+            // Hosted workers have no request tenant context. Always scope this
+            // lookup explicitly to the broadcast tenant instead of relying on
+            // AppDbContext's global tenant filter.
+            var account = await whatsAppAccountRepo.GetByTenantAndPhoneNumberIdAsync(
+                broadcast.TenantId,
+                broadcast.LinePhoneNumberId,
+                ct);
 
             if (account is null || !account.IsActive
                 || account.ConnectionType != WhatsAppConnectionType.QrCode)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil, Upload } from 'lucide-react'
+import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil, Upload, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -37,6 +37,7 @@ export function ContactsPage() {
   const [editTarget, setEditTarget] = useState<Contact | null>(null)
   const [memoryKey, setMemoryKey] = useState('')
   const [memoryValue, setMemoryValue] = useState('')
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts'],
@@ -74,6 +75,20 @@ export function ContactsPage() {
         current.map((c) => (c.id === updated.id ? updated : c))
       )
       setEditTarget(null)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (contactId: string) => api.contacts.delete(contactId),
+    onSuccess: (_, contactId) => {
+      queryClient.setQueryData<Contact[]>(['contacts'], (current = []) =>
+        current.filter((contact) => contact.id !== contactId)
+      )
+      setDeleteError(null)
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    },
+    onError: (error) => {
+      setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir o contato.')
     },
   })
 
@@ -229,6 +244,19 @@ export function ContactsPage() {
                               <span className="hidden sm:inline">Editar</span>
                             </button>
                             <button
+                              onClick={() => {
+                                if (window.confirm(`Excluir o contato ${contact.name || contact.phoneNumber}? O histórico será anonimizado.`)) {
+                                  deleteMutation.mutate(contact.id)
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                              title="Excluir contato"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span className="hidden sm:inline">Excluir</span>
+                            </button>
+                            <button
                               onClick={() => startConversationMutation.mutate(contact.id)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap"
                             >
@@ -243,6 +271,11 @@ export function ContactsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+        {deleteError && (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {deleteError}
           </div>
         )}
       </div>

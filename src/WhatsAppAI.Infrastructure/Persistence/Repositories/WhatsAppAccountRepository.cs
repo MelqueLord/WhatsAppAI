@@ -51,6 +51,19 @@ public sealed class WhatsAppAccountRepository(AppDbContext context) : IWhatsAppA
             .FirstOrDefaultAsync(a => a.PhoneNumberId == phoneNumberId, cancellationToken);
     }
 
+    public async Task<WhatsAppAccount?> GetByTenantAndPhoneNumberIdAsync(
+        Guid tenantId,
+        string phoneNumberId,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Set<WhatsAppAccount>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a =>
+                a.TenantId == tenantId &&
+                a.PhoneNumberId == phoneNumberId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(WhatsAppAccount account, CancellationToken cancellationToken = default)
     {
         await context.Set<WhatsAppAccount>().AddAsync(account, cancellationToken);

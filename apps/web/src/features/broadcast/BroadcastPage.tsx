@@ -22,6 +22,7 @@ function statusLabel(s: string) {
   switch (s) {
     case 'Draft':    return { text: 'Rascunho',   cls: 'bg-slate-100 text-slate-600' }
     case 'Sending':  return { text: 'Enviando',   cls: 'bg-blue-100 text-blue-700' }
+    case 'Completed':
     case 'Finished': return { text: 'Concluído',  cls: 'bg-emerald-100 text-emerald-700' }
     case 'Cancelled':return { text: 'Cancelado',  cls: 'bg-red-100 text-red-600' }
     default:         return { text: s,            cls: 'bg-slate-100 text-slate-600' }
@@ -624,7 +625,7 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
 export function BroadcastPage() {
   const [showCreate, setShowCreate] = useState(false)
 
-  const { data: broadcasts, isLoading } = useQuery({
+  const { data: broadcasts, isLoading, isError, error } = useQuery({
     queryKey: ['broadcasts'],
     queryFn: () => api.broadcasts.list(),
     refetchInterval: 5000,
@@ -654,6 +655,12 @@ export function BroadcastPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+            <Radio className="w-10 h-10 text-red-400 opacity-70" />
+            <p className="text-sm text-red-700">Não foi possível carregar os disparos.</p>
+            <p className="text-xs text-slate-500 max-w-md">{(error as Error).message}</p>
           </div>
         ) : !broadcasts || broadcasts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">

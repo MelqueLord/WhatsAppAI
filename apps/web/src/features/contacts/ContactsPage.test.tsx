@@ -12,6 +12,7 @@ vi.mock('../../lib/api', () => ({
       list: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       startConversation: vi.fn(),
       import: vi.fn(),
     },

@@ -44,18 +44,17 @@ describe('BotConfigPage', () => {
     expect(fetch).not.toHaveBeenCalledWith('/api/integrations/ai/simulate', expect.anything())
   })
 
-  it('shows the BOT as active while the AI strategy is active', async () => {
+  it('shows the BOT as inactive while the AI strategy is active', async () => {
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'Bot ativo' })).toBeInTheDocument()
-    expect(screen.getByText('O BOT está ativo com IA. A IA responde dentro do fluxo do BOT, sem duplicar mensagens.')).toBeInTheDocument()
-    expect(screen.queryByText('inativo', { selector: 'strong' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Bot inativo' })).toBeInTheDocument()
+    expect(screen.getByText('A IA é a estratégia automática ativa. Ativar o BOT desativa a IA e seleciona as respostas do BOT.')).toBeInTheDocument()
   })
 
-  it('reactivates the BOT without replacing the active AI strategy', async () => {
+  it('reactivates the BOT and selects the BOT strategy over AI', async () => {
     vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => {
       if (url.includes('/api/bot-config') && options?.method === 'POST') {
-        return Promise.resolve({ ok: true, json: async () => ({ enabled: true, mode: 'AiPowered', version: 4 }) })
+        return Promise.resolve({ ok: true, json: async () => ({ enabled: true, mode: 'SimpleAutoReply', version: 4 }) })
       }
       return Promise.resolve({ ok: true, json: async () => ({ configured: true, mode: 'AiPowered', enabled: false, version: 3, welcomeMessage: 'Olá', flowSteps: [] }) })
     }))
@@ -65,7 +64,7 @@ describe('BotConfigPage', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/bot-config/toggle', expect.objectContaining({ method: 'POST' })))
 
     const call = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => url === '/api/bot-config/toggle')
-    expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ enabled: true, mode: 'AiPowered' })
+    expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ enabled: true, mode: 'SimpleAutoReply' })
   })
 
   it('shows a clear error when activation is rejected by the server', async () => {

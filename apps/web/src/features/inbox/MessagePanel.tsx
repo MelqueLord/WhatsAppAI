@@ -57,6 +57,7 @@ export function MessagePanel({
   const [closeError, setCloseError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
 
   const isPhoneNumber = /^\+?\d+$/.test(
@@ -258,6 +259,14 @@ export function MessagePanel({
       behavior: 'smooth',
     })
   }, [messages])
+
+  useEffect(() => {
+    const input = messageInputRef.current
+    if (!input) return
+
+    input.style.height = 'auto'
+    input.style.height = `${Math.min(input.scrollHeight, 144)}px`
+  }, [message])
 
   const mode =
     modeOverride ?? conversation.mode
@@ -773,25 +782,28 @@ export function MessagePanel({
             <Paperclip className="w-5 h-5 text-slate-400" />
           </button>
 
-          <input
-            type="text"
+          <textarea
+            ref={messageInputRef}
             value={message}
             onChange={(e) =>
               setMessage(
                 e.target.value
               )
             }
-            onKeyDown={(e) =>
-              e.key === 'Enter' &&
-              !e.shiftKey &&
-              handleSend()
-            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            rows={1}
+            aria-label="Mensagem"
             placeholder="Digite uma mensagem..."
             disabled={
               !isConversationOpen ||
               sendMutation.isPending
             }
-            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#10223f] px-3 py-2.5 text-sm text-white focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+            className="min-w-0 flex-1 max-h-36 resize-none overflow-y-auto rounded-xl border border-white/10 bg-[#10223f] px-3 py-2.5 text-sm leading-5 text-white focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
           />
 
           <button

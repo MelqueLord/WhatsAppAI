@@ -149,14 +149,13 @@ export function BotConfigPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const activationMode = config?.mode && config.mode !== 'Manual'
-        ? config.mode
-        : 'SimpleAutoReply'
       const res = await fetchWithCsrf('/api/bot-config/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',
-        body: JSON.stringify({ enabled, mode: enabled ? activationMode : undefined }),
+        // Activating the BOT selects it as the sole automatic strategy.
+        // AI can be enabled separately from the AI configuration screen.
+        body: JSON.stringify({ enabled, mode: enabled ? 'SimpleAutoReply' : undefined }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null
@@ -234,7 +233,7 @@ export function BotConfigPage() {
 
   const effectiveSteps = config?.flowSteps?.length ? config.flowSteps : []
   const steps = flowSteps ?? effectiveSteps
-  const isBotActive = config?.enabled === true && config.mode !== 'Manual'
+  const isBotActive = config?.enabled === true && config.mode === 'SimpleAutoReply'
 
   const val = (local: string | undefined, remote: string | null | undefined) =>
     local ?? remote ?? ''
@@ -294,15 +293,19 @@ export function BotConfigPage() {
         {!isBotActive && config?.configured && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Info className="w-4 h-4 flex-shrink-0 text-amber-500" />
-            <p className="leading-5">O bot está <strong className="font-semibold">inativo</strong>. As mensagens automáticas não serão enviadas.</p>
+            <p className="leading-5">
+              {config.mode === 'AiPowered'
+                ? <>A IA está ativa. Ativar o BOT fará o atendimento automático passar para o fluxo do BOT.</>
+                : <>O bot está <strong className="font-semibold">inativo</strong>. As mensagens automáticas não serão enviadas.</>}
+            </p>
           </div>
         )}
         {user?.aiEnabled && (
           <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-lg text-sm text-violet-800">
             <Info className="w-4 h-4 flex-shrink-0" />
-            {config?.mode === 'AiPowered' && isBotActive
-              ? 'O BOT está ativo com IA. A IA responde dentro do fluxo do BOT, sem duplicar mensagens.'
-              : 'O BOT é a automação principal. Sem IA, ele continua usando respostas fixas; desligar o BOT pausa toda automação.'}
+            {config?.mode === 'AiPowered'
+              ? 'A IA é a estratégia automática ativa. Ativar o BOT desativa a IA e seleciona as respostas do BOT.'
+              : 'O BOT é a estratégia automática ativa. Ativar a IA desativa o BOT e seleciona as respostas da IA.'}
           </div>
         )}
 
