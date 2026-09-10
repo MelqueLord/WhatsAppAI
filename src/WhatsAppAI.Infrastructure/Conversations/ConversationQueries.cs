@@ -175,6 +175,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Content = m.Content,
                 MediaId = m.MediaId,
                 Caption = m.Caption,
+                FailureReason = m.FailureReason,
                 CreatedAt = m.CreatedAt,
                 SenderName = m.Direction == MessageDirection.Inbound
                     ? m.Contact.Name ?? m.Contact.PhoneNumber

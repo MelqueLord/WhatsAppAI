@@ -648,7 +648,7 @@ export function MessagePanel({
                       </p>
                     )}
 
-                  {msg.content && (
+                    {msg.content && (
                     <p className="text-sm whitespace-pre-wrap break-words">
                       {msg.content}
                     </p>
@@ -685,6 +685,10 @@ export function MessagePanel({
                         msg.status
                       )}
                   </div>
+
+                  {msg.status === 'Failed' && msg.failureReason && (
+                    <p className="mt-1 text-[11px] text-red-200">Falha: {msg.failureReason}</p>
+                  )}
 
                   {msg.direction === 'Outbound' && msg.aiInteractionId && (
                     <div className="mt-1 border-t border-white/10 pt-1.5">

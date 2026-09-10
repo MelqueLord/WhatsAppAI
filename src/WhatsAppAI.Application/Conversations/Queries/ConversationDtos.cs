@@ -41,6 +41,7 @@ public sealed record MessageDto
     public string? Content { get; init; }
     public string? MediaId { get; init; }
     public string? Caption { get; init; }
+    public string? FailureReason { get; init; }
     public DateTime CreatedAt { get; init; }
     public string? SenderName { get; init; }
     public Guid? AiInteractionId { get; init; }

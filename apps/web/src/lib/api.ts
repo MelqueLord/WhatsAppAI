@@ -103,6 +103,7 @@ export interface Message {
   content?: string
   mediaId?: string
   caption?: string
+  failureReason?: string
   createdAt: string
   senderName?: string
   aiInteractionId?: string

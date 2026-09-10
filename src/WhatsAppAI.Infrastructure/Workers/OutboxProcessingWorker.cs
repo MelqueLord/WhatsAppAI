@@ -202,7 +202,14 @@ public sealed class OutboxProcessingWorker(
             }
 
             SendMessageResult result;
-            if (message.Type == MessageType.Template)
+            if (!string.IsNullOrWhiteSpace(message.MediaUrl))
+            {
+                result = await whatsAppClient.SendMediaMessageAsync(
+                    outboundPhoneNumberId, token, contact.PhoneNumber,
+                    message.Type.ToString().ToLowerInvariant(), message.MediaUrl,
+                    message.Caption, null, cancellationToken);
+            }
+            else if (message.Type == MessageType.Template)
             {
                 if (isQrSession || account?.ConnectionType != WhatsAppConnectionType.OfficialApi ||
                     string.IsNullOrWhiteSpace(message.TemplateName) ||
@@ -289,7 +296,32 @@ public sealed class OutboxProcessingWorker(
         catch (Exception ex)
         {
             HandleFailure(outboxMessage, ex.Message);
-            await outboxRepository.UpdateAsync(outboxMessage);
+            try
+            {
+                var failedMessage = await messageRepository.GetByIdAsync(
+                    outboxMessage.MessageId, cancellationToken);
+                if (failedMessage is not null)
+                {
+                    if (outboxMessage.Status == OutboxStatus.Dead)
+                        failedMessage.MarkFailed(ex.Message);
+                    else
+                        failedMessage.MarkQueuedForRetry();
+
+                    await SaveMessageAndOutboxAsync(
+                        dbContext, failedMessage, outboxMessage, cancellationToken);
+                }
+                else
+                {
+                    await outboxRepository.UpdateAsync(outboxMessage);
+                }
+            }
+            catch (Exception persistenceException)
+            {
+                logger.LogError(
+                    persistenceException,
+                    "Failed to persist outbox failure state for {OutboxId}",
+                    outboxMessage.Id);
+            }
             logger.LogError(ex, "Error processing outbox {OutboxId}", outboxMessage.Id);
         }
     }
