@@ -59,6 +59,7 @@ export function MessagePanel({
   const [feedbackNote, setFeedbackNote] = useState('')
   const [correctedResponse, setCorrectedResponse] = useState('')
   const [closeError, setCloseError] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
@@ -223,6 +224,7 @@ export function MessagePanel({
       correctedResponse?: string
     }) => api.conversations.submitAiFeedback(conversation.id, payload.responseMessageId, payload),
     onSuccess: () => {
+      setSendError(null)
       setFeedbackDraft(null)
       setFeedbackNote('')
       setCorrectedResponse('')
@@ -254,6 +256,9 @@ export function MessagePanel({
       queryClient.invalidateQueries({
         queryKey: ['conversations'],
       })
+    },
+    onError: (error) => {
+      setSendError(error instanceof Error ? error.message : 'Não foi possível enviar a mensagem.')
     },
 
     onStatusUpdate: () => {
@@ -298,6 +303,7 @@ export function MessagePanel({
       return
     }
 
+    setSendError(null)
     sendMutation.mutate({ content: message })
 
     setMessage('')
@@ -915,6 +921,12 @@ export function MessagePanel({
             )}
           </button>
         </div>
+
+        {sendError && (
+          <div role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {sendError}
+          </div>
+        )}
 
         {selectedFile && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#10223f] px-3 py-2 text-xs text-slate-200">

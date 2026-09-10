@@ -461,8 +461,8 @@ public static class ContactEndpoints
         }
 
         return accounts
-            .OrderBy(account => account.LineNumber)
-            .ThenBy(account => account.ConnectionType)
+            .OrderByDescending(account => account.ConnectionType == WhatsAppConnectionType.QrCode)
+            .ThenBy(account => account.LineNumber)
             .Select(account => account.PhoneNumberId)
             .FirstOrDefault();
     }
