@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Mvc;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.WebApi;
+using WhatsAppAI.WebApi.Hubs;
 
 namespace WhatsAppAI.WebApi.Queues;
 
@@ -104,7 +106,8 @@ public static class ServiceLineEndpoints
         Guid conversationId, [FromBody] AssignQueueRequest request,
         ICurrentTenant currentTenant, IConversationRepository convRepo,
         IServiceLineRepository queueRepo,
-        ITenantMembershipRepository membershipRepo)
+        ITenantMembershipRepository membershipRepo,
+        IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         var conversation = await convRepo.GetByIdAsync(conversationId);
@@ -121,13 +124,15 @@ public static class ServiceLineEndpoints
 
         conversation.AssignQueue(request.QueueId);
         await convRepo.UpdateAsync(conversation);
+        await NotifyConversationUpdatedAsync(hub, conversation.TenantId, conversation.Id);
         return Results.Ok(new { conversationId, queueId = request.QueueId });
     }
 
     private static async Task<IResult> UnassignQueueAsync(
         Guid conversationId,
         ICurrentTenant currentTenant, IConversationRepository convRepo,
-        ITenantMembershipRepository membershipRepo)
+        ITenantMembershipRepository membershipRepo,
+        IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
         var conversation = await convRepo.GetByIdAsync(conversationId);
@@ -137,8 +142,15 @@ public static class ServiceLineEndpoints
 
         conversation.AssignQueue(null);
         await convRepo.UpdateAsync(conversation);
+        await NotifyConversationUpdatedAsync(hub, conversation.TenantId, conversation.Id);
         return Results.Ok(new { conversationId, queueId = (Guid?)null });
     }
+
+    private static Task NotifyConversationUpdatedAsync(
+        IHubContext<InboxHub> hub, Guid tenantId, Guid conversationId)
+        => hub.Clients
+            .Group($"tenant:{tenantId}")
+            .SendAsync(InboxHubMethods.ConversationUpdated, new { conversationId });
 
     private static async Task<bool> OperatorCanAccessQueueAsync(
         ICurrentTenant currentTenant,

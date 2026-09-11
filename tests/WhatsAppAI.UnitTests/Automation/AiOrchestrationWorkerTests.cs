@@ -27,6 +27,28 @@ public sealed class AiOrchestrationWorkerTests
                 withinBusinessHours, offlineMessage));
     }
 
+    [Theory]
+    [InlineData("ai_unavailable")]
+    [InlineData("ai_quota_exhausted")]
+    [InlineData("ai_retry_exhausted")]
+    [InlineData("empty_ai_reply")]
+    public void ShouldPreserveAutomaticMode_WhenBotBecomesActiveDuringAiFallback(string reason)
+    {
+        var botConfig = BotConfiguration.Create(Guid.NewGuid(), BotMode.SimpleAutoReply);
+
+        Assert.True(AiOrchestrationWorker.ShouldPreserveAutomaticMode(
+            botConfig, ConversationMode.Automatic, reason));
+    }
+
+    [Fact]
+    public void ShouldPreserveAutomaticMode_DoesNotSuppressExplicitHandoffs()
+    {
+        var botConfig = BotConfiguration.Create(Guid.NewGuid(), BotMode.SimpleAutoReply);
+
+        Assert.False(AiOrchestrationWorker.ShouldPreserveAutomaticMode(
+            botConfig, ConversationMode.Automatic, "customer_request"));
+    }
+
     [Fact]
     public void ApplyUnavailableAiFallback_FinalizesInboundAndCreatesFallbackMessage()
     {

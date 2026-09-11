@@ -1,11 +1,24 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Inbox, Loader2, MessageCircle } from 'lucide-react'
 import { api, type Conversation, type ServiceQueue } from '../../lib/api'
 import { MessagePanel } from '../inbox/MessagePanel'
+import { useSignalR } from '../../lib/signalr'
 
 export function QueueInboxPage() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
+  const queryClient = useQueryClient()
+
+  const { start: startSignalR } = useSignalR({
+    hubUrl: '/hubs/inbox',
+    onConversationUpdate: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue-inbox-conversations'] })
+    },
+  })
+
+  useEffect(() => {
+    startSignalR()
+  }, [startSignalR])
 
   const queuesQuery = useQuery({
     queryKey: ['service-queues'],
