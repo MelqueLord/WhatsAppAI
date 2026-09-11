@@ -640,6 +640,7 @@ export const api = {
       phoneNumber: string
       name?: string
       startConversation?: boolean
+      phoneNumberId?: string
     }) =>
       fetchApi<Contact & { conversationId?: string }>('/api/contacts', {
         method: 'POST',
@@ -667,11 +668,12 @@ export const api = {
       })
     },
 
-    startConversation: (id: string) =>
+    startConversation: (id: string, phoneNumberId?: string) =>
       fetchApi<{ conversationId: string }>(
         `/api/contacts/${id}/start-conversation`,
         {
           method: 'POST',
+          body: JSON.stringify(phoneNumberId ? { phoneNumberId } : {}),
         }
       ),
 

@@ -65,6 +65,25 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatsAppWebClient_RetriesWhenBridgeSessionIsReconnecting()
+    {
+        using var client = new WhatsAppWebClient(
+            new HttpClient(new StaticResponseHandler(HttpStatusCode.ServiceUnavailable,
+                "{\"success\":false,\"error\":\"WhatsApp Web session is reconnecting.\"}")),
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["WhatsAppWeb:BaseUrl"] = "http://whatsapp-web:3020"
+            }).Build());
+
+        var result = await client.SendTextMessageAsync(
+            "qr:tenant:2", "whatsapp-web", "5571987712263", "Teste");
+
+        Assert.False(result.IsSuccess);
+        Assert.True(result.IsRetryable);
+        Assert.Equal("WhatsApp Web session is reconnecting.", result.ErrorMessage);
+    }
+
+    [Fact]
     public async Task MediaGateway_UsesRequestScopedAuthorizationForBothRequests()
     {
         var gateway = new MediaGateway(httpClient, NullLogger<MediaGateway>.Instance);
@@ -119,5 +138,16 @@ public sealed class MetaClientAuthorizationTests : IDisposable
 
             return response;
         }
+    }
+
+    private sealed class StaticResponseHandler(HttpStatusCode statusCode, string body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(body)
+            });
     }
 }

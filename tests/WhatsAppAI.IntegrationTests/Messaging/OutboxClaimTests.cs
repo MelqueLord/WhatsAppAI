@@ -38,4 +38,32 @@ public sealed class OutboxClaimTests(TestWebApplicationFactory factory)
         Assert.Single(claims, claimed => claimed);
         Assert.False(claims[0] && claims[1]);
     }
+
+    [Fact]
+    public async Task RecoverStaleClaims_ReturnsAbandonedProcessingItemToPending()
+    {
+        Guid outboxId;
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            var outbox = OutboxMessage.Create(Guid.NewGuid(), Guid.NewGuid());
+            db.OutboxMessages.Add(outbox);
+            await db.SaveChangesAsync();
+            outboxId = outbox.Id;
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
+        var claimed = await repository.TryClaimAsync(outboxId, DateTime.UtcNow.AddMinutes(-10));
+
+        Assert.True(claimed);
+        var recovered = await repository.RecoverStaleClaimsAsync(DateTime.UtcNow.AddMinutes(-5));
+        Assert.Equal(1, recovered);
+
+        await using var verifyDb = await factory.GetDbContextAsync();
+        var recoveredOutbox = await verifyDb.OutboxMessages
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == outboxId);
+        Assert.Equal(OutboxStatus.Pending, recoveredOutbox.Status);
+        Assert.Null(recoveredOutbox.NextRetryAt);
+    }
 }

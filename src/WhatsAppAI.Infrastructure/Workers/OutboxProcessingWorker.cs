@@ -18,6 +18,7 @@ public sealed class OutboxProcessingWorker(
     private const int MaxConcurrency = 4;
     private const int MaxRetries = 5;
     private const int BatchSize = 20;
+    private static readonly TimeSpan ClaimLeaseDuration = TimeSpan.FromMinutes(5);
 
     private static readonly TimeSpan[] BackoffDelays =
     [
@@ -59,6 +60,11 @@ public sealed class OutboxProcessingWorker(
     {
         using var scope = serviceProvider.CreateScope();
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
+        var recovered = await outboxRepository.RecoverStaleClaimsAsync(
+            DateTime.UtcNow - ClaimLeaseDuration, cancellationToken);
+        if (recovered > 0)
+            logger.LogWarning("Recovered {RecoveredCount} stale outbox claims", recovered);
+
         var pending = await outboxRepository.GetPendingAsync(BatchSize);
         if (pending.Count == 0)
             return false;

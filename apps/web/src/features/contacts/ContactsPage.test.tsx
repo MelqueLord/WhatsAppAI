@@ -16,6 +16,9 @@ vi.mock('../../lib/api', () => ({
       startConversation: vi.fn(),
       import: vi.fn(),
     },
+    whatsapp: {
+      getLines: vi.fn(),
+    },
   },
 }))
 
@@ -32,6 +35,7 @@ describe('ContactsPage import', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.contacts.list).mockResolvedValue([])
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([])
   })
 
   it('uploads the selected spreadsheet and shows the result', async () => {
@@ -52,5 +56,28 @@ describe('ContactsPage import', () => {
     await waitFor(() => expect(api.contacts.import).toHaveBeenCalledWith(file))
     expect(await screen.findByText('1 importados, 1 ignorados e 1 inválidos.')).toBeInTheDocument()
     expect(screen.getByText('Linha 4: Contato inválido.')).toBeInTheDocument()
+  })
+
+  it('asks which company line should start a conversation when multiple lines are active', async () => {
+    vi.mocked(api.contacts.list).mockResolvedValue([{
+      id: 'contact-1',
+      phoneNumber: '5571999999999',
+      name: 'Cliente',
+      createdAt: '2026-09-10T00:00:00Z',
+    }])
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([
+      { lineNumber: 1, connectionType: 'QrCode', phoneNumberId: 'qr:tenant:1', isActive: true },
+      { lineNumber: 2, connectionType: 'QrCode', phoneNumberId: 'qr:tenant:2', isActive: true },
+    ])
+    vi.mocked(api.contacts.startConversation).mockResolvedValue({ conversationId: 'conversation-1' })
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Conversar/i }))
+    expect(screen.getByRole('heading', { name: 'Escolher linha' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /QR Code — linha 2/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir conversa' }))
+
+    await waitFor(() => expect(api.contacts.startConversation).toHaveBeenCalledWith('contact-1', 'qr:tenant:2'))
   })
 })

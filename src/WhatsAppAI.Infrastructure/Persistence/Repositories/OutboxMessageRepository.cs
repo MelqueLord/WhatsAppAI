@@ -34,6 +34,17 @@ public sealed class OutboxMessageRepository(AppDbContext context) : IOutboxMessa
             .ToListAsync();
     }
 
+    public Task<int> RecoverStaleClaimsAsync(DateTime staleBefore, CancellationToken cancellationToken = default)
+    {
+        return context.Set<OutboxMessage>()
+            .IgnoreQueryFilters()
+            .Where(o => o.Status == OutboxStatus.Processing &&
+                o.NextRetryAt != null && o.NextRetryAt <= staleBefore)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(o => o.Status, OutboxStatus.Pending)
+                .SetProperty(o => o.NextRetryAt, (DateTime?)null), cancellationToken);
+    }
+
     public async Task<bool> TryClaimAsync(Guid id, DateTime utcNow, CancellationToken cancellationToken = default)
     {
         var affected = await context.Set<OutboxMessage>()
@@ -41,7 +52,8 @@ public sealed class OutboxMessageRepository(AppDbContext context) : IOutboxMessa
             .Where(o => o.Id == id && o.Status == OutboxStatus.Pending &&
                 (o.NextRetryAt == null || o.NextRetryAt <= utcNow))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(o => o.Status, OutboxStatus.Processing), cancellationToken);
+                .SetProperty(o => o.Status, OutboxStatus.Processing)
+                .SetProperty(o => o.NextRetryAt, utcNow), cancellationToken);
         return affected == 1;
     }
 

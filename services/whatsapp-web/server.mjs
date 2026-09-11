@@ -270,8 +270,15 @@ app.post('/sessions/:tenantId/logout', withSessionOwnership(async (req, res) => 
 app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
   const { recipientPhone, text } = req.body ?? {}
-  if (!session?.sock || !isValidRecipient(recipientPhone) || !isValidMessageText(text)) {
-    return res.status(400).json({ success: false, error: 'Session, recipientPhone and text are required.' })
+  if (!isValidRecipient(recipientPhone) || !isValidMessageText(text)) {
+    return res.status(400).json({ success: false, error: 'recipientPhone and text are required.' })
+  }
+
+  // Keep one socket reference during the operation. A reconnect can clear
+  // session.sock between validation and onWhatsApp/sendMessage.
+  const socket = session?.sock
+  if (!socket || session.status !== 'connected') {
+    return res.status(503).json({ success: false, error: 'WhatsApp Web session is reconnecting.' })
   }
 
   try {
@@ -283,7 +290,7 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
       if (mappedLid) recipientJid = mappedLid
     }
 
-    const registeredContact = (await session.sock.onWhatsApp(recipientPhone))
+    const registeredContact = (await socket.onWhatsApp(recipientPhone))
       ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
     if (!registeredContact?.jid) {
       console.warn(`WhatsApp recipient is not registered: session=${req.params.tenantId}`)
@@ -293,7 +300,7 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
     recipientJid = registeredContact.jid
     console.log(`WhatsApp recipient resolved: session=${req.params.tenantId} type=${recipientJid.split('@')[1] ?? 'unknown'}`)
 
-    const result = await session.sock.sendMessage(recipientJid, { text })
+    const result = await socket.sendMessage(recipientJid, { text })
     res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
   } catch (error) {
     logError('Failed to send WhatsApp message', req.params.tenantId, error)

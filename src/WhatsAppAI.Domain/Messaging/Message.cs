@@ -69,7 +69,8 @@ public sealed class Message
         string? content,
         string? idempotencyKey,
         string? mediaId = null,
-        string? caption = null)
+        string? caption = null,
+        string? mediaUrl = null)
     {
         return new Message
         {
@@ -82,6 +83,7 @@ public sealed class Message
             Type = type,
             Content = content,
             MediaId = mediaId,
+            MediaUrl = mediaUrl,
             Caption = caption,
             IdempotencyKey = idempotencyKey,
             CreatedAt = DateTime.UtcNow

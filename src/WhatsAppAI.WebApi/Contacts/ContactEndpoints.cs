@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Application.Contacts;
+using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Integrations;
@@ -166,7 +167,8 @@ public static class ContactEndpoints
         AppDbContext dbContext,
         HttpContext httpContext,
         IWhatsAppAccountRepository accountRepository,
-        ITenantMembershipRepository membershipRepository)
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppClient whatsAppClient)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -194,7 +196,8 @@ public static class ContactEndpoints
             if (request.StartConversation)
             {
                 var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-                    currentTenant, accountRepository, membershipRepository,
+                    currentTenant, accountRepository, membershipRepository, whatsAppClient,
+                    request.PhoneNumberId,
                     currentTenant.TenantId.Value, httpContext.RequestAborted);
                 if (phoneNumberId is null)
                     return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
@@ -239,7 +242,8 @@ public static class ContactEndpoints
         if (request.StartConversation)
         {
             var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-                currentTenant, accountRepository, membershipRepository,
+                currentTenant, accountRepository, membershipRepository, whatsAppClient,
+                request.PhoneNumberId,
                 currentTenant.TenantId.Value, httpContext.RequestAborted);
             if (phoneNumberId is null)
                 return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
@@ -350,11 +354,13 @@ public static class ContactEndpoints
 
     private static async Task<IResult> StartConversationAsync(
         Guid contactId,
+        [FromBody] StartConversationRequest? request,
         ICurrentTenant currentTenant,
         AppDbContext dbContext,
         HttpContext httpContext,
         IWhatsAppAccountRepository accountRepository,
-        ITenantMembershipRepository membershipRepository)
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppClient whatsAppClient)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -368,7 +374,8 @@ public static class ContactEndpoints
             return Results.NotFound();
 
         var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-            currentTenant, accountRepository, membershipRepository,
+            currentTenant, accountRepository, membershipRepository, whatsAppClient,
+            request?.PhoneNumberId,
             currentTenant.TenantId.Value, httpContext.RequestAborted);
         if (phoneNumberId is null)
             return Results.BadRequest(new { error = "No active WhatsApp line is configured for this tenant." });
@@ -427,6 +434,8 @@ public static class ContactEndpoints
         ICurrentTenant currentTenant,
         IWhatsAppAccountRepository accountRepository,
         ITenantMembershipRepository membershipRepository,
+        IWhatsAppClient whatsAppClient,
+        string? requestedPhoneNumberId,
         Guid tenantId,
         CancellationToken cancellationToken)
     {
@@ -436,6 +445,32 @@ public static class ContactEndpoints
 
         if (accounts.Count == 0)
             return null;
+
+        if (!string.IsNullOrWhiteSpace(requestedPhoneNumberId))
+        {
+            var selected = accounts.FirstOrDefault(account =>
+                account.PhoneNumberId == requestedPhoneNumberId);
+            if (selected is null)
+                return null;
+
+            if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
+            {
+                var membership = await membershipRepository.GetByUserAndTenantAsync(
+                    currentTenant.UserId.Value, tenantId);
+                membership?.LoadAssignedLinesFromJson();
+                var assignedLines = membership is not null && membership.AssignedLines.Count > 0
+                    ? membership.AssignedLines
+                    : membership?.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
+                        ? [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)]
+                        : [];
+                if (!assignedLines.Any(line =>
+                        line.ConnectionType == selected.ConnectionType &&
+                        line.LineNumber == selected.LineNumber))
+                    return null;
+            }
+
+            return selected.PhoneNumberId;
+        }
 
         if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
         {
@@ -461,9 +496,22 @@ public static class ContactEndpoints
             }
         }
 
+        // A direct conversation started by an owner has no operator assignment.
+        // Prefer a QR line whose session is actually connected, rather than the
+        // lowest numbered active account, which may still be waiting for a QR scan.
+        foreach (var account in accounts
+            .Where(account => account.ConnectionType == WhatsAppConnectionType.QrCode)
+            .OrderBy(account => account.LineNumber))
+        {
+            var status = await whatsAppClient.GetSessionStatusAsync(
+                tenantId, account.LineNumber, cancellationToken);
+            if (status.IsConnected)
+                return account.PhoneNumberId;
+        }
+
         return accounts
-            .OrderByDescending(account => account.ConnectionType == WhatsAppConnectionType.QrCode)
-            .ThenBy(account => account.LineNumber)
+            .Where(account => account.ConnectionType == WhatsAppConnectionType.OfficialApi)
+            .OrderBy(account => account.LineNumber)
             .Select(account => account.PhoneNumberId)
             .FirstOrDefault();
     }
@@ -722,6 +770,12 @@ public sealed class CreateContactRequest
     public string PhoneNumber { get; init; } = string.Empty;
     public string? Name { get; init; }
     public bool StartConversation { get; init; }
+    public string? PhoneNumberId { get; init; }
+}
+
+public sealed class StartConversationRequest
+{
+    public string? PhoneNumberId { get; init; }
 }
 
 public sealed class UpdateContactRequest

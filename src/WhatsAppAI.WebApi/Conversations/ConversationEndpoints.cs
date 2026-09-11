@@ -35,6 +35,9 @@ public static class ConversationEndpoints
         group.MapPost("/{conversationId:guid}/messages", SendMessageAsync)
             .WithName("SendMessage");
 
+        group.MapPost("/{conversationId:guid}/media", SendMediaMessageAsync)
+            .WithName("SendMediaMessage");
+
         group.MapPost("/{conversationId:guid}/close", CloseConversationAsync)
             .WithName("CloseConversation");
 
@@ -295,6 +298,91 @@ public static class ConversationEndpoints
                 createdAt = message.CreatedAt
             });
 
+        return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
+    }
+
+    private static async Task<IResult> SendMediaMessageAsync(
+        Guid conversationId,
+        IFormFile file,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IOutboxMessageRepository outboxMessageRepository,
+        IClock clock,
+        IHubContext<InboxHub> hubContext,
+        AppDbContext dbContext,
+        string? caption = null)
+    {
+        const long maxBytes = 16 * 1024 * 1024;
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (file is null || file.Length == 0 || file.Length > maxBytes)
+            return Results.BadRequest(new { error = "Attachment must be between 1 byte and 16 MB." });
+
+        var contentType = file.ContentType?.Split(';')[0].Trim().ToLowerInvariant();
+        var messageType = contentType switch
+        {
+            var type when type.StartsWith("image/") => MessageType.Image,
+            var type when type.StartsWith("audio/") => MessageType.Audio,
+            var type when type.StartsWith("video/") => MessageType.Video,
+            "application/pdf" or "text/plain" or "application/msword" or
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or
+                "application/vnd.ms-excel" or
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => MessageType.Document,
+            _ => (MessageType?)null
+        };
+        if (messageType is null)
+            return Results.BadRequest(new { error = "Unsupported attachment type." });
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        if (conversation is null || conversation.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+        if (conversation.Status == ConversationStatus.Closed)
+            return Results.Conflict(new { error = "Conversation is closed." });
+
+        if (currentTenant.UserRole == "Operator")
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            membership?.LoadAssignedLinesFromJson();
+            var phoneNumberIds = await ResolvePhoneNumberIdsAsync(
+                membership, currentTenant.TenantId.Value, accountRepository);
+            if (membership is null || phoneNumberIds.Count == 0 ||
+                (!phoneNumberIds.Contains(conversation.PhoneNumberId) && conversation.PhoneNumberId != "manual") ||
+                !membership.CanAccessQueue(conversation.QueueId))
+                return Results.Forbid();
+        }
+
+        var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        if (account is null && conversation.PhoneNumberId == "manual")
+            account = await accountRepository.GetByTenantAndSlotAsync(
+                currentTenant.TenantId.Value, WhatsAppConnectionType.QrCode, 1);
+        var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
+            account?.ConnectionType == WhatsAppConnectionType.QrCode;
+        if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
+            return Results.BadRequest(new { error = "Window closed. Only templates are allowed." });
+
+        await using var stream = file.OpenReadStream();
+        await using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        var dataUrl = $"data:{contentType};base64,{Convert.ToBase64String(memory.ToArray())}";
+        var message = Message.CreateOutbound(
+            currentTenant.TenantId.Value, conversationId, conversation.ContactId,
+            messageType.Value, null, Guid.NewGuid().ToString(),
+            caption: caption?.Trim(), mediaUrl: dataUrl);
+        await messageRepository.AddAsync(message);
+        await outboxMessageRepository.AddAsync(OutboxMessage.Create(currentTenant.TenantId.Value, message.Id));
+        conversation.RecordMessage();
+        await conversationRepository.UpdateAsync(conversation);
+        await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}").SendAsync(
+            InboxHubMethods.NewMessage, new
+            {
+                id = message.Id, conversationId, direction = message.Direction.ToString(),
+                content = caption, type = message.Type.ToString(), status = message.Status.ToString(),
+                createdAt = message.CreatedAt
+            });
         return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
     }
 

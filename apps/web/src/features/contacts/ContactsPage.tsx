@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil, Upload, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +28,7 @@ function normalizeBrazilPhone(value: string) {
 export function ContactsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { isTenantOwner } = useAuth()
+  const { isTenantOwner, user } = useAuth()
   const [search, setSearch] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showImportForm, setShowImportForm] = useState(false)
@@ -38,6 +38,29 @@ export function ContactsPage() {
   const [memoryKey, setMemoryKey] = useState('')
   const [memoryValue, setMemoryValue] = useState('')
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [selectedLineId, setSelectedLineId] = useState('')
+  const [conversationTarget, setConversationTarget] = useState<Contact | null>(null)
+  const [startConversationOn, setStartConversationOn] = useState(false)
+
+  const { data: whatsappLines = [] } = useQuery({
+    queryKey: ['whatsapp-lines'],
+    queryFn: () => api.whatsapp.getLines(),
+  })
+
+  const availableLines = useMemo(() => {
+    const assigned = user?.assignedLines?.length
+      ? user.assignedLines
+      : user?.assignedConnectionType && user.assignedLineNumber
+        ? [{ connectionType: user.assignedConnectionType, lineNumber: user.assignedLineNumber }]
+        : []
+    return whatsappLines.filter((line) =>
+      line.isActive && (isTenantOwner || assigned.some((item) =>
+        item.connectionType === line.connectionType && item.lineNumber === line.lineNumber))
+    )
+  }, [isTenantOwner, user, whatsappLines])
+
+  const automaticLineId = availableLines.length === 1 ? availableLines[0].phoneNumberId : undefined
+  const chosenLineId = selectedLineId || automaticLineId
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts'],
@@ -51,7 +74,7 @@ export function ContactsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: { phoneNumber: string; name?: string; startConversation?: boolean }) =>
+    mutationFn: (data: { phoneNumber: string; name?: string; startConversation?: boolean; phoneNumberId?: string }) =>
       api.contacts.create(data),
     onSuccess: (data) => {
       queryClient.setQueryData<Contact[]>(['contacts'], (current = []) => [
@@ -61,6 +84,8 @@ export function ContactsPage() {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setShowCreateForm(false)
       setPhoneNumber('')
+      setSelectedLineId('')
+      setStartConversationOn(false)
       if (data?.conversationId) {
         navigate('/inbox', { state: { conversationId: data.conversationId } })
       }
@@ -125,7 +150,8 @@ export function ContactsPage() {
   }
 
   const startConversationMutation = useMutation({
-    mutationFn: (contactId: string) => api.contacts.startConversation(contactId),
+    mutationFn: ({ contactId, phoneNumberId }: { contactId: string; phoneNumberId?: string }) =>
+      api.contacts.startConversation(contactId, phoneNumberId),
     onSuccess: (data) => {
       if (data?.conversationId) {
         navigate('/inbox', { state: { conversationId: data.conversationId } })
@@ -136,11 +162,23 @@ export function ContactsPage() {
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
+    const startConversation = startConversationOn
+    if (startConversation && availableLines.length > 1 && !chosenLineId) return
     createMutation.mutate({
       phoneNumber: normalizeBrazilPhone(phoneNumber),
       name: (formData.get('name') as string) || undefined,
-      startConversation: formData.get('startConversation') === 'on',
+      startConversation,
+      phoneNumberId: startConversation ? chosenLineId : undefined,
     })
+  }
+
+  const openConversation = (contact: Contact) => {
+    if (availableLines.length > 1) {
+      setConversationTarget(contact)
+      setSelectedLineId('')
+      return
+    }
+    startConversationMutation.mutate({ contactId: contact.id, phoneNumberId: automaticLineId })
   }
 
   const filteredContacts = (contacts ?? []).filter((c) =>
@@ -166,7 +204,11 @@ export function ContactsPage() {
               </button>
             )}
             <button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => {
+                setSelectedLineId('')
+                setStartConversationOn(false)
+                setShowCreateForm(true)
+              }}
               className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors whitespace-nowrap"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
@@ -257,8 +299,9 @@ export function ContactsPage() {
                               <span className="hidden sm:inline">Excluir</span>
                             </button>
                             <button
-                              onClick={() => startConversationMutation.mutate(contact.id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap"
+                              onClick={() => openConversation(contact)}
+                              disabled={startConversationMutation.isPending}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg whitespace-nowrap disabled:opacity-50"
                             >
                               <MessageSquare className="w-4 h-4" />
                               <span className="hidden sm:inline">Conversar</span>
@@ -499,6 +542,58 @@ export function ContactsPage() {
         </div>
       )}
 
+      {conversationTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">Escolher linha</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Selecione a linha que atenderá {conversationTarget.name || conversationTarget.phoneNumber}.
+                </p>
+              </div>
+              <button onClick={() => setConversationTarget(null)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {availableLines.map((line) => (
+                <button
+                  key={line.phoneNumberId}
+                  type="button"
+                  onClick={() => setSelectedLineId(line.phoneNumberId)}
+                  className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
+                    selectedLineId === line.phoneNumberId ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-300'
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-slate-800">
+                    {line.connectionType === 'OfficialApi' ? 'API Oficial' : 'QR Code'} — linha {line.lineNumber}
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-1">Linha ativa da empresa</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 pt-5">
+              <button type="button" onClick={() => setConversationTarget(null)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!selectedLineId || startConversationMutation.isPending}
+                onClick={() => {
+                  startConversationMutation.mutate({ contactId: conversationTarget.id, phoneNumberId: selectedLineId }, {
+                    onSuccess: () => setConversationTarget(null),
+                  })
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50"
+              >
+                {startConversationMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Abrindo...</> : 'Abrir conversa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create contact modal */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -539,11 +634,39 @@ export function ContactsPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" name="startConversation" id="startConversation" className="rounded" />
+                <input
+                  type="checkbox"
+                  name="startConversation"
+                  id="startConversation"
+                  checked={startConversationOn}
+                  onChange={(event) => setStartConversationOn(event.target.checked)}
+                  className="rounded"
+                />
                 <label htmlFor="startConversation" className="text-sm text-slate-700">
                   Iniciar conversa após salvar
                 </label>
               </div>
+              {availableLines.length > 1 && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 space-y-2">
+                  <label htmlFor="create-contact-line" className="block text-sm font-medium text-slate-700">
+                    Linha para iniciar a conversa
+                  </label>
+                  <select
+                    id="create-contact-line"
+                    value={selectedLineId}
+                    onChange={(event) => setSelectedLineId(event.target.value)}
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Selecione uma linha quando iniciar a conversa</option>
+                    {availableLines.map((line) => (
+                      <option key={line.phoneNumberId} value={line.phoneNumberId}>
+                        {line.connectionType === 'OfficialApi' ? 'API Oficial' : 'QR Code'} — linha {line.lineNumber}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500">Com uma única linha, ela é selecionada automaticamente.</p>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
                   Cancelar
