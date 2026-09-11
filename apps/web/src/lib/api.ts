@@ -425,7 +425,7 @@ export interface BroadcastList {
   message: string
   status: string
   linePhoneNumberId?: string
-  queueId?: string
+  queueId?: string | null
   totalCount: number
   sentCount: number
   failedCount: number
@@ -738,16 +738,27 @@ export const api = {
 
     get: (id: string) => fetchApi<BroadcastDetail>(`/api/broadcasts/${id}`),
 
-    create: (data: { name: string; message: string; contactIds: string[] }) =>
+    create: (data: { name: string; message: string; contactIds: string[]; queueId?: string }) =>
       fetchApi<BroadcastList>('/api/broadcasts', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
-    dispatch: (id: string, linePhoneNumberId: string, queueId?: string) =>
+    dispatch: (id: string, linePhoneNumberId: string) =>
       fetchApi<BroadcastList>(`/api/broadcasts/${id}/dispatch`, {
         method: 'POST',
-        body: JSON.stringify({ linePhoneNumberId, queueId: queueId || undefined }),
+        body: JSON.stringify({ linePhoneNumberId }),
+      }),
+
+    update: (id: string, message: string) =>
+      fetchApi<BroadcastList>(`/api/broadcasts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ message }),
+      }),
+
+    retryFailed: (id: string) =>
+      fetchApi<BroadcastList>(`/api/broadcasts/${id}/retry-failed`, {
+        method: 'POST',
       }),
 
     cancel: (id: string) =>

@@ -60,6 +60,16 @@ public sealed class BroadcastRepository(AppDbContext context) : IBroadcastReposi
             .ToListAsync();
     }
 
+    public async Task<IReadOnlyList<BroadcastRecipient>> GetFailedRecipientsAsync(Guid broadcastListId)
+    {
+        return await context.Set<BroadcastRecipient>()
+            .IgnoreQueryFilters()
+            .Where(r => r.BroadcastListId == broadcastListId
+                     && r.Status == BroadcastRecipientStatus.Failed)
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<BroadcastRecipient?> GetRecipientByIdAsync(Guid id)
     {
         return await context.Set<BroadcastRecipient>()

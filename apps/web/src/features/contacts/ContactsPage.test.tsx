@@ -5,7 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../lib/api'
 import { ContactsPage } from './ContactsPage'
 
+let signalROptions: { onMessage?: (payload: unknown) => void } | undefined
+
 vi.mock('../../lib/auth', () => ({ useAuth: () => ({ isTenantOwner: true }) }))
+vi.mock('../../lib/signalr', () => ({
+  useSignalR: (options: typeof signalROptions) => {
+    signalROptions = options
+    return { start: vi.fn() }
+  },
+}))
 vi.mock('../../lib/api', () => ({
   api: {
     contacts: {
@@ -34,8 +42,29 @@ function renderPage() {
 describe('ContactsPage import', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    signalROptions = undefined
     vi.mocked(api.contacts.list).mockResolvedValue([])
     vi.mocked(api.whatsapp.getLines).mockResolvedValue([])
+  })
+
+  it('refreshes the list when a new inbound message is announced', async () => {
+    const newContact = {
+      id: 'contact-new',
+      phoneNumber: '5511999990000',
+      name: 'Novo contato',
+      createdAt: '2026-09-11T00:00:00Z',
+    }
+    vi.mocked(api.contacts.list)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([newContact])
+
+    renderPage()
+
+    await waitFor(() => expect(api.contacts.list).toHaveBeenCalledTimes(1))
+    signalROptions?.onMessage?.({ conversationId: 'conversation-new' })
+
+    expect(await screen.findByText('Novo contato')).toBeInTheDocument()
+    expect(api.contacts.list).toHaveBeenCalledTimes(2)
   })
 
   it('uploads the selected spreadsheet and shows the result', async () => {

@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  Pencil,
+  RotateCcw,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import type { BroadcastList, Contact, ServiceQueue } from '../../lib/api'
@@ -57,12 +59,12 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
-  const [selectedSourceQueueId, setSelectedSourceQueueId] = useState('')
+  const [selectedQueueId, setSelectedQueueId] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { data: contacts, isLoading: loadingContacts } = useQuery({
-    queryKey: ['contacts', 'broadcast', selectedSourceQueueId],
-    queryFn: () => api.contacts.list(undefined, 500, selectedSourceQueueId || undefined),
+    queryKey: ['contacts', 'broadcast'],
+    queryFn: () => api.contacts.list(undefined, 500),
   })
 
   const { data: queues } = useQuery({
@@ -77,6 +79,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
         name,
         message,
         contactIds: [...selectedIds],
+        queueId: selectedQueueId || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] })
@@ -132,16 +135,14 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Fila de origem</label>
+              <label htmlFor="broadcast-queue" className="block text-sm font-medium text-slate-700 mb-1.5">Fila de atendimento</label>
               <select
-                value={selectedSourceQueueId}
-                onChange={(e) => {
-                  setSelectedSourceQueueId(e.target.value)
-                  setSelectedIds(new Set())
-                }}
+                id="broadcast-queue"
+                value={selectedQueueId}
+                onChange={(e) => setSelectedQueueId(e.target.value)}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
-                <option value="">Todos os contatos</option>
+                <option value="">Sem fila</option>
                 {(queues ?? []).map((queue: ServiceQueue) => (
                   <option key={queue.id} value={queue.id}>{queue.name}</option>
                 ))}
@@ -149,8 +150,9 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome da lista *</label>
+              <label htmlFor="broadcast-name" className="block text-sm font-medium text-slate-700 mb-1.5">Nome da lista *</label>
               <input
+                id="broadcast-name"
                 type="text"
                 required
                 value={name}
@@ -162,8 +164,9 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Mensagem *</label>
+              <label htmlFor="broadcast-message" className="block text-sm font-medium text-slate-700 mb-1.5">Mensagem *</label>
               <textarea
+                id="broadcast-message"
                 required
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -264,6 +267,87 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ──────────────────────────────── Edit Dialog ────────────────────────────────
+
+function EditBroadcastDialog({
+  broadcast,
+  onClose,
+}: {
+  broadcast: BroadcastList
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [message, setMessage] = useState(broadcast.message)
+
+  const updateMutation = useMutation({
+    mutationFn: () => api.broadcasts.update(broadcast.id, message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['broadcasts'] })
+      queryClient.invalidateQueries({ queryKey: ['broadcast', broadcast.id] })
+      onClose()
+    },
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    updateMutation.mutate()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-800">Editar mensagem</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="px-6 py-5 space-y-4">
+            {updateMutation.isError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                {(updateMutation.error as Error).message}
+              </div>
+            )}
+            <div>
+              <label htmlFor="edit-broadcast-message" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Mensagem
+              </label>
+              <textarea
+                id="edit-broadcast-message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={4096}
+                rows={6}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+              <p className="text-xs text-slate-400 text-right mt-1">{message.length}/4096</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={updateMutation.isPending || !message.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
+            >
+              {updateMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : 'Salvar mensagem'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ──────────────────────────── Dispatch Dialog ────────────────────────────────
 
 function DispatchDialog({
@@ -276,7 +360,6 @@ function DispatchDialog({
   const { user, isOperator } = useAuth()
   const queryClient = useQueryClient()
   const [selectedLine, setSelectedLine] = useState('')
-  const [selectedQueueId, setSelectedQueueId] = useState('')
 
   const assignedQrLineNumbers = new Set(
     user?.assignedLines
@@ -307,12 +390,16 @@ function DispatchDialog({
     select: (data) => data.filter((q) => q.isActive),
   })
 
+  const selectedQueueName = broadcast.queueId
+    ? queues?.find((queue) => queue.id === broadcast.queueId)?.name ?? 'Fila configurada'
+    : 'Sem fila'
+
   const operatorLine = isOperator && lines?.length === 1 ? lines[0] : null
   const operatorPhoneNumberId = operatorLine?.phoneNumberId ?? null
 
   const dispatchMutation = useMutation({
-    mutationFn: ({ linePhoneNumberId, queueId }: { linePhoneNumberId: string; queueId?: string }) =>
-      api.broadcasts.dispatch(broadcast.id, linePhoneNumberId, queueId),
+    mutationFn: ({ linePhoneNumberId }: { linePhoneNumberId: string }) =>
+      api.broadcasts.dispatch(broadcast.id, linePhoneNumberId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['broadcasts'] })
       onClose()
@@ -391,26 +478,13 @@ function DispatchDialog({
             Selecione a linha QR Code para enviar <strong>{broadcast.name}</strong> a{' '}
             {broadcast.totalCount} destinatário{broadcast.totalCount !== 1 ? 's' : ''}.
           </p>
+          <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Fila de atendimento: <strong>{selectedQueueName}</strong>
+          </p>
 
           {dispatchMutation.isError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               {(dispatchMutation.error as Error).message}
-            </div>
-          )}
-
-          {queues && queues.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Fila de atendimento <span className="font-normal text-slate-400">(opcional)</span></label>
-              <select
-                value={selectedQueueId}
-                onChange={(e) => setSelectedQueueId(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="">Nenhuma (sem fila)</option>
-                {queues.map((q) => (
-                  <option key={q.id} value={q.id}>{q.name}</option>
-                ))}
-              </select>
             </div>
           )}
 
@@ -426,8 +500,9 @@ function DispatchDialog({
             </p>
           ) : (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Linha QR Code</label>
+              <label htmlFor="broadcast-line" className="text-sm font-medium text-slate-700">Linha QR Code</label>
               <select
+                id="broadcast-line"
                 value={selectedLine}
                 onChange={(e) => setSelectedLine(e.target.value)}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -451,7 +526,7 @@ function DispatchDialog({
             Cancelar
           </button>
           <button
-            onClick={() => dispatchMutation.mutate({ linePhoneNumberId: selectedLine, queueId: selectedQueueId || undefined })}
+            onClick={() => dispatchMutation.mutate({ linePhoneNumberId: selectedLine })}
             disabled={!selectedLine || dispatchMutation.isPending}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
           >
@@ -473,6 +548,7 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [showDispatch, setShowDispatch] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   const { data: detail, isLoading: loadingDetail } = useQuery({
     queryKey: ['broadcast', broadcast.id],
@@ -488,6 +564,11 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
 
   const deleteMutation = useMutation({
     mutationFn: () => api.broadcasts.delete(broadcast.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['broadcasts'] }),
+  })
+
+  const retryMutation = useMutation({
+    mutationFn: () => api.broadcasts.retryFailed(broadcast.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['broadcasts'] }),
   })
 
@@ -526,12 +607,35 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-1">
             {broadcast.status === 'Draft' && (
+              <>
+                <button
+                  onClick={() => setShowEdit(true)}
+                  title="Editar mensagem"
+                  className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowDispatch(true)}
+                  title="Disparar"
+                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                >
+                  <Play className="w-4 h-4" />
+                </button>
+              </>
+            )}
+            {(broadcast.status === 'Completed' || broadcast.status === 'Finished') && broadcast.failedCount > 0 && (
               <button
-                onClick={() => setShowDispatch(true)}
-                title="Disparar"
-                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+                title="Reenviar falhas"
+                className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50"
               >
-                <Play className="w-4 h-4" />
+                {retryMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
               </button>
             )}
             {broadcast.status === 'Sending' && (
@@ -563,6 +667,9 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
               </button>
             )}
           </div>
+          {retryMutation.isError && (
+            <p className="text-xs text-red-600 mt-1">{(retryMutation.error as Error).message}</p>
+          )}
         </td>
       </tr>
 
@@ -615,6 +722,9 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
 
       {showDispatch && (
         <DispatchDialog broadcast={broadcast} onClose={() => setShowDispatch(false)} />
+      )}
+      {showEdit && (
+        <EditBroadcastDialog broadcast={broadcast} onClose={() => setShowEdit(false)} />
       )}
     </>
   )

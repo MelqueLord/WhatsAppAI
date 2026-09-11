@@ -119,12 +119,9 @@ public sealed class BroadcastDispatchWorker(
                 conversation.RecordMessage();
                 await conversationRepo.AddAsync(conversation, ct);
             }
-            else if (conversation.Mode == ConversationMode.Human)
-            {
-                // BR-BC-004: don't interfere with Human-mode conversations
-                await FailRecipientAsync(broadcastRepo, broadcast, recipient, "Conversation is in Human mode", ct);
-                return;
-            }
+            // A broadcast is an explicit operator action. It is allowed to
+            // send regardless of the current automation mode and must not
+            // change that mode.
 
             // Get WhatsApp account for this line
             // Hosted workers have no request tenant context. Always scope this

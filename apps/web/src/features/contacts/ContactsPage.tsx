@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Plus, Search, X, Loader2, MessageSquare, Pencil, Upload, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { useSignalR } from '../../lib/signalr'
 
 interface Contact {
   id: string
@@ -66,6 +67,20 @@ export function ContactsPage() {
     queryKey: ['contacts'],
     queryFn: () => api.contacts.list(undefined, 100),
   })
+
+  const refreshContacts = () => {
+    queryClient.invalidateQueries({ queryKey: ['contacts'] })
+  }
+
+  const { start: startSignalR } = useSignalR({
+    hubUrl: '/hubs/inbox',
+    onMessage: refreshContacts,
+    onConversationUpdate: refreshContacts,
+  })
+
+  useEffect(() => {
+    startSignalR()
+  }, [startSignalR])
 
   const { data: contactMemory, isLoading: isLoadingMemory, isError: isMemoryError } = useQuery({
     queryKey: ['contact-memory', editTarget?.id],

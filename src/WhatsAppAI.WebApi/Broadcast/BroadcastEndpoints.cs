@@ -22,7 +22,9 @@ public static class BroadcastEndpoints
         group.MapGet("/", ListAsync).WithName("ListBroadcasts");
         group.MapGet("/{id:guid}", GetAsync).WithName("GetBroadcast");
         group.MapPost("/", CreateAsync).WithName("CreateBroadcast");
+        group.MapPut("/{id:guid}", UpdateAsync).WithName("UpdateBroadcast");
         group.MapPost("/{id:guid}/dispatch", DispatchAsync).WithName("DispatchBroadcast");
+        group.MapPost("/{id:guid}/retry-failed", RetryFailedAsync).WithName("RetryFailedBroadcast");
         group.MapPost("/{id:guid}/cancel", CancelAsync).WithName("CancelBroadcast");
         group.MapDelete("/{id:guid}", DeleteAsync).WithName("DeleteBroadcast");
 
@@ -96,6 +98,16 @@ public static class BroadcastEndpoints
         var contactIds = request.ContactIds.Distinct().ToList();
         var tenantId = currentTenant.TenantId.Value;
 
+        Guid? queueId = null;
+        if (request.QueueId.HasValue)
+        {
+            var queueExists = await db.ServiceLines
+                .AnyAsync(q => q.Id == request.QueueId.Value && q.TenantId == tenantId && q.IsActive);
+            if (!queueExists)
+                return Results.BadRequest(new { error = "Queue not found or does not belong to this tenant." });
+            queueId = request.QueueId.Value;
+        }
+
         var validContacts = await db.Contacts
             .IgnoreQueryFilters()
             .Where(c => c.TenantId == tenantId && contactIds.Contains(c.Id))
@@ -109,7 +121,8 @@ public static class BroadcastEndpoints
             tenantId,
             request.Name,
             request.Message,
-            currentTenant.UserId.Value);
+            currentTenant.UserId.Value,
+            queueId);
 
         await broadcastRepo.AddAsync(broadcast);
 
@@ -122,6 +135,37 @@ public static class BroadcastEndpoints
         return Results.Created($"/api/broadcasts/{broadcast.Id}", ToDto(broadcast));
     }
 
+    // PUT /api/broadcasts/{id}
+    private static async Task<IResult> UpdateAsync(
+        Guid id,
+        [FromBody] UpdateBroadcastRequest request,
+        ICurrentTenant currentTenant,
+        IBroadcastRepository broadcastRepo)
+    {
+        if (currentTenant.TenantId is null) return Results.Unauthorized();
+
+        var broadcast = await broadcastRepo.GetByIdAsync(id);
+        if (broadcast is null || broadcast.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+
+        if (string.IsNullOrWhiteSpace(request.Message))
+            return Results.BadRequest(new { error = "Message is required." });
+        if (request.Message.Length > 4096)
+            return Results.BadRequest(new { error = "Message must be at most 4096 characters." });
+
+        try
+        {
+            broadcast.UpdateMessage(request.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+
+        await broadcastRepo.UpdateAsync(broadcast);
+        return Results.Ok(ToDto(broadcast));
+    }
+
     // POST /api/broadcasts/{id}/dispatch
     private static async Task<IResult> DispatchAsync(
         Guid id,
@@ -130,7 +174,6 @@ public static class BroadcastEndpoints
         IBroadcastRepository broadcastRepo,
         IWhatsAppAccountRepository accountRepo,
         ITenantMembershipRepository membershipRepo,
-        AppDbContext dbContext,
         IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -188,20 +231,80 @@ public static class BroadcastEndpoints
         if (totalCount == 0)
             return Results.BadRequest(new { error = "No recipients found for this broadcast." });
 
-        Guid? queueId = null;
-        if (request.QueueId.HasValue)
-        {
-            var queueExists = await dbContext.ServiceLines
-                .AnyAsync(q => q.Id == request.QueueId.Value && q.TenantId == tenantId && q.IsActive);
-            if (!queueExists)
-                return Results.BadRequest(new { error = "Queue not found or does not belong to this tenant." });
-            queueId = request.QueueId.Value;
-        }
-
-        broadcast.StartDispatch(request.LinePhoneNumberId, totalCount, queueId);
+        broadcast.StartDispatch(request.LinePhoneNumberId, totalCount);
         await broadcastRepo.UpdateAsync(broadcast);
 
         // Notify via SignalR
+        await hub.Clients.Group($"tenant:{tenantId}")
+            .SendAsync(BroadcastHubEvents.BroadcastUpdated, ToDto(broadcast));
+
+        return Results.Ok(ToDto(broadcast));
+    }
+
+    // POST /api/broadcasts/{id}/retry-failed
+    private static async Task<IResult> RetryFailedAsync(
+        Guid id,
+        ICurrentTenant currentTenant,
+        IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepo,
+        ITenantMembershipRepository membershipRepo,
+        IHubContext<InboxHub> hub)
+    {
+        if (currentTenant.TenantId is null) return Results.Unauthorized();
+
+        var tenantId = currentTenant.TenantId.Value;
+        var broadcast = await broadcastRepo.GetByIdAsync(id);
+        if (broadcast is null || broadcast.TenantId != tenantId)
+            return Results.NotFound();
+
+        if (broadcast.Status != BroadcastStatus.Completed)
+            return Results.BadRequest(new { error = "Only completed broadcasts can retry failed recipients." });
+
+        var active = await broadcastRepo.GetActiveSendingAsync(tenantId);
+        if (active is not null)
+            return Results.BadRequest(new { error = "There is already a broadcast in progress." });
+
+        var accounts = await accountRepo.GetAllByTenantAsync(tenantId);
+        var line = accounts.FirstOrDefault(a =>
+            a.PhoneNumberId == broadcast.LinePhoneNumberId
+            && a.ConnectionType == WhatsAppConnectionType.QrCode
+            && a.IsActive);
+
+        if (line is null)
+            return Results.BadRequest(new { error = "The broadcast QR Code line is not active." });
+
+        if (currentTenant.UserRole == "Operator")
+        {
+            if (currentTenant.UserId is null)
+                return Results.Forbid();
+
+            var membership = await membershipRepo.GetByUserAndTenantAsync(
+                currentTenant.UserId.Value,
+                tenantId);
+            membership?.LoadAssignedLinesFromJson();
+
+            var hasAssignedLine = membership is not null &&
+                (membership.AssignedLines.Any(assigned =>
+                    assigned.ConnectionType == WhatsAppConnectionType.QrCode &&
+                    assigned.LineNumber == line.LineNumber) ||
+                 (membership.AssignedLines.Count == 0 &&
+                  membership.AssignedConnectionType == WhatsAppConnectionType.QrCode &&
+                  membership.AssignedLineNumber == line.LineNumber));
+
+            if (!hasAssignedLine)
+                return Results.Forbid();
+        }
+
+        var failedRecipients = await broadcastRepo.GetFailedRecipientsAsync(id);
+        if (failedRecipients.Count == 0)
+            return Results.BadRequest(new { error = "No failed recipients found for this broadcast." });
+
+        foreach (var recipient in failedRecipients)
+            recipient.Retry();
+
+        broadcast.PrepareRetry(failedRecipients.Count);
+        await broadcastRepo.UpdateAsync(broadcast);
+
         await hub.Clients.Group($"tenant:{tenantId}")
             .SendAsync(BroadcastHubEvents.BroadcastUpdated, ToDto(broadcast));
 
@@ -274,10 +377,15 @@ public sealed record CreateBroadcastRequest
     public string Name { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
     public List<Guid> ContactIds { get; init; } = [];
+    public Guid? QueueId { get; init; }
 }
 
 public sealed record DispatchBroadcastRequest
 {
     public string LinePhoneNumberId { get; init; } = string.Empty;
-    public Guid? QueueId { get; init; }
+}
+
+public sealed record UpdateBroadcastRequest
+{
+    public string Message { get; init; } = string.Empty;
 }

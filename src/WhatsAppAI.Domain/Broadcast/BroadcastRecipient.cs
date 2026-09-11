@@ -40,6 +40,16 @@ public sealed class BroadcastRecipient
         Status = BroadcastRecipientStatus.Failed;
         ErrorMessage = error;
     }
+
+    public void Retry()
+    {
+        if (Status != BroadcastRecipientStatus.Failed)
+            throw new InvalidOperationException("Only failed recipients can be retried.");
+
+        Status = BroadcastRecipientStatus.Pending;
+        ErrorMessage = null;
+        SentAt = null;
+    }
 }
 
 public enum BroadcastRecipientStatus

@@ -23,7 +23,8 @@ public sealed class BroadcastList
         Guid tenantId,
         string name,
         string message,
-        Guid createdByUserId)
+        Guid createdByUserId,
+        Guid? queueId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
@@ -39,12 +40,13 @@ public sealed class BroadcastList
             Name = name.Trim(),
             Message = message,
             Status = BroadcastStatus.Draft,
+            QueueId = queueId,
             CreatedByUserId = createdByUserId,
             CreatedAt = DateTime.UtcNow,
         };
     }
 
-    public void StartDispatch(string linePhoneNumberId, int totalCount, Guid? queueId = null)
+    public void StartDispatch(string linePhoneNumberId, int totalCount)
     {
         if (Status != BroadcastStatus.Draft)
             throw new InvalidOperationException("Only draft broadcasts can be dispatched.");
@@ -54,10 +56,34 @@ public sealed class BroadcastList
             throw new ArgumentException("At least one recipient required.", nameof(totalCount));
 
         LinePhoneNumberId = linePhoneNumberId;
-        QueueId = queueId;
         TotalCount = totalCount;
         Status = BroadcastStatus.Sending;
         StartedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateMessage(string message)
+    {
+        if (Status != BroadcastStatus.Draft)
+            throw new InvalidOperationException("Only draft broadcasts can be edited.");
+        if (string.IsNullOrWhiteSpace(message))
+            throw new ArgumentException("Message is required.", nameof(message));
+        if (message.Length > 4096)
+            throw new ArgumentException("Message must be at most 4096 characters.", nameof(message));
+
+        Message = message;
+    }
+
+    public void PrepareRetry(int failedRecipientCount)
+    {
+        if (Status != BroadcastStatus.Completed)
+            throw new InvalidOperationException("Only completed broadcasts can retry failed recipients.");
+        if (failedRecipientCount < 1 || failedRecipientCount > FailedCount)
+            throw new ArgumentException("The failed recipient count is invalid.", nameof(failedRecipientCount));
+
+        FailedCount -= failedRecipientCount;
+        Status = BroadcastStatus.Sending;
+        StartedAt = DateTime.UtcNow;
+        FinishedAt = null;
     }
 
     public void RecordSent()
