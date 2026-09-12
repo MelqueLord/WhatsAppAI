@@ -121,6 +121,7 @@ public sealed class AiOrchestrationWorker(
         var modelEvaluationRepository = scopedServices.GetRequiredService<IModelEvaluationRepository>();
         var auditLogRepository = scopedServices.GetRequiredService<IAuditLogRepository>();
         var handoffEventRepository = scopedServices.GetRequiredService<IHandoffEventRepository>();
+        var realtimeNotifier = scopedServices.GetRequiredService<IRealtimeNotifier>();
         long monthlyAiResponsesUsed = 0;
         int? effectiveMonthlyAiResponseLimit = null;
 
@@ -236,7 +237,7 @@ public sealed class AiOrchestrationWorker(
                             message, conversation, botConfig, simpleModeQueues,
                             dbContext, messageRepository, conversationRepository,
                             outboxRepository, handoffEventRepository, tagRepository,
-                            contactTagRepository, includeWaitingResponse: true,
+                            contactTagRepository, realtimeNotifier, includeWaitingResponse: true,
                             cancellationToken: cancellationToken))
                     {
                         return;
@@ -420,7 +421,7 @@ public sealed class AiOrchestrationWorker(
                     message, conversation, botConfig, activeQueues,
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
-                    contactTagRepository, includeWaitingResponse: false,
+                    contactTagRepository, realtimeNotifier, includeWaitingResponse: false,
                     cancellationToken: cancellationToken,
                     authorizedQueues: routingQueues))
             {
@@ -711,13 +712,20 @@ public sealed class AiOrchestrationWorker(
                         "ai-queue-transfer",
                         dbContext,
                         cancellationToken);
-                    await ApplyQueueTagAsync(
+                    if (await ApplyQueueTagAsync(
                         message.TenantId,
                         message.ContactId,
-                        selectedRoutingQueue.Name,
+                        selectedRoutingQueue,
                         tagRepository,
                         contactTagRepository,
-                        cancellationToken);
+                        cancellationToken))
+                    {
+                        await realtimeNotifier.NotifyTenantAsync(
+                            message.TenantId,
+                            "ConversationUpdated",
+                            new { conversationId = message.ConversationId },
+                            cancellationToken);
+                    }
                     logger.LogInformation(
                         "Conversation {ConversationId} auto-assigned to queue {QueueName} while remaining automatic",
                         conversation.Id,
@@ -918,7 +926,7 @@ public sealed class AiOrchestrationWorker(
                     message, conversation, botConfig, activeQueues,
                     dbContext, messageRepository, conversationRepository,
                     outboxRepository, handoffEventRepository, tagRepository,
-                    contactTagRepository, includeWaitingResponse: true,
+                    contactTagRepository, realtimeNotifier, includeWaitingResponse: true,
                     cancellationToken: cancellationToken,
                     authorizedQueues: routingQueues))
             {
@@ -1267,6 +1275,7 @@ public sealed class AiOrchestrationWorker(
         IHandoffEventRepository handoffEventRepository,
         IClientTagRepository tagRepository,
         IContactTagRepository contactTagRepository,
+        IRealtimeNotifier realtimeNotifier,
         bool includeWaitingResponse,
         CancellationToken cancellationToken,
         IReadOnlyList<ServiceLine>? authorizedQueues = null)
@@ -1308,13 +1317,20 @@ public sealed class AiOrchestrationWorker(
             isWaitingInCurrentQueue ? "queue-waiting" : "queue-transfer",
             dbContext,
             cancellationToken);
-        await ApplyQueueTagAsync(
+        if (await ApplyQueueTagAsync(
             message.TenantId,
             message.ContactId,
-            selectedQueue.Name,
+            selectedQueue,
             tagRepository,
             contactTagRepository,
-            cancellationToken);
+            cancellationToken))
+        {
+            await realtimeNotifier.NotifyTenantAsync(
+                message.TenantId,
+                "ConversationUpdated",
+                new { conversationId = message.ConversationId },
+                cancellationToken);
+        }
         return true;
     }
 
@@ -1383,28 +1399,35 @@ public sealed class AiOrchestrationWorker(
         }
     }
 
-    private static async Task ApplyQueueTagAsync(
+    internal static async Task<bool> ApplyQueueTagAsync(
         Guid tenantId,
         Guid contactId,
-        string? queueName,
+        ServiceLine queue,
         IClientTagRepository tagRepository,
         IContactTagRepository contactTagRepository,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(queueName))
-            return;
+        if (string.IsNullOrWhiteSpace(queue.Name))
+            return false;
 
-        var allTenantTags = await tagRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
+        var allTenantTags = await tagRepository.GetByTenantAsync(tenantId, cancellationToken);
         var queueTag = allTenantTags.FirstOrDefault(tag =>
-            tag.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
-        if (queueTag is null ||
+            tag.Name.Equals(queue.Name, StringComparison.OrdinalIgnoreCase));
+        if (queueTag is null)
+        {
+            queueTag = ClientTag.Create(tenantId, queue.Name, queue.Color);
+            await tagRepository.AddAsync(queueTag, cancellationToken);
+        }
+
+        if (!queueTag.IsActive ||
             await contactTagRepository.ExistsAsync(tenantId, contactId, queueTag.Id, cancellationToken))
         {
-            return;
+            return false;
         }
 
         await contactTagRepository.AddAsync(
             ContactTag.Create(contactId, queueTag.Id, tenantId), cancellationToken);
+        return true;
     }
 
     internal static ServiceLine? SelectBotRoutingQueue(

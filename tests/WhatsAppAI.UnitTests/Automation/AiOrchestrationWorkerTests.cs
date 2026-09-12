@@ -150,6 +150,36 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
+    public async Task ApplyQueueTagAsync_CreatesAndAssociatesTheQueueTagOnlyOnce()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var tenantId = Guid.NewGuid();
+        var contact = Contact.Create(tenantId, "+5511999999999");
+        var queue = ServiceLine.Create(tenantId, "Suporte", color: "#4F46E5");
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        await using var db = new AppDbContext(options, new TestCurrentTenant(tenantId));
+        await db.Database.EnsureCreatedAsync();
+        db.Contacts.Add(contact);
+        await db.SaveChangesAsync();
+
+        var tags = new ClientTagRepository(db);
+        var contactTags = new ContactTagRepository(db);
+
+        var assigned = await AiOrchestrationWorker.ApplyQueueTagAsync(
+            tenantId, contact.Id, queue, tags, contactTags, CancellationToken.None);
+        var repeated = await AiOrchestrationWorker.ApplyQueueTagAsync(
+            tenantId, contact.Id, queue, tags, contactTags, CancellationToken.None);
+
+        var tag = Assert.Single(await db.ClientTags.IgnoreQueryFilters().ToListAsync());
+        Assert.True(assigned);
+        Assert.False(repeated);
+        Assert.Equal("Suporte", tag.Name);
+        Assert.Equal("#4F46E5", tag.Color);
+        Assert.Single(await db.ContactTags.IgnoreQueryFilters().ToListAsync());
+    }
+
+    [Fact]
     public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndLetsExplicitKeywordReplacePriorAssignment()
     {
         var tenantId = Guid.NewGuid();
