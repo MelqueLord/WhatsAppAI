@@ -1229,8 +1229,13 @@ public sealed class AiOrchestrationWorker(
         return "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
     }
 
-    internal static string ResolveQueueWaitingMessage(ServiceLine queue) =>
-        $"Aguarde, você está na fila {queue.Name} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.";
+    internal static string ResolveQueueWaitingMessage(ServiceLine queue)
+    {
+        if (!string.IsNullOrWhiteSpace(queue.InteractionReply))
+            return AiOutputSafetyPolicy.LimitReply(queue.InteractionReply);
+
+        return $"Aguarde, você está na fila {queue.Name} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.";
+    }
 
     internal static AiResponse ApplyGreetingPolicy(
         AiResponse response,

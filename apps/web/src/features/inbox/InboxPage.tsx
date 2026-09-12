@@ -16,6 +16,7 @@ export function InboxPage() {
   const openConversationId: string | undefined = (location.state as { conversationId?: string } | null)?.conversationId
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [showMobileList, setShowMobileList] = useState(true)
+  const [conversationStatusFilter, setConversationStatusFilter] = useState<'Open' | 'Closed'>('Open')
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -62,9 +63,12 @@ export function InboxPage() {
     setShowMobileList(false)
   }
 
-  const handleBack = () => {
+  const handleBack = (showClosed = false) => {
     setShowMobileList(true)
     setSelectedConversation(null)
+    if (showClosed) {
+      setConversationStatusFilter('Closed')
+    }
   }
 
   return (
@@ -88,6 +92,8 @@ export function InboxPage() {
           <ConversationList
             selectedId={selectedConversation?.id}
             onSelect={handleSelect}
+            statusFilter={conversationStatusFilter}
+            onStatusFilterChange={setConversationStatusFilter}
           />
         </div>
 
@@ -103,7 +109,7 @@ export function InboxPage() {
               key={selectedConversation.id}
               conversation={selectedConversation}
               onBack={handleBack}
-              onConversationClosed={handleBack}
+              onConversationClosed={() => handleBack(true)}
             />
           ) : (
             <EmptyState isConnected={isConnected} />

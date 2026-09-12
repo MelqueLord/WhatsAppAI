@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS whatsappai.service_queues (
     color character varying(20),
     keywords character varying(500),
     transfer_notice character varying(160),
+    interaction_reply character varying(160),
     sort_order integer NOT NULL,
     is_active boolean NOT NULL,
     created_at timestamp with time zone NOT NULL,

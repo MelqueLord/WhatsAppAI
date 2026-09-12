@@ -13,7 +13,7 @@ public sealed class ServiceQueueTransferNoticeEndpointsTests(TestWebApplicationF
     : IClassFixture<TestWebApplicationFactory>
 {
     [Fact]
-    public async Task TransferNotice_IsPersistedReturnedAndTenantScoped()
+    public async Task QueueMessages_ArePersistedReturnedAndTenantScoped()
     {
         var first = await CreateTenantOwnerAsync();
         var second = await CreateTenantOwnerAsync();
@@ -25,7 +25,8 @@ public sealed class ServiceQueueTransferNoticeEndpointsTests(TestWebApplicationF
             color = "#4F46E5",
             sortOrder = 0,
             keywords = "suporte, técnico",
-            transferNotice = "Você será atendido pela nossa equipe de suporte."
+            transferNotice = "Você será atendido pela nossa equipe de suporte.",
+            interactionReply = "Recebemos sua mensagem. Nossa equipe retornará em breve."
         });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>();
         var queueId = created.GetProperty("id").GetGuid();
@@ -38,7 +39,8 @@ public sealed class ServiceQueueTransferNoticeEndpointsTests(TestWebApplicationF
             color = "#4F46E5",
             sortOrder = 0,
             keywords = "",
-            transferNotice = "Não deve ser gravada."
+            transferNotice = "Não deve ser gravada.",
+            interactionReply = "Não deve ser gravada."
         });
         var secondList = await second.Client.GetFromJsonAsync<JsonElement[]>("/api/service-queues");
 
@@ -47,6 +49,8 @@ public sealed class ServiceQueueTransferNoticeEndpointsTests(TestWebApplicationF
         Assert.Single(firstList!);
         Assert.Equal("Você será atendido pela nossa equipe de suporte.",
             firstList[0].GetProperty("transferNotice").GetString());
+        Assert.Equal("Recebemos sua mensagem. Nossa equipe retornará em breve.",
+            firstList[0].GetProperty("interactionReply").GetString());
         Assert.Equal(HttpStatusCode.NotFound, crossTenantUpdate.StatusCode);
         Assert.NotNull(secondList);
         Assert.Empty(secondList!);

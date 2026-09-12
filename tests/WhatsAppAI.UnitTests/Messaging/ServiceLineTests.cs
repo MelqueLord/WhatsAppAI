@@ -38,4 +38,18 @@ public sealed class ServiceLineTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             queue.SetTransferNotice(new string('a', ServiceLine.TransferNoticeMaxLength + 1)));
     }
+
+    [Fact]
+    public void SetInteractionReply_NormalizesBlankTextAndRejectsLongMessages()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
+
+        queue.SetInteractionReply("  Aguarde enquanto nossa equipe analisa sua solicitação.  ");
+        Assert.Equal("Aguarde enquanto nossa equipe analisa sua solicitação.", queue.InteractionReply);
+
+        queue.SetInteractionReply(" ");
+        Assert.Null(queue.InteractionReply);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            queue.SetInteractionReply(new string('a', ServiceLine.InteractionReplyMaxLength + 1)));
+    }
 }

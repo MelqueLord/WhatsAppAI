@@ -38,7 +38,8 @@ public static class ServiceLineEndpoints
         {
             id = q.Id, name = q.Name, description = q.Description,
             color = q.Color, sortOrder = q.SortOrder, isActive = q.IsActive,
-            keywords = q.Keywords, transferNotice = q.TransferNotice
+            keywords = q.Keywords, transferNotice = q.TransferNotice,
+            interactionReply = q.InteractionReply
         }));
     }
 
@@ -51,12 +52,15 @@ public static class ServiceLineEndpoints
             return Results.BadRequest(new { error = "Name is required." });
         if (request.TransferNotice?.Trim().Length > ServiceLine.TransferNoticeMaxLength)
             return Results.BadRequest(new { error = $"Transfer notice must contain at most {ServiceLine.TransferNoticeMaxLength} characters." });
+        if (request.InteractionReply?.Trim().Length > ServiceLine.InteractionReplyMaxLength)
+            return Results.BadRequest(new { error = $"Interaction reply must contain at most {ServiceLine.InteractionReplyMaxLength} characters." });
 
         var queue = ServiceLine.Create(
             currentTenant.TenantId.Value, request.Name,
             request.Description, request.Color, request.SortOrder);
         queue.SetKeywords(request.Keywords);
         queue.SetTransferNotice(request.TransferNotice);
+        queue.SetInteractionReply(request.InteractionReply);
         await repo.AddAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -70,10 +74,13 @@ public static class ServiceLineEndpoints
         if (queue is null || queue.TenantId != currentTenant.TenantId) return Results.NotFound();
         if (request.TransferNotice?.Trim().Length > ServiceLine.TransferNoticeMaxLength)
             return Results.BadRequest(new { error = $"Transfer notice must contain at most {ServiceLine.TransferNoticeMaxLength} characters." });
+        if (request.InteractionReply?.Trim().Length > ServiceLine.InteractionReplyMaxLength)
+            return Results.BadRequest(new { error = $"Interaction reply must contain at most {ServiceLine.InteractionReplyMaxLength} characters." });
 
         queue.Update(request.Name, request.Description, request.Color, request.SortOrder);
         queue.SetKeywords(request.Keywords);
         queue.SetTransferNotice(request.TransferNotice);
+        queue.SetInteractionReply(request.InteractionReply);
         await repo.UpdateAsync(queue);
         return Results.Ok(new { id = queue.Id });
     }
@@ -166,6 +173,6 @@ public static class ServiceLineEndpoints
     }
 }
 
-public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice);
-public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice);
+public sealed record CreateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice, string? InteractionReply);
+public sealed record UpdateQueueRequest(string Name, string? Description, string? Color, int SortOrder, string? Keywords, string? TransferNotice, string? InteractionReply);
 public sealed record AssignQueueRequest(Guid? QueueId);

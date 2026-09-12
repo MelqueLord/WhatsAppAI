@@ -304,6 +304,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-079:** gerar respostas de atendimento naturais, curtas e contextuais, usando o histórico, o tom e a identidade do tenant sem repetir saudações, perguntas já respondidas ou frases burocráticas; a naturalidade não pode alterar fatos autorizados nem ultrapassar 160 caracteres.
 - **FR-080:** validar antes do envio que valores concretos produzidos pela IA — preço, horário, prazo, percentual, data, link ou contato — aparecem no contexto autorizado do tenant; quando não houver correspondência, bloquear a resposta e aplicar handoff seguro, exceto em pesquisa pública explicitamente permitida para pergunta genérica.
 - **FR-081:** apresentar o BOT como controle principal da automação e a IA como sua estratégia inteligente: ativar IA também mantém o BOT ativo; desativar IA em plano com BOT troca para respostas fixas sem interromper a automação; desligar o BOT pausa qualquer estratégia automática.
+- **FR-082:** permitir ao TenantOwner configurar por fila uma mensagem opcional de espera, enviada quando um contato já atribuído àquela fila interagir novamente e não houver uma resposta automática mais específica; a configuração e o envio permanecem isolados ao tenant e não alteram o modo da conversa.
 
 ## 6. Regras de negócio
 
@@ -357,6 +358,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-048:** a política de conversa natural deve responder primeiro ao pedido atual, aproveitar até o histórico autorizado, evitar repetição e usar no máximo uma pergunta útil; ela modifica somente linguagem e estrutura, nunca cria fatos nem substitui as regras de segurança, handoff ou limite de 160 caracteres.
 - **BR-049:** nenhuma resposta com valor concreto não encontrado nas fontes autorizadas pode ser enfileirada para o cliente. A validação ocorre depois das tentativas de inferência e antes da criação da mensagem/Outbox; quando bloquear, usa `out_of_scope`, preserva pedido humano e segurança, e não impede resposta pública genérica autorizada.
 - **BR-050:** `SimpleAutoReply` e `AiPowered` são estratégias internas mutuamente exclusivas para garantir uma única resposta por mensagem, mas não são recursos concorrentes na interface: em `AiPowered`, BOT e IA aparecem ativos; ao desligar somente a IA, planos com capacidade de BOT permanecem habilitados em `SimpleAutoReply`, enquanto planos sem BOT retornam a `Manual`.
+- **BR-051:** a mensagem de espera de uma fila é opcional e limitada a 160 caracteres; quando configurada, substitui somente o aviso genérico de espera da própria fila. Respostas válidas da IA, mensagens fora do expediente, pedido explícito de humano e regras de segurança mantêm precedência.
 
 ## 7. Requisitos não funcionais
 

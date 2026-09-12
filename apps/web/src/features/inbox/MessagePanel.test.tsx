@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessagePanel } from './MessagePanel'
-import type { Conversation } from '../../lib/api'
+import type { Conversation, CursorPaginationResponse } from '../../lib/api'
 import { formatDate, formatTime } from '../../lib/utils'
 
 const apiMock = vi.hoisted(() => ({
@@ -14,6 +14,7 @@ const apiMock = vi.hoisted(() => ({
   },
   serviceQueues: {
     list: vi.fn(),
+    assign: vi.fn(),
   },
   contacts: {
     create: vi.fn(),
@@ -22,13 +23,15 @@ const apiMock = vi.hoisted(() => ({
 
 vi.mock('../../lib/api', () => ({ api: apiMock }))
 
+const authMock = vi.hoisted(() => ({
+  user: {
+    automaticDistributionEnabled: false,
+    tagsEnabled: false,
+  },
+}))
+
 vi.mock('../../lib/auth', () => ({
-  useAuth: () => ({
-    user: {
-      automaticDistributionEnabled: false,
-      tagsEnabled: false,
-    },
-  }),
+  useAuth: () => ({ user: authMock.user }),
 }))
 
 vi.mock('../../lib/signalr', () => ({
@@ -66,7 +69,7 @@ function renderPanel(conversation = createConversation(), onConversationClosed =
     </QueryClientProvider>,
   )
 
-  return { onConversationClosed }
+  return { onConversationClosed, queryClient }
 }
 
 describe('MessagePanel conversation closing', () => {
@@ -81,7 +84,10 @@ describe('MessagePanel conversation closing', () => {
     apiMock.conversations.close.mockReset()
     apiMock.conversations.submitAiFeedback.mockReset()
     apiMock.serviceQueues.list.mockReset()
+    apiMock.serviceQueues.assign.mockReset()
     apiMock.contacts.create.mockReset()
+    authMock.user.automaticDistributionEnabled = false
+    authMock.user.tagsEnabled = false
 
     apiMock.conversations.get.mockResolvedValue({
       ...createConversation(),
@@ -108,6 +114,46 @@ describe('MessagePanel conversation closing', () => {
       expect(apiMock.conversations.get).toHaveBeenCalledWith('conversation-1')
       expect(apiMock.conversations.close).toHaveBeenCalledWith('conversation-1', 2)
       expect(onConversationClosed).toHaveBeenCalledOnce()
+    })
+  })
+
+  it('updates the queue inbox cache immediately after changing a conversation queue', async () => {
+    authMock.user.automaticDistributionEnabled = true
+    apiMock.serviceQueues.list.mockResolvedValue([{
+      id: 'queue-1',
+      name: 'Vendas',
+      sortOrder: 1,
+      isActive: true,
+    }, {
+      id: 'queue-2',
+      name: 'Suporte',
+      sortOrder: 2,
+      isActive: true,
+    }])
+    apiMock.serviceQueues.assign.mockResolvedValue({
+      conversationId: 'conversation-1',
+      queueId: 'queue-2',
+    })
+
+    const { queryClient } = renderPanel({ ...createConversation(), queueId: 'queue-1' })
+    queryClient.setQueryData<CursorPaginationResponse<Conversation>>(
+      ['queue-inbox-conversations'],
+      {
+        items: [{ ...createConversation(), queueId: 'queue-1' }],
+        hasMore: false,
+      },
+    )
+
+    fireEvent.change(await screen.findByLabelText('Fila da conversa'), {
+      target: { value: 'queue-2' },
+    })
+
+    await waitFor(() => {
+      expect(apiMock.serviceQueues.assign).toHaveBeenCalledWith('conversation-1', 'queue-2')
+      const cached = queryClient.getQueryData<CursorPaginationResponse<Conversation>>(
+        ['queue-inbox-conversations'],
+      )
+      expect(cached?.items[0].queueId).toBe('queue-2')
     })
   })
 

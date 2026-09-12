@@ -139,6 +139,17 @@ public sealed class AiOrchestrationWorkerTests
     }
 
     [Fact]
+    public void ResolveQueueWaitingMessage_PrefersConfiguredInteractionReply()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte Técnico");
+        queue.SetInteractionReply("Recebemos sua mensagem. O suporte retornará em breve.");
+
+        Assert.Equal(
+            "Recebemos sua mensagem. O suporte retornará em breve.",
+            AiOrchestrationWorker.ResolveQueueWaitingMessage(queue));
+    }
+
+    [Fact]
     public void SelectBotRoutingQueue_UsesAuthorizedKeywordQueueAndLetsExplicitKeywordReplacePriorAssignment()
     {
         var tenantId = Guid.NewGuid();

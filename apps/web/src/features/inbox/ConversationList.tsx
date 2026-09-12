@@ -8,6 +8,8 @@ import { MessageCircle, Search, Bot, User, Pause, Loader2, Filter } from 'lucide
 interface ConversationListProps {
   selectedId?: string
   onSelect: (conversation: Conversation) => void
+  statusFilter?: 'Open' | 'Closed'
+  onStatusFilterChange?: (status: 'Open' | 'Closed') => void
 }
 
 function lineLabel(line: LineAssignment) {
@@ -15,13 +17,24 @@ function lineLabel(line: LineAssignment) {
   return `${type} ${line.lineNumber}`
 }
 
-export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
+export function ConversationList({
+  selectedId,
+  onSelect,
+  statusFilter: controlledStatusFilter,
+  onStatusFilterChange,
+}: ConversationListProps) {
   const { isTenantOwner, user } = useAuth()
   const queuesEnabled = user?.automaticDistributionEnabled === true
   const [search, setSearch] = useState('')
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
   const [queueFilter, setQueueFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<'Open' | 'Closed'>('Open')
+  const [internalStatusFilter, setInternalStatusFilter] = useState<'Open' | 'Closed'>('Open')
+  const statusFilter = controlledStatusFilter ?? internalStatusFilter
+
+  const setStatusFilter = (status: 'Open' | 'Closed') => {
+    setInternalStatusFilter(status)
+    onStatusFilterChange?.(status)
+  }
 
   // For operators with multiple lines: which line tab is selected (null = all)
   const assignedLines = user?.assignedLines ?? []

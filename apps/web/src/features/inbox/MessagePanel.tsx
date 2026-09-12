@@ -1,7 +1,12 @@
 import { Fragment, useState, useRef, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type Conversation, type ServiceQueue } from '../../lib/api'
+import {
+  api,
+  type Conversation,
+  type CursorPaginationResponse,
+  type ServiceQueue,
+} from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatDate, formatTime, isSameCalendarDay } from '../../lib/utils'
 import { TagAssigner } from '../../components/TagAssigner'
@@ -181,7 +186,44 @@ export function MessagePanel({
       api.serviceQueues.assign(conversation.id, queueId),
     onSuccess: (data) => {
       setSelectedQueueId(data.queueId ?? '')
+
+      const selectedQueue = serviceQueues.find((queue) => queue.id === data.queueId)
+      const updateCachedConversation = (current: CursorPaginationResponse<Conversation> | undefined) => {
+        if (!current) return current
+
+        return {
+          ...current,
+          items: current.items.map((item) => item.id === conversation.id
+            ? {
+                ...item,
+                queueId: data.queueId ?? undefined,
+                queueName: selectedQueue?.name,
+                queueColor: selectedQueue?.color ?? undefined,
+              }
+            : item),
+        }
+      }
+
+      queryClient.setQueryData<Conversation>(['conversation', conversation.id], (current) =>
+        current
+          ? {
+              ...current,
+              queueId: data.queueId ?? undefined,
+              queueName: selectedQueue?.name,
+              queueColor: selectedQueue?.color ?? undefined,
+            }
+          : current,
+      )
+      queryClient.setQueriesData<CursorPaginationResponse<Conversation>>(
+        { queryKey: ['conversations'] },
+        updateCachedConversation,
+      )
+      queryClient.setQueriesData<CursorPaginationResponse<Conversation>>(
+        { queryKey: ['queue-inbox-conversations'] },
+        updateCachedConversation,
+      )
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-inbox-conversations'] })
       queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
     },
   })

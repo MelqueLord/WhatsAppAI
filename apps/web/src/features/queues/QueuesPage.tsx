@@ -12,6 +12,7 @@ interface ServiceQueue {
   isActive: boolean
   keywords: string | null
   transferNotice: string | null
+  interactionReply: string | null
 }
 
 export function QueuesPage() {
@@ -24,6 +25,7 @@ export function QueuesPage() {
   const [sortOrder, setSortOrder] = useState(0)
   const [keywords, setKeywords] = useState('')
   const [transferNotice, setTransferNotice] = useState('')
+  const [interactionReply, setInteractionReply] = useState('')
 
   const { data: queues, isLoading } = useQuery({
     queryKey: ['service-queues'],
@@ -39,7 +41,7 @@ export function QueuesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice, interactionReply }),
       })
       if (!res.ok) throw new Error('Erro ao criar fila')
       return res.json()
@@ -53,7 +55,7 @@ export function QueuesPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice }),
+        body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice, interactionReply }),
       })
       if (!res.ok) throw new Error('Erro ao atualizar fila')
       return res.json()
@@ -72,12 +74,12 @@ export function QueuesPage() {
 
   const resetForm = () => {
     setShowForm(false); setEditing(null)
-    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords(''); setTransferNotice('')
+    setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords(''); setTransferNotice(''); setInteractionReply('')
   }
 
   const startEdit = (q: ServiceQueue) => {
     setEditing(q); setName(q.name); setDescription(q.description || '')
-    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setTransferNotice(q.transferNotice || ''); setShowForm(true)
+    setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setTransferNotice(q.transferNotice || ''); setInteractionReply(q.interactionReply || ''); setShowForm(true)
   }
 
   return (
@@ -118,6 +120,12 @@ export function QueuesPage() {
                 className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
               <p className="mt-1 text-xs text-slate-500">Enviada ao cliente ao entrar nesta fila. Em branco, usa a mensagem geral. {transferNotice.length}/160</p>
             </div>
+            <div className="md:col-span-2">
+              <textarea value={interactionReply} onChange={(e) => setInteractionReply(e.target.value)} maxLength={160}
+                placeholder="Resposta quando o cliente interagir nesta fila (opcional)" rows={2}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              <p className="mt-1 text-xs text-slate-500">Enviada enquanto o cliente aguarda nesta fila, quando não houver uma resposta automática mais específica. {interactionReply.length}/160</p>
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button onClick={() => editing ? updateMutation.mutate(editing) : createMutation.mutate()}
@@ -148,6 +156,7 @@ export function QueuesPage() {
                 {q.description && <p className="text-sm text-slate-500 truncate">{q.description}</p>}
                 {q.keywords && <p className="text-xs text-indigo-500 truncate mt-0.5">Palavras-chave: {q.keywords}</p>}
                 {q.transferNotice && <p className="text-xs text-emerald-600 truncate mt-0.5">Aviso ao cliente: {q.transferNotice}</p>}
+                {q.interactionReply && <p className="text-xs text-cyan-600 truncate mt-0.5">Resposta na fila: {q.interactionReply}</p>}
               </div>
               <span className="text-xs text-slate-400">#{q.sortOrder}</span>
               <div className="flex gap-1">

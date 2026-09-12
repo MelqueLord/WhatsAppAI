@@ -93,6 +93,7 @@ export interface ServiceQueue {
   sortOrder: number
   isActive: boolean
   transferNotice?: string | null
+  interactionReply?: string | null
 }
 
 export interface Message {

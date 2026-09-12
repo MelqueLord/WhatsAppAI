@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,11 +21,26 @@ vi.mock('../../lib/signalr', () => ({
 }))
 
 vi.mock('./ConversationList', () => ({
-  ConversationList: () => <div>Lista de conversas</div>,
+  ConversationList: ({ onSelect, statusFilter, onStatusFilterChange }: {
+    onSelect: (conversation: { id: string }) => void
+    statusFilter: 'Open' | 'Closed'
+    onStatusFilterChange: (status: 'Open' | 'Closed') => void
+  }) => (
+    <div>
+      <div data-testid="conversation-status">{statusFilter}</div>
+      <button onClick={() => onStatusFilterChange('Closed')}>Filtrar encerradas</button>
+      <button onClick={() => onSelect({ id: 'conversation-1' })}>Abrir conversa</button>
+    </div>
+  ),
 }))
 
 vi.mock('./MessagePanel', () => ({
-  MessagePanel: () => <div>Painel da conversa</div>,
+  MessagePanel: ({ onConversationClosed }: { onConversationClosed?: () => void }) => (
+    <div>
+      <div>Painel da conversa</div>
+      <button onClick={() => onConversationClosed?.()}>Encerrar conversa</button>
+    </div>
+  ),
 }))
 
 function renderPage() {
@@ -59,5 +74,14 @@ describe('InboxPage', () => {
     renderPage()
 
     expect(screen.getByText('Reconectando ao servidor...')).toBeInTheDocument()
+  })
+
+  it('switches to closed conversations after closing the selected conversation', () => {
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir conversa' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar conversa' }))
+
+    expect(screen.getByTestId('conversation-status')).toHaveTextContent('Closed')
   })
 })
