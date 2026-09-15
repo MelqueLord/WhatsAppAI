@@ -10,14 +10,25 @@ public static class HumanHandoffRequestPolicy
 
     private static readonly string[] HumanRequestTerms =
     [
-        "atendente",
         "atendimento humano",
+        "falar com atendente",
+        "falar com um atendente",
+        "conversar com atendente",
+        "conversar com um atendente",
+        "quero atendente",
+        "quero um atendente",
+        "preciso de um atendente",
+        "chamar um atendente",
         "quero falar com uma pessoa",
         "falar com humano",
         "falar com uma pessoa",
         "falar com alguem",
         "falar com alguém",
-        "operador",
+        "falar com operador",
+        "falar com um operador",
+        "conversar com operador",
+        "conversar com um operador",
+        "preciso de um operador",
         "quero um humano",
         "quero um operador"
     ];
@@ -26,7 +37,7 @@ public static class HumanHandoffRequestPolicy
     {
         var normalizedMessage = $" {Normalize(messageContent)} ";
         return HumanRequestTerms.Any(term =>
-            normalizedMessage.Contains($" {Normalize(term)}", StringComparison.Ordinal));
+            normalizedMessage.Contains($" {Normalize(term)} ", StringComparison.Ordinal));
     }
 
     public static bool IsHumanQueueName(string queueName)

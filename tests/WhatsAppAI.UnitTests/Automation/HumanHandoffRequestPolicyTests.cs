@@ -8,6 +8,8 @@ public sealed class HumanHandoffRequestPolicyTests
     [Theory]
     [InlineData("Quero falar com um atendente", true)]
     [InlineData("Preciso de um operador", true)]
+    [InlineData("Não sei qual plano escolher. Somos 4 atendentes e usamos duas linhas.", false)]
+    [InlineData("Precisamos de mais atendentes na nossa equipe", false)]
     [InlineData("Preciso de suporte", false)]
     [InlineData("Aceita cartão?", false)]
     public void IsExplicitHumanRequest_RecognizesOnlyARequestForHumanHelp(
