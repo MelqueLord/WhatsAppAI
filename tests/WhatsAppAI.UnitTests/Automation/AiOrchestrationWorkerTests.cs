@@ -84,7 +84,16 @@ public sealed class AiOrchestrationWorkerTests
     {
         var message = AiOrchestrationWorker.ResolveHandoffMessage(null);
 
-        Assert.Equal("Vou encaminhar voce para um atendente.", message);
+        Assert.Equal("Vou encaminhar sua conversa para alguém da nossa equipe continuar o atendimento.", message);
+    }
+
+    [Theory]
+    [InlineData("customer_request", "Claro. Vou encaminhar sua conversa para alguém da nossa equipe continuar o atendimento.")]
+    [InlineData("complaint", "Sinto que isso tenha acontecido. Vou encaminhar seu relato para a equipe responsável.")]
+    [InlineData("out_of_scope", "Para te orientar corretamente, vou chamar alguém da nossa equipe.")]
+    public void ResolveHandoffMessage_UsesAnEmpathicDefaultForTheReason(string reason, string expected)
+    {
+        Assert.Equal(expected, AiOrchestrationWorker.ResolveHandoffMessage(null, reason));
     }
 
     [Fact]
@@ -124,7 +133,7 @@ public sealed class AiOrchestrationWorkerTests
     {
         var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte");
 
-        Assert.Equal("Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.",
+        Assert.Equal("Vou direcionar sua conversa para a equipe certa. Assim que alguém assumir, seguimos por aqui.",
             AiOrchestrationWorker.ResolveQueueTransferMessage(queue, null));
     }
 
@@ -134,8 +143,16 @@ public sealed class AiOrchestrationWorkerTests
         var queue = ServiceLine.Create(Guid.NewGuid(), "Suporte Técnico");
 
         Assert.Equal(
-            "Aguarde, você está na fila Suporte Técnico para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.",
+            "Sua conversa segue na fila Suporte Técnico. Se quiser mudar de assunto, me diga por aqui.",
             AiOrchestrationWorker.ResolveQueueWaitingMessage(queue));
+    }
+
+    [Fact]
+    public void ResolveQueueWaitingMessage_LimitsTheDefaultWhenQueueNameIsLong()
+    {
+        var queue = ServiceLine.Create(Guid.NewGuid(), new string('A', 100));
+
+        Assert.True(AiOrchestrationWorker.ResolveQueueWaitingMessage(queue).Length <= 160);
     }
 
     [Fact]

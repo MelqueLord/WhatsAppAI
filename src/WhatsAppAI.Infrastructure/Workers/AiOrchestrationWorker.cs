@@ -250,7 +250,7 @@ public sealed class AiOrchestrationWorker(
                             message,
                             conversation,
                             "customer_request",
-                            ResolveHandoffMessage(botConfig),
+                            ResolveHandoffMessage(botConfig, "customer_request"),
                             "simple-human-request",
                             dbContext,
                             messageRepository,
@@ -910,7 +910,7 @@ public sealed class AiOrchestrationWorker(
                 await PersistAutomaticHandoffAsync(
                     message.TenantId, message, conversation,
                     response.Decision.HandoffReason ?? "handoff",
-                    ResolveHandoffMessage(botConfig), "ai-handoff", dbContext,
+                    ResolveHandoffMessage(botConfig, response.Decision.HandoffReason), "ai-handoff", dbContext,
                     messageRepository, conversationRepository, outboxRepository,
                     handoffEventRepository, cancellationToken);
 
@@ -1211,7 +1211,7 @@ public sealed class AiOrchestrationWorker(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    internal static string ResolveHandoffMessage(BotConfiguration? botConfig)
+    internal static string ResolveHandoffMessage(BotConfiguration? botConfig, string? handoffReason = null)
     {
         var handoffMessage = botConfig?.HandoffMessage;
         if (!string.IsNullOrWhiteSpace(handoffMessage))
@@ -1221,7 +1221,14 @@ public sealed class AiOrchestrationWorker(
         if (!string.IsNullOrWhiteSpace(fallbackMessage))
             return AiOutputSafetyPolicy.LimitReply(fallbackMessage);
 
-        return AiOutputSafetyPolicy.LimitReply("Vou encaminhar voce para um atendente.");
+        return AiOutputSafetyPolicy.LimitReply(handoffReason switch
+        {
+            "complaint" => "Sinto que isso tenha acontecido. Vou encaminhar seu relato para a equipe responsável.",
+            "customer_request" => "Claro. Vou encaminhar sua conversa para alguém da nossa equipe continuar o atendimento.",
+            "out_of_scope" or "escalation_needed" => "Para te orientar corretamente, vou chamar alguém da nossa equipe.",
+            "sensitive_topic" or "refund_request" or "legal_issue" => "Para cuidar disso com atenção, vou encaminhar você para alguém da nossa equipe.",
+            _ => "Vou encaminhar sua conversa para alguém da nossa equipe continuar o atendimento."
+        });
     }
 
     internal static string ResolveQueueTransferMessage(BotConfiguration? botConfig)
@@ -1237,7 +1244,7 @@ public sealed class AiOrchestrationWorker(
         if (!string.IsNullOrWhiteSpace(botConfig?.QueueTransferMessage))
             return AiOutputSafetyPolicy.LimitReply(botConfig.QueueTransferMessage);
 
-        return "Estou transferindo seu atendimento para a fila especializada. Por favor, aguarde.";
+        return "Vou direcionar sua conversa para a equipe certa. Assim que alguém assumir, seguimos por aqui.";
     }
 
     internal static string ResolveQueueWaitingMessage(ServiceLine queue)
@@ -1245,7 +1252,8 @@ public sealed class AiOrchestrationWorker(
         if (!string.IsNullOrWhiteSpace(queue.InteractionReply))
             return AiOutputSafetyPolicy.LimitReply(queue.InteractionReply);
 
-        return $"Aguarde, você está na fila {queue.Name} para atendimento. Caso queira mudar seu atendimento, envie o tipo de atendimento que deseja.";
+        return AiOutputSafetyPolicy.LimitReply(
+            $"Sua conversa segue na fila {queue.Name}. Se quiser mudar de assunto, me diga por aqui.");
     }
 
     internal static AiResponse ApplyGreetingPolicy(
