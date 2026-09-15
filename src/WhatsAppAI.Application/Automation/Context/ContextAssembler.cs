@@ -19,11 +19,11 @@ public sealed class ContextAssembler(
     private const int MaxKnowledgeItems = 6;
     private const int MaxKnowledgeItemCharacters = 360;
     private const int MaxBusinessProfileCharacters = 480;
-    private const int MaxResponseExamples = 3;
-    private const int MaxResponseExampleCharacters = 820;
+    private const int MaxResponseExamples = 1;
+    private const int MaxResponseExampleCharacters = 360;
     private const int MaxCustomInstructionsCharacters = 1_100;
     private const int MaxRoutingItems = 4;
-    private const int MaxContextCharacters = 7_000;
+    private const int MaxContextCharacters = 9_000;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -234,6 +234,18 @@ public sealed class ContextAssembler(
         if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
             dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
 
+        var servicePlaybook = BusinessServicePlaybookPolicy.Build(
+            GetProfileValue(configured.ProfileFields, "Objetivo do atendimento"),
+            GetProfileValue(configured.ProfileFields, "Dados para qualificar"),
+            GetProfileValue(configured.ProfileFields, "Processo de atendimento"),
+            GetProfileValue(configured.ProfileFields, "Critérios de encaminhamento"));
+        if (!string.IsNullOrWhiteSpace(servicePlaybook))
+        {
+            dynamicParts.Add((
+                $"Guia operacional específico desta empresa: {servicePlaybook}",
+                980));
+        }
+
         var businessGuide = BusinessProfileGuidePolicy.Build(
             GetProfileValue(configured.ProfileFields, "Tipo de negócio"),
             GetProfileValue(configured.ProfileFields, "Tom de voz"));
@@ -394,6 +406,7 @@ public sealed class ContextAssembler(
         AddProfileField(fields, "público", Get("Público-alvo"), 70);
         AddProfileField(fields, "negócio", Get("Descrição do negócio"), 82);
         AddProfileField(fields, "oferta", Get("Produtos e serviços"), 90);
+        AddProfileField(fields, "objetivo", Get("Objetivo do atendimento"), 72);
         AddProfileField(fields, "horário", Get("Horário de atendimento"), 48);
         AddProfileField(fields, "local", Get("Localização"), 48);
 

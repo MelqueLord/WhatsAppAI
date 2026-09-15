@@ -876,6 +876,42 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public void BusinessServicePlaybookPolicy_BuildsSpecializedConversationFlow()
+    {
+        var playbook = BusinessServicePlaybookPolicy.Build(
+            "Entender a necessidade e agendar uma demonstração",
+            "número de atendentes e volume mensal de mensagens",
+            "descobrir o cenário, indicar o plano e oferecer demonstração",
+            "pedido de cancelamento ou problema sem solução cadastrada");
+
+        Assert.Contains("agendar uma demonstração", playbook, StringComparison.Ordinal);
+        Assert.Contains("número de atendentes", playbook, StringComparison.Ordinal);
+        Assert.Contains("Continue da última etapa concluída", playbook, StringComparison.Ordinal);
+        Assert.Contains("uma pergunta necessária por mensagem", playbook, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ComposeSystemPrompt_IncludesOnlyConfiguredCompanyPlaybook()
+    {
+        var prompt = ContextAssembler.ComposeSystemPrompt(
+            """
+            [PERFIL_EMPRESA]
+            Tipo de negócio: Tecnologia e software
+            Objetivo do atendimento: Agendar demonstrações qualificadas
+            Dados para qualificar: atendentes e volume de mensagens
+            Processo de atendimento: entender o cenário, indicar a solução e combinar a demonstração
+            Critérios de encaminhamento: pedido explícito de humano
+            [/PERFIL_EMPRESA]
+            """);
+
+        Assert.Contains("Guia operacional específico desta empresa", prompt, StringComparison.Ordinal);
+        Assert.Contains("Agendar demonstrações qualificadas", prompt, StringComparison.Ordinal);
+        Assert.Contains("atendentes e volume de mensagens", prompt, StringComparison.Ordinal);
+        Assert.Contains("continue", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("diagnóstico clínico", prompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ComposeSystemPrompt_IncludesBusinessGuideForGenericQuestions()
     {
         var prompt = ContextAssembler.ComposeSystemPrompt(

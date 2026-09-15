@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { AiConfigPage } from './AiConfigPage'
+import { buildAiInstructions } from './aiInstructions'
 
 vi.mock('../../../lib/auth', () => ({
   useAuth: () => ({
@@ -64,6 +65,11 @@ describe('AiConfigPage', () => {
     expect(screen.getByRole('option', { name: 'Didático e paciente' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Calmo e tranquilizador' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /2\. Comportamento/ }))
+    expect(screen.getByText('Especialização do atendimento')).toBeInTheDocument()
+    expect(screen.getByText('Objetivo do atendimento')).toBeInTheDocument()
+    expect(screen.getByText('Dados para qualificar')).toBeInTheDocument()
+    expect(screen.getByText('Processo de atendimento')).toBeInTheDocument()
+    expect(screen.getByText('Critérios de encaminhamento')).toBeInTheDocument()
     expect(screen.getByText('Regras da plataforma')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /3\. Conhecimento/ }))
     expect(screen.getByText('Base de conhecimento')).toBeInTheDocument()
@@ -72,6 +78,27 @@ describe('AiConfigPage', () => {
     expect(screen.queryByText('API Key')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Testar conexão' })).not.toBeInTheDocument()
     expect(screen.queryByText('Mensagens automáticas')).not.toBeInTheDocument()
+  })
+
+  it('builds a complete specialized profile without silently cutting directions', () => {
+    const directions = `REGRA FINAL ${'x'.repeat(600)}`
+    const result = buildAiInstructions({
+      businessType: 'Tecnologia e software',
+      businessDescription: 'Plataforma de atendimento pelo WhatsApp',
+      targetAudience: 'Empresas com equipes de atendimento',
+      serviceCatalog: 'Inbox, automação e IA',
+      toneOfVoice: 'Consultivo e acolhedor',
+      serviceHours: 'segunda a sexta, 8h às 18h',
+      location: 'Brasil',
+      serviceGoal: 'Agendar uma demonstração qualificada',
+      qualificationData: 'atendentes, linhas e volume de mensagens',
+      serviceProcess: 'entender o cenário, orientar e oferecer demonstração',
+      handoffCriteria: 'pedido explícito de humano ou cancelamento',
+    }, directions)
+
+    expect(result).toContain('Objetivo do atendimento: Agendar uma demonstração qualificada')
+    expect(result).toContain('Processo de atendimento: entender o cenário, orientar e oferecer demonstração')
+    expect(result.endsWith(directions)).toBe(true)
   })
 
   it('calls fetch for providers and config', async () => {

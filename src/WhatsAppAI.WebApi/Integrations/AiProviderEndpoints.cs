@@ -242,6 +242,9 @@ public static class AiProviderEndpoints
             (double.IsNaN(confidenceThreshold) || confidenceThreshold is < 0 or > 1))
             return Results.BadRequest(new { error = "O limiar de confiança deve estar entre 0 e 1." });
 
+        if (request.SystemPrompt?.Length > 4_000)
+            return Results.BadRequest(new { error = "As informações de atendimento devem ter no máximo 4.000 caracteres." });
+
         var requestedQueueIds = (request.RoutingQueueIds ?? []).Distinct().ToArray();
         if (requestedQueueIds.Length > 0 &&
             !await dbContext.HasAutomaticDistributionEnabledAsync(currentTenant.TenantId.Value))

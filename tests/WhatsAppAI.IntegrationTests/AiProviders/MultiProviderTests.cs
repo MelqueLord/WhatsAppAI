@@ -191,6 +191,38 @@ public class MultiProviderTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task UpdateInstructions_RejectsOversizedConfigurationWithoutPersistingIt()
+    {
+        var (client, _) = await CreateTenantWithAiPlanAsync();
+        var saveResponse = await PostConfigAsync(client, new
+        {
+            provider = "openai", modelId = "gpt-4o-mini", apiKey = "sk-test-openai"
+        });
+        saveResponse.EnsureSuccessStatusCode();
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put, "/api/integrations/ai/instructions")
+        {
+            Content = JsonContent.Create(new
+            {
+                systemPrompt = new string('x', 4_001),
+                maxTokensPerResponse = 180,
+                confidenceThreshold = 0.5,
+                routingQueueIds = Array.Empty<Guid>(),
+                routingTagIds = Array.Empty<Guid>()
+            })
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", "0");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("4.000 caracteres", await response.Content.ReadAsStringAsync());
+        var config = await client.GetFromJsonAsync<JsonElement>("/api/integrations/ai");
+        Assert.True(config.GetProperty("draftSystemPrompt").ValueKind is JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task UpdateInstructions_RejectsBotOnlyPlanBeforeChangingAiConfiguration()
     {
         var (client, tenantId) = await CreateTenantWithPlanAsync("BOT");
