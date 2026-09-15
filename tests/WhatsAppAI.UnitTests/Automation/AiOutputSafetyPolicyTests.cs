@@ -27,12 +27,34 @@ public sealed class AiOutputSafetyPolicyTests
     }
 
     [Fact]
-    public void SanitizeDecision_HandoffsContentAboveLimit()
+    public void SanitizeDecision_SafelyShortensContentAboveLimit()
     {
         var result = BehaviorPolicy.SanitizeDecision(Reply(new string('a', 241)), 0.7);
 
-        Assert.Equal(AiAction.Handoff, result.Action);
-        Assert.Equal(AiOutputSafetyPolicy.UnsafeContentHandoffReason, result.HandoffReason);
+        Assert.Equal(AiAction.Reply, result.Action);
+        Assert.NotNull(result.Text);
+        Assert.True(result.Text.Length <= AiOutputSafetyPolicy.MaxReplyCharacters);
+        Assert.EndsWith("...", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SanitizeResponse_SafelyShortensProviderContentAboveLimit()
+    {
+        var longReply = string.Join(' ', Enumerable.Repeat("atendimento consultivo", 20));
+        var response = new AiResponse
+        {
+            Decision = Reply(longReply),
+            Content = longReply,
+            InputTokens = 1,
+            OutputTokens = 1
+        };
+
+        var result = BehaviorPolicy.SanitizeResponse(response, 0.7);
+
+        Assert.Equal(AiAction.Reply, result.Decision.Action);
+        Assert.NotNull(result.Content);
+        Assert.True(result.Content.Length <= AiOutputSafetyPolicy.MaxReplyCharacters);
+        Assert.Equal(result.Decision.Text, result.Content);
     }
 
     [Fact]
@@ -59,6 +81,15 @@ public sealed class AiOutputSafetyPolicyTests
 
         Assert.True(result.Length <= AiOutputSafetyPolicy.MaxReplyCharacters);
         Assert.EndsWith("...", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LimitReply_PrefersACompleteSentence()
+    {
+        var result = AiOutputSafetyPolicy.LimitReply(
+            "Entendi sua necessidade e posso ajudar com isso. " + new string('a', 180));
+
+        Assert.Equal("Entendi sua necessidade e posso ajudar com isso.", result);
     }
 
     private static AiDecision Reply(string text) => new()

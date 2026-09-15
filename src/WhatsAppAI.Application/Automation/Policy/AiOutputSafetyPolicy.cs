@@ -13,6 +13,12 @@ public static class AiOutputSafetyPolicy
         if (text.Length <= MaxReplyCharacters)
             return text;
 
+        for (var index = MaxReplyCharacters - 1; index >= MaxReplyCharacters / 2; index--)
+        {
+            if (text[index] is '.' or '!' or '?')
+                return text[..(index + 1)].TrimEnd();
+        }
+
         var candidate = text[..(MaxReplyCharacters - 3)].TrimEnd();
         var lastSpace = candidate.LastIndexOf(' ');
         if (lastSpace >= MaxReplyCharacters / 2)
@@ -61,6 +67,16 @@ public static class AiOutputSafetyPolicy
         var normalized = content.Trim();
         if (normalized.Length > MaxReplyCharacters)
             return false;
+
+        return IsContentSafe(normalized);
+    }
+
+    public static bool IsContentSafe(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return true;
+
+        var normalized = content.Trim();
 
         if (AiContextSanitizer.RedactPersonalData(normalized) != normalized)
             return false;

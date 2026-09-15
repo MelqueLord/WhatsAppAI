@@ -169,6 +169,38 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public async Task BuildAsync_ContinuesConversationAfterLongInactivePeriod()
+    {
+        var tenantId = Guid.NewGuid();
+        var currentId = Guid.NewGuid();
+        var messages = new List<MessageDto>
+        {
+            new() { Id = Guid.NewGuid(), Direction = "Inbound", Content = "Tenho duas atendentes", CreatedAt = DateTime.UtcNow.AddDays(-30) },
+            new() { Id = Guid.NewGuid(), Direction = "Outbound", Content = "Certo, e quantas linhas de WhatsApp?", CreatedAt = DateTime.UtcNow.AddDays(-30).AddMinutes(1) },
+            new() { Id = currentId, Direction = "Inbound", Content = "Voltei, preciso usar três linhas", CreatedAt = DateTime.UtcNow }
+        };
+
+        var context = await new ContextAssembler(
+            new FakeConversationQueries(messages),
+            new FakeKnowledgeRepository([])).BuildAsync(
+                tenantId,
+                Guid.NewGuid(),
+                null,
+                welcomeMessage: "Seja bem-vindo à ATENZ!",
+                isFirstInbound: false,
+                customerContext: new CustomerServiceContext("Maria", true, "Comercial"),
+                currentMessageId: currentId);
+
+        Assert.Collection(
+            context.Messages,
+            first => Assert.Contains("duas atendentes", first.Content, StringComparison.Ordinal),
+            second => Assert.Contains("quantas linhas", second.Content, StringComparison.Ordinal),
+            current => Assert.Contains("três linhas", current.Content, StringComparison.Ordinal));
+        Assert.DoesNotContain("Mensagem de boas-vindas personalizada", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Continue do ponto atual", context.SystemPrompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BuildAsync_UsesStructuredBusinessProfileForStyleWithoutTreatingItAsCompanyKnowledge()
     {
         var tenantId = Guid.NewGuid();
@@ -487,6 +519,31 @@ public sealed class ContextAssemblerTests
         Assert.Contains("299", result.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("Premium", result.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("999", result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KnownKnowledgeResponsePolicy_PreservesConsultativeReplyForPlanSelection()
+    {
+        var response = new AiResponse
+        {
+            Decision = new AiDecision
+            {
+                Action = AiAction.Reply,
+                Text = "Quantas pessoas atenderão pelo WhatsApp?",
+                Confidence = 0.95
+            },
+            Content = "Quantas pessoas atenderão pelo WhatsApp?",
+            InputTokens = 10,
+            OutputTokens = 5
+        };
+
+        var result = KnownKnowledgeResponsePolicy.EnforceAuthorizedPricing(
+            response,
+            "Ainda não sei qual plano escolher",
+            ["Plano FLOW: R$ 299 por mês.", "Plano STAR: R$ 149 por mês."]);
+
+        Assert.Equal("Quantas pessoas atenderão pelo WhatsApp?", result.Content);
+        Assert.DoesNotContain("R$", result.Content, StringComparison.Ordinal);
     }
 
     [Fact]

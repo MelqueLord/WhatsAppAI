@@ -23,13 +23,22 @@ public static class BehaviorPolicy
     {
         if (decision.Action == AiAction.Reply &&
             !string.IsNullOrWhiteSpace(decision.Text) &&
-            !AiOutputSafetyPolicy.IsSafe(decision.Text))
+            !AiOutputSafetyPolicy.IsContentSafe(decision.Text))
         {
             return decision with
             {
                 Action = AiAction.Handoff,
                 HandoffReason = AiOutputSafetyPolicy.UnsafeContentHandoffReason,
                 Text = null
+            };
+        }
+
+        if (decision.Action == AiAction.Reply &&
+            !string.IsNullOrWhiteSpace(decision.Text))
+        {
+            decision = decision with
+            {
+                Text = AiOutputSafetyPolicy.LimitReply(decision.Text)
             };
         }
 
@@ -51,7 +60,7 @@ public static class BehaviorPolicy
         var decision = SanitizeDecision(response.Decision, confidenceThreshold);
         if (decision.Action == AiAction.Reply &&
             !string.IsNullOrWhiteSpace(response.Content) &&
-            !AiOutputSafetyPolicy.IsSafe(response.Content))
+            !AiOutputSafetyPolicy.IsContentSafe(response.Content))
         {
             decision = decision with
             {
@@ -64,7 +73,9 @@ public static class BehaviorPolicy
         return response with
         {
             Decision = decision,
-            Content = decision.Action == AiAction.Reply ? response.Content : null
+            Content = decision.Action == AiAction.Reply
+                ? AiOutputSafetyPolicy.LimitReply(response.Content ?? decision.Text)
+                : null
         };
     }
 }

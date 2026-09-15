@@ -19,12 +19,28 @@ public static class KnownKnowledgeResponsePolicy
             .Any(term => term is "preco" or "precos" or "valor" or "valores" or "quanto" or "custa" or "custam" or "mensalidade" or "mensalidades" or "assinatura" or "assinaturas" or "plano" or "planos");
     }
 
+    public static bool IsPlanSelectionQuestion(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        var normalized = Normalize(message);
+        return normalized.Contains("qual plano", StringComparison.Ordinal) ||
+            normalized.Contains("plano escolher", StringComparison.Ordinal) ||
+            normalized.Contains("escolher o plano", StringComparison.Ordinal) ||
+            normalized.Contains("melhor plano", StringComparison.Ordinal) ||
+            normalized.Contains("plano ideal", StringComparison.Ordinal) ||
+            normalized.Contains("plano indicado", StringComparison.Ordinal) ||
+            normalized.Contains("plano combina", StringComparison.Ordinal) ||
+            normalized.Contains("nao sei qual plano", StringComparison.Ordinal);
+    }
+
     public static AiResponse EnforceAuthorizedPricing(
         AiResponse response,
         string? customerMessage,
         IReadOnlyList<string> relevantKnowledge)
     {
-        if (!IsPricingQuestion(customerMessage))
+        if (!IsPricingQuestion(customerMessage) || IsPlanSelectionQuestion(customerMessage))
             return response;
 
         var answer = BuildAnswer(relevantKnowledge);
@@ -109,4 +125,11 @@ public static class KnownKnowledgeResponsePolicy
 
         return AiOutputSafetyPolicy.LimitReply(answer);
     }
+
+    private static string Normalize(string value) =>
+        new string(value
+            .Normalize(System.Text.NormalizationForm.FormD)
+            .Where(character => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .ToLowerInvariant();
 }
