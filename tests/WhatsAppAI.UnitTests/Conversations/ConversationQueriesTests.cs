@@ -11,6 +11,46 @@ namespace WhatsAppAI.UnitTests.Conversations;
 public sealed class ConversationQueriesTests
 {
     [Fact]
+    public async Task GetMessages_StopsAtTheMessageBeingProcessed()
+    {
+        var tenantId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+
+        await using var context = new AppDbContext(options, new TenantContext(tenantId));
+        await context.Database.OpenConnectionAsync();
+        await context.Database.EnsureCreatedAsync();
+
+        var contact = Contact.Create(tenantId, "5511999990001", "Returning customer");
+        var conversation = Conversation.Create(tenantId, contact.Id, "phone-1");
+        context.AddRange(contact, conversation);
+        await context.SaveChangesAsync();
+
+        var previous = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "previous", MessageType.Text, "Plano Flow");
+        context.Add(previous);
+        await context.SaveChangesAsync();
+        var current = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "current", MessageType.Text, "Quanto custa?");
+        context.Add(current);
+        await context.SaveChangesAsync();
+        var later = Message.CreateInbound(tenantId, conversation.Id, contact.Id, "later", MessageType.Text, "Preciso de suporte");
+        context.Add(later);
+        await context.SaveChangesAsync();
+
+        var result = await new ConversationQueries(context).GetMessagesAsync(
+            tenantId,
+            conversation.Id,
+            new CursorPaginationRequest { Limit = 4 },
+            throughMessageId: current.Id);
+
+        Assert.Collection(
+            result.Items,
+            item => Assert.Equal(current.Id, item.Id),
+            item => Assert.Equal(previous.Id, item.Id));
+        Assert.DoesNotContain(result.Items, item => item.Id == later.Id);
+    }
+
+    [Fact]
     public async Task GetConversations_FiltersByAssignedQueue()
     {
         var tenantId = Guid.NewGuid();

@@ -141,7 +141,8 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
     }
 
     public async Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
-        Guid tenantId, Guid conversationId, CursorPaginationRequest request, CancellationToken cancellationToken = default)
+        Guid tenantId, Guid conversationId, CursorPaginationRequest request,
+        CancellationToken cancellationToken = default, Guid? throughMessageId = null)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
 
@@ -150,6 +151,24 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Include(m => m.Contact)
             .Where(m => m.TenantId == tenantId && m.ConversationId == conversationId)
             .AsQueryable();
+
+        if (throughMessageId.HasValue)
+        {
+            var boundary = await context.Messages
+                .IgnoreQueryFilters()
+                .Where(m => m.TenantId == tenantId &&
+                    m.ConversationId == conversationId &&
+                    m.Id == throughMessageId.Value)
+                .Select(m => new { m.CreatedAt, m.Id })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (boundary is null)
+                return new CursorPaginationResponse<MessageDto>();
+
+            query = query.Where(m =>
+                m.CreatedAt < boundary.CreatedAt ||
+                (m.CreatedAt == boundary.CreatedAt && m.Id.CompareTo(boundary.Id) <= 0));
+        }
 
         if (!string.IsNullOrEmpty(request.Cursor))
         {

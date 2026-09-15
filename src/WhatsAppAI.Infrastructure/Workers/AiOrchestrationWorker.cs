@@ -457,7 +457,9 @@ public sealed class AiOrchestrationWorker(
             var isFirstInbound = !await dbContext.Messages
                 .IgnoreQueryFilters()
                 .AnyAsync(item => item.ConversationId == message.ConversationId &&
-                    item.Direction == MessageDirection.Inbound && item.Id != message.Id,
+                    item.Direction == MessageDirection.Inbound && item.Id != message.Id &&
+                    (item.CreatedAt < message.CreatedAt ||
+                        (item.CreatedAt == message.CreatedAt && item.Id.CompareTo(message.Id) < 0)),
                     cancellationToken);
             var welcomeMessage = ContextAssembler.ResolveWelcomeMessage(
                 botConfig.WelcomeMessage,
@@ -484,7 +486,8 @@ public sealed class AiOrchestrationWorker(
                 isFirstInbound,
                 tenant?.Name,
                 new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName),
-                contactId: message.ContactId);
+                contactId: message.ContactId,
+                currentMessageId: message.Id);
             var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
                 message.Content,
                 context.RelevantKnowledge);

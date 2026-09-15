@@ -137,6 +137,38 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
+    public async Task BuildAsync_AnchorsReturningContextAtTheMessageBeingProcessed()
+    {
+        var tenantId = Guid.NewGuid();
+        var previousId = Guid.NewGuid();
+        var currentId = Guid.NewGuid();
+        var laterId = Guid.NewGuid();
+        var messages = new List<MessageDto>
+        {
+            new() { Id = previousId, Direction = "Inbound", Content = "Quero conhecer o plano Flow", CreatedAt = DateTime.UtcNow.AddMinutes(-2) },
+            new() { Id = currentId, Direction = "Inbound", Content = "Quanto custa?", CreatedAt = DateTime.UtcNow.AddMinutes(-1) },
+            new() { Id = laterId, Direction = "Inbound", Content = "Também preciso de suporte", CreatedAt = DateTime.UtcNow }
+        };
+
+        var context = await new ContextAssembler(
+            new FakeConversationQueries(messages),
+            new FakeKnowledgeRepository([])).BuildAsync(
+                tenantId,
+                Guid.NewGuid(),
+                null,
+                customerContext: new CustomerServiceContext("Maria", true, null),
+                currentMessageId: currentId);
+
+        Assert.Collection(
+            context.Messages,
+            previous => Assert.Equal("Quero conhecer o plano Flow", previous.Content),
+            current => Assert.Equal("Quanto custa?", current.Content));
+        Assert.DoesNotContain(context.Messages, item => item.Content.Contains("suporte", StringComparison.Ordinal));
+        Assert.DoesNotContain("Mensagem de boas-vindas personalizada", context.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Continue do ponto atual", context.SystemPrompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BuildAsync_UsesStructuredBusinessProfileForStyleWithoutTreatingItAsCompanyKnowledge()
     {
         var tenantId = Guid.NewGuid();
@@ -921,8 +953,20 @@ public sealed class ContextAssemblerTests
 
         public Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
             Guid tenantId, Guid conversationId, CursorPaginationRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CursorPaginationResponse<MessageDto> { Items = messages });
+            CancellationToken cancellationToken = default, Guid? throughMessageId = null)
+        {
+            var selected = messages;
+            if (throughMessageId.HasValue)
+            {
+                var boundary = messages.Single(item => item.Id == throughMessageId.Value);
+                selected = messages
+                    .Where(item => item.CreatedAt < boundary.CreatedAt ||
+                        (item.CreatedAt == boundary.CreatedAt && item.Id.CompareTo(boundary.Id) <= 0))
+                    .ToList();
+            }
+
+            return Task.FromResult(new CursorPaginationResponse<MessageDto> { Items = selected });
+        }
 
         public Task<ConversationDto?> GetConversationByIdAsync(
             Guid tenantId, Guid conversationId, CancellationToken cancellationToken = default) =>

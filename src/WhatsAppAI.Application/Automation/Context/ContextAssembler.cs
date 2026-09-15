@@ -36,12 +36,14 @@ public sealed class ContextAssembler(
         bool isFirstInbound = false,
         string? businessName = null,
         CustomerServiceContext? customerContext = null,
-        Guid? contactId = null)
+        Guid? contactId = null,
+        Guid? currentMessageId = null)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
             new CursorPaginationRequest { Limit = MaxMessages },
-            cancellationToken);
+            cancellationToken,
+            throughMessageId: currentMessageId);
 
         var messages = messagesResponse.Items
             .OrderBy(m => m.CreatedAt)

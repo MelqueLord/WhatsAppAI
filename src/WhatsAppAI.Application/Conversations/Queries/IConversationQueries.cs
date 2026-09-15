@@ -10,7 +10,8 @@ public interface IConversationQueries
         CancellationToken cancellationToken = default);
 
     Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
-        Guid tenantId, Guid conversationId, CursorPaginationRequest request, CancellationToken cancellationToken = default);
+        Guid tenantId, Guid conversationId, CursorPaginationRequest request,
+        CancellationToken cancellationToken = default, Guid? throughMessageId = null);
 
     Task<ConversationDto?> GetConversationByIdAsync(
         Guid tenantId, Guid conversationId, CancellationToken cancellationToken = default);
