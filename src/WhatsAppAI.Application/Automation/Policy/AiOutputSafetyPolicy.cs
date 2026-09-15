@@ -13,7 +13,7 @@ public static class AiOutputSafetyPolicy
         if (text.Length <= MaxReplyCharacters)
             return text;
 
-        for (var index = MaxReplyCharacters - 1; index >= MaxReplyCharacters / 2; index--)
+        for (var index = MaxReplyCharacters - 1; index >= MaxReplyCharacters / 4; index--)
         {
             if (text[index] is '.' or '!' or '?')
                 return text[..(index + 1)].TrimEnd();
