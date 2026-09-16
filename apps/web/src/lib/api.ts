@@ -1,3 +1,5 @@
+import { ApiError, createApiError } from './errors'
+
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 const TOKEN_KEY = 'whatsappai.token'
@@ -14,15 +16,35 @@ export function clearStoredToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-// fetchWithCsrf kept for backward compat (used by SignalR hub connection, etc.)
-export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestInit = {}) {
-  const requestUrl = typeof input === 'string' && input.startsWith('/')
+function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
+  return typeof input === 'string' && input.startsWith('/')
     ? `${API_BASE}${input}`
     : input
+}
+
+// Kept for integrations that need to inspect the raw response themselves.
+export async function fetchWithCsrf(input: RequestInfo | URL, options: RequestInit = {}) {
   const headers = new Headers(options.headers)
   const token = getStoredToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  return fetch(requestUrl, { ...options, headers })
+  return fetch(resolveApiUrl(input), { ...options, headers })
+}
+
+export async function fetchApiResponse(input: RequestInfo | URL, options: RequestInit = {}): Promise<Response> {
+  let response: Response
+
+  try {
+    response = await fetchWithCsrf(input, options)
+  } catch {
+    throw new ApiError(
+      'Não foi possível conectar ao sistema. Verifique sua internet e tente novamente.',
+      0,
+      'NETWORK_ERROR',
+    )
+  }
+
+  if (!response.ok) throw await createApiError(response)
+  return response
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
@@ -30,7 +52,7 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {}
   if (!(options?.body instanceof FormData)) headers['Content-Type'] = 'application/json'
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const response = await fetch(`${API_BASE}${url}`, {
+  const response = await fetchApiResponse(url, {
     ...options,
     cache: options?.method ? undefined : 'no-store',
     headers: {
@@ -38,24 +60,6 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
       ...options?.headers as Record<string, string>,
     },
   })
-  if (!response.ok) {
-    if (response.status === 401) {
-      // Login attempt → wrong credentials
-      // Any other endpoint → session expired / not authenticated
-      const isLoginEndpoint = url.includes('/api/auth/login')
-      throw new Error(isLoginEndpoint ? 'INVALID_CREDENTIALS' : 'UNAUTHORIZED')
-    }
-    const error = await response.text()
-    let message = error
-    try {
-      const payload = JSON.parse(error) as { error?: unknown; message?: unknown }
-      if (typeof payload.error === 'string') message = payload.error
-      else if (typeof payload.message === 'string') message = payload.message
-    } catch {
-      // Keep plain-text responses unchanged.
-    }
-    throw new Error(message || `HTTP ${response.status}`)
-  }
   if (response.status === 204) return undefined as T
   return response.json()
 }
@@ -461,15 +465,18 @@ export const api = {
     getMe: () => fetchApi<User>('/api/auth/me'),
 
     login: async (email: string, password: string) => {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      if (!response.ok) {
-        if (response.status === 401) throw new Error('INVALID_CREDENTIALS')
-        const error = await response.text()
-        throw new Error(error || `HTTP ${response.status}`)
+      let response: Response
+      try {
+        response = await fetchApiResponse('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          throw new Error('INVALID_CREDENTIALS')
+        }
+        throw error
       }
       const data = (await response.json()) as { token: string; user: User }
       setStoredToken(data.token)

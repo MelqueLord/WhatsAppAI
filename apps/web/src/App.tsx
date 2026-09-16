@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { Layout } from './components/Layout'
@@ -26,8 +26,16 @@ import { ContactsPage } from './features/contacts/ContactsPage'
 import { BroadcastPage } from './features/broadcast/BroadcastPage'
 import LandingPage from './features/landing/LandingPage'
 import { Loader2 } from 'lucide-react'
+import { AppErrorBoundary } from './components/AppErrorBoundary'
+import { ErrorNotifications, notifyError } from './components/ErrorNotifications'
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: notifyError,
+  }),
+  mutationCache: new MutationCache({
+    onError: notifyError,
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30000,
@@ -102,8 +110,10 @@ function NavigateToHome() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
+      <ErrorNotifications>
+        <AppErrorBoundary>
+          <BrowserRouter>
+            <AuthProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -139,8 +149,10 @@ function App() {
             <Route path="/app" element={<NavigateToHome />} />
             <Route path="*" element={<NavigateToHome />} />
           </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+            </AuthProvider>
+          </BrowserRouter>
+        </AppErrorBoundary>
+      </ErrorNotifications>
     </QueryClientProvider>
   )
 }

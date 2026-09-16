@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Loader2,
 } from 'lucide-react'
+import { fetchApiResponse } from '../../../lib/api'
+import { friendlyErrorMessage } from '../../../lib/errors'
 
 interface InvitationInfo {
   id: string
@@ -34,24 +36,19 @@ interface ActivateResponse {
 }
 
 async function fetchInvitationInfo(invitationId: string): Promise<InvitationInfo> {
-  const response = await fetch(`/api/auth/activate/invitation/${invitationId}`, {
+  const response = await fetchApiResponse(`/api/auth/activate/invitation/${invitationId}`, {
     credentials: 'include',
   })
-  if (!response.ok) throw new Error('Failed to fetch invitation info')
   return response.json()
 }
 
 async function activateAccount(request: ActivateRequest): Promise<ActivateResponse> {
-  const response = await fetch('/api/auth/activate', {
+  const response = await fetchApiResponse('/api/auth/activate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(request),
   })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to activate account')
-  }
   return response.json()
 }
 
@@ -75,7 +72,7 @@ export function ActivatePage() {
   const activateMutation = useMutation({
     mutationFn: activateAccount,
     onSuccess: () => navigate('/inbox'),
-    onError: (err: Error) => setError(err.message),
+    onError: (err) => setError(friendlyErrorMessage(err)),
   })
 
   const handleSubmit = (e: React.FormEvent) => {

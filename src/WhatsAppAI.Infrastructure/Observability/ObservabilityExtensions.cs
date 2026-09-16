@@ -29,6 +29,7 @@ public static class ObservabilityExtensions
 
         services.AddHealthChecks();
         services.AddProblemDetails();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
 
         // OpenTelemetry
         var otelEndpoint = configuration["OpenTelemetry:Endpoint"];

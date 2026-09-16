@@ -1,4 +1,4 @@
-import { fetchWithCsrf } from '../../lib/api'
+import { fetchApiResponse } from '../../lib/api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, Plus, Edit2, XCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
@@ -50,14 +50,14 @@ export function KnowledgePage() {
   const { data: items, isLoading } = useQuery({
     queryKey: ['knowledge'],
     queryFn: async () => {
-      const res = await fetchWithCsrf('/api/knowledge')
+      const res = await fetchApiResponse('/api/knowledge')
       return res.json() as Promise<KnowledgeItem[]>
     },
   })
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetchWithCsrf('/api/knowledge', {
+      const res = await fetchApiResponse('/api/knowledge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ title, content, category, priority }),
       })
@@ -69,7 +69,7 @@ export function KnowledgePage() {
 
   const updateMutation = useMutation({
     mutationFn: async (item: KnowledgeItem) => {
-      const res = await fetchWithCsrf(`/api/knowledge/${item.id}`, {
+      const res = await fetchApiResponse(`/api/knowledge/${item.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', 'If-Match': String(item.version) }, credentials: 'include',
         body: JSON.stringify({ title, content, category, priority }),
       })
@@ -82,7 +82,7 @@ export function KnowledgePage() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ item, action }: { item: KnowledgeItem; action: 'deactivate' | 'reactivate' }) => {
-      const res = await fetchWithCsrf(`/api/knowledge/${item.id}/${action}`, { method: 'POST', headers: { 'If-Match': String(item.version) }, credentials: 'include' })
+      const res = await fetchApiResponse(`/api/knowledge/${item.id}/${action}`, { method: 'POST', headers: { 'If-Match': String(item.version) }, credentials: 'include' })
       if (res.status === 409) throw new Error('Conflito de versão.')
       if (!res.ok) throw new Error('Erro')
       return res.json()

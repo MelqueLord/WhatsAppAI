@@ -1,4 +1,4 @@
-import { fetchWithCsrf } from '../../lib/api'
+import { fetchApiResponse } from '../../lib/api'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../lib/auth'
@@ -125,7 +125,7 @@ export function BotConfigPage() {
   const { data: config, isLoading, isError, error } = useQuery({
     queryKey: ['bot-config'],
     queryFn: async () => {
-      const res = await fetchWithCsrf('/api/bot-config')
+      const res = await fetchApiResponse('/api/bot-config')
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null
         throw new Error(body?.error || 'Não foi possível carregar a configuração do BOT.')
@@ -149,7 +149,7 @@ export function BotConfigPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const res = await fetchWithCsrf('/api/bot-config/toggle', {
+      const res = await fetchApiResponse('/api/bot-config/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',
@@ -174,7 +174,7 @@ export function BotConfigPage() {
       const steps = (flowSteps ?? config?.flowSteps ?? []).filter(
         (s) => s.title.trim() && s.response.trim()
       )
-      const res = await fetchWithCsrf('/api/bot-config', {
+      const res = await fetchApiResponse('/api/bot-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'If-Match': String(version) },
         credentials: 'include',

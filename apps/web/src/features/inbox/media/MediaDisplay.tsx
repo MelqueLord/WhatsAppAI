@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Download, FileText, Image, Mic, Play } from 'lucide-react'
+import { fetchApiResponse } from '../../../lib/api'
+import { friendlyErrorMessage } from '../../../lib/errors'
 
 interface MediaDisplayProps {
   messageId: string
@@ -19,13 +21,9 @@ export function MediaDisplay({ messageId, type, mediaId, caption }: MediaDisplay
     setError(null)
 
     try {
-      const response = await fetch(`/api/media/${messageId}/download`, {
+      const response = await fetchApiResponse(`/api/media/${messageId}/download`, {
         credentials: 'include',
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to download media')
-      }
 
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
@@ -36,8 +34,8 @@ export function MediaDisplay({ messageId, type, mediaId, caption }: MediaDisplay
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-    } catch {
-      setError('Erro ao baixar mídia')
+    } catch (error) {
+      setError(friendlyErrorMessage(error, 'Não foi possível baixar esta mídia. Tente novamente.'))
     } finally {
       setLoading(false)
     }

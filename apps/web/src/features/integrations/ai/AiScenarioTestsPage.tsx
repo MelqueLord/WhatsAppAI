@@ -11,7 +11,7 @@ import {
   Play,
 } from 'lucide-react'
 import { useState } from 'react'
-import { fetchWithCsrf } from '../../../lib/api'
+import { fetchApiResponse } from '../../../lib/api'
 import { formatAiDecision, formatAiReason } from '../../../lib/utils'
 
 interface AiScenarioResult {
@@ -89,7 +89,7 @@ export function AiScenarioTestsPage() {
 
   const simulation = useMutation<AiScenarioResult, Error, string>({
     mutationFn: async (scenarioMessage) => {
-      const response = await fetchWithCsrf('/api/integrations/ai/simulate', {
+      const response = await fetchApiResponse('/api/integrations/ai/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

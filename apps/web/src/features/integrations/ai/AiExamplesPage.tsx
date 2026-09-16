@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BotMessageSquare, CheckCircle2, Edit2, Loader2, Plus, XCircle } from 'lucide-react'
 import { useState } from 'react'
-import { fetchWithCsrf } from '../../../lib/api'
+import { fetchApiResponse } from '../../../lib/api'
 
 interface AiResponseExample {
   id: string
@@ -23,7 +23,7 @@ export function AiExamplesPage() {
   const { data: examples = [], isLoading } = useQuery({
     queryKey: ['ai-response-examples'],
     queryFn: async () => {
-      const response = await fetchWithCsrf('/api/ai-response-examples')
+      const response = await fetchApiResponse('/api/ai-response-examples')
       if (!response.ok) throw new Error('Não foi possível carregar os exemplos.')
       return response.json() as Promise<AiResponseExample[]>
     },
@@ -31,7 +31,7 @@ export function AiExamplesPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetchWithCsrf(editing ? `/api/ai-response-examples/${editing.id}` : '/api/ai-response-examples', {
+      const response = await fetchApiResponse(editing ? `/api/ai-response-examples/${editing.id}` : '/api/ai-response-examples', {
         method: editing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ export function AiExamplesPage() {
   const statusMutation = useMutation({
     mutationFn: async (example: AiResponseExample) => {
       const action = example.isActive ? 'deactivate' : 'reactivate'
-      const response = await fetchWithCsrf(`/api/ai-response-examples/${example.id}/${action}`, {
+      const response = await fetchApiResponse(`/api/ai-response-examples/${example.id}/${action}`, {
         method: 'POST',
         headers: { 'If-Match': String(example.version) },
         credentials: 'include',
