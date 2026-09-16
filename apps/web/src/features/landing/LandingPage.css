@@ -220,6 +220,11 @@
   gap: 60px;
 }
 
+.atenz-site .hero-copy,
+.atenz-site .hero-visual {
+  min-width: 0;
+}
+
 .atenz-site .eyebrow,
 .atenz-site .section-label {
   display: inline-flex;

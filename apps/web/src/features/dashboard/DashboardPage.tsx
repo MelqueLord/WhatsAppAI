@@ -84,9 +84,9 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-page h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
               Olá, {user?.displayName || user?.email?.split('@')[0]}

@@ -243,10 +243,10 @@ export function BotConfigPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-6">
 
         {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
               <Bot className="w-5 h-5" />
@@ -329,11 +329,11 @@ export function BotConfigPage() {
           </div>
           <div className={`space-y-2 ${!businessHoursEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             {businessHours.map((day) => (
-              <div key={day.dayOfWeek} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 text-sm">
-                <label className="flex items-center gap-2 text-slate-700"><input type="checkbox" checked={day.enabled} onChange={(e) => updateBusinessDay(day.dayOfWeek, { enabled: e.target.checked })} />{dayNames[day.dayOfWeek]}</label>
-                <input type="time" value={day.open} onChange={(e) => updateBusinessDay(day.dayOfWeek, { open: e.target.value })} className="px-2 py-1.5 border border-slate-200 rounded-lg" />
+              <div key={day.dayOfWeek} className="flex flex-wrap items-center gap-3 text-sm">
+                <label className="basis-full flex items-center gap-2 text-slate-700 sm:basis-auto sm:flex-1"><input type="checkbox" checked={day.enabled} onChange={(e) => updateBusinessDay(day.dayOfWeek, { enabled: e.target.checked })} />{dayNames[day.dayOfWeek]}</label>
+                <input type="time" value={day.open} onChange={(e) => updateBusinessDay(day.dayOfWeek, { open: e.target.value })} className="min-w-0 flex-1 px-2 py-1.5 border border-slate-200 rounded-lg sm:flex-none" />
                 <span className="text-slate-400">até</span>
-                <input type="time" value={day.close} onChange={(e) => updateBusinessDay(day.dayOfWeek, { close: e.target.value })} className="px-2 py-1.5 border border-slate-200 rounded-lg" />
+                <input type="time" value={day.close} onChange={(e) => updateBusinessDay(day.dayOfWeek, { close: e.target.value })} className="min-w-0 flex-1 px-2 py-1.5 border border-slate-200 rounded-lg sm:flex-none" />
               </div>
             ))}
           </div>
@@ -558,7 +558,7 @@ export function BotConfigPage() {
         </Section>
 
         {/* ── Save bar ── */}
-        <div className="flex items-center justify-between gap-4 py-4 border-t border-slate-200 sticky bottom-0 bg-slate-50">
+        <div className="flex flex-col items-start gap-4 py-4 border-t border-slate-200 sticky bottom-0 bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-slate-400">
             As alterações só são aplicadas após salvar.
           </div>
