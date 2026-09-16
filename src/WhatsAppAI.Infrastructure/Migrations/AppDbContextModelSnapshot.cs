@@ -1386,6 +1386,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("QueueId");
+
                     b.HasIndex("TenantId", "QueueId");
 
                     b.HasIndex("TenantId", "PhoneNumber")

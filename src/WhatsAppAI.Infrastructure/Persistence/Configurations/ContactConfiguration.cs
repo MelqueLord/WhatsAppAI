@@ -54,6 +54,8 @@ public sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
 
         builder.HasIndex(c => c.TenantId);
 
+        builder.HasIndex(c => c.QueueId);
+
         builder.HasIndex(c => new { c.TenantId, c.QueueId });
 
         builder.HasOne<ServiceLine>()

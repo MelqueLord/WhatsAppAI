@@ -16,6 +16,12 @@ public partial class AddContactImportQueue : Migration
             nullable: true);
 
         migrationBuilder.CreateIndex(
+            name: "ix_contacts_queue_id",
+            schema: "whatsappai",
+            table: "contacts",
+            column: "queue_id");
+
+        migrationBuilder.CreateIndex(
             name: "ix_contacts_tenant_id_queue_id",
             schema: "whatsappai",
             table: "contacts",
@@ -36,6 +42,11 @@ public partial class AddContactImportQueue : Migration
     {
         migrationBuilder.DropForeignKey(
             name: "fk_contacts_service_queues_queue_id",
+            schema: "whatsappai",
+            table: "contacts");
+
+        migrationBuilder.DropIndex(
+            name: "ix_contacts_queue_id",
             schema: "whatsappai",
             table: "contacts");
 
