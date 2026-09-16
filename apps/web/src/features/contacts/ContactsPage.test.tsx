@@ -27,6 +27,9 @@ vi.mock('../../lib/api', () => ({
     whatsapp: {
       getLines: vi.fn(),
     },
+    serviceQueues: {
+      list: vi.fn(),
+    },
   },
 }))
 
@@ -45,6 +48,7 @@ describe('ContactsPage import', () => {
     signalROptions = undefined
     vi.mocked(api.contacts.list).mockResolvedValue([])
     vi.mocked(api.whatsapp.getLines).mockResolvedValue([])
+    vi.mocked(api.serviceQueues.list).mockResolvedValue([])
   })
 
   it('refreshes the list when a new inbound message is announced', async () => {
@@ -82,9 +86,29 @@ describe('ContactsPage import', () => {
     fireEvent.change(screen.getByLabelText('Arquivo *'), { target: { files: [file] } })
     fireEvent.submit(screen.getByRole('button', { name: 'Importar contatos' }).closest('form')!)
 
-    await waitFor(() => expect(api.contacts.import).toHaveBeenCalledWith(file))
+    await waitFor(() => expect(api.contacts.import).toHaveBeenCalledWith(file, undefined))
     expect(await screen.findByText('1 importados, 1 ignorados e 1 inválidos.')).toBeInTheDocument()
     expect(screen.getByText('Linha 4: Contato inválido.')).toBeInTheDocument()
+  })
+
+  it('sends the selected queue with the imported spreadsheet', async () => {
+    vi.mocked(api.serviceQueues.list).mockResolvedValue([{
+      id: 'queue-1', name: 'Clientes ativos', isActive: true, sortOrder: 0,
+    }])
+    vi.mocked(api.contacts.import).mockResolvedValue({
+      total: 1, imported: 1, skipped: 0, invalid: 0, errors: [],
+    })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Importar' }))
+    await screen.findByRole('option', { name: 'Clientes ativos' })
+    const queueSelect = await screen.findByLabelText('Fila para o disparo')
+    fireEvent.change(queueSelect, { target: { value: 'queue-1' } })
+    const file = new File(['nome,contato\nAna,5511999990000'], 'contatos.csv', { type: 'text/csv' })
+    fireEvent.change(screen.getByLabelText('Arquivo *'), { target: { files: [file] } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Importar contatos' }).closest('form')!)
+
+    await waitFor(() => expect(api.contacts.import).toHaveBeenCalledWith(file, 'queue-1'))
   })
 
   it('asks which company line should start a conversation when multiple lines are active', async () => {

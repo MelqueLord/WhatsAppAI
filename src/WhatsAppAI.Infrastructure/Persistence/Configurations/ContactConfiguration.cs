@@ -33,6 +33,9 @@ public sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
             .HasColumnName("profile_picture_url")
             .HasMaxLength(500);
 
+        builder.Property(c => c.QueueId)
+            .HasColumnName("queue_id");
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone")
@@ -50,5 +53,12 @@ public sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
             .IsUnique();
 
         builder.HasIndex(c => c.TenantId);
+
+        builder.HasIndex(c => new { c.TenantId, c.QueueId });
+
+        builder.HasOne<ServiceLine>()
+            .WithMany()
+            .HasForeignKey(c => c.QueueId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

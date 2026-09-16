@@ -83,6 +83,27 @@ public sealed class ContactImportServiceTests
         Assert.Equal(currentTenant, Assert.Single(repository.Added).TenantId);
     }
 
+    [Fact]
+    public async Task ImportAsync_AssignsSelectedQueueOnlyToNewContacts()
+    {
+        var tenantId = Guid.NewGuid();
+        var queueId = Guid.NewGuid();
+        var existing = Contact.Create(tenantId, "5511999990000", "Existente");
+        var repository = new FakeContactRepository(existing);
+        var service = new ContactImportService(
+            new StubFileReader([
+                new ContactImportRow(2, "Existente", "5511999990000"),
+                new ContactImportRow(3, "Nova", "5511888880000")
+            ]),
+            repository);
+
+        var result = await service.ImportAsync(tenantId, Stream.Null, "contatos.csv", queueId);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Null(existing.QueueId);
+        Assert.Equal(queueId, Assert.Single(repository.Added).QueueId);
+    }
+
     private sealed class StubFileReader(IReadOnlyList<ContactImportRow> rows) : IContactImportFileReader
     {
         public Task<IReadOnlyList<ContactImportRow>> ReadAsync(

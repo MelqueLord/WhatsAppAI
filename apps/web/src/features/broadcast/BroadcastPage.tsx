@@ -65,6 +65,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const { data: contacts, isLoading: loadingContacts } = useQuery({
     queryKey: ['contacts', 'broadcast'],
     queryFn: () => api.contacts.list(undefined, 500),
+    enabled: !selectedQueueId,
   })
 
   const { data: queues } = useQuery({
@@ -78,7 +79,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
       api.broadcasts.create({
         name,
         message,
-        contactIds: [...selectedIds],
+        contactIds: selectedQueueId ? [] : [...selectedIds],
         queueId: selectedQueueId || undefined,
       }),
     onSuccess: () => {
@@ -109,9 +110,14 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const selectQueue = (queueId: string) => {
+    setSelectedQueueId(queueId)
+    setSelectedIds(new Set())
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !message.trim() || selectedIds.size === 0) return
+    if (!name.trim() || !message.trim() || (!selectedQueueId && selectedIds.size === 0)) return
     createMutation.mutate()
   }
 
@@ -139,7 +145,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <select
                 id="broadcast-queue"
                 value={selectedQueueId}
-                onChange={(e) => setSelectedQueueId(e.target.value)}
+                onChange={(event) => selectQueue(event.target.value)}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">Sem fila</option>
@@ -147,6 +153,11 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                   <option key={queue.id} value={queue.id}>{queue.name}</option>
                 ))}
               </select>
+              {selectedQueueId && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Todos os contatos desta fila serão incluídos. O sistema registra cada destinatário uma única vez e envia em lotes de 5.
+                </p>
+              )}
             </div>
 
             <div>
@@ -178,8 +189,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <p className="text-xs text-slate-400 mt-1 text-right">{message.length}/4096</p>
             </div>
 
-            {/* Contact picker */}
-            <div>
+            {!selectedQueueId && <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-slate-700">
                   Destinatários{' '}
@@ -231,7 +241,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               {selectedIds.size > 500 && (
                 <p className="text-xs text-red-600 mt-1">Máximo de 500 destinatários por transmissão.</p>
               )}
-            </div>
+            </div>}
           </div>
 
           {/* Footer */}
@@ -249,8 +259,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 createMutation.isPending ||
                 !name.trim() ||
                 !message.trim() ||
-                selectedIds.size === 0 ||
-                selectedIds.size > 500
+                (!selectedQueueId && (selectedIds.size === 0 || selectedIds.size > 500))
               }
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
             >

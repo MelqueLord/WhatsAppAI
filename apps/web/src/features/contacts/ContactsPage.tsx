@@ -68,6 +68,12 @@ export function ContactsPage() {
     queryFn: () => api.contacts.list(undefined, 100),
   })
 
+  const { data: serviceQueues = [] } = useQuery({
+    queryKey: ['service-queues'],
+    queryFn: api.serviceQueues.list,
+    enabled: isTenantOwner && showImportForm,
+  })
+
   const refreshContacts = () => {
     queryClient.invalidateQueries({ queryKey: ['contacts'] })
   }
@@ -152,7 +158,7 @@ export function ContactsPage() {
   })
 
   const importMutation = useMutation({
-    mutationFn: (file: File) => api.contacts.import(file),
+    mutationFn: ({ file, queueId }: { file: File; queueId?: string }) => api.contacts.import(file, queueId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
     },
@@ -387,7 +393,8 @@ export function ContactsPage() {
             <form
               onSubmit={(event) => {
                 event.preventDefault()
-                if (importFile) importMutation.mutate(importFile)
+                const queueId = new FormData(event.currentTarget).get('queueId')?.toString()
+                if (importFile) importMutation.mutate({ file: importFile, queueId: queueId || undefined })
               }}
               className="space-y-4"
             >
@@ -401,6 +408,20 @@ export function ContactsPage() {
                   onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
                   className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-700"
                 />
+              </div>
+              <div>
+                <label htmlFor="contacts-import-queue" className="block text-sm font-medium text-slate-700 mb-1.5">Fila para o disparo</label>
+                <select
+                  id="contacts-import-queue"
+                  name="queueId"
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Sem fila</option>
+                  {serviceQueues.filter((queue) => queue.isActive).map((queue) => (
+                    <option key={queue.id} value={queue.id}>{queue.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">Os contatos continuam na lista geral. Depois, escolha esta fila no disparo para selecionar o grupo.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={closeImportForm} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm">

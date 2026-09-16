@@ -25,6 +25,16 @@ public class ContactTests
     }
 
     [Fact]
+    public void Create_AssignsOptionalQueue()
+    {
+        var queueId = Guid.NewGuid();
+
+        var contact = Contact.Create(Guid.NewGuid(), "+5511999999999", queueId: queueId);
+
+        Assert.Equal(queueId, contact.QueueId);
+    }
+
+    [Fact]
     public void Create_NormalizesWhatsAppName()
     {
         var contact = Contact.Create(Guid.NewGuid(), "+5511999999999", "  Maria\t da  Silva  ");

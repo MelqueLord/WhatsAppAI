@@ -660,9 +660,10 @@ export const api = {
     delete: (id: string) =>
       fetchApi<void>(`/api/contacts/${id}`, { method: 'DELETE' }),
 
-    import: (file: File) => {
+    import: (file: File, queueId?: string) => {
       const data = new FormData()
       data.append('file', file)
+      if (queueId) data.append('queueId', queueId)
       return fetchApi<ContactImportResult>('/api/contacts/import', {
         method: 'POST',
         body: data,

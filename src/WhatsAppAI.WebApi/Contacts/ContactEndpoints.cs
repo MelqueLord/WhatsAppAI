@@ -58,7 +58,9 @@ public static class ContactEndpoints
 
     private static async Task<IResult> ImportContactsAsync(
         IFormFile file,
+        Guid? queueId,
         ICurrentTenant currentTenant,
+        IServiceLineRepository queueRepository,
         ContactImportService importService,
         CancellationToken cancellationToken)
     {
@@ -76,6 +78,13 @@ public static class ContactEndpoints
                 statusCode: StatusCodes.Status413PayloadTooLarge,
                 title: "O arquivo deve ter no máximo 2 MB.");
 
+        if (queueId.HasValue)
+        {
+            var queue = await queueRepository.GetByIdAsync(queueId.Value, cancellationToken);
+            if (queue is null || queue.TenantId != currentTenant.TenantId.Value || !queue.IsActive)
+                return Results.BadRequest(new { error = "Fila não encontrada ou inativa." });
+        }
+
         try
         {
             await using var stream = file.OpenReadStream();
@@ -83,6 +92,7 @@ public static class ContactEndpoints
                 currentTenant.TenantId.Value,
                 stream,
                 file.FileName,
+                queueId,
                 cancellationToken);
             return Results.Ok(result);
         }
@@ -114,26 +124,13 @@ public static class ContactEndpoints
                 return Results.BadRequest(new { error = "Queue not found." });
         }
 
-        List<Guid>? queueContactIds = null;
-        if (queueId.HasValue)
-        {
-            queueContactIds = await dbContext.Conversations
-                .Where(conversation =>
-                    conversation.TenantId == currentTenant.TenantId.Value &&
-                    conversation.QueueId == queueId.Value &&
-                    conversation.Status == ConversationStatus.Open)
-                .Select(conversation => conversation.ContactId)
-                .Distinct()
-                .ToListAsync();
-        }
-
         var query = dbContext.Contacts
             .Where(c =>
                 c.TenantId == currentTenant.TenantId.Value &&
                 !c.PhoneNumber.StartsWith("anon-"));
 
-        if (queueContactIds is not null)
-            query = query.Where(c => queueContactIds.Contains(c.Id));
+        if (queueId.HasValue)
+            query = query.Where(c => c.QueueId == queueId.Value);
 
         if (!string.IsNullOrWhiteSpace(search))
         {

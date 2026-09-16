@@ -12,6 +12,7 @@ public interface IBroadcastRepository
 
     Task AddRecipientsAsync(IEnumerable<BroadcastRecipient> recipients);
     Task<IReadOnlyList<BroadcastRecipient>> GetPendingRecipientsAsync(Guid broadcastListId, int batchSize = 10);
+    Task<int> CountPendingRecipientsAsync(Guid broadcastListId);
     Task<IReadOnlyList<BroadcastRecipient>> GetFailedRecipientsAsync(Guid broadcastListId);
     Task<BroadcastRecipient?> GetRecipientByIdAsync(Guid id);
     Task UpdateRecipientAsync(BroadcastRecipient recipient);

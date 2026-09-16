@@ -13,6 +13,9 @@ namespace WhatsAppAI.WebApi.Broadcast;
 
 public static class BroadcastEndpoints
 {
+    private const int ManualRecipientLimit = 500;
+    private const int RecipientInsertBatchSize = 500;
+
     public static IEndpointRouteBuilder MapBroadcastEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/broadcasts")
@@ -73,8 +76,8 @@ public static class BroadcastEndpoints
         [FromBody] CreateBroadcastRequest request,
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
-        IContactRepository contactRepo,
-        AppDbContext db)
+        AppDbContext db,
+        CancellationToken cancellationToken)
     {
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
@@ -88,34 +91,48 @@ public static class BroadcastEndpoints
         if (request.Message.Length > 4096)
             return Results.BadRequest(new { error = "Message must be at most 4096 characters." });
 
-        if (request.ContactIds is null || request.ContactIds.Count == 0)
-            return Results.BadRequest(new { error = "At least one recipient required." });
-
-        if (request.ContactIds.Count > 500)
-            return Results.BadRequest(new { error = "Maximum 500 recipients per broadcast." });
-
-        // Validate all contacts belong to this tenant
-        var contactIds = request.ContactIds.Distinct().ToList();
         var tenantId = currentTenant.TenantId.Value;
-
         Guid? queueId = null;
+        List<Guid> contactIds;
+
         if (request.QueueId.HasValue)
         {
             var queueExists = await db.ServiceLines
-                .AnyAsync(q => q.Id == request.QueueId.Value && q.TenantId == tenantId && q.IsActive);
+                .AnyAsync(
+                    q => q.Id == request.QueueId.Value && q.TenantId == tenantId && q.IsActive,
+                    cancellationToken);
             if (!queueExists)
                 return Results.BadRequest(new { error = "Queue not found or does not belong to this tenant." });
+
+            contactIds = await db.Contacts
+                .IgnoreQueryFilters()
+                .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value)
+                .OrderBy(c => c.Id)
+                .Select(c => c.Id)
+                .ToListAsync(cancellationToken);
+
+            if (contactIds.Count == 0)
+                return Results.BadRequest(new { error = "No contacts found for this queue." });
+
             queueId = request.QueueId.Value;
         }
+        else
+        {
+            contactIds = request.ContactIds.Distinct().ToList();
+            if (contactIds.Count == 0)
+                return Results.BadRequest(new { error = "At least one recipient required." });
+            if (contactIds.Count > ManualRecipientLimit)
+                return Results.BadRequest(new { error = $"Maximum {ManualRecipientLimit} manually selected recipients per broadcast." });
 
-        var validContacts = await db.Contacts
-            .IgnoreQueryFilters()
-            .Where(c => c.TenantId == tenantId && contactIds.Contains(c.Id))
-            .Select(c => c.Id)
-            .ToListAsync();
+            var validContacts = await db.Contacts
+                .IgnoreQueryFilters()
+                .Where(c => c.TenantId == tenantId && contactIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .ToListAsync(cancellationToken);
 
-        if (validContacts.Count != contactIds.Count)
-            return Results.BadRequest(new { error = "One or more contacts not found." });
+            if (validContacts.Count != contactIds.Count)
+                return Results.BadRequest(new { error = "One or more contacts not found." });
+        }
 
         var broadcast = BroadcastList.Create(
             tenantId,
@@ -124,13 +141,17 @@ public static class BroadcastEndpoints
             currentTenant.UserId.Value,
             queueId);
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await broadcastRepo.AddAsync(broadcast);
 
-        var recipients = contactIds
-            .Select(cid => BroadcastRecipient.Create(tenantId, broadcast.Id, cid))
-            .ToList();
+        foreach (var recipientBatch in contactIds.Chunk(RecipientInsertBatchSize))
+        {
+            var recipients = recipientBatch
+                .Select(contactId => BroadcastRecipient.Create(tenantId, broadcast.Id, contactId));
+            await broadcastRepo.AddRecipientsAsync(recipients);
+        }
 
-        await broadcastRepo.AddRecipientsAsync(recipients);
+        await transaction.CommitAsync(cancellationToken);
 
         return Results.Created($"/api/broadcasts/{broadcast.Id}", ToDto(broadcast));
     }
@@ -224,9 +245,7 @@ public static class BroadcastEndpoints
         if (active is not null)
             return Results.BadRequest(new { error = "There is already a broadcast in progress." });
 
-        // Count pending recipients for this broadcast
-        var pendingRecipients = await broadcastRepo.GetPendingRecipientsAsync(broadcast.Id, 500);
-        var totalCount = pendingRecipients.Count;
+        var totalCount = await broadcastRepo.CountPendingRecipientsAsync(broadcast.Id);
 
         if (totalCount == 0)
             return Results.BadRequest(new { error = "No recipients found for this broadcast." });

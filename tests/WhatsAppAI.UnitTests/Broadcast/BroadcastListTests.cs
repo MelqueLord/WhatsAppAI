@@ -37,6 +37,22 @@ public sealed class BroadcastListTests
     }
 
     [Fact]
+    public void StartDispatch_AcceptsQueueAudienceLargerThanManualSelectionLimit()
+    {
+        var broadcast = BroadcastList.Create(
+            Guid.NewGuid(),
+            "Oferta",
+            "Mensagem",
+            Guid.NewGuid(),
+            Guid.NewGuid());
+
+        broadcast.StartDispatch("qr:tenant:1:1", 501);
+
+        Assert.Equal(BroadcastStatus.Sending, broadcast.Status);
+        Assert.Equal(501, broadcast.TotalCount);
+    }
+
+    [Fact]
     public void UpdateMessage_AllowsDraftBroadcastsOnly()
     {
         var broadcast = BroadcastList.Create(

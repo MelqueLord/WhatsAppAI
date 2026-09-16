@@ -82,15 +82,24 @@ describe('BroadcastPage', () => {
     fireEvent.change(screen.getByLabelText('Fila de atendimento'), { target: { value: 'queue-1' } })
     fireEvent.change(screen.getByLabelText('Nome da lista *'), { target: { value: 'Aviso' } })
     fireEvent.change(screen.getByLabelText('Mensagem *'), { target: { value: 'Mensagem' } })
-    fireEvent.click(await screen.findByText('Cliente'))
     fireEvent.click(screen.getByRole('button', { name: 'Criar Lista' }))
 
     await waitFor(() => expect(api.broadcasts.create).toHaveBeenCalledWith({
       name: 'Aviso',
       message: 'Mensagem',
-      contactIds: ['contact-1'],
+      contactIds: [],
       queueId: 'queue-1',
     }))
+  })
+
+  it('uses the entire selected queue instead of the first 500 loaded contacts', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    await screen.findByRole('option', { name: 'Vendas' })
+    fireEvent.change(screen.getByLabelText('Fila de atendimento'), { target: { value: 'queue-1' } })
+
+    expect(await screen.findByText(/Todos os contatos desta fila serão incluídos/)).toBeInTheDocument()
+    expect(api.contacts.list).not.toHaveBeenCalledWith(undefined, 500, 'queue-1')
   })
 
   it('does not ask for a queue again when dispatching a saved broadcast', async () => {

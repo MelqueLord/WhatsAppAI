@@ -13,6 +13,7 @@ public sealed class ContactImportService(
         Guid tenantId,
         Stream stream,
         string fileName,
+        Guid? queueId = null,
         CancellationToken cancellationToken = default)
     {
         var rows = await fileReader.ReadAsync(stream, fileName, MaxRows, cancellationToken);
@@ -57,7 +58,7 @@ public sealed class ContactImportService(
                 continue;
             }
 
-            contacts.Add(Contact.Create(tenantId, phone, name));
+            contacts.Add(Contact.Create(tenantId, phone, name, queueId));
         }
 
         if (contacts.Count > 0)

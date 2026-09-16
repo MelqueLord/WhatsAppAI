@@ -1370,6 +1370,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("profile_picture_url");
 
+                    b.Property<Guid?>("QueueId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("queue_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -1381,6 +1385,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "QueueId");
 
                     b.HasIndex("TenantId", "PhoneNumber")
                         .IsUnique();
@@ -1541,6 +1547,14 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ConversationId", "OccurredAt");
 
                     b.ToTable("handoff_events", "whatsappai");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Contact", b =>
+                {
+                    b.HasOne("WhatsAppAI.Domain.Messaging.ServiceLine", null)
+                        .WithMany()
+                        .HasForeignKey("QueueId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Message", b =>

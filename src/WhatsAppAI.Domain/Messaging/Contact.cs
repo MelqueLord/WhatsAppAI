@@ -7,6 +7,7 @@ public sealed class Contact
     public string PhoneNumber { get; private set; } = string.Empty;
     public string? Name { get; private set; }
     public string? ProfilePictureUrl { get; private set; }
+    public Guid? QueueId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
     public DateTime? LastMessageAt { get; private set; }
@@ -16,7 +17,7 @@ public sealed class Contact
 
     private Contact() { }
 
-    public static Contact Create(Guid tenantId, string phoneNumber, string? name = null)
+    public static Contact Create(Guid tenantId, string phoneNumber, string? name = null, Guid? queueId = null)
     {
         return new Contact
         {
@@ -24,6 +25,7 @@ public sealed class Contact
             TenantId = tenantId,
             PhoneNumber = phoneNumber,
             Name = NormalizeName(name),
+            QueueId = queueId,
             CreatedAt = DateTime.UtcNow
         };
     }
