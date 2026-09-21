@@ -24,6 +24,9 @@ public static class WhatsAppEndpoints
         group.MapPost("/test-connection", TestConnectionAsync)
             .WithName("TestWhatsAppConnection");
 
+        group.MapGet("/official/status/{lineNumber:int}", GetOfficialApiStatusAsync)
+            .WithName("GetOfficialApiStatus");
+
         // QR Code connection endpoints
         group.MapGet("/qrcode/{lineNumber:int}", GetQrCodeAsync)
             .WithName("GetWhatsAppQrCode");
@@ -130,14 +133,21 @@ public static class WhatsAppEndpoints
         ICurrentTenant currentTenant,
         IWhatsAppAccountRepository accountRepository,
         ISecretStore secretStore,
-        IWhatsAppClient whatsAppClient)
+        IWhatsAppClient whatsAppClient,
+        [FromQuery] int lineNumber = 1)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
         if (currentTenant.UserRole != "TenantOwner")
             return Results.Forbid();
 
-        var account = await accountRepository.GetByTenantAsync(currentTenant.TenantId.Value);
+        if (lineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var account = await accountRepository.GetByTenantAndSlotAsync(
+            currentTenant.TenantId.Value,
+            WhatsAppConnectionType.OfficialApi,
+            lineNumber);
         if (account is null)
             return Results.BadRequest(new { error = "WhatsApp not configured." });
 
@@ -164,6 +174,63 @@ public static class WhatsAppEndpoints
         {
             success = false,
             message = result.ErrorMessage
+        });
+    }
+
+    private static async Task<IResult> GetOfficialApiStatusAsync(
+        ICurrentTenant currentTenant,
+        int lineNumber,
+        IWhatsAppAccountRepository accountRepository,
+        ISecretStore secretStore,
+        IWhatsAppClient whatsAppClient,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+        if (lineNumber < 1)
+            return Results.BadRequest(new { error = "Line number must be greater than zero." });
+
+        var tenant = await dbContext.Tenants.FindAsync(currentTenant.TenantId.Value);
+        if (tenant is null || lineNumber > tenant.OfficialApiLineCount)
+            return Results.BadRequest(new { error = "The selected official API line is outside the contracted quota." });
+
+        var account = await accountRepository.GetByTenantAndSlotAsync(
+            currentTenant.TenantId.Value,
+            WhatsAppConnectionType.OfficialApi,
+            lineNumber);
+        if (account is null || !account.IsActive)
+        {
+            return Results.Ok(new
+            {
+                configured = false,
+                isConnected = false,
+                message = "Configure the credentials for this official API line."
+            });
+        }
+
+        var accessToken = await secretStore.GetAsync(account.AccessTokenRef);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return Results.Ok(new
+            {
+                configured = true,
+                isConnected = false,
+                message = "The access token for this official API line was not found."
+            });
+        }
+
+        var result = await whatsAppClient.TestConnectionAsync(account.PhoneNumberId, accessToken);
+        return Results.Ok(new
+        {
+            configured = true,
+            isConnected = result.IsSuccess,
+            phoneNumber = result.PhoneNumber,
+            qualityRating = result.QualityRating,
+            message = result.IsSuccess
+                ? "Connection successful."
+                : result.ErrorMessage ?? "Connection failed. Please check your credentials."
         });
     }
 

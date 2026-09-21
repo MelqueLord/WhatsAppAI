@@ -63,6 +63,16 @@ export function WhatsAppConfigPage() {
     refetchInterval: 5000, // Poll every 5 seconds
   })
 
+  const { data: officialApiStatus, isFetching: officialApiStatusLoading, refetch: refetchOfficialApiStatus } = useQuery({
+    queryKey: ['whatsapp-official-status', selectedApiLine],
+    queryFn: async () => {
+      const res = await fetchApiResponse(`/api/integrations/whatsapp/official/status/${selectedApiLine}`)
+      if (!res.ok) throw new Error('Não foi possível verificar a conexão da API oficial.')
+      return res.json() as Promise<{ configured: boolean; isConnected: boolean; phoneNumber?: string; qualityRating?: string; message: string }>
+    },
+    enabled: !isSuspended && !isOperator && connectionMode === 'api' && apiLineCount > 0,
+  })
+
   const disconnectMutation = useMutation({
     mutationFn: async () => {
       const res = await fetchApiResponse(`/api/integrations/whatsapp/session/disconnect/${selectedQrLine}`, {
@@ -92,13 +102,14 @@ export function WhatsAppConfigPage() {
       setSuccess('Configuração salva com sucesso!')
       setAccessToken('')
       queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-official-status', selectedApiLine] })
       setTimeout(() => setSuccess(null), 3000)
     },
   })
 
   const testMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetchApiResponse('/api/integrations/whatsapp/test-connection', {
+      const res = await fetchApiResponse(`/api/integrations/whatsapp/test-connection?lineNumber=${selectedApiLine}`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -309,6 +320,37 @@ export function WhatsAppConfigPage() {
         {!isOperator && connectionMode === 'api' && (
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="font-semibold text-slate-900 mb-4">Credenciais da API Oficial</h2>
+
+            <div className={`mb-4 p-4 rounded-xl flex items-center gap-3 ${
+              officialApiStatus?.isConnected
+                ? 'bg-emerald-50 border border-emerald-200'
+                : 'bg-slate-50 border border-slate-200'
+            }`}>
+              {officialApiStatus?.isConnected ? (
+                <Wifi className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <WifiOff className="w-5 h-5 text-slate-400" />
+              )}
+              <div>
+                <p className={`font-medium ${officialApiStatus?.isConnected ? 'text-emerald-800' : 'text-slate-700'}`}>
+                  {officialApiStatus?.isConnected ? 'Conectado' : 'Desconectado'}
+                </p>
+                <p className={`text-sm ${officialApiStatus?.isConnected ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  {officialApiStatus?.isConnected
+                    ? officialApiStatus.phoneNumber ?? 'A API Oficial está pronta para receber mensagens.'
+                    : officialApiStatus?.message ?? 'Verificando a conexão da API Oficial...'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => refetchOfficialApiStatus()}
+                disabled={officialApiStatusLoading}
+                className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 hover:bg-white rounded-lg disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${officialApiStatusLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+            </div>
 
             {success && (
               <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm flex items-center gap-2">
