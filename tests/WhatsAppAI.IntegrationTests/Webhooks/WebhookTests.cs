@@ -45,7 +45,7 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
 
         // Act
         var response = await _client.GetAsync(
-            $"/api/webhooks/meta?hub_mode=subscribe&hub_verify_token={_verifyToken}&hub_challenge={challenge}");
+            $"/api/webhooks/meta?hub.mode=subscribe&hub.verify_token={_verifyToken}&hub.challenge={challenge}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -58,7 +58,7 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
     {
         // Act
         var response = await _client.GetAsync(
-            "/api/webhooks/meta?hub_mode=subscribe&hub_verify_token=wrong-token&hub_challenge=test");
+            "/api/webhooks/meta?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=test");
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

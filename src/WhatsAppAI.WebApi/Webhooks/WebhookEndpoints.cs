@@ -395,9 +395,9 @@ public static class WebhookEndpoints
     }
 
     private static async Task<IResult> VerifyChallengeAsync(
-        [FromQuery] string hub_mode,
-        [FromQuery] string hub_verify_token,
-        [FromQuery] string hub_challenge,
+        [FromQuery(Name = "hub.mode")] string hub_mode,
+        [FromQuery(Name = "hub.verify_token")] string hub_verify_token,
+        [FromQuery(Name = "hub.challenge")] string hub_challenge,
         ISecretStore secretStore,
         ILogger<Program> logger)
     {
