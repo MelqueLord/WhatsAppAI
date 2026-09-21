@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -49,7 +48,8 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var content = await response.Content.ReadFromJsonAsync<string>();
+        Assert.Equal("text/plain; charset=utf-8", response.Content.Headers.ContentType?.ToString());
+        var content = await response.Content.ReadAsStringAsync();
         Assert.Equal(challenge, content);
     }
 

@@ -416,7 +416,7 @@ public static class WebhookEndpoints
         }
 
         logger.LogInformation("Webhook verification successful");
-        return Results.Ok(hub_challenge);
+        return Results.Text(hub_challenge, "text/plain");
     }
 
     private static async Task<IResult> ReceiveEventAsync(
