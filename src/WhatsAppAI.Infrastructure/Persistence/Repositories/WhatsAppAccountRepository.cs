@@ -48,6 +48,10 @@ public sealed class WhatsAppAccountRepository(AppDbContext context) : IWhatsAppA
     public async Task<WhatsAppAccount?> GetByPhoneNumberIdAsync(string phoneNumberId, CancellationToken cancellationToken = default)
     {
         return await context.Set<WhatsAppAccount>()
+            // Webhooks run outside an authenticated tenant request. The phone
+            // number ID has a global unique constraint and is the verified
+            // boundary used to resolve the owning tenant.
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(a => a.PhoneNumberId == phoneNumberId, cancellationToken);
     }
 

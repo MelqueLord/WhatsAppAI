@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
 using Xunit;
@@ -177,6 +179,29 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(2, context.WebhookEvents.Count());
+    }
+
+    [Fact]
+    public async Task PhoneNumberLookup_ResolvesOfficialAccountOutsideAuthenticatedTenantRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        var phoneNumberId = Guid.NewGuid().ToString("N");
+
+        using var setupScope = _factory.Services.CreateScope();
+        var context = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        context.WhatsAppAccounts.Add(WhatsAppAccount.Create(
+            tenantId,
+            "waba-test",
+            phoneNumberId,
+            "whatsapp:token:test"));
+        await context.SaveChangesAsync();
+
+        using var lookupScope = _factory.Services.CreateScope();
+        var repository = lookupScope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
+        var account = await repository.GetByPhoneNumberIdAsync(phoneNumberId);
+
+        Assert.NotNull(account);
+        Assert.Equal(tenantId, account.TenantId);
     }
 
     [Fact]
