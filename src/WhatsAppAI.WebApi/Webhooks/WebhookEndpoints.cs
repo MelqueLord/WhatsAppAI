@@ -482,9 +482,10 @@ public static class WebhookEndpoints
             return Results.Ok("OK");
         }
 
-        // Create idempotency key from entry ID + timestamp
-        var entryId = payload.Entry?.FirstOrDefault()?.Id ?? "unknown";
-        var idempotencyKey = $"{entryId}:{payload.Entry?.FirstOrDefault()?.Changes?.FirstOrDefault()?.Value?.Metadata?.DisplayPhoneNumber}";
+        // Meta reuses the WABA entry ID for many deliveries. Hash the signed raw
+        // event instead so retries deduplicate without discarding later messages.
+        var idempotencyKey = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))).ToLowerInvariant();
 
         // Check for duplicate
         var existingEvent = await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey);

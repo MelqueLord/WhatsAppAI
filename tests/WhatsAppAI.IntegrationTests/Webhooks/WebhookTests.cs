@@ -156,6 +156,30 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task ReceiveEvent_SameWabaEntryWithDifferentMessages_PersistsBothEvents()
+    {
+        // Meta uses the same WABA entry ID for separate incoming deliveries.
+        var firstPayload = CreateTestPayload("+5511999887665", "123456789", "First", "waba-entry");
+        var secondPayload = CreateTestPayload("+5511999887665", "123456789", "Second", "waba-entry");
+
+        foreach (var payload in new[] { firstPayload, secondPayload })
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/webhooks/meta")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Add("X-Hub-Signature-256", ComputeSignature(payload));
+
+            var response = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, context.WebhookEvents.Count());
+    }
+
+    [Fact]
     public async Task ReceiveEvent_LargePayload_HandlesCorrectly()
     {
         // Arrange - Create a large message content
