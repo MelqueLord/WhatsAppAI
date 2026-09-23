@@ -100,7 +100,7 @@ public sealed class OutboxProcessingWorker(
         var contactRepository = scopedServices.GetRequiredService<IContactRepository>();
         var dbContext = scopedServices.GetRequiredService<AppDbContext>();
         var whatsAppAccountRepository = scopedServices.GetRequiredService<IWhatsAppAccountRepository>();
-        var whatsAppClient = scopedServices.GetRequiredService<IWhatsAppClient>();
+        var whatsAppClientResolver = scopedServices.GetRequiredService<IWhatsAppClientResolver>();
         var secretStore = scopedServices.GetRequiredService<ISecretStore>();
 
         try
@@ -185,6 +185,11 @@ public sealed class OutboxProcessingWorker(
                 await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
                 return;
             }
+
+            var connectionType = isQrSession
+                ? WhatsAppConnectionType.QrCode
+                : account!.ConnectionType;
+            var whatsAppClient = whatsAppClientResolver.GetClient(connectionType);
 
             if (AiReplyDeliveryGuard.IsAutomated(message.IdempotencyKey))
             {

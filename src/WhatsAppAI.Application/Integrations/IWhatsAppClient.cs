@@ -1,3 +1,5 @@
+using WhatsAppAI.Domain.Integrations;
+
 namespace WhatsAppAI.Application.Integrations;
 
 public interface IWhatsAppClient
@@ -48,6 +50,11 @@ public interface IWhatsAppClient
         Guid tenantId,
         int lineNumber = 1,
         CancellationToken cancellationToken = default);
+}
+
+public interface IWhatsAppClientResolver
+{
+    IWhatsAppClient GetClient(WhatsAppConnectionType connectionType);
 }
 
 public sealed record WhatsAppConnectionResult

@@ -16,18 +16,19 @@ public static class MetaServiceCollectionExtensions
     {
         var useBridge = configuration.GetValue<bool>("WhatsAppWeb:Enabled") || environment.IsDevelopment();
 
+        services.AddHttpClient<WhatsAppClient>();
+        var qrClient = services.AddHttpClient<WhatsAppWebClient>();
+
         if (useBridge)
         {
             var bridgeSecret = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
                 ?? configuration["WhatsAppWeb:WebhookSecret"]
                 ?? throw new InvalidOperationException("WhatsAppWeb:WebhookSecret is required when the WhatsApp Web bridge is enabled.");
-            services.AddHttpClient<IWhatsAppClient, WhatsAppWebClient>(client =>
+            qrClient.ConfigureHttpClient(client =>
                 client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Secret", bridgeSecret));
         }
-        else
-        {
-            services.AddHttpClient<IWhatsAppClient, WhatsAppClient>();
-        }
+
+        services.AddScoped<IWhatsAppClientResolver, WhatsAppClientResolver>();
 
         services.AddHttpClient<IMediaGateway, MediaGateway>();
         return services;

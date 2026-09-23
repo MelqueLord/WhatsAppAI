@@ -165,7 +165,7 @@ public static class ContactEndpoints
         HttpContext httpContext,
         IWhatsAppAccountRepository accountRepository,
         ITenantMembershipRepository membershipRepository,
-        IWhatsAppClient whatsAppClient)
+        IWhatsAppClientResolver whatsAppClientResolver)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -193,7 +193,7 @@ public static class ContactEndpoints
             if (request.StartConversation)
             {
                 var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-                    currentTenant, accountRepository, membershipRepository, whatsAppClient,
+                    currentTenant, accountRepository, membershipRepository, whatsAppClientResolver,
                     request.PhoneNumberId,
                     currentTenant.TenantId.Value, httpContext.RequestAborted);
                 if (phoneNumberId is null)
@@ -239,7 +239,7 @@ public static class ContactEndpoints
         if (request.StartConversation)
         {
             var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-                currentTenant, accountRepository, membershipRepository, whatsAppClient,
+                currentTenant, accountRepository, membershipRepository, whatsAppClientResolver,
                 request.PhoneNumberId,
                 currentTenant.TenantId.Value, httpContext.RequestAborted);
             if (phoneNumberId is null)
@@ -357,7 +357,7 @@ public static class ContactEndpoints
         HttpContext httpContext,
         IWhatsAppAccountRepository accountRepository,
         ITenantMembershipRepository membershipRepository,
-        IWhatsAppClient whatsAppClient)
+        IWhatsAppClientResolver whatsAppClientResolver)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -371,7 +371,7 @@ public static class ContactEndpoints
             return Results.NotFound();
 
         var phoneNumberId = await ResolveOutboundPhoneNumberIdAsync(
-            currentTenant, accountRepository, membershipRepository, whatsAppClient,
+            currentTenant, accountRepository, membershipRepository, whatsAppClientResolver,
             request?.PhoneNumberId,
             currentTenant.TenantId.Value, httpContext.RequestAborted);
         if (phoneNumberId is null)
@@ -431,7 +431,7 @@ public static class ContactEndpoints
         ICurrentTenant currentTenant,
         IWhatsAppAccountRepository accountRepository,
         ITenantMembershipRepository membershipRepository,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         string? requestedPhoneNumberId,
         Guid tenantId,
         CancellationToken cancellationToken)
@@ -500,7 +500,9 @@ public static class ContactEndpoints
             .Where(account => account.ConnectionType == WhatsAppConnectionType.QrCode)
             .OrderBy(account => account.LineNumber))
         {
-            var status = await whatsAppClient.GetSessionStatusAsync(
+            var status = await whatsAppClientResolver
+                .GetClient(WhatsAppConnectionType.QrCode)
+                .GetSessionStatusAsync(
                 tenantId, account.LineNumber, cancellationToken);
             if (status.IsConnected)
                 return account.PhoneNumberId;

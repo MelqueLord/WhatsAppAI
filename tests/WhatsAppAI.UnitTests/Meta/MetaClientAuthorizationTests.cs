@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Meta;
 using WhatsAppAI.Infrastructure.WhatsApp;
 
@@ -81,6 +82,17 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         Assert.False(result.IsSuccess);
         Assert.True(result.IsRetryable);
         Assert.Equal("WhatsApp Web session is reconnecting.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void WhatsAppClientResolver_UsesTheClientForTheConversationChannel()
+    {
+        var officialApiClient = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+        var qrCodeClient = new WhatsAppWebClient(new HttpClient(), new ConfigurationBuilder().Build());
+        var resolver = new WhatsAppClientResolver(officialApiClient, qrCodeClient);
+
+        Assert.Same(officialApiClient, resolver.GetClient(WhatsAppConnectionType.OfficialApi));
+        Assert.Same(qrCodeClient, resolver.GetClient(WhatsAppConnectionType.QrCode));
     }
 
     [Fact]

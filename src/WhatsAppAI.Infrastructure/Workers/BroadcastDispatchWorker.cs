@@ -54,7 +54,7 @@ public sealed class BroadcastDispatchWorker(
         var conversationRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
         var messageRepo = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
         var whatsAppAccountRepo = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
-        var whatsAppClient = scope.ServiceProvider.GetRequiredService<IWhatsAppClient>();
+        var whatsAppClientResolver = scope.ServiceProvider.GetRequiredService<IWhatsAppClientResolver>();
         var secretStore = scope.ServiceProvider.GetRequiredService<ISecretStore>();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -78,7 +78,7 @@ public sealed class BroadcastDispatchWorker(
                 await ProcessRecipientAsync(
                     broadcast, recipient,
                     broadcastRepo, contactRepo, conversationRepo,
-                    messageRepo, whatsAppAccountRepo, whatsAppClient, secretStore,
+                    messageRepo, whatsAppAccountRepo, whatsAppClientResolver, secretStore,
                     stoppingToken);
 
                 // Fixed 2 second delay between sends (avoids CA5394 / rate limiting)
@@ -95,7 +95,7 @@ public sealed class BroadcastDispatchWorker(
         IConversationRepository conversationRepo,
         IMessageRepository messageRepo,
         IWhatsAppAccountRepository whatsAppAccountRepo,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         ISecretStore secretStore,
         CancellationToken ct)
     {
@@ -146,7 +146,9 @@ public sealed class BroadcastDispatchWorker(
             accessToken ??= "whatsapp-web";
 
             // Send message directly (QR has no 24h restriction)
-            var result = await whatsAppClient.SendTextMessageAsync(
+            var result = await whatsAppClientResolver
+                .GetClient(WhatsAppConnectionType.QrCode)
+                .SendTextMessageAsync(
                 account.PhoneNumberId,
                 accessToken,
                 contact.PhoneNumber,

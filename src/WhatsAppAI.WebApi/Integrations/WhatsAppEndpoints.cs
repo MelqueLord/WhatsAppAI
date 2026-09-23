@@ -133,7 +133,7 @@ public static class WhatsAppEndpoints
         ICurrentTenant currentTenant,
         IWhatsAppAccountRepository accountRepository,
         ISecretStore secretStore,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         [FromQuery] int lineNumber = 1)
     {
         if (currentTenant.TenantId is null)
@@ -155,7 +155,9 @@ public static class WhatsAppEndpoints
         if (accessToken is null)
             return Results.BadRequest(new { error = "Access token not found." });
 
-        var result = await whatsAppClient.TestConnectionAsync(
+        var result = await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.OfficialApi)
+            .TestConnectionAsync(
             account.PhoneNumberId,
             accessToken);
 
@@ -182,7 +184,7 @@ public static class WhatsAppEndpoints
         int lineNumber,
         IWhatsAppAccountRepository accountRepository,
         ISecretStore secretStore,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -221,7 +223,9 @@ public static class WhatsAppEndpoints
             });
         }
 
-        var result = await whatsAppClient.TestConnectionAsync(account.PhoneNumberId, accessToken);
+        var result = await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.OfficialApi)
+            .TestConnectionAsync(account.PhoneNumberId, accessToken);
         return Results.Ok(new
         {
             configured = true,
@@ -237,7 +241,7 @@ public static class WhatsAppEndpoints
     private static async Task<IResult> GetQrCodeAsync(
         ICurrentTenant currentTenant,
         int lineNumber,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         IWhatsAppAccountRepository accountRepository,
         AppDbContext dbContext)
     {
@@ -269,7 +273,9 @@ public static class WhatsAppEndpoints
             await accountRepository.AddAsync(account);
         }
 
-        var result = await whatsAppClient.GetQrCodeAsync(currentTenant.TenantId.Value, lineNumber);
+        var result = await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.QrCode)
+            .GetQrCodeAsync(currentTenant.TenantId.Value, lineNumber);
 
         if (!result.IsSuccess)
         {
@@ -290,7 +296,7 @@ public static class WhatsAppEndpoints
     private static async Task<IResult> GetSessionStatusAsync(
         ICurrentTenant currentTenant,
         int lineNumber,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -305,7 +311,9 @@ public static class WhatsAppEndpoints
         if (tenant is null || lineNumber > tenant.QrCodeLineCount)
             return Results.BadRequest(new { error = "The selected QR Code line is outside the contracted quota." });
 
-        var result = await whatsAppClient.GetSessionStatusAsync(currentTenant.TenantId.Value, lineNumber);
+        var result = await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.QrCode)
+            .GetSessionStatusAsync(currentTenant.TenantId.Value, lineNumber);
 
         return Results.Ok(new
         {
@@ -318,7 +326,7 @@ public static class WhatsAppEndpoints
     private static async Task<IResult> DisconnectSessionAsync(
         ICurrentTenant currentTenant,
         int lineNumber,
-        IWhatsAppClient whatsAppClient,
+        IWhatsAppClientResolver whatsAppClientResolver,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -333,7 +341,9 @@ public static class WhatsAppEndpoints
         if (tenant is null || lineNumber > tenant.QrCodeLineCount)
             return Results.BadRequest(new { error = "The selected QR Code line is outside the contracted quota." });
 
-        await whatsAppClient.DisconnectSessionAsync(currentTenant.TenantId.Value, lineNumber);
+        await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.QrCode)
+            .DisconnectSessionAsync(currentTenant.TenantId.Value, lineNumber);
 
         return Results.Ok(new { message = "Session disconnected successfully." });
     }
