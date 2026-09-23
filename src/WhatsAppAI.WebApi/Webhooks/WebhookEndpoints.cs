@@ -16,7 +16,8 @@ public static class WebhookEndpoints
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
     public static IEndpointRouteBuilder MapWebhookEndpoints(this IEndpointRouteBuilder app)

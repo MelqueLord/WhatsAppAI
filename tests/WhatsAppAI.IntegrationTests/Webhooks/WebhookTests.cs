@@ -247,7 +247,8 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
                                     {
                                         from = from,
                                         id = $"msg-{Guid.NewGuid()}",
-                                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                                        // Meta Cloud API serializes message timestamps as strings.
+                                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(),
                                         type = "text",
                                         text = new { body = text }
                                     }
