@@ -114,31 +114,31 @@ public sealed class BroadcastDispatchWorker(
 
             if (broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate)
             {
-                var account = await whatsAppAccountRepo.GetByTenantAndPhoneNumberIdAsync(
+                var officialAccount = await whatsAppAccountRepo.GetByTenantAndPhoneNumberIdAsync(
                     broadcast.TenantId, broadcast.LinePhoneNumberId, ct);
-                if (account is null || !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+                if (officialAccount is null || !officialAccount.IsActive || officialAccount.ConnectionType != WhatsAppConnectionType.OfficialApi ||
                     string.IsNullOrWhiteSpace(broadcast.TemplateName) || string.IsNullOrWhiteSpace(broadcast.TemplateLanguage))
                 {
                     await FailRecipientAsync(broadcastRepo, broadcast, recipient, "Official API line or template unavailable", ct);
                     return;
                 }
 
-                var conversation = await dbContext.Conversations.IgnoreQueryFilters().FirstOrDefaultAsync(
+                var officialConversation = await dbContext.Conversations.IgnoreQueryFilters().FirstOrDefaultAsync(
                     item => item.TenantId == broadcast.TenantId && item.ContactId == contact.Id &&
                         item.PhoneNumberId == broadcast.LinePhoneNumberId, ct);
-                if (conversation is null)
+                if (officialConversation is null)
                 {
-                    conversation = Conversation.Create(broadcast.TenantId, contact.Id, broadcast.LinePhoneNumberId);
-                    conversation.RecordMessage();
-                    dbContext.Set<Conversation>().Add(conversation);
+                    officialConversation = Conversation.Create(broadcast.TenantId, contact.Id, broadcast.LinePhoneNumberId);
+                    officialConversation.RecordMessage();
+                    dbContext.Set<Conversation>().Add(officialConversation);
                 }
 
-                var message = Message.CreateOutboundTemplate(broadcast.TenantId, conversation.Id, contact.Id,
+                var officialMessage = Message.CreateOutboundTemplate(broadcast.TenantId, officialConversation.Id, contact.Id,
                     broadcast.TemplateName, broadcast.TemplateLanguage, broadcast.TemplateParametersJson ?? "[]",
                     $"broadcast:{broadcast.Id}:recipient:{recipient.Id}:attempt:{recipient.DispatchAttempt}");
-                dbContext.Set<Message>().Add(message);
-                dbContext.Set<OutboxMessage>().Add(OutboxMessage.Create(broadcast.TenantId, message.Id));
-                recipient.MarkQueued(message.Id);
+                dbContext.Set<Message>().Add(officialMessage);
+                dbContext.Set<OutboxMessage>().Add(OutboxMessage.Create(broadcast.TenantId, officialMessage.Id));
+                recipient.MarkQueued(officialMessage.Id);
                 dbContext.Set<BroadcastRecipient>().Update(recipient);
                 await dbContext.SaveChangesAsync(ct);
                 return;
