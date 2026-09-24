@@ -321,6 +321,12 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<string>("DeliveryMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("delivery_mode");
+
                     b.Property<int>("FailedCount")
                         .HasColumnType("integer")
                         .HasColumnName("failed_count");
@@ -373,6 +379,21 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("total_count");
 
+                    b.Property<string>("TemplateLanguage")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("template_language");
+
+                    b.Property<string>("TemplateName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("template_name");
+
+                    b.Property<string>("TemplateParametersJson")
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)")
+                        .HasColumnName("template_parameters_json");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
@@ -400,10 +421,22 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("DispatchAttempt")
+                        .HasColumnType("integer")
+                        .HasColumnName("dispatch_attempt");
+
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("error_message");
+
+                    b.Property<Guid?>("OutboundMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbound_message_id");
+
+                    b.Property<DateTime?>("QueuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at");
 
                     b.Property<DateTime?>("SentAt")
                         .HasColumnType("timestamp with time zone")
@@ -424,6 +457,9 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("BroadcastListId");
 
                     b.HasIndex("BroadcastListId", "Status");
+
+                    b.HasIndex("OutboundMessageId")
+                        .IsUnique();
 
                     b.HasIndex("TenantId", "BroadcastListId", "ContactId")
                         .IsUnique();
