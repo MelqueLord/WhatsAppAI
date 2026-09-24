@@ -84,6 +84,7 @@ export interface Conversation {
   queueColor?: string
   isQrCode?: boolean
   isWindowOpen: boolean
+  canUseTemplates?: boolean
   assignedToUserId?: string
   assignedToUserName?: string
   tags?: ConversationTag[]

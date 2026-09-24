@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Domain.Identity;
+using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
 
@@ -13,6 +14,45 @@ namespace WhatsAppAI.IntegrationTests.Messaging;
 public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {
+    [Fact]
+    public async Task TemplateAvailability_FollowsTheConversationOfficialLine()
+    {
+        var setup = await CreateTenantOwnerAsync();
+        var manualContact = Contact.Create(setup.TenantId, "5511999999901", "Legado QR");
+        var officialContact = Contact.Create(setup.TenantId, "5511999999902", "Oficial");
+        var manualConversation = Conversation.Create(setup.TenantId, manualContact.Id, "manual");
+        var officialConversation = Conversation.Create(setup.TenantId, officialContact.Id, "official-phone-1");
+        var officialAccount = WhatsAppAccount.Create(setup.TenantId, "waba-1", "official-phone-1", "secret-ref");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(manualContact, officialContact);
+            db.Conversations.AddRange(manualConversation, officialConversation);
+            db.WhatsAppAccounts.Add(officialAccount);
+            await db.SaveChangesAsync();
+        }
+
+        var list = await setup.Client.GetFromJsonAsync<JsonElement>("/api/conversations");
+        var items = list.GetProperty("items").EnumerateArray().ToList();
+        var manualItem = items.Single(item => item.GetProperty("id").GetGuid() == manualConversation.Id);
+        var officialItem = items.Single(item => item.GetProperty("id").GetGuid() == officialConversation.Id);
+        Assert.False(manualItem.GetProperty("canUseTemplates").GetBoolean());
+        Assert.True(officialItem.GetProperty("canUseTemplates").GetBoolean());
+
+        var manualDetail = await setup.Client.GetFromJsonAsync<JsonElement>($"/api/conversations/{manualConversation.Id}");
+        Assert.False(manualDetail.GetProperty("canUseTemplates").GetBoolean());
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            var account = await db.WhatsAppAccounts.SingleAsync(item => item.Id == officialAccount.Id);
+            account.Deactivate();
+            await db.SaveChangesAsync();
+        }
+
+        var inactiveDetail = await setup.Client.GetFromJsonAsync<JsonElement>($"/api/conversations/{officialConversation.Id}");
+        Assert.False(inactiveDetail.GetProperty("canUseTemplates").GetBoolean());
+    }
+
     [Fact]
     public async Task CloseMovesConversationToClosedFilterAndKeepsHistory()
     {

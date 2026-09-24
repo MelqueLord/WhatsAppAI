@@ -110,6 +110,35 @@ describe('BroadcastPage', () => {
     expect(api.contacts.list).not.toHaveBeenCalledWith(undefined, 500, 'queue-1')
   })
 
+  it('allows selecting individual contacts from the chosen queue', async () => {
+    vi.mocked(api.contacts.list).mockImplementation(async (_search, _limit, queueId) =>
+      queueId === 'queue-1'
+        ? [{ id: 'contact-2', phoneNumber: '5511888888888', name: 'Cliente da fila', createdAt: '2026-09-11T00:00:00Z' }]
+        : [{ id: 'contact-1', phoneNumber: '5511999999999', name: 'Cliente geral', createdAt: '2026-09-11T00:00:00Z' }])
+    vi.mocked(api.broadcasts.create).mockResolvedValue({
+      id: 'broadcast-2', name: 'Aviso', message: 'Mensagem', status: 'Draft', queueId: 'queue-1',
+      totalCount: 1, sentCount: 0, failedCount: 0, createdAt: '2026-09-11T00:00:00Z',
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    await screen.findByRole('option', { name: 'Vendas' })
+    fireEvent.change(screen.getByLabelText('Fila de atendimento'), { target: { value: 'queue-1' } })
+    fireEvent.click(screen.getByLabelText('Selecionar contatos desta fila'))
+
+    await waitFor(() => expect(api.contacts.list).toHaveBeenCalledWith(undefined, 500, 'queue-1'))
+    await screen.findByText('Cliente da fila')
+    expect(screen.queryByText('Cliente geral')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Cliente da fila').closest('label')!.querySelector('input')!)
+    fireEvent.change(screen.getByLabelText('Nome da lista *'), { target: { value: 'Aviso' } })
+    fireEvent.change(screen.getByLabelText('Mensagem *'), { target: { value: 'Mensagem' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar Lista' }))
+
+    await waitFor(() => expect(api.broadcasts.create).toHaveBeenCalledWith(expect.objectContaining({
+      contactIds: ['contact-2'], queueId: 'queue-1',
+    })))
+  })
+
   it('creates an official broadcast with the selected approved template and body parameters', async () => {
     vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
       lineNumber: 2,

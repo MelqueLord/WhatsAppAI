@@ -77,6 +77,7 @@ export function MessagePanel({
   )
   const isConversationClosed = conversation.status === 'Closed'
   const isConversationOpen = !isConversationClosed && (conversation.isQrCode || conversation.isWindowOpen)
+  const canSendTemplate = !isConversationClosed && !isConversationOpen && conversation.canUseTemplates === true
 
   const { data: serviceQueues = [] } = useQuery({
     queryKey: ['service-queues', 'active'],
@@ -125,10 +126,10 @@ export function MessagePanel({
 
   const messages = [...(messagesData?.items ?? [])].reverse()
 
-  const { data: templatesData, isLoading: isLoadingTemplates } = useQuery({
+  const { data: templatesData, isLoading: isLoadingTemplates, isError: templatesFailed } = useQuery({
     queryKey: ['conversation-templates', conversation.id],
     queryFn: () => api.conversations.listTemplates(conversation.id),
-    enabled: !isConversationClosed && !isConversationOpen && !conversation.isQrCode,
+    enabled: canSendTemplate,
     staleTime: 60_000,
   })
 
@@ -859,16 +860,21 @@ export function MessagePanel({
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
 
             <p className="text-xs text-amber-700">
-              Janela de 24h fechada.
-              Apenas templates são
-              permitidos.
+              {canSendTemplate
+                ? 'Janela de 24h fechada. Apenas templates são permitidos.'
+                : 'A linha desta conversa está indisponível. Verifique a conexão do WhatsApp para responder.'}
             </p>
           </div>
         )}
 
-        {!isConversationClosed && !isConversationOpen && !conversation.isQrCode && (
+        {canSendTemplate && (
           <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-[#10223f] p-3">
             <p className="text-xs font-medium text-slate-200">Enviar template aprovado pela Meta</p>
+            {(templatesFailed || templatesData?.error) && (
+              <p className="text-xs text-amber-300">
+                Não foi possível carregar os templates desta linha. Verifique a conexão da API Oficial.
+              </p>
+            )}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <select
                 value={templateName ? `${templateName}:${templateLanguage}` : ''}

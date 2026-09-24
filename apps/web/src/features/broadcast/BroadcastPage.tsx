@@ -64,12 +64,14 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const [templateParameters, setTemplateParameters] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState('')
+  const [queueRecipientMode, setQueueRecipientMode] = useState<'all' | 'manual'>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const selectingContacts = !selectedQueueId || queueRecipientMode === 'manual'
 
   const { data: contacts, isLoading: loadingContacts } = useQuery({
-    queryKey: ['contacts', 'broadcast'],
-    queryFn: () => api.contacts.list(undefined, 500),
-    enabled: !selectedQueueId,
+    queryKey: ['contacts', 'broadcast', selectedQueueId, search],
+    queryFn: () => api.contacts.list(search || undefined, 500, selectedQueueId || undefined),
+    enabled: selectingContacts,
   })
 
   const { data: queues } = useQuery({
@@ -97,7 +99,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
         templateName: selectedTemplate?.name,
         templateLanguage: selectedTemplate?.language,
         templateBodyParameters: templateParameters,
-        contactIds: selectedQueueId ? [] : [...selectedIds],
+        contactIds: selectingContacts ? [...selectedIds] : [],
         queueId: selectedQueueId || undefined,
       }),
     onSuccess: () => {
@@ -106,11 +108,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     },
   })
 
-  const filtered = (contacts ?? []).filter(
-    (c: Contact) =>
-      (c.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      c.phoneNumber.includes(search)
-  )
+  const filtered = contacts ?? []
 
   const toggleContact = (id: string) =>
     setSelectedIds((prev) => {
@@ -121,15 +119,26 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     })
 
   const toggleAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filtered.map((c: Contact) => c.id)))
-    }
+    setSelectedIds((previous) => {
+      const next = new Set(previous)
+      const allVisibleSelected = filtered.every((contact: Contact) => next.has(contact.id))
+      filtered.forEach((contact: Contact) => {
+        if (allVisibleSelected) next.delete(contact.id)
+        else next.add(contact.id)
+      })
+      return next
+    })
   }
 
   const selectQueue = (queueId: string) => {
     setSelectedQueueId(queueId)
+    setQueueRecipientMode('all')
+    setSearch('')
+    setSelectedIds(new Set())
+  }
+
+  const selectQueueRecipientMode = (mode: 'all' | 'manual') => {
+    setQueueRecipientMode(mode)
     setSelectedIds(new Set())
   }
 
@@ -137,7 +146,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     if (!name.trim() || (deliveryMode === 'QrCodeText' && !message.trim()) ||
       (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
-      (!selectedQueueId && selectedIds.size === 0)) return
+      (selectingContacts && (selectedIds.size === 0 || selectedIds.size > 500))) return
     createMutation.mutate()
   }
 
@@ -189,9 +198,17 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </select>
               {selectedQueueId && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Todos os contatos desta fila serão incluídos. O sistema registra cada destinatário uma única vez e envia em lotes de 5.
-                </p>
+                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="queue-recipient-mode" value="all" checked={queueRecipientMode === 'all'} onChange={() => selectQueueRecipientMode('all')} />
+                    Todos os contatos desta fila
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="queue-recipient-mode" value="manual" checked={queueRecipientMode === 'manual'} onChange={() => selectQueueRecipientMode('manual')} />
+                    Selecionar contatos desta fila
+                  </label>
+                  {queueRecipientMode === 'all' && <p className="text-xs text-slate-500">Todos os contatos desta fila serão incluídos, mesmo que haja mais de 500.</p>}
+                </div>
               )}
             </div>
 
@@ -224,7 +241,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <p className="text-xs text-slate-400 mt-1 text-right">{message.length}/4096</p>
             </div>}
 
-            {!selectedQueueId && <div>
+            {selectingContacts && <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-slate-700">
                   Destinatários{' '}
@@ -234,7 +251,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 </label>
                 {filtered.length > 0 && (
                   <button type="button" onClick={toggleAll} className="text-xs text-emerald-600 hover:underline">
-                    {selectedIds.size === filtered.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                    {filtered.every((contact: Contact) => selectedIds.has(contact.id)) ? 'Desmarcar exibidos' : 'Selecionar exibidos'}
                   </button>
                 )}
               </div>
@@ -244,7 +261,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar contatos..."
+                  placeholder={selectedQueueId ? 'Buscar contatos da fila...' : 'Buscar contatos...'}
                   className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
@@ -276,6 +293,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               {selectedIds.size > 500 && (
                 <p className="text-xs text-red-600 mt-1">Máximo de 500 destinatários por transmissão.</p>
               )}
+              {filtered.length === 500 && <p className="text-xs text-slate-500 mt-1">Mostrando até 500 contatos. Busque pelo nome ou número para encontrar outros.</p>}
             </div>}
           </div>
 
@@ -295,7 +313,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 !name.trim() ||
                 (deliveryMode === 'QrCodeText' && !message.trim()) ||
                 (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
-                (!selectedQueueId && (selectedIds.size === 0 || selectedIds.size > 500))
+                (selectingContacts && (selectedIds.size === 0 || selectedIds.size > 500))
               }
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
             >

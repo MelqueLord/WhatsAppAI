@@ -221,7 +221,9 @@ public static class ConversationEndpoints
             return Results.NotFound();
 
         var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
-        if (account is null || !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi)
+        if (account is null || account.TenantId != currentTenant.TenantId.Value ||
+            !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+            string.IsNullOrWhiteSpace(account.WabaId))
             return Results.BadRequest(new { error = "Templates are available only for the official WhatsApp API." });
 
         var accessToken = await secretStore.GetAsync(account.AccessTokenRef);
@@ -307,7 +309,8 @@ public static class ConversationEndpoints
 
         if (templateRequested)
         {
-            if (conversationAccount is null || !conversationAccount.IsActive ||
+            if (conversationAccount is null || conversationAccount.TenantId != currentTenant.TenantId.Value ||
+                !conversationAccount.IsActive ||
                 conversationAccount.ConnectionType != WhatsAppConnectionType.OfficialApi ||
                 string.IsNullOrWhiteSpace(conversationAccount.WabaId))
             {

@@ -128,15 +128,32 @@ public static class BroadcastEndpoints
             if (!queueExists)
                 return Results.BadRequest(new { error = "Queue not found or does not belong to this tenant." });
 
-            contactIds = await db.Contacts
-                .IgnoreQueryFilters()
-                .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value)
-                .OrderBy(c => c.Id)
-                .Select(c => c.Id)
-                .ToListAsync(cancellationToken);
+            if (request.ContactIds.Count == 0)
+            {
+                contactIds = await db.Contacts
+                    .IgnoreQueryFilters()
+                    .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value)
+                    .OrderBy(c => c.Id)
+                    .Select(c => c.Id)
+                    .ToListAsync(cancellationToken);
 
-            if (contactIds.Count == 0)
-                return Results.BadRequest(new { error = "No contacts found for this queue." });
+                if (contactIds.Count == 0)
+                    return Results.BadRequest(new { error = "No contacts found for this queue." });
+            }
+            else
+            {
+                contactIds = request.ContactIds.Distinct().ToList();
+                if (contactIds.Count > ManualRecipientLimit)
+                    return Results.BadRequest(new { error = $"Maximum {ManualRecipientLimit} manually selected recipients per broadcast." });
+
+                var validContacts = await db.Contacts
+                    .IgnoreQueryFilters()
+                    .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value && contactIds.Contains(c.Id))
+                    .CountAsync(cancellationToken);
+
+                if (validContacts != contactIds.Count)
+                    return Results.BadRequest(new { error = "One or more contacts do not belong to this queue." });
+            }
 
             queueId = request.QueueId.Value;
         }

@@ -211,7 +211,7 @@ describe('MessagePanel conversation closing', () => {
     apiMock.conversations.listTemplates.mockResolvedValue({
       templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1 }],
     })
-    const conversation = { ...createConversation(), isQrCode: false, isWindowOpen: false }
+    const conversation = { ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: true }
 
     renderPanel(conversation)
 
@@ -234,5 +234,13 @@ describe('MessagePanel conversation closing', () => {
         { name: 'service_update', language: 'pt_BR', parameters: ['Maria'] },
       )
     })
+  })
+
+  it('does not request templates for a conversation without an active official line', async () => {
+    renderPanel({ ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: false })
+
+    expect(await screen.findByText(/A linha desta conversa está indisponível/)).toBeInTheDocument()
+    expect(apiMock.conversations.listTemplates).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Enviar template' })).not.toBeInTheDocument()
   })
 })

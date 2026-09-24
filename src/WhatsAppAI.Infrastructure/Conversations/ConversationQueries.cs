@@ -98,9 +98,14 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .ToDictionary(g => g.Key, g => (IReadOnlyList<ConversationTagDto>)g.Select(x => new ConversationTagDto(x.Name, x.Color)).ToList());
 
         var activeQrExists = await context.WhatsAppAccounts
-            .AnyAsync(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
+            .AnyAsync(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
         var qrPhoneNumberIds = await context.WhatsAppAccounts
-            .Where(a => a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Where(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Select(a => a.PhoneNumberId)
+            .ToListAsync(cancellationToken);
+        var officialPhoneNumberIds = await context.WhatsAppAccounts
+            .Where(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.OfficialApi &&
+                a.IsActive && a.WabaId.Trim() != "")
             .Select(a => a.PhoneNumberId)
             .ToListAsync(cancellationToken);
 
@@ -123,6 +128,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             IsWindowOpen = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
                 (activeQrExists && (qrPhoneNumberIds.Contains(c.PhoneNumberId) || c.PhoneNumberId == "manual")) ||
                 (c.WindowExpiresAt.HasValue && c.WindowExpiresAt.Value > DateTime.UtcNow),
+            CanUseTemplates = officialPhoneNumberIds.Contains(c.PhoneNumberId),
         }).ToList();
 
         var hasMore = conversations.Count > limit;
@@ -289,9 +295,14 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
         ).ToListAsync(cancellationToken);
 
         var activeQrExists = await context.WhatsAppAccounts
-            .AnyAsync(a => a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
+            .AnyAsync(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.QrCode && a.IsActive, cancellationToken);
         var qrPhoneNumberIds = await context.WhatsAppAccounts
-            .Where(a => a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Where(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.QrCode)
+            .Select(a => a.PhoneNumberId)
+            .ToListAsync(cancellationToken);
+        var officialPhoneNumberIds = await context.WhatsAppAccounts
+            .Where(a => a.TenantId == tenantId && a.ConnectionType == WhatsAppConnectionType.OfficialApi &&
+                a.IsActive && a.WabaId.Trim() != "")
             .Select(a => a.PhoneNumberId)
             .ToListAsync(cancellationToken);
 
@@ -314,6 +325,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             IsWindowOpen = raw.PhoneNumberId.StartsWith("qr:") || raw.PhoneNumberId == "whatsapp-web" ||
                 (activeQrExists && (qrPhoneNumberIds.Contains(raw.PhoneNumberId) || raw.PhoneNumberId == "manual")) ||
                 (raw.WindowExpiresAt.HasValue && raw.WindowExpiresAt.Value > DateTime.UtcNow),
+            CanUseTemplates = officialPhoneNumberIds.Contains(raw.PhoneNumberId),
         };
     }
 

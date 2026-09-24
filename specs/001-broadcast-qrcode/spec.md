@@ -32,9 +32,10 @@ Operadores precisam enviar a mesma mensagem para múltiplos contatos de uma vez 
 ## Requisitos Funcionais
 
 ### FR-BR-001 — Criação
-- O sistema permite criar uma lista com: nome (obrigatório), mensagem de texto (obrigatório, máx 4096 caracteres), e seleção de contatos
-- Contatos podem ser selecionados individualmente ou via filtro por tag
-- Mínimo de 1 contato; máximo de 500 por lista
+- O sistema permite criar uma lista com: nome (obrigatório), mensagem de texto (obrigatório, máx 4096 caracteres), e seleção de contatos ou de uma fila
+- A seleção manual aceita de 1 a 500 contatos. Ao selecionar uma fila ativa do tenant, o operador pode incluir todos os contatos da fila, inclusive quando o total passa de 500, ou selecionar manualmente de 1 a 500 contatos pertencentes àquela fila
+- A busca de contatos da fila é limitada ao tenant e à fila selecionada; o backend valida novamente essa associação antes de criar a lista
+- Cada contato aparece uma única vez na fotografia da lista; destinatários de filas grandes são gravados em blocos
 
 ### FR-BR-002 — Seleção de linha
 - Ao disparar, o operador seleciona qual linha QR Code ativa será usada para envio
