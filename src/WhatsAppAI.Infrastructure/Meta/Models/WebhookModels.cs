@@ -166,4 +166,28 @@ public sealed class WebhookStatus
 
     [JsonPropertyName("recipient_id")]
     public string? RecipientId { get; set; }
+
+    [JsonPropertyName("errors")]
+    public List<WebhookError>? Errors { get; set; }
+}
+
+public sealed class WebhookError
+{
+    [JsonPropertyName("code")]
+    public int Code { get; set; }
+
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("error_data")]
+    public WebhookErrorData? ErrorData { get; set; }
+}
+
+public sealed class WebhookErrorData
+{
+    [JsonPropertyName("details")]
+    public string? Details { get; set; }
 }

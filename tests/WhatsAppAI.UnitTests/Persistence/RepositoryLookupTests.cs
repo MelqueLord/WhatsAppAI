@@ -84,6 +84,41 @@ public sealed class RepositoryLookupTests
         Assert.Null(inactiveResult);
     }
 
+    [Fact]
+    public async Task MessageExternalIdLookup_UsesExplicitTenantOutsideRequestContext()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var workerContextTenantId = Guid.NewGuid();
+        var targetTenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        await using var db = CreateContext(connection, workerContextTenantId);
+        await db.Database.EnsureCreatedAsync();
+
+        var targetContact = Contact.Create(targetTenantId, "5571999990001");
+        var otherContact = Contact.Create(otherTenantId, "5571999990002");
+        var targetConversation = Conversation.Create(targetTenantId, targetContact.Id, "line-1");
+        var otherConversation = Conversation.Create(otherTenantId, otherContact.Id, "line-2");
+        var targetMessage = Message.CreateOutbound(
+            targetTenantId, targetConversation.Id, targetContact.Id, MessageType.Text, "Olá", "target");
+        targetMessage.MarkSent("wamid.target");
+        var otherMessage = Message.CreateOutbound(
+            otherTenantId, otherConversation.Id, otherContact.Id, MessageType.Text, "Olá", "other");
+        otherMessage.MarkSent("wamid.other");
+        db.Contacts.AddRange(targetContact, otherContact);
+        db.Conversations.AddRange(targetConversation, otherConversation);
+        db.Messages.AddRange(targetMessage, otherMessage);
+        await db.SaveChangesAsync();
+
+        var repository = new MessageRepository(db);
+        var result = await repository.GetByExternalIdAsync(targetTenantId, "wamid.target");
+        var crossTenantResult = await repository.GetByExternalIdAsync(targetTenantId, "wamid.other");
+
+        Assert.NotNull(result);
+        Assert.Equal(targetMessage.Id, result.Id);
+        Assert.Null(crossTenantResult);
+    }
+
     private static AppDbContext CreateContext(SqliteConnection connection, Guid tenantId)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

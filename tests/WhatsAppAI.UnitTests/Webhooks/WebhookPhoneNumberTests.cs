@@ -6,6 +6,30 @@ namespace WhatsAppAI.UnitTests.Webhooks;
 public sealed class WebhookPhoneNumberTests
 {
     [Fact]
+    public void ResolveStatusFailureReason_PreservesSanitizedMetaCodeAndDetails()
+    {
+        var status = new WebhookStatus
+        {
+            Status = "failed",
+            Errors =
+            [
+                new WebhookError
+                {
+                    Code = 131049,
+                    Title = "Message not delivered",
+                    ErrorData = new WebhookErrorData { Details = "Meta chose not to deliver this marketing message." }
+                }
+            ]
+        };
+
+        var result = WebhookProcessingWorker.ResolveStatusFailureReason(status);
+
+        Assert.Equal(
+            "WhatsApp error 131049: Meta chose not to deliver this marketing message.",
+            result);
+    }
+
+    [Fact]
     public void NormalizePhoneNumber_RestoresBrazilianMobileFromQrDeviceIdentity()
     {
         Assert.Equal("5571996531915", WebhookProcessingWorker.NormalizePhoneNumber("557196531915:0"));

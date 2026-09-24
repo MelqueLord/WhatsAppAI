@@ -233,7 +233,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-007:** deduplicar eventos e mensagens por identificadores do provedor.
 - **FR-008:** associar mensagens a contato e conversa do tenant/número corretos.
 - **FR-009:** publicar atualizações de inbox via SignalR somente ao grupo do tenant.
-- **FR-010:** enviar mensagens humanas por fila durável e registrar status.
+- **FR-010:** enviar mensagens humanas por fila durável e registrar status. O processamento assíncrono do webhook deve localizar a mensagem pelo tenant resolvido e pelo identificador externo, sem depender do tenant de uma requisição HTTP, e preservar código e descrição sanitizados de falhas de entrega da Meta.
 - **FR-011:** controlar modo e responsável da conversa com concorrência otimista.
 - **FR-012:** impedir texto livre fora da janela de atendimento no MVP e permitir somente templates aprovados pela Meta quando a conversa usa a API Oficial; conexões QR Code não aceitam templates.
 - **FR-013:** montar contexto de IA com política, conhecimento ativo e histórico limitado.

@@ -13,10 +13,16 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public async Task<Message?> GetByExternalIdAsync(string externalId, CancellationToken cancellationToken = default)
+    public async Task<Message?> GetByExternalIdAsync(
+        Guid tenantId,
+        string externalId,
+        CancellationToken cancellationToken = default)
     {
         return await context.Set<Message>()
-            .FirstOrDefaultAsync(m => m.ExternalId == externalId, cancellationToken);
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                message => message.TenantId == tenantId && message.ExternalId == externalId,
+                cancellationToken);
     }
 
     public async Task<Message?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)

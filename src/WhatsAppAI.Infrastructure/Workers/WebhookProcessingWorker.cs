@@ -213,6 +213,7 @@ public sealed class WebhookProcessingWorker(
                         foreach (var status in change.Value.Statuses)
                         {
                             await ProcessStatusUpdateAsync(
+                                tenantId,
                                 status,
                                 messageRepository,
                                 cancellationToken);
@@ -250,7 +251,10 @@ public sealed class WebhookProcessingWorker(
         var phoneNumber = NormalizePhoneNumber(whatsappMessage.From);
 
         // Check for duplicate message
-        var existingMessage = await messageRepository.GetByExternalIdAsync(whatsappMessage.Id, cancellationToken);
+        var existingMessage = await messageRepository.GetByExternalIdAsync(
+            tenantId,
+            whatsappMessage.Id,
+            cancellationToken);
         if (existingMessage is not null)
         {
             logger.LogInformation("Duplicate message {MessageId}, skipping", whatsappMessage.Id);
@@ -382,13 +386,14 @@ public sealed class WebhookProcessingWorker(
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private async Task ProcessStatusUpdateAsync(
+        Guid tenantId,
         WebhookStatus status,
         IMessageRepository messageRepository,
         CancellationToken cancellationToken)
     {
         if (status.Id is null) return;
 
-        var message = await messageRepository.GetByExternalIdAsync(status.Id, cancellationToken);
+        var message = await messageRepository.GetByExternalIdAsync(tenantId, status.Id, cancellationToken);
         if (message is null)
         {
             logger.LogWarning("Status update for unknown message {MessageId}", status.Id);
@@ -407,11 +412,30 @@ public sealed class WebhookProcessingWorker(
                 message.MarkRead();
                 break;
             case "failed":
-                message.MarkFailed(status.Status ?? "Unknown error");
+                message.MarkFailed(ResolveStatusFailureReason(status));
                 break;
         }
 
         await messageRepository.UpdateAsync(message, cancellationToken);
+        logger.LogInformation(
+            "Message {MessageId} updated from WhatsApp status {WhatsAppStatus}",
+            message.Id,
+            status.Status ?? "unknown");
+    }
+
+    internal static string ResolveStatusFailureReason(WebhookStatus status)
+    {
+        var error = status.Errors?.FirstOrDefault();
+        if (error is null)
+            return status.Status ?? "Unknown error";
+
+        var description = FirstNonBlank(error.ErrorData?.Details, error.Message, error.Title)
+            ?? "WhatsApp delivery failed";
+        var reason = error.Code > 0
+            ? $"WhatsApp error {error.Code}: {description}"
+            : description;
+
+        return reason.Length <= 2000 ? reason : reason[..2000];
     }
 
     private static MessageType ParseMessageType(string? type)

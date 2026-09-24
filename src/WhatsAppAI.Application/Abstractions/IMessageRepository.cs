@@ -5,7 +5,7 @@ namespace WhatsAppAI.Application.Abstractions;
 public interface IMessageRepository
 {
     Task<Message?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<Message?> GetByExternalIdAsync(string externalId, CancellationToken cancellationToken = default);
+    Task<Message?> GetByExternalIdAsync(Guid tenantId, string externalId, CancellationToken cancellationToken = default);
     Task<Message?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Message>> GetUnprocessedInboundAsync(int limit = 20, CancellationToken cancellationToken = default);
     Task<bool> TryClaimInboundForAiAsync(
