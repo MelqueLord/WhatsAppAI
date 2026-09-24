@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace WhatsAppAI.Infrastructure.Migrations;
 
+[Migration("20260924000000_AddOfficialTemplateBroadcasts")]
 public partial class AddOfficialTemplateBroadcasts : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
