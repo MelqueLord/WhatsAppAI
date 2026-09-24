@@ -334,8 +334,8 @@ public static class ConversationEndpoints
             var selectedTemplate = templatesResult.Templates.SingleOrDefault(template =>
                 string.Equals(template.Name, request.TemplateName!.Trim(), StringComparison.Ordinal) &&
                 string.Equals(template.Language, request.TemplateLanguage!.Trim(), StringComparison.Ordinal));
-            if (selectedTemplate is null)
-                return Results.BadRequest(new { error = "The selected template is not an approved transactional Meta template." });
+            if (selectedTemplate is null || !selectedTemplate.CanSendInInbox)
+                return Results.BadRequest(new { error = "The selected template is not approved or is incompatible with individual sending." });
 
             if (templateParameters.Count != selectedTemplate.BodyParameterCount)
             {

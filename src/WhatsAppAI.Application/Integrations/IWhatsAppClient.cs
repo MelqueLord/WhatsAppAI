@@ -88,7 +88,22 @@ public sealed record WhatsAppTemplateListResult
 public sealed record WhatsAppTemplateSummary(
     string Name,
     string Language,
-    int BodyParameterCount);
+    int BodyParameterCount,
+    string Category,
+    string Status,
+    bool IsCompatible)
+{
+    public bool CanSendInInbox =>
+        string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
+        (string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(Category, "MARKETING", StringComparison.OrdinalIgnoreCase)) &&
+        IsCompatible;
+
+    public bool CanSendInBroadcast =>
+        string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
+        IsCompatible;
+}
 
 public sealed record WhatsAppQrCodeResult
 {

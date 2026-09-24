@@ -227,14 +227,15 @@ internal sealed class WhatsAppClient(
                     cancellationToken: cancellationToken);
                 templates.AddRange((content?.Data ?? [])
                     .Where(template =>
-                        string.Equals(template.Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(template.Category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
                         !string.IsNullOrWhiteSpace(template.Name) &&
                         !string.IsNullOrWhiteSpace(template.Language))
                     .Select(template => new WhatsAppTemplateSummary(
                         template.Name!,
                         template.Language!,
-                        CountBodyParameters(template.Components))));
+                        CountBodyParameters(template.Components),
+                        string.IsNullOrWhiteSpace(template.Category) ? "UNKNOWN" : template.Category.Trim().ToUpperInvariant(),
+                        string.IsNullOrWhiteSpace(template.Status) ? "UNKNOWN" : template.Status.Trim().ToUpperInvariant(),
+                        HasOnlySupportedTemplateComponents(template.Components))));
 
                 nextPageUrl = IsTrustedMetaPageUrl(content?.Paging?.Next)
                     ? content?.Paging?.Next
@@ -253,7 +254,7 @@ internal sealed class WhatsAppClient(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to list WhatsApp templates");
-            return new WhatsAppTemplateListResult { ErrorMessage = "Unable to load approved templates." };
+            return new WhatsAppTemplateListResult { ErrorMessage = "Unable to load templates." };
         }
     }
 
@@ -321,6 +322,16 @@ internal sealed class WhatsAppClient(
             string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase));
         return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Matches(body.Text, @"\{\{\d+\}\}").Count;
     }
+
+    private static bool HasOnlySupportedTemplateComponents(IReadOnlyList<TemplateListComponent>? components) =>
+        components is { Count: > 0 } &&
+        components.Any(component =>
+            string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(component.Text)) &&
+        components.All(component =>
+            string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(component.Type, "FOOTER", StringComparison.OrdinalIgnoreCase)) &&
+        CountBodyParameters(components) <= 10;
 
     private static bool IsTrustedMetaPageUrl(string? pageUrl) =>
         Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri) &&

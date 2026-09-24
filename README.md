@@ -4,7 +4,7 @@ Nome provisório de um SaaS multiempresa para centralizar atendimentos do WhatsA
 
 ## Estado do projeto
 
-O pacote SDD inicial e os incrementos posteriores foram implementados. O backlog em `specs/000-platform/tasks.md` esta marcado como concluido ate `T240`, cobrindo bootstrap, identidade/tenancy, WhatsApp, inbox, resposta humana, IA segura, conhecimento, memoria, aprendizado supervisionado, uso/auditoria, producao/piloto e sistema de planos.
+O pacote SDD inicial e os incrementos posteriores foram implementados. O backlog em `docs/tasks/plataforma.md` esta marcado como concluido ate `T240`, cobrindo bootstrap, identidade/tenancy, WhatsApp, inbox, resposta humana, IA segura, conhecimento, memoria, aprendizado supervisionado, uso/auditoria, producao/piloto e sistema de planos.
 
 Implementado:
 
@@ -19,7 +19,7 @@ Atualizacao de readiness (2026-09-05):
 - IA por empresa consolidada ate T240: diretrizes, perfil, conhecimento ativo, exemplos manuais/supervisionados, memoria consentida, inferencia segura, filas automaticas, respostas naturais e validacao contra fatos inventados.
 - A producao Hostinger usa `/opt/atenz/WhatsAppAI` na branch `master`, com PostgreSQL e sessoes QR persistentes; atualizacoes nao removem volumes.
 - A validacao operacional inclui `docker compose config --quiet`, build, migration, health checks HTTPS e conferencia da ponte WhatsApp antes e depois da recriacao controlada.
-- Pendencias conhecidas: o ambiente local desta maquina ainda exige o SDK .NET 10.0.302 definido em `global.json`; lint/testes preexistentes permanecem registrados em `docs/implementation-history.md`.
+- Pendencias conhecidas: o ambiente local desta maquina ainda exige o SDK .NET 10.0.302 definido em `global.json`; lint/testes preexistentes permanecem registrados em `docs/contexto/historico-implementacao.md`.
 
 ## Premissas fechadas
 
@@ -34,24 +34,34 @@ Atualizacao de readiness (2026-09-05):
 
 | Documento | Finalidade |
 |---|---|
-| `AGENTS.md` | Regras operacionais para agentes do Codex |
+| `AGENTS.md` | Regras operacionais e estrutura SDD do repositório |
+| `ROADMAP.md` | Marcos canônicos de validação, piloto e evolução |
+| `docs/README.md` | Índice da documentação SDD e sua precedência |
+| `docs/contexto/` | Contexto geral e por domínio do produto |
+| `docs/regras/` | Regras de arquitetura, qualidade, segurança e operação |
+| `docs/skills/` | Guias para pesquisa, planejamento, revisão, testes e investigação |
+| `docs/specs/` | Especificações canônicas e comportamentos por capacidade |
+| `docs/design/` | Designs técnicos da solução aprovada |
+| `docs/tasks/` | Backlog canônico, validações e operação por frente |
+| `docs/decisoes/` | Índices dos ADRs canônicos |
+| `docs/pesquisa/` | Índices de pesquisas e critérios de reavaliação |
 | `.specify/memory/constitution.md` | Princípios que governam todas as decisões |
-| `specs/000-platform/spec.md` | Escopo, histórias, requisitos e critérios de sucesso |
-| `specs/000-platform/plan.md` | Plano técnico e estrutura do código |
-| `specs/000-platform/research.md` | Decisões e justificativas |
-| `specs/000-platform/data-model.md` | Modelo de dados e invariantes |
-| `specs/000-platform/contracts/openapi.yaml` | Contrato HTTP inicial |
-| `specs/000-platform/tasks.md` | Backlog de implementação rastreável |
-| `specs/000-platform/quickstart.md` | Sequência de preparação e execução local |
-| `docs/architecture/architecture.md` | Visão de componentes e fluxos |
-| `docs/architecture/adr/` | Registros de decisões arquiteturais |
-| `docs/security/threat-model.md` | Ameaças, controles e privacidade |
-| `docs/ai/behavior-policy.md` | Limites e comportamento da automação |
-| `docs/runbooks/implemented-flows.md` | Guia consolidado do funcionamento implementado |
-| `docs/implementation-history.md` | Histórico consolidado de implementação e publicação |
-| `docs/testing/strategy.md` | Estratégia de testes e gates |
-| `docs/runbooks/webhook-failures.md` | Operação de falhas de webhook |
-| `docs/sdd-framework.md` | Framework SDD e skills recomendadas |
+| `docs/specs/plataforma/especificacao-plataforma.md` | Escopo, histórias, requisitos e critérios de sucesso |
+| `docs/design/plano-plataforma.md` | Plano técnico e estrutura do código |
+| `docs/pesquisa/decisoes-tecnicas.md` | Decisões e justificativas |
+| `docs/design/modelo-de-dados.md` | Modelo de dados e invariantes |
+| `docs/specs/plataforma/openapi.yaml` | Contrato HTTP inicial |
+| `docs/tasks/plataforma.md` | Backlog de implementação rastreável |
+| `docs/tasks/execucao-local.md` | Sequência de preparação e execução local |
+| `docs/design/arquitetura-geral.md` | Visão de componentes e fluxos |
+| `docs/decisoes/` | Registros de decisões arquiteturais |
+| `docs/regras/seguranca.md` | Ameaças, controles e privacidade |
+| `docs/regras/inteligencia-artificial.md` | Limites e comportamento da automação |
+| `docs/contexto/fluxos-implementados.md` | Guia consolidado do funcionamento implementado |
+| `docs/contexto/historico-implementacao.md` | Histórico consolidado de implementação e publicação |
+| `docs/regras/testes.md` | Estratégia de testes e gates |
+| `docs/specs/whatsapp/processar-webhook.md` | Operação de falhas de webhook |
+| `docs/skills/framework-sdd.md` | Framework SDD e skills recomendadas |
 
 ## Como rodar localmente
 

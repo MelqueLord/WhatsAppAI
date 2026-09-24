@@ -124,13 +124,11 @@ public static class ContactEndpoints
                 return Results.BadRequest(new { error = "Queue not found." });
         }
 
-        var query = dbContext.Contacts
-            .Where(c =>
+        var query = queueId.HasValue
+            ? QueueContactQuery.ForQueue(dbContext, currentTenant.TenantId.Value, queueId.Value)
+            : dbContext.Contacts.Where(c =>
                 c.TenantId == currentTenant.TenantId.Value &&
                 !c.PhoneNumber.StartsWith("anon-"));
-
-        if (queueId.HasValue)
-            query = query.Where(c => c.QueueId == queueId.Value);
 
         if (!string.IsNullOrWhiteSpace(search))
         {

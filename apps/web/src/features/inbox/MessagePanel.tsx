@@ -39,6 +39,18 @@ interface MessagePanelProps {
   onConversationClosed?: () => void
 }
 
+const TEMPLATE_CATEGORIES: Record<string, string> = {
+  MARKETING: 'Marketing',
+  UTILITY: 'Utilidade',
+  AUTHENTICATION: 'Autenticação',
+}
+
+function templateUnavailableReason(template: WhatsAppTemplate): string {
+  if (template.status !== 'APPROVED') return `status ${template.status.toLowerCase()}`
+  if (template.category !== 'UTILITY' && template.category !== 'MARKETING') return 'categoria ainda não suportada'
+  return 'componentes ainda não suportados'
+}
+
 export function MessagePanel({
   conversation,
   onBack,
@@ -134,6 +146,17 @@ export function MessagePanel({
   })
 
   const templates = templatesData?.templates ?? []
+  const templatesByCategory = templates.reduce<Record<string, WhatsAppTemplate[]>>((groups, template) => {
+    const category = template.category || 'UNKNOWN'
+    ;(groups[category] ??= []).push(template)
+    return groups
+  }, {})
+  const categoryOrder = Object.keys(templatesByCategory).sort((left, right) => {
+    const priority = (category: string) => ['MARKETING', 'UTILITY', 'AUTHENTICATION'].indexOf(category)
+    const leftPriority = priority(left)
+    const rightPriority = priority(right)
+    return (leftPriority < 0 ? 3 : leftPriority) - (rightPriority < 0 ? 3 : rightPriority) || left.localeCompare(right)
+  })
   const selectedTemplate = templates.find((template) =>
     template.name === templateName && template.language === templateLanguage,
   )
@@ -385,7 +408,12 @@ export function MessagePanel({
     const name = templateName.trim()
     const language = templateLanguage.trim()
     if (!name || !language || !selectedTemplate) {
-      setSendError('Selecione um template transacional aprovado pela Meta.')
+      setSendError('Selecione um template aprovado e compatível com o envio pela Inbox.')
+      return
+    }
+
+    if (!selectedTemplate.canSendInInbox) {
+      setSendError('Este template não pode ser enviado pela Inbox.')
       return
     }
 
@@ -869,7 +897,7 @@ export function MessagePanel({
 
         {canSendTemplate && (
           <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-[#10223f] p-3">
-            <p className="text-xs font-medium text-slate-200">Enviar template aprovado pela Meta</p>
+            <p className="text-xs font-medium text-slate-200">Templates da API Oficial por categoria</p>
             {(templatesFailed || templatesData?.error) && (
               <p className="text-xs text-amber-300">
                 Não foi possível carregar os templates desta linha. Verifique a conexão da API Oficial.
@@ -885,11 +913,15 @@ export function MessagePanel({
                 className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white"
                 disabled={isLoadingTemplates || templates.length === 0}
               >
-                <option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione um template aprovado'}</option>
-                {templates.map((template) => (
-                  <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>
-                    {template.name} ({template.language})
-                  </option>
+                <option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione um template'}</option>
+                {categoryOrder.map((category) => (
+                  <optgroup key={category} label={TEMPLATE_CATEGORIES[category] ?? `Outros: ${category}`}>
+                    {(templatesByCategory[category] ?? []).map((template) => (
+                      <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`} disabled={!template.canSendInInbox}>
+                        {template.name} ({template.language}) — {template.canSendInInbox ? 'aprovado' : templateUnavailableReason(template)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <input
@@ -901,6 +933,7 @@ export function MessagePanel({
                 className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
               />
             </div>
+            {templates.length > 0 && <p className="text-[11px] text-slate-400">Todos os modelos da linha aparecem por categoria. Os indisponíveis ficam desabilitados com o motivo; o disparo em massa continua limitado a Utilidade.</p>}
             <div className="flex gap-2">
               <input
                 value={templateParameters}
@@ -915,7 +948,7 @@ export function MessagePanel({
               />
               <button
                 onClick={handleTemplateSend}
-                disabled={!selectedTemplate || selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount || sendMutation.isPending}
+                disabled={!selectedTemplate || !selectedTemplate.canSendInInbox || selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount || sendMutation.isPending}
                 className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
               >
                 {sendMutation.isPending ? 'Enviando…' : 'Enviar template'}

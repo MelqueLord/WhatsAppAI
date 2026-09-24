@@ -54,26 +54,38 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
-    public async Task WhatsAppClient_ListsOnlyApprovedUtilityTemplatesAcrossAllPages()
+    public async Task WhatsAppClient_ListsAllTemplateCategoriesAndStatusesAcrossAllPages()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
 
         var result = await client.ListTemplatesAsync("waba-id", "token");
 
         Assert.True(result.IsSuccess);
-        Assert.Collection(result.Templates,
-            template =>
-            {
-                Assert.Equal("follow_up", template.Name);
-                Assert.Equal("pt_BR", template.Language);
-                Assert.Equal(0, template.BodyParameterCount);
-            },
-            template =>
-            {
-                Assert.Equal("welcome_customer", template.Name);
-                Assert.Equal("pt_BR", template.Language);
-                Assert.Equal(1, template.BodyParameterCount);
-            });
+        Assert.Equal(6, result.Templates.Count);
+        var utility = Assert.Single(result.Templates, template => template.Name == "welcome_customer");
+        Assert.Equal("UTILITY", utility.Category);
+        Assert.Equal(1, utility.BodyParameterCount);
+        Assert.True(utility.CanSendInInbox);
+        Assert.True(utility.CanSendInBroadcast);
+
+        var marketing = Assert.Single(result.Templates, template => template.Name == "marketing_offer");
+        Assert.Equal("MARKETING", marketing.Category);
+        Assert.True(marketing.CanSendInInbox);
+        Assert.False(marketing.CanSendInBroadcast);
+
+        var pending = Assert.Single(result.Templates, template => template.Name == "draft");
+        Assert.Equal("PENDING", pending.Status);
+        Assert.False(pending.CanSendInInbox);
+
+        var authentication = Assert.Single(result.Templates, template => template.Name == "otp_code");
+        Assert.Equal("AUTHENTICATION", authentication.Category);
+        Assert.False(authentication.CanSendInInbox);
+
+        var unsupported = Assert.Single(result.Templates, template => template.Name == "rich_offer");
+        Assert.False(unsupported.IsCompatible);
+        Assert.False(unsupported.CanSendInInbox);
+
+        Assert.True(result.Templates.Any(template => template.Name == "follow_up"));
         Assert.Equal(2, handler.TemplateRequests.Count);
     }
 
@@ -92,7 +104,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     [Fact]
     public async Task WhatsAppWebClient_RetriesWhenBridgeSessionIsReconnecting()
     {
-        using var client = new WhatsAppWebClient(
+        var client = new WhatsAppWebClient(
             new HttpClient(new StaticResponseHandler(HttpStatusCode.ServiceUnavailable,
                 "{\"success\":false,\"error\":\"WhatsApp Web session is reconnecting.\"}")),
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -165,7 +177,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
                 TemplateRequests.Add(request.RequestUri.ToString());
                 var content = request.RequestUri.Query.Contains("after=next", StringComparison.Ordinal)
                     ? "{\"data\":[{\"name\":\"follow_up\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá\"}]}]}"
-                    : "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"marketing_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\"},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\",\"category\":\"UTILITY\"}],\"paging\":{\"next\":\"https://graph.facebook.com/v21.0/waba-id/message_templates?after=next\"}}";
+                    : "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"marketing_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"BODY\",\"text\":\"Oferta para {{1}}\"}]},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Rascunho\"}]},{\"name\":\"otp_code\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"AUTHENTICATION\",\"components\":[{\"type\":\"BODY\"},{\"type\":\"BUTTONS\"}]},{\"name\":\"rich_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"HEADER\",\"text\":\"Promoção\"},{\"type\":\"BODY\",\"text\":\"Olá\"}]}],\"paging\":{\"next\":\"https://graph.facebook.com/v21.0/waba-id/message_templates?after=next\"}}";
                 response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(content)

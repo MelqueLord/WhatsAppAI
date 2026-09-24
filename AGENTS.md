@@ -5,12 +5,22 @@
 Antes de alterar código, leia nesta ordem:
 
 1. `.specify/memory/constitution.md`;
-2. `specs/000-platform/spec.md`;
-3. `specs/000-platform/plan.md`;
-4. `specs/000-platform/tasks.md`;
+2. `docs/specs/plataforma/especificacao-plataforma.md`;
+3. `docs/design/plano-plataforma.md`;
+4. `docs/tasks/plataforma.md`;
 5. ADRs e documentos especializados afetados.
 
 Se código e especificação divergirem, interrompa a implementação e proponha a correção explícita de um deles. Não altere silenciosamente a intenção do produto.
+
+## Estrutura de documentação SDD
+
+- `ROADMAP.md` na raiz organiza os marcos do produto.
+- `docs/contexto/` oferece contexto por domínio antes de uma alteração.
+- `docs/regras/` consolida regras de arquitetura, qualidade, segurança, tenancy e operação.
+- `docs/skills/` documenta fluxos repetíveis de pesquisa, planejamento, revisão, testes e investigação; skills executáveis continuam em `.agents/skills/`.
+- `docs/specs/`, `docs/design/`, `docs/tasks/`, `docs/decisoes/` e `docs/pesquisa/` organizam a navegação por capacidade.
+- Os templates do Spec Kit permanecem em `.specify/`; os artefatos canônicos e os ADRs permanecem em `docs/`.
+- Ao alterar comportamento, atualizar o documento SDD do domínio afetado quando ele ajudar a explicar a mudança; ele nunca substitui requisito, plano, tarefa ou ADR canônico.
 
 ## Modo de trabalho
 

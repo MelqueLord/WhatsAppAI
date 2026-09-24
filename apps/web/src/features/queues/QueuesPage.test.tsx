@@ -39,4 +39,21 @@ describe('QueuesPage interaction reply', () => {
       }),
     ))
   })
+
+  it('shows the server reason when creating a queue fails', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => Promise.resolve({
+      ok: !(url === '/api/service-queues' && options?.method === 'POST'),
+      json: async () => options?.method === 'POST'
+        ? { error: 'A fila não pode ser criada agora.' }
+        : [],
+    })))
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nova Fila/ }))
+    fireEvent.change(screen.getByPlaceholderText('Nome da fila *'), { target: { value: 'Suporte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('A fila não pode ser criada agora.')
+  })
 })

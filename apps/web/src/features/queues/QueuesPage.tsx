@@ -15,6 +15,13 @@ interface ServiceQueue {
   interactionReply: string | null
 }
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  const payload = await response.json().catch(() => null) as { error?: unknown; message?: unknown } | null
+  if (typeof payload?.error === 'string') return payload.error
+  if (typeof payload?.message === 'string') return payload.message
+  return fallback
+}
+
 export function QueuesPage() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -27,10 +34,11 @@ export function QueuesPage() {
   const [transferNotice, setTransferNotice] = useState('')
   const [interactionReply, setInteractionReply] = useState('')
 
-  const { data: queues, isLoading } = useQuery({
+  const { data: queues, isLoading, isError, error } = useQuery({
     queryKey: ['service-queues'],
     queryFn: async () => {
       const res = await fetchApiResponse('/api/service-queues')
+      if (!res.ok) throw new Error(await readErrorMessage(res, 'Não foi possível carregar as filas.'))
       return res.json() as Promise<ServiceQueue[]>
     },
   })
@@ -43,7 +51,7 @@ export function QueuesPage() {
         credentials: 'include',
         body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice, interactionReply }),
       })
-      if (!res.ok) throw new Error('Erro ao criar fila')
+      if (!res.ok) throw new Error(await readErrorMessage(res, 'Não foi possível criar a fila.'))
       return res.json()
     },
     onSuccess: () => { resetForm(); queryClient.invalidateQueries({ queryKey: ['service-queues'] }) },
@@ -57,7 +65,7 @@ export function QueuesPage() {
         credentials: 'include',
         body: JSON.stringify({ name, description, color, sortOrder, keywords, transferNotice, interactionReply }),
       })
-      if (!res.ok) throw new Error('Erro ao atualizar fila')
+      if (!res.ok) throw new Error(await readErrorMessage(res, 'Não foi possível atualizar a fila.'))
       return res.json()
     },
     onSuccess: () => { resetForm(); queryClient.invalidateQueries({ queryKey: ['service-queues'] }) },
@@ -66,13 +74,14 @@ export function QueuesPage() {
   const toggleMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'deactivate' | 'reactivate' }) => {
       const res = await fetchApiResponse(`/api/service-queues/${id}/${action}`, { method: 'POST' })
-      if (!res.ok) throw new Error('Erro')
+      if (!res.ok) throw new Error(await readErrorMessage(res, 'Não foi possível alterar a fila.'))
       return res.json()
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['service-queues'] }),
   })
 
   const resetForm = () => {
+    createMutation.reset(); updateMutation.reset()
     setShowForm(false); setEditing(null)
     setName(''); setDescription(''); setColor('#6366F1'); setSortOrder(0); setKeywords(''); setTransferNotice(''); setInteractionReply('')
   }
@@ -81,6 +90,8 @@ export function QueuesPage() {
     setEditing(q); setName(q.name); setDescription(q.description || '')
     setColor(q.color || '#6366F1'); setSortOrder(q.sortOrder); setKeywords(q.keywords || ''); setTransferNotice(q.transferNotice || ''); setInteractionReply(q.interactionReply || ''); setShowForm(true)
   }
+
+  const mutationError = createMutation.error ?? updateMutation.error
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
@@ -135,11 +146,18 @@ export function QueuesPage() {
             </button>
             <button onClick={resetForm} className="px-4 py-2 border border-slate-300 rounded-xl text-sm">Cancelar</button>
           </div>
+          {mutationError && (
+            <p role="alert" className="mt-3 text-sm text-red-600">
+              {mutationError.message}
+            </p>
+          )}
         </div>
       )}
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-indigo-500 animate-spin" /></div>
+      ) : isError ? (
+        <p role="alert" className="py-12 text-center text-red-600">{error.message}</p>
       ) : !queues?.length ? (
         <div className="text-center py-12 text-slate-400">
           <ListOrdered className="w-12 h-12 mx-auto mb-3 text-slate-300" />

@@ -105,6 +105,11 @@ export interface WhatsAppTemplate {
   name: string
   language: string
   bodyParameterCount: number
+  category: string
+  status: string
+  isCompatible: boolean
+  canSendInInbox: boolean
+  canSendInBroadcast: boolean
 }
 
 export interface Message {

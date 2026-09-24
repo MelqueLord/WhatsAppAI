@@ -9,6 +9,7 @@ using WhatsAppAI.Domain.Broadcast;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.WebApi.Contacts;
 using WhatsAppAI.WebApi.Hubs;
 
 namespace WhatsAppAI.WebApi.Broadcast;
@@ -130,9 +131,7 @@ public static class BroadcastEndpoints
 
             if (request.ContactIds.Count == 0)
             {
-                contactIds = await db.Contacts
-                    .IgnoreQueryFilters()
-                    .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value)
+                contactIds = await QueueContactQuery.ForQueue(db, tenantId, request.QueueId.Value)
                     .OrderBy(c => c.Id)
                     .Select(c => c.Id)
                     .ToListAsync(cancellationToken);
@@ -146,9 +145,8 @@ public static class BroadcastEndpoints
                 if (contactIds.Count > ManualRecipientLimit)
                     return Results.BadRequest(new { error = $"Maximum {ManualRecipientLimit} manually selected recipients per broadcast." });
 
-                var validContacts = await db.Contacts
-                    .IgnoreQueryFilters()
-                    .Where(c => c.TenantId == tenantId && c.QueueId == request.QueueId.Value && contactIds.Contains(c.Id))
+                var validContacts = await QueueContactQuery.ForQueue(db, tenantId, request.QueueId.Value)
+                    .Where(c => contactIds.Contains(c.Id))
                     .CountAsync(cancellationToken);
 
                 if (validContacts != contactIds.Count)
@@ -299,6 +297,7 @@ public static class BroadcastEndpoints
                 JsonSerializer.Deserialize<List<string>>(broadcast.TemplateParametersJson)?.Count ?? 0;
             if (!templates.IsSuccess || !templates.Templates.Any(template =>
                 template.Name == broadcast.TemplateName && template.Language == broadcast.TemplateLanguage &&
+                template.CanSendInBroadcast &&
                 template.BodyParameterCount == parameterCount))
                 return Results.BadRequest(new { error = "The selected template is no longer eligible for sending." });
         }
@@ -532,7 +531,7 @@ public static class BroadcastEndpoints
         if (!result.IsSuccess)
             return Results.BadRequest(new { error = result.ErrorMessage ?? "Unable to load templates." });
 
-        return Results.Ok(new { templates = result.Templates });
+        return Results.Ok(new { templates = result.Templates.Where(template => template.CanSendInBroadcast).ToArray() });
     }
 
     private static object ToDto(BroadcastList b) => new

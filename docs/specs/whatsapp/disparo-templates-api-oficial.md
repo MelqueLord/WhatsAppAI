@@ -15,7 +15,7 @@ Permitir que uma lista de transmissão use uma linha ativa da Cloud API e um tem
 - **FR-BOT-001:** lista usa exclusivamente `QrCodeText` ou `OfficialApiTemplate`.
 - **FR-BOT-002:** lista oficial armazena linha, nome, idioma e parâmetros de `BODY` (0–10 textos de até 1024 caracteres); não aceita texto livre.
 - **FR-BOT-003:** a opção de template vem da WABA da linha e inclui somente `APPROVED` + `UTILITY`; componentes dinâmicos fora do corpo são rejeitados nesta entrega.
-- **FR-BOT-004:** destinatários seguem `FR-BR-001`: 1–500 manualmente, inclusive quando filtrados por uma fila, ou fotografia de todos os contatos da fila; todos pertencem ao tenant.
+- **FR-BOT-004:** destinatários seguem `FR-BR-001`: 1–500 manualmente, inclusive quando filtrados por uma fila, ou fotografia de todos os contatos importados para ela e dos contatos com conversa aberta atribuída à fila; todos pertencem ao tenant e entram uma única vez.
 - **FR-BOT-005:** TenantOwner opera todo o tenant. Operator só acessa a interseção de sua linha e fila atribuídas, em listagem, detalhe, criação, edição, dispatch, cancelamento e retry.
 - **FR-BOT-006:** no dispatch o backend revalida linha, token, template, idioma e parâmetros na Meta; frontend não é fonte de verdade.
 - **FR-BOT-007:** cada destinatário gera `Message` de template + `OutboxMessage` transacionais e idempotentes; somente a Outbox chama a Meta.
@@ -34,4 +34,4 @@ Permitir que uma lista de transmissão use uma linha ativa da Cloud API e um tem
 
 ## Compatibilidade
 
-Esta especificação complementa `broadcast-qrcode.md`: substitui somente sua exclusão de API Oficial por este caminho separado e restrito. A especificação de plataforma, especialmente `FR-012`, `FR-059`, `BR-006` e `BR-029`, continua prevalecendo. Marketing requer especificação própria de consentimento.
+Esta especificação complementa `broadcast-qrcode.md`: substitui somente sua exclusão de API Oficial por este caminho separado e restrito. A especificação de plataforma, especialmente `FR-012`, `FR-059`, `BR-006` e `BR-029`, continua prevalecendo. O envio individual de Marketing pela Inbox segue `FR-059`; campanhas em massa de Marketing permanecem fora deste escopo e requerem especificação própria de consentimento.

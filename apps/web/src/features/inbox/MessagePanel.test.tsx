@@ -209,13 +209,13 @@ describe('MessagePanel conversation closing', () => {
 
   it('requires the selected template body parameter count before sending', async () => {
     apiMock.conversations.listTemplates.mockResolvedValue({
-      templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1 }],
+      templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
     })
     const conversation = { ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: true }
 
     renderPanel(conversation)
 
-    await screen.findByRole('option', { name: 'service_update (pt_BR)' })
+    await screen.findByRole('option', { name: /service_update \(pt_BR\)/ })
     fireEvent.change(await screen.findByRole('combobox'), {
       target: { value: 'service_update:pt_BR' },
     })
@@ -234,6 +234,35 @@ describe('MessagePanel conversation closing', () => {
         { name: 'service_update', language: 'pt_BR', parameters: ['Maria'] },
       )
     })
+  })
+
+  it('groups every category and sends a compatible approved marketing template', async () => {
+    apiMock.conversations.listTemplates.mockResolvedValue({
+      templates: [
+        { name: 'retomar_atendimento', language: 'pt_BR', bodyParameterCount: 1, category: 'MARKETING', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: false },
+        { name: 'service_update', language: 'pt_BR', bodyParameterCount: 0, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true },
+        { name: 'otp_code', language: 'pt_BR', bodyParameterCount: 0, category: 'AUTHENTICATION', status: 'APPROVED', isCompatible: false, canSendInInbox: false, canSendInBroadcast: false },
+        { name: 'new_category', language: 'pt_BR', bodyParameterCount: 0, category: 'OTHER', status: 'APPROVED', isCompatible: true, canSendInInbox: false, canSendInBroadcast: false },
+        { name: 'pending_offer', language: 'pt_BR', bodyParameterCount: 0, category: 'MARKETING', status: 'PENDING', isCompatible: true, canSendInInbox: false, canSendInBroadcast: false },
+      ],
+    })
+    renderPanel({ ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: true })
+
+    const marketing = await screen.findByRole('option', { name: /retomar_atendimento \(pt_BR\)/ })
+    expect(marketing.closest('optgroup')).toHaveAttribute('label', 'Marketing')
+    expect(screen.getByRole('option', { name: /service_update \(pt_BR\)/ }).closest('optgroup')).toHaveAttribute('label', 'Utilidade')
+    expect(screen.getByRole('option', { name: /otp_code/ })).toBeDisabled()
+    expect(screen.getByRole('option', { name: /otp_code/ }).closest('optgroup')).toHaveAttribute('label', 'Autenticação')
+    expect(screen.getByRole('option', { name: /new_category/ }).closest('optgroup')).toHaveAttribute('label', 'Outros: OTHER')
+    expect(screen.getByRole('option', { name: /pending_offer/ })).toBeDisabled()
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'retomar_atendimento:pt_BR' } })
+    fireEvent.change(screen.getByPlaceholderText('Informe 1 parâmetro(s), separados por vírgula'), { target: { value: 'Maria' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar template' }))
+
+    await waitFor(() => expect(apiMock.conversations.sendMessage).toHaveBeenCalledWith(
+      'conversation-1', '', { name: 'retomar_atendimento', language: 'pt_BR', parameters: ['Maria'] },
+    ))
   })
 
   it('does not request templates for a conversation without an active official line', async () => {

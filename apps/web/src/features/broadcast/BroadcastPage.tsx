@@ -64,11 +64,11 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const [templateParameters, setTemplateParameters] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState('')
-  const [queueRecipientMode, setQueueRecipientMode] = useState<'all' | 'manual'>('all')
+  const [queueRecipientMode, setQueueRecipientMode] = useState<'all' | 'manual'>('manual')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectingContacts = !selectedQueueId || queueRecipientMode === 'manual'
 
-  const { data: contacts, isLoading: loadingContacts } = useQuery({
+  const { data: contacts, isLoading: loadingContacts, isError: contactsError, refetch: refetchContacts } = useQuery({
     queryKey: ['contacts', 'broadcast', selectedQueueId, search],
     queryFn: () => api.contacts.list(search || undefined, 500, selectedQueueId || undefined),
     enabled: selectingContacts,
@@ -132,7 +132,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
 
   const selectQueue = (queueId: string) => {
     setSelectedQueueId(queueId)
-    setQueueRecipientMode('all')
+    setQueueRecipientMode('manual')
     setSearch('')
     setSelectedIds(new Set())
   }
@@ -269,6 +269,11 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 {loadingContacts ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+                  </div>
+                ) : contactsError ? (
+                  <div className="py-6 text-center">
+                    <p className="text-sm text-red-600">{selectedQueueId ? 'Não foi possível carregar os contatos desta fila.' : 'Não foi possível carregar os contatos.'}</p>
+                    <button type="button" onClick={() => void refetchContacts()} className="mt-2 text-xs text-emerald-600 hover:underline">Tentar novamente</button>
                   </div>
                 ) : filtered.length === 0 ? (
                   <p className="text-sm text-slate-400 text-center py-6">Nenhum contato encontrado.</p>
