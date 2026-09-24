@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info: { title: WhatsApp AI Broadcast Templates, version: 1.0.0-draft }
+paths:
+  /api/broadcasts/official-templates:
+    get:
+      summary: Lista templates UTILITY aprovados da linha oficial
+      parameters:
+        - { in: query, name: linePhoneNumberId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Templates com nome, idioma e bodyParameterCount }
+        '400': { description: Linha/tokens inválidos }
+        '403': { description: Linha fora do escopo do operador }
+  /api/broadcasts:
+    post:
+      summary: Cria rascunho QR ou oficial
+      responses:
+        '201': { description: Rascunho criado }
+        '400': { description: Canal, template ou destinatários inválidos }
+        '403': { description: Escopo inválido }
+  /api/broadcasts/{id}/dispatch:
+    post:
+      summary: Revalida template e inicia produção durável
+      responses:
+        '200': { description: Lista em processamento }
+        '400': { description: Linha/template inválido }
+        '403': { description: Escopo inválido }
+        '409': { description: Outra lista ativa no tenant }

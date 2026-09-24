@@ -15,6 +15,10 @@ public sealed class BroadcastListConfiguration : IEntityTypeConfiguration<Broadc
         builder.Property(b => b.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(b => b.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
         builder.Property(b => b.Message).HasColumnName("message").HasMaxLength(4096).IsRequired();
+        builder.Property(b => b.DeliveryMode).HasColumnName("delivery_mode").HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(b => b.TemplateName).HasColumnName("template_name").HasMaxLength(512);
+        builder.Property(b => b.TemplateLanguage).HasColumnName("template_language").HasMaxLength(20);
+        builder.Property(b => b.TemplateParametersJson).HasColumnName("template_parameters_json").HasMaxLength(12000);
         builder.Property(b => b.Status)
             .HasColumnName("status")
             .HasConversion<string>()

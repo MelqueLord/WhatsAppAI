@@ -6,6 +6,10 @@ public sealed class BroadcastList
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string Message { get; private set; } = string.Empty;
+    public BroadcastDeliveryMode DeliveryMode { get; private set; }
+    public string? TemplateName { get; private set; }
+    public string? TemplateLanguage { get; private set; }
+    public string? TemplateParametersJson { get; private set; }
     public BroadcastStatus Status { get; private set; }
     public string LinePhoneNumberId { get; private set; } = string.Empty;
     public Guid? QueueId { get; private set; }
@@ -24,21 +28,35 @@ public sealed class BroadcastList
         string name,
         string message,
         Guid createdByUserId,
-        Guid? queueId = null)
+        Guid? queueId = null,
+        BroadcastDeliveryMode deliveryMode = BroadcastDeliveryMode.QrCodeText,
+        string? templateName = null,
+        string? templateLanguage = null,
+        string? templateParametersJson = null,
+        string? linePhoneNumberId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
-        if (string.IsNullOrWhiteSpace(message))
+        if (deliveryMode == BroadcastDeliveryMode.QrCodeText && string.IsNullOrWhiteSpace(message))
             throw new ArgumentException("Message is required.", nameof(message));
         if (message.Length > 4096)
             throw new ArgumentException("Message must be at most 4096 characters.", nameof(message));
+
+        if (deliveryMode == BroadcastDeliveryMode.OfficialApiTemplate &&
+            (string.IsNullOrWhiteSpace(templateName) || string.IsNullOrWhiteSpace(templateLanguage) || string.IsNullOrWhiteSpace(linePhoneNumberId)))
+            throw new ArgumentException("Official template broadcasts require a line, template name and language.");
 
         return new BroadcastList
         {
             Id = Guid.CreateVersion7(),
             TenantId = tenantId,
             Name = name.Trim(),
-            Message = message,
+            Message = deliveryMode == BroadcastDeliveryMode.QrCodeText ? message : string.Empty,
+            DeliveryMode = deliveryMode,
+            TemplateName = templateName?.Trim(),
+            TemplateLanguage = templateLanguage?.Trim(),
+            TemplateParametersJson = templateParametersJson,
+            LinePhoneNumberId = linePhoneNumberId?.Trim() ?? string.Empty,
             Status = BroadcastStatus.Draft,
             QueueId = queueId,
             CreatedByUserId = createdByUserId,
@@ -55,6 +73,9 @@ public sealed class BroadcastList
         if (totalCount < 1)
             throw new ArgumentException("At least one recipient required.", nameof(totalCount));
 
+        if (DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate &&
+            !string.Equals(LinePhoneNumberId, linePhoneNumberId, StringComparison.Ordinal))
+            throw new InvalidOperationException("The official API line is fixed when the broadcast is created.");
         LinePhoneNumberId = linePhoneNumberId;
         TotalCount = totalCount;
         Status = BroadcastStatus.Sending;
@@ -63,6 +84,8 @@ public sealed class BroadcastList
 
     public void UpdateMessage(string message)
     {
+        if (DeliveryMode != BroadcastDeliveryMode.QrCodeText)
+            throw new InvalidOperationException("Template broadcasts cannot edit free text.");
         if (Status != BroadcastStatus.Draft)
             throw new InvalidOperationException("Only draft broadcasts can be edited.");
         if (string.IsNullOrWhiteSpace(message))
@@ -126,4 +149,10 @@ public enum BroadcastStatus
     Sending = 1,
     Completed = 2,
     Cancelled = 3,
+}
+
+public enum BroadcastDeliveryMode
+{
+    QrCodeText = 0,
+    OfficialApiTemplate = 1,
 }

@@ -21,6 +21,9 @@ public sealed class BroadcastRecipientConfiguration : IEntityTypeConfiguration<B
             .HasMaxLength(20)
             .IsRequired();
         builder.Property(r => r.ErrorMessage).HasColumnName("error_message").HasMaxLength(500);
+        builder.Property(r => r.OutboundMessageId).HasColumnName("outbound_message_id");
+        builder.Property(r => r.DispatchAttempt).HasColumnName("dispatch_attempt").IsRequired();
+        builder.Property(r => r.QueuedAt).HasColumnName("queued_at").HasColumnType("timestamp with time zone");
         builder.Property(r => r.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(r => r.SentAt).HasColumnName("sent_at").HasColumnType("timestamp with time zone");
 
@@ -32,5 +35,6 @@ public sealed class BroadcastRecipientConfiguration : IEntityTypeConfiguration<B
         builder.HasIndex(r => r.BroadcastListId);
         builder.HasIndex(r => new { r.BroadcastListId, r.Status });
         builder.HasIndex(r => new { r.TenantId, r.BroadcastListId, r.ContactId }).IsUnique();
+        builder.HasIndex(r => r.OutboundMessageId).IsUnique();
     }
 }

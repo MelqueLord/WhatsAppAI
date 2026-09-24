@@ -8,6 +8,9 @@ public sealed class BroadcastRecipient
     public Guid ContactId { get; private set; }
     public BroadcastRecipientStatus Status { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public Guid? OutboundMessageId { get; private set; }
+    public int DispatchAttempt { get; private set; } = 1;
+    public DateTime? QueuedAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? SentAt { get; private set; }
 
@@ -41,6 +44,15 @@ public sealed class BroadcastRecipient
         ErrorMessage = error;
     }
 
+    public void MarkQueued(Guid messageId)
+    {
+        if (Status != BroadcastRecipientStatus.Pending)
+            throw new InvalidOperationException("Only pending recipients can be queued.");
+        OutboundMessageId = messageId;
+        QueuedAt = DateTime.UtcNow;
+        Status = BroadcastRecipientStatus.Queued;
+    }
+
     public void Retry()
     {
         if (Status != BroadcastRecipientStatus.Failed)
@@ -49,13 +61,17 @@ public sealed class BroadcastRecipient
         Status = BroadcastRecipientStatus.Pending;
         ErrorMessage = null;
         SentAt = null;
+        QueuedAt = null;
+        OutboundMessageId = null;
+        DispatchAttempt++;
     }
 }
 
 public enum BroadcastRecipientStatus
 {
     Pending = 0,
-    Sent = 1,
-    Failed = 2,
-    Skipped = 3,
+    Queued = 1,
+    Sent = 2,
+    Failed = 3,
+    Skipped = 4,
 }

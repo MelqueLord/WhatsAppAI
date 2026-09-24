@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Broadcast;
@@ -69,6 +70,7 @@ public sealed class BroadcastDispatchWorker(
             if (stoppingToken.IsCancellationRequested) break;
 
             var recipients = await broadcastRepo.GetPendingRecipientsAsync(broadcast.Id, BatchSize);
+            await ReconcileQueuedRecipientsAsync(broadcast, broadcastRepo, messageRepo, stoppingToken);
             if (recipients.Count == 0) continue;
 
             foreach (var recipient in recipients)
@@ -79,6 +81,7 @@ public sealed class BroadcastDispatchWorker(
                     broadcast, recipient,
                     broadcastRepo, contactRepo, conversationRepo,
                     messageRepo, whatsAppAccountRepo, whatsAppClientResolver, secretStore,
+                    dbContext,
                     stoppingToken);
 
                 // Fixed 2 second delay between sends (avoids CA5394 / rate limiting)
@@ -97,6 +100,7 @@ public sealed class BroadcastDispatchWorker(
         IWhatsAppAccountRepository whatsAppAccountRepo,
         IWhatsAppClientResolver whatsAppClientResolver,
         ISecretStore secretStore,
+        AppDbContext dbContext,
         CancellationToken ct)
     {
         try
@@ -105,6 +109,38 @@ public sealed class BroadcastDispatchWorker(
             if (contact is null)
             {
                 await FailRecipientAsync(broadcastRepo, broadcast, recipient, "Contact not found", ct);
+                return;
+            }
+
+            if (broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate)
+            {
+                var account = await whatsAppAccountRepo.GetByTenantAndPhoneNumberIdAsync(
+                    broadcast.TenantId, broadcast.LinePhoneNumberId, ct);
+                if (account is null || !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+                    string.IsNullOrWhiteSpace(broadcast.TemplateName) || string.IsNullOrWhiteSpace(broadcast.TemplateLanguage))
+                {
+                    await FailRecipientAsync(broadcastRepo, broadcast, recipient, "Official API line or template unavailable", ct);
+                    return;
+                }
+
+                var conversation = await dbContext.Conversations.IgnoreQueryFilters().FirstOrDefaultAsync(
+                    item => item.TenantId == broadcast.TenantId && item.ContactId == contact.Id &&
+                        item.PhoneNumberId == broadcast.LinePhoneNumberId, ct);
+                if (conversation is null)
+                {
+                    conversation = Conversation.Create(broadcast.TenantId, contact.Id, broadcast.LinePhoneNumberId);
+                    conversation.RecordMessage();
+                    dbContext.Set<Conversation>().Add(conversation);
+                }
+
+                var message = Message.CreateOutboundTemplate(broadcast.TenantId, conversation.Id, contact.Id,
+                    broadcast.TemplateName, broadcast.TemplateLanguage, broadcast.TemplateParametersJson ?? "[]",
+                    $"broadcast:{broadcast.Id}:recipient:{recipient.Id}:attempt:{recipient.DispatchAttempt}");
+                dbContext.Set<Message>().Add(message);
+                dbContext.Set<OutboxMessage>().Add(OutboxMessage.Create(broadcast.TenantId, message.Id));
+                recipient.MarkQueued(message.Id);
+                dbContext.Set<BroadcastRecipient>().Update(recipient);
+                await dbContext.SaveChangesAsync(ct);
                 return;
             }
 
@@ -204,6 +240,34 @@ public sealed class BroadcastDispatchWorker(
             catch (Exception innerEx)
             {
                 logger.LogError(innerEx, "Failed to persist broadcast failure state");
+            }
+        }
+    }
+
+    private static async Task ReconcileQueuedRecipientsAsync(
+        BroadcastList broadcast,
+        IBroadcastRepository broadcastRepo,
+        IMessageRepository messageRepo,
+        CancellationToken cancellationToken)
+    {
+        var queued = await broadcastRepo.GetQueuedRecipientsAsync(broadcast.Id);
+        foreach (var recipient in queued)
+        {
+            if (!recipient.OutboundMessageId.HasValue) continue;
+            var message = await messageRepo.GetByIdAsync(recipient.OutboundMessageId.Value, cancellationToken);
+            if (message?.Status == MessageStatus.Sent)
+            {
+                recipient.MarkSent();
+                await broadcastRepo.UpdateRecipientAsync(recipient);
+                broadcast.RecordSent();
+                await broadcastRepo.UpdateAsync(broadcast);
+            }
+            else if (message?.Status == MessageStatus.Failed)
+            {
+                recipient.MarkFailed("Template delivery failed");
+                await broadcastRepo.UpdateRecipientAsync(recipient);
+                broadcast.RecordFailed();
+                await broadcastRepo.UpdateAsync(broadcast);
             }
         }
     }

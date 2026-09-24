@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Broadcast;
 using WhatsAppAI.Domain.Broadcast;
@@ -25,6 +26,7 @@ public static class BroadcastEndpoints
         group.MapGet("/", ListAsync).WithName("ListBroadcasts");
         group.MapGet("/{id:guid}", GetAsync).WithName("GetBroadcast");
         group.MapPost("/", CreateAsync).WithName("CreateBroadcast");
+        group.MapGet("/official-templates", ListOfficialTemplatesAsync).WithName("ListOfficialBroadcastTemplates");
         group.MapPut("/{id:guid}", UpdateAsync).WithName("UpdateBroadcast");
         group.MapPost("/{id:guid}/dispatch", DispatchAsync).WithName("DispatchBroadcast");
         group.MapPost("/{id:guid}/retry-failed", RetryFailedAsync).WithName("RetryFailedBroadcast");
@@ -37,12 +39,20 @@ public static class BroadcastEndpoints
     // GET /api/broadcasts
     private static async Task<IResult> ListAsync(
         ICurrentTenant currentTenant,
-        IBroadcastRepository broadcastRepo)
+        IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
         var broadcasts = await broadcastRepo.GetByTenantAsync(currentTenant.TenantId.Value);
-        return Results.Ok(broadcasts.Select(ToDto));
+        var visible = new List<BroadcastList>();
+        foreach (var broadcast in broadcasts)
+        {
+            if (await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
+                visible.Add(broadcast);
+        }
+        return Results.Ok(visible.Select(ToDto));
     }
 
     // GET /api/broadcasts/{id}
@@ -50,6 +60,8 @@ public static class BroadcastEndpoints
         Guid id,
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository,
         AppDbContext db)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -57,10 +69,12 @@ public static class BroadcastEndpoints
         var broadcast = await broadcastRepo.GetByIdAsync(id);
         if (broadcast is null || broadcast.TenantId != currentTenant.TenantId)
             return Results.NotFound();
+        if (!await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
+            return Results.NotFound();
 
         var recipients = await db.BroadcastRecipients
             .IgnoreQueryFilters()
-            .Where(r => r.BroadcastListId == id)
+            .Where(r => r.BroadcastListId == id && r.TenantId == currentTenant.TenantId)
             .Select(r => new { r.Id, r.ContactId, r.Status, r.ErrorMessage, r.SentAt })
             .ToListAsync();
 
@@ -76,6 +90,8 @@ public static class BroadcastEndpoints
         [FromBody] CreateBroadcastRequest request,
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository,
         AppDbContext db,
         CancellationToken cancellationToken)
     {
@@ -85,11 +101,18 @@ public static class BroadcastEndpoints
         if (string.IsNullOrWhiteSpace(request.Name))
             return Results.BadRequest(new { error = "Name is required." });
 
-        if (string.IsNullOrWhiteSpace(request.Message))
+        if (request.DeliveryMode == BroadcastDeliveryMode.QrCodeText && string.IsNullOrWhiteSpace(request.Message))
             return Results.BadRequest(new { error = "Message is required." });
 
         if (request.Message.Length > 4096)
             return Results.BadRequest(new { error = "Message must be at most 4096 characters." });
+
+        var templateBodyParameters = request.TemplateBodyParameters ?? [];
+        if (request.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate &&
+            (string.IsNullOrWhiteSpace(request.LinePhoneNumberId) || string.IsNullOrWhiteSpace(request.TemplateName) ||
+             string.IsNullOrWhiteSpace(request.TemplateLanguage) || templateBodyParameters.Count > 10 ||
+             templateBodyParameters.Any(value => value is null || value.Length > 1024)))
+            return Results.BadRequest(new { error = "An official template broadcast requires a line, template, language and valid body parameters." });
 
         var tenantId = currentTenant.TenantId.Value;
         Guid? queueId = null;
@@ -134,12 +157,32 @@ public static class BroadcastEndpoints
                 return Results.BadRequest(new { error = "One or more contacts not found." });
         }
 
+        if (currentTenant.UserRole == "Operator")
+        {
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, tenantId);
+            membership?.LoadAssignedLinesFromJson();
+            if (membership is null || !membership.CanAccessQueue(queueId)) return Results.Forbid();
+            if (request.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate)
+            {
+                var account = await accountRepository.GetByTenantAndPhoneNumberIdAsync(tenantId, request.LinePhoneNumberId!, cancellationToken);
+                var hasLine = account is not null &&
+                    (membership.AssignedLines.Any(assignment => assignment.ConnectionType == WhatsAppConnectionType.OfficialApi && assignment.LineNumber == account.LineNumber) ||
+                     (membership.AssignedLines.Count == 0 && membership.AssignedConnectionType == WhatsAppConnectionType.OfficialApi && membership.AssignedLineNumber == account.LineNumber));
+                if (!hasLine) return Results.Forbid();
+            }
+        }
+
         var broadcast = BroadcastList.Create(
             tenantId,
             request.Name,
             request.Message,
             currentTenant.UserId.Value,
-            queueId);
+            queueId,
+            request.DeliveryMode,
+            request.TemplateName,
+            request.TemplateLanguage,
+            request.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate ? JsonSerializer.Serialize(templateBodyParameters) : null,
+            request.LinePhoneNumberId);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await broadcastRepo.AddAsync(broadcast);
@@ -161,12 +204,16 @@ public static class BroadcastEndpoints
         Guid id,
         [FromBody] UpdateBroadcastRequest request,
         ICurrentTenant currentTenant,
-        IBroadcastRepository broadcastRepo)
+        IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
         var broadcast = await broadcastRepo.GetByIdAsync(id);
         if (broadcast is null || broadcast.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+        if (!await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
             return Results.NotFound();
 
         if (string.IsNullOrWhiteSpace(request.Message))
@@ -195,6 +242,8 @@ public static class BroadcastEndpoints
         IBroadcastRepository broadcastRepo,
         IWhatsAppAccountRepository accountRepo,
         ITenantMembershipRepository membershipRepo,
+        ISecretStore secretStore,
+        IWhatsAppClientResolver whatsAppClientResolver,
         IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -208,15 +257,33 @@ public static class BroadcastEndpoints
         if (broadcast.Status != BroadcastStatus.Draft)
             return Results.BadRequest(new { error = "Only draft broadcasts can be dispatched." });
 
-        // BR-BC-001: only QR Code lines
+        var expectedConnectionType = broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate
+            ? WhatsAppConnectionType.OfficialApi : WhatsAppConnectionType.QrCode;
+        var requestedLine = broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate
+            ? broadcast.LinePhoneNumberId : request.LinePhoneNumberId;
         var accounts = await accountRepo.GetAllByTenantAsync(tenantId);
         var line = accounts.FirstOrDefault(a =>
-            a.PhoneNumberId == request.LinePhoneNumberId
-            && a.ConnectionType == WhatsAppConnectionType.QrCode
+            a.PhoneNumberId == requestedLine
+            && a.ConnectionType == expectedConnectionType
             && a.IsActive);
 
         if (line is null)
-            return Results.BadRequest(new { error = "QR Code line not found or not active." });
+            return Results.BadRequest(new { error = "Selected WhatsApp line not found or not active." });
+
+        if (broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate)
+        {
+            var token = await secretStore.GetAsync(line.AccessTokenRef);
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(line.WabaId))
+                return Results.BadRequest(new { error = "Official API credentials are not available." });
+            var templates = await whatsAppClientResolver.GetClient(WhatsAppConnectionType.OfficialApi)
+                .ListTemplatesAsync(line.WabaId, token);
+            var parameterCount = string.IsNullOrWhiteSpace(broadcast.TemplateParametersJson) ? 0 :
+                JsonSerializer.Deserialize<List<string>>(broadcast.TemplateParametersJson)?.Count ?? 0;
+            if (!templates.IsSuccess || !templates.Templates.Any(template =>
+                template.Name == broadcast.TemplateName && template.Language == broadcast.TemplateLanguage &&
+                template.BodyParameterCount == parameterCount))
+                return Results.BadRequest(new { error = "The selected template is no longer eligible for sending." });
+        }
 
         if (currentTenant.UserRole == "Operator")
         {
@@ -228,12 +295,15 @@ public static class BroadcastEndpoints
                 tenantId);
             membership?.LoadAssignedLinesFromJson();
 
+            if (membership is null || !membership.CanAccessQueue(broadcast.QueueId))
+                return Results.Forbid();
+
             var hasAssignedLine = membership is not null &&
                 (membership.AssignedLines.Any(assigned =>
-                    assigned.ConnectionType == WhatsAppConnectionType.QrCode &&
+                    assigned.ConnectionType == expectedConnectionType &&
                     assigned.LineNumber == line.LineNumber) ||
                  (membership.AssignedLines.Count == 0 &&
-                  membership.AssignedConnectionType == WhatsAppConnectionType.QrCode &&
+                  membership.AssignedConnectionType == expectedConnectionType &&
                   membership.AssignedLineNumber == line.LineNumber));
 
             if (!hasAssignedLine)
@@ -250,7 +320,7 @@ public static class BroadcastEndpoints
         if (totalCount == 0)
             return Results.BadRequest(new { error = "No recipients found for this broadcast." });
 
-        broadcast.StartDispatch(request.LinePhoneNumberId, totalCount);
+        broadcast.StartDispatch(requestedLine, totalCount);
         await broadcastRepo.UpdateAsync(broadcast);
 
         // Notify via SignalR
@@ -283,14 +353,16 @@ public static class BroadcastEndpoints
         if (active is not null)
             return Results.BadRequest(new { error = "There is already a broadcast in progress." });
 
+        var expectedConnectionType = broadcast.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate
+            ? WhatsAppConnectionType.OfficialApi : WhatsAppConnectionType.QrCode;
         var accounts = await accountRepo.GetAllByTenantAsync(tenantId);
         var line = accounts.FirstOrDefault(a =>
             a.PhoneNumberId == broadcast.LinePhoneNumberId
-            && a.ConnectionType == WhatsAppConnectionType.QrCode
+            && a.ConnectionType == expectedConnectionType
             && a.IsActive);
 
         if (line is null)
-            return Results.BadRequest(new { error = "The broadcast QR Code line is not active." });
+            return Results.BadRequest(new { error = "The broadcast line is not active." });
 
         if (currentTenant.UserRole == "Operator")
         {
@@ -302,12 +374,15 @@ public static class BroadcastEndpoints
                 tenantId);
             membership?.LoadAssignedLinesFromJson();
 
+            if (membership is null || !membership.CanAccessQueue(broadcast.QueueId))
+                return Results.Forbid();
+
             var hasAssignedLine = membership is not null &&
                 (membership.AssignedLines.Any(assigned =>
-                    assigned.ConnectionType == WhatsAppConnectionType.QrCode &&
+                    assigned.ConnectionType == expectedConnectionType &&
                     assigned.LineNumber == line.LineNumber) ||
                  (membership.AssignedLines.Count == 0 &&
-                  membership.AssignedConnectionType == WhatsAppConnectionType.QrCode &&
+                  membership.AssignedConnectionType == expectedConnectionType &&
                   membership.AssignedLineNumber == line.LineNumber));
 
             if (!hasAssignedLine)
@@ -335,12 +410,16 @@ public static class BroadcastEndpoints
         Guid id,
         ICurrentTenant currentTenant,
         IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository,
         IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
         var broadcast = await broadcastRepo.GetByIdAsync(id);
         if (broadcast is null || broadcast.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+        if (!await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
             return Results.NotFound();
 
         broadcast.Cancel();
@@ -356,12 +435,16 @@ public static class BroadcastEndpoints
     private static async Task<IResult> DeleteAsync(
         Guid id,
         ICurrentTenant currentTenant,
-        IBroadcastRepository broadcastRepo)
+        IBroadcastRepository broadcastRepo,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
 
         var broadcast = await broadcastRepo.GetByIdAsync(id);
         if (broadcast is null || broadcast.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+        if (!await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
             return Results.NotFound();
 
         if (broadcast.Status == BroadcastStatus.Sending)
@@ -374,11 +457,74 @@ public static class BroadcastEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<bool> CanAccessBroadcastAsync(
+        ICurrentTenant currentTenant,
+        BroadcastList broadcast,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository)
+    {
+        if (currentTenant.UserRole != "Operator") return true;
+        if (currentTenant.UserId is null || currentTenant.TenantId != broadcast.TenantId) return false;
+        var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, broadcast.TenantId);
+        if (membership is null || !membership.CanAccessQueue(broadcast.QueueId)) return false;
+        membership.LoadAssignedLinesFromJson();
+        if (string.IsNullOrWhiteSpace(broadcast.LinePhoneNumberId))
+            return broadcast.CreatedByUserId == currentTenant.UserId.Value;
+        var account = await accountRepository.GetByTenantAndPhoneNumberIdAsync(broadcast.TenantId, broadcast.LinePhoneNumberId);
+        if (account is null) return false;
+        return membership.AssignedLines.Any(assignment =>
+            assignment.ConnectionType == account.ConnectionType && assignment.LineNumber == account.LineNumber) ||
+            (membership.AssignedLines.Count == 0 && membership.AssignedConnectionType == account.ConnectionType && membership.AssignedLineNumber == account.LineNumber);
+    }
+
+    private static async Task<IResult> ListOfficialTemplatesAsync(
+        [FromQuery] string linePhoneNumberId,
+        ICurrentTenant currentTenant,
+        IWhatsAppAccountRepository accountRepository,
+        ITenantMembershipRepository membershipRepository,
+        ISecretStore secretStore,
+        IWhatsAppClientResolver whatsAppClientResolver,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.TenantId is null) return Results.Unauthorized();
+        var account = await accountRepository.GetByTenantAndPhoneNumberIdAsync(
+            currentTenant.TenantId.Value, linePhoneNumberId, cancellationToken);
+        if (account is null || !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+            string.IsNullOrWhiteSpace(account.WabaId))
+            return Results.BadRequest(new { error = "Official API line not found or inactive." });
+
+        if (currentTenant.UserRole == "Operator")
+        {
+            if (currentTenant.UserId is null) return Results.Forbid();
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            membership?.LoadAssignedLinesFromJson();
+            var hasLine = membership is not null &&
+                (membership.AssignedLines.Any(assignment =>
+                    assignment.ConnectionType == WhatsAppConnectionType.OfficialApi && assignment.LineNumber == account.LineNumber) ||
+                 (membership.AssignedLines.Count == 0 && membership.AssignedConnectionType == WhatsAppConnectionType.OfficialApi && membership.AssignedLineNumber == account.LineNumber));
+            if (!hasLine) return Results.Forbid();
+        }
+
+        var token = await secretStore.GetAsync(account.AccessTokenRef, cancellationToken);
+        if (string.IsNullOrWhiteSpace(token))
+            return Results.BadRequest(new { error = "Access token not available." });
+
+        var result = await whatsAppClientResolver.GetClient(WhatsAppConnectionType.OfficialApi)
+            .ListTemplatesAsync(account.WabaId, token);
+        if (!result.IsSuccess)
+            return Results.BadRequest(new { error = result.ErrorMessage ?? "Unable to load templates." });
+
+        return Results.Ok(new { templates = result.Templates });
+    }
+
     private static object ToDto(BroadcastList b) => new
     {
         id = b.Id,
         name = b.Name,
         message = b.Message,
+        deliveryMode = b.DeliveryMode.ToString(),
+        templateName = b.TemplateName,
+        templateLanguage = b.TemplateLanguage,
         status = b.Status.ToString(),
         linePhoneNumberId = b.LinePhoneNumberId,
         queueId = b.QueueId,
@@ -397,6 +543,11 @@ public sealed record CreateBroadcastRequest
     public string Message { get; init; } = string.Empty;
     public List<Guid> ContactIds { get; init; } = [];
     public Guid? QueueId { get; init; }
+    public BroadcastDeliveryMode DeliveryMode { get; init; } = BroadcastDeliveryMode.QrCodeText;
+    public string? LinePhoneNumberId { get; init; }
+    public string? TemplateName { get; init; }
+    public string? TemplateLanguage { get; init; }
+    public List<string>? TemplateBodyParameters { get; init; } = [];
 }
 
 public sealed record DispatchBroadcastRequest
