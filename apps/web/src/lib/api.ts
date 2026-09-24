@@ -100,6 +100,12 @@ export interface ServiceQueue {
   interactionReply?: string | null
 }
 
+export interface WhatsAppTemplate {
+  name: string
+  language: string
+  bodyParameterCount: number
+}
+
 export interface Message {
   id: string
   direction: string
@@ -554,6 +560,11 @@ export const api = {
               }
             : { content }),
         }
+      ),
+
+    listTemplates: (id: string) =>
+      fetchApi<{ templates: WhatsAppTemplate[]; error?: string }>(
+        `/api/conversations/${id}/templates`
       ),
 
     switchMode: (id: string, mode: string, version?: number) =>

@@ -77,6 +77,15 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
             ErrorMessage = "Templates are available only for the official WhatsApp API."
         });
 
+    public Task<WhatsAppTemplateListResult> ListTemplatesAsync(
+        string wabaId,
+        string accessToken,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new WhatsAppTemplateListResult
+        {
+            ErrorMessage = "Templates are available only for the official WhatsApp API."
+        });
+
     private async Task<SendMessageResult> SendWhatsAppWebMessageAsync(
         string tenantId,
         string lineNumber,

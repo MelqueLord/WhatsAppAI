@@ -35,6 +35,11 @@ public interface IWhatsAppClient
         IReadOnlyList<string> parameters,
         CancellationToken cancellationToken = default);
 
+    Task<WhatsAppTemplateListResult> ListTemplatesAsync(
+        string wabaId,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
     // QR Code connection for development/unofficial API
     Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
@@ -72,6 +77,18 @@ public sealed record SendMessageResult
     public string? MessageId { get; init; }
     public string? ErrorMessage { get; init; }
 }
+
+public sealed record WhatsAppTemplateListResult
+{
+    public bool IsSuccess { get; init; }
+    public string? ErrorMessage { get; init; }
+    public IReadOnlyList<WhatsAppTemplateSummary> Templates { get; init; } = [];
+}
+
+public sealed record WhatsAppTemplateSummary(
+    string Name,
+    string Language,
+    int BodyParameterCount);
 
 public sealed record WhatsAppQrCodeResult
 {

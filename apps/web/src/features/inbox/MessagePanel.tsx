@@ -6,6 +6,7 @@ import {
   type Conversation,
   type CursorPaginationResponse,
   type ServiceQueue,
+  type WhatsAppTemplate,
 } from '../../lib/api'
 import { useSignalR } from '../../lib/signalr'
 import { cn, formatDate, formatTime, isSameCalendarDay } from '../../lib/utils'
@@ -123,6 +124,21 @@ export function MessagePanel({
   })
 
   const messages = [...(messagesData?.items ?? [])].reverse()
+
+  const { data: templatesData, isLoading: isLoadingTemplates } = useQuery({
+    queryKey: ['conversation-templates', conversation.id],
+    queryFn: () => api.conversations.listTemplates(conversation.id),
+    enabled: !isConversationClosed && !isConversationOpen && !conversation.isQrCode,
+    staleTime: 60_000,
+  })
+
+  const templates = templatesData?.templates ?? []
+
+  const selectTemplate = (template: WhatsAppTemplate) => {
+    setTemplateName(template.name)
+    setTemplateLanguage(template.language)
+    setTemplateParameters('')
+  }
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content: string; template?: { name: string; language: string; parameters?: string[] } }) =>
@@ -841,13 +857,22 @@ export function MessagePanel({
           <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-[#10223f] p-3">
             <p className="text-xs font-medium text-slate-200">Enviar template aprovado pela Meta</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <input
-                value={templateName}
-                onChange={(event) => setTemplateName(event.target.value)}
-                placeholder="Nome do template"
-                maxLength={512}
-                className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
-              />
+              <select
+                value={templateName ? `${templateName}:${templateLanguage}` : ''}
+                onChange={(event) => {
+                  const template = templates.find((item) => `${item.name}:${item.language}` === event.target.value)
+                  if (template) selectTemplate(template)
+                }}
+                className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white"
+                disabled={isLoadingTemplates || templates.length === 0}
+              >
+                <option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione um template aprovado'}</option>
+                {templates.map((template) => (
+                  <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>
+                    {template.name} ({template.language})
+                  </option>
+                ))}
+              </select>
               <input
                 value={templateLanguage}
                 onChange={(event) => setTemplateLanguage(event.target.value)}

@@ -32,6 +32,9 @@ public static class ConversationEndpoints
         group.MapGet("/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListMessages");
 
+        group.MapGet("/{conversationId:guid}/templates", ListTemplatesAsync)
+            .WithName("ListConversationTemplates");
+
         group.MapPost("/{conversationId:guid}/messages", SendMessageAsync)
             .WithName("SendMessage");
 
@@ -183,6 +186,44 @@ public static class ConversationEndpoints
             new CursorPaginationRequest { Cursor = cursor, Limit = limit });
 
         return Results.Ok(result);
+    }
+
+    private static async Task<IResult> ListTemplatesAsync(
+        Guid conversationId,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        ISecretStore secretStore,
+        IWhatsAppClientResolver whatsAppClientResolver,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant, conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        if (conversation is null || conversation.TenantId != currentTenant.TenantId.Value)
+            return Results.NotFound();
+
+        var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        if (account is null || !account.IsActive || account.ConnectionType != WhatsAppConnectionType.OfficialApi)
+            return Results.BadRequest(new { error = "Templates are available only for the official WhatsApp API." });
+
+        var accessToken = await secretStore.GetAsync(account.AccessTokenRef);
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return Results.Ok(new { templates = Array.Empty<WhatsAppTemplateSummary>(), error = "Access token not available." });
+
+        var result = await whatsAppClientResolver
+            .GetClient(WhatsAppConnectionType.OfficialApi)
+            .ListTemplatesAsync(account.WabaId, accessToken);
+
+        return Results.Ok(new { templates = result.Templates, error = result.ErrorMessage });
     }
 
     private static async Task<IResult> SendMessageAsync(

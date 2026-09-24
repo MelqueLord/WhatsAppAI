@@ -54,6 +54,20 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatsAppClient_ListsOnlyApprovedTemplates()
+    {
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.ListTemplatesAsync("waba-id", "token");
+
+        var template = Assert.Single(result.Templates);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("welcome_customer", template.Name);
+        Assert.Equal("pt_BR", template.Language);
+        Assert.Equal(1, template.BodyParameterCount);
+    }
+
+    [Fact]
     public async Task WhatsAppWebClient_RejectsTemplates()
     {
         var client = new WhatsAppWebClient(new HttpClient(), new ConfigurationBuilder().Build());
@@ -134,6 +148,10 @@ public sealed class MetaClientAuthorizationTests : IDisposable
                 {
                     Content = new ByteArrayContent([1, 2, 3])
                 };
+            }
+            else if (request.RequestUri?.AbsolutePath.Contains("message_templates", StringComparison.Ordinal) == true)
+            {
+                content = "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\"}]}";
             }
             else
             {

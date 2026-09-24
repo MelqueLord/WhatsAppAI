@@ -197,6 +197,51 @@ internal sealed class WhatsAppClient(
         }
     }
 
+    public async Task<WhatsAppTemplateListResult> ListTemplatesAsync(
+        string wabaId,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{BaseUrl}/{wabaId}/message_templates?fields=name,language,status,components&limit=250");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("WhatsApp template API returned {StatusCode}", response.StatusCode);
+                return new WhatsAppTemplateListResult
+                {
+                    ErrorMessage = GetSanitizedErrorMessage(response.StatusCode)
+                };
+            }
+
+            var content = await response.Content.ReadFromJsonAsync<TemplateListResponse>(cancellationToken: cancellationToken);
+            return new WhatsAppTemplateListResult
+            {
+                IsSuccess = true,
+                Templates = (content?.Data ?? [])
+                    .Where(template => string.Equals(template.Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(template.Name) && !string.IsNullOrWhiteSpace(template.Language))
+                    .Select(template => new WhatsAppTemplateSummary(
+                        template.Name!,
+                        template.Language!,
+                        CountBodyParameters(template.Components)))
+                    .OrderBy(template => template.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(template => template.Language, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to list WhatsApp templates");
+            return new WhatsAppTemplateListResult { ErrorMessage = "Unable to load approved templates." };
+        }
+    }
+
     public Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
         int lineNumber = 1,
@@ -254,6 +299,13 @@ internal sealed class WhatsAppClient(
             _ => "Connection failed. Please check your configuration."
         };
     }
+
+    private static int CountBodyParameters(IReadOnlyList<TemplateListComponent>? components)
+    {
+        var body = components?.FirstOrDefault(component =>
+            string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase));
+        return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Matches(body.Text, @"\{\{\d+\}\}").Count;
+    }
 }
 
 internal sealed class PhoneNumberResponse
@@ -278,6 +330,36 @@ internal sealed class SendMessageRequest
 
     [JsonPropertyName("text")]
     public TextBody Text { get; init; } = new();
+}
+
+internal sealed class TemplateListResponse
+{
+    [JsonPropertyName("data")]
+    public List<TemplateListItem> Data { get; init; } = [];
+}
+
+internal sealed class TemplateListItem
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("language")]
+    public string? Language { get; init; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; init; }
+
+    [JsonPropertyName("components")]
+    public List<TemplateListComponent>? Components { get; init; }
+}
+
+internal sealed class TemplateListComponent
+{
+    [JsonPropertyName("type")]
+    public string? Type { get; init; }
+
+    [JsonPropertyName("text")]
+    public string? Text { get; init; }
 }
 
 internal sealed class SendTemplateMessageRequest
