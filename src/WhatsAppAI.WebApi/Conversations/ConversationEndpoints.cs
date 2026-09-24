@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
+using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;

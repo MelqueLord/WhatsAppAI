@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Broadcast;
+using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Broadcast;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
