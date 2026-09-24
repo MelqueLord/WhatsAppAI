@@ -111,6 +111,9 @@ public static class ConversationEndpoints
             if (!string.IsNullOrWhiteSpace(lineConnectionType) && lineNumber is not null &&
                 Enum.TryParse<WhatsAppConnectionType>(lineConnectionType, true, out var lineType))
             {
+                if (!HasAssignedLine(membership, lineType, lineNumber.Value))
+                    return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
                 var account = await accountRepository.GetByTenantAndSlotAsync(
                     currentTenant.TenantId.Value, lineType, lineNumber.Value);
                 phoneNumberIds = account?.PhoneNumberId is not null ? [account.PhoneNumberId] : [];
@@ -122,7 +125,12 @@ public static class ConversationEndpoints
             }
 
             if (phoneNumberIds.Count == 0)
-                return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+            {
+                if (queueId is null)
+                    return Results.Ok(new CursorPaginationResponse<ConversationDto>());
+
+                phoneNumberIds = null;
+            }
         }
 
         var result = await conversationQueries.GetConversationsAsync(
@@ -235,6 +243,8 @@ public static class ConversationEndpoints
         ITenantMembershipRepository membershipRepository,
         IWhatsAppAccountRepository accountRepository,
         IOutboxMessageRepository outboxMessageRepository,
+        ISecretStore secretStore,
+        IWhatsAppClientResolver whatsAppClientResolver,
         IClock clock,
         IHubContext<InboxHub> hubContext,
         AppDbContext dbContext)
@@ -293,6 +303,44 @@ public static class ConversationEndpoints
         if (templateRequested && (templateParameters.Count > 10 ||
             templateParameters.Any(parameter => parameter is null || parameter.Length > 1024)))
             return Results.BadRequest(new { error = "A template may contain up to 10 parameters of 1024 characters." });
+
+        if (templateRequested)
+        {
+            if (conversationAccount is null || !conversationAccount.IsActive ||
+                conversationAccount.ConnectionType != WhatsAppConnectionType.OfficialApi ||
+                string.IsNullOrWhiteSpace(conversationAccount.WabaId))
+            {
+                return Results.BadRequest(new { error = "Templates are available only for an active official WhatsApp API line." });
+            }
+
+            var accessToken = await secretStore.GetAsync(conversationAccount.AccessTokenRef);
+            if (string.IsNullOrWhiteSpace(accessToken))
+                return Results.Problem("The WhatsApp access token is not available.", statusCode: StatusCodes.Status503ServiceUnavailable);
+
+            var templatesResult = await whatsAppClientResolver
+                .GetClient(WhatsAppConnectionType.OfficialApi)
+                .ListTemplatesAsync(conversationAccount.WabaId, accessToken);
+            if (!templatesResult.IsSuccess)
+            {
+                return Results.Problem(
+                    templatesResult.ErrorMessage ?? "Unable to verify approved templates.",
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var selectedTemplate = templatesResult.Templates.SingleOrDefault(template =>
+                string.Equals(template.Name, request.TemplateName!.Trim(), StringComparison.Ordinal) &&
+                string.Equals(template.Language, request.TemplateLanguage!.Trim(), StringComparison.Ordinal));
+            if (selectedTemplate is null)
+                return Results.BadRequest(new { error = "The selected template is not an approved transactional Meta template." });
+
+            if (templateParameters.Count != selectedTemplate.BodyParameterCount)
+            {
+                return Results.BadRequest(new
+                {
+                    error = $"This template requires exactly {selectedTemplate.BodyParameterCount} body parameters."
+                });
+            }
+        }
 
         if (!templateRequested && !isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates allowed." });
@@ -530,15 +578,29 @@ public static class ConversationEndpoints
         membership.LoadAssignedLinesFromJson();
         var phoneNumberIds = await ResolvePhoneNumberIdsAsync(
             membership, currentTenant.TenantId.Value, accountRepository);
+        var hasLineAssignment = membership.AssignedLines.Count > 0 ||
+            (membership.AssignedConnectionType is not null && membership.AssignedLineNumber is not null);
 
         var includeManual = phoneNumberIds.Exists(p =>
             p.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) && p.EndsWith(":1"));
         var canAccessQueue = membership.CanAccessQueue(conversation.QueueId);
         return canAccessQueue &&
-            phoneNumberIds.Count > 0 &&
-            (phoneNumberIds.Contains(conversation.PhoneNumberId) ||
-             (conversation.PhoneNumberId == "manual" && includeManual));
+            (hasLineAssignment
+                ? phoneNumberIds.Count > 0 &&
+                  (phoneNumberIds.Contains(conversation.PhoneNumberId) ||
+                   (conversation.PhoneNumberId == "manual" && includeManual))
+                : membership.AssignedQueueId is not null);
     }
+
+    private static bool HasAssignedLine(
+        TenantMembership? membership,
+        WhatsAppConnectionType connectionType,
+        int lineNumber) =>
+        membership?.AssignedLines.Any(line =>
+            line.ConnectionType == connectionType && line.LineNumber == lineNumber) == true ||
+        (membership?.AssignedLines.Count == 0 &&
+         membership?.AssignedConnectionType == connectionType &&
+         membership?.AssignedLineNumber == lineNumber);
 
     // Resolves all assigned lines of a membership to their WhatsApp account PhoneNumberIds.
     // Falls back to the legacy single-line fields when AssignedLines is empty.

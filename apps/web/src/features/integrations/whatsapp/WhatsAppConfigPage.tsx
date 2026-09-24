@@ -38,7 +38,7 @@ export function WhatsAppConfigPage() {
       const res = await fetchApiResponse('/api/integrations/whatsapp')
       return res.json()
     },
-    enabled: !isSuspended,
+    enabled: !isSuspended && !isOperator,
   })
 
   const { data: qrData, isLoading: qrLoading, refetch: refetchQr } = useQuery({
@@ -59,7 +59,7 @@ export function WhatsAppConfigPage() {
       const res = await fetchApiResponse(`/api/integrations/whatsapp/session/status/${selectedQrLine}`)
       return res.json()
     },
-    enabled: !isSuspended,
+    enabled: !isSuspended && !isOperator,
     refetchInterval: 5000, // Poll every 5 seconds
   })
 
@@ -68,7 +68,7 @@ export function WhatsAppConfigPage() {
     queryFn: async () => {
       const res = await fetchApiResponse(`/api/integrations/whatsapp/official/status/${selectedApiLine}`)
       if (!res.ok) throw new Error('Não foi possível verificar a conexão da API oficial.')
-      return res.json() as Promise<{ configured: boolean; isConnected: boolean; phoneNumber?: string; qualityRating?: string; message: string }>
+      return res.json() as Promise<{ configured: boolean; isActive: boolean; isConnected: boolean; phoneNumber?: string; qualityRating?: string; message: string }>
     },
     enabled: !isSuspended && !isOperator && connectionMode === 'api' && apiLineCount > 0,
   })
@@ -84,6 +84,24 @@ export function WhatsAppConfigPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-session', selectedQrLine] })
       queryClient.invalidateQueries({ queryKey: ['whatsapp-qrcode', selectedQrLine] })
+    },
+  })
+
+  const disconnectOfficialApiMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetchApiResponse(`/api/integrations/whatsapp/official/disconnect/${selectedApiLine}`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Não foi possível desconectar a API Oficial.')
+      return res.json() as Promise<{ message: string }>
+    },
+    onSuccess: (data) => {
+      setSuccess(data.message)
+      setAccessToken('')
+      setTestResult(null)
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-official-status', selectedApiLine] })
     },
   })
 
@@ -134,6 +152,18 @@ export function WhatsAppConfigPage() {
     return (
       <div className="h-full flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (isOperator) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md text-center">
+          <LockKeyhole className="w-10 h-10 mx-auto mb-4 text-slate-400" />
+          <h1 className="text-xl font-semibold text-slate-800">Configuração restrita</h1>
+          <p className="mt-2 text-sm text-slate-500">A conexão do WhatsApp é administrada pelo proprietário. No Inbox você verá somente as conversas da sua linha ou fila atribuída.</p>
+        </div>
       </div>
     )
   }
@@ -319,7 +349,10 @@ export function WhatsAppConfigPage() {
         {/* API Configuration */}
         {!isOperator && connectionMode === 'api' && (
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="font-semibold text-slate-900 mb-4">Credenciais da API Oficial</h2>
+            <div className="mb-4">
+              <h2 className="font-semibold text-slate-900">Linha {selectedApiLine} da API Oficial</h2>
+              <p className="mt-1 text-sm text-slate-500">Conecte a linha com a WABA, o Phone Number ID e um token de acesso da Meta. O token nunca é exibido depois de salvo.</p>
+            </div>
 
             <div className={`mb-4 p-4 rounded-xl flex items-center gap-3 ${
               officialApiStatus?.isConnected
@@ -350,6 +383,17 @@ export function WhatsAppConfigPage() {
                 <RefreshCw className={`w-4 h-4 ${officialApiStatusLoading ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
+              {officialApiStatus?.isActive && (
+                <button
+                  type="button"
+                  onClick={() => disconnectOfficialApiMutation.mutate()}
+                  disabled={disconnectOfficialApiMutation.isPending}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                >
+                  {disconnectOfficialApiMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <WifiOff className="w-4 h-4" />}
+                  Desconectar API
+                </button>
+              )}
             </div>
 
             {success && (

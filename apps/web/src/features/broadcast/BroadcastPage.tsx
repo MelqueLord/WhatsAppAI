@@ -58,6 +58,10 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
+  const [deliveryMode, setDeliveryMode] = useState<'QrCodeText' | 'OfficialApiTemplate'>('QrCodeText')
+  const [officialLineId, setOfficialLineId] = useState('')
+  const [templateKey, setTemplateKey] = useState('')
+  const [templateParameters, setTemplateParameters] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [selectedQueueId, setSelectedQueueId] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -74,11 +78,25 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     select: (data) => data.filter((q) => q.isActive),
   })
 
+  const { data: officialLinesData } = useQuery({ queryKey: ['whatsapp-lines'], queryFn: () => api.whatsapp.getLines() })
+  const officialLines = (officialLinesData ?? []).filter((line) => line.connectionType === 'OfficialApi' && line.isActive)
+  const { data: templateResult } = useQuery({
+    queryKey: ['broadcast-official-templates', officialLineId],
+    queryFn: () => api.broadcasts.listOfficialTemplates(officialLineId),
+    enabled: deliveryMode === 'OfficialApiTemplate' && Boolean(officialLineId),
+  })
+  const selectedTemplate = (templateResult?.templates ?? []).find((template) => `${template.name}:${template.language}` === templateKey)
+
   const createMutation = useMutation({
     mutationFn: () =>
       api.broadcasts.create({
         name,
-        message,
+        message: deliveryMode === 'QrCodeText' ? message : '',
+        deliveryMode: deliveryMode === 'OfficialApiTemplate' ? 1 : 0,
+        linePhoneNumberId: deliveryMode === 'OfficialApiTemplate' ? officialLineId : undefined,
+        templateName: selectedTemplate?.name,
+        templateLanguage: selectedTemplate?.language,
+        templateBodyParameters: templateParameters,
         contactIds: selectedQueueId ? [] : [...selectedIds],
         queueId: selectedQueueId || undefined,
       }),
@@ -117,7 +135,9 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !message.trim() || (!selectedQueueId && selectedIds.size === 0)) return
+    if (!name.trim() || (deliveryMode === 'QrCodeText' && !message.trim()) ||
+      (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
+      (!selectedQueueId && selectedIds.size === 0)) return
     createMutation.mutate()
   }
 
@@ -139,6 +159,21 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 {(createMutation.error as Error).message}
               </div>
             )}
+
+            <div>
+              <label htmlFor="broadcast-delivery-mode" className="block text-sm font-medium text-slate-700 mb-1.5">Canal de envio</label>
+              <select id="broadcast-delivery-mode" value={deliveryMode} onChange={(event) => { setDeliveryMode(event.target.value as 'QrCodeText' | 'OfficialApiTemplate'); setTemplateKey(''); setTemplateParameters([]) }} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm">
+                <option value="QrCodeText">QR Code — texto livre</option>
+                <option value="OfficialApiTemplate">API Oficial — template transacional</option>
+              </select>
+              {deliveryMode === 'OfficialApiTemplate' && <p className="mt-1 text-xs text-slate-500">Somente templates UTILITY aprovados podem ser enviados.</p>}
+            </div>
+
+            {deliveryMode === 'OfficialApiTemplate' && <>
+              <div><label htmlFor="broadcast-official-line" className="block text-sm font-medium text-slate-700 mb-1.5">Linha oficial</label><select id="broadcast-official-line" value={officialLineId} onChange={(event) => { setOfficialLineId(event.target.value); setTemplateKey(''); setTemplateParameters([]) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione a linha</option>{officialLines.map((line) => <option key={line.phoneNumberId} value={line.phoneNumberId}>{line.lineNumber}</option>)}</select></div>
+              <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione o template</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
+              {templateParameters.map((parameter, index) => <div key={index}><label htmlFor={`broadcast-template-param-${index}`} className="block text-sm font-medium text-slate-700 mb-1.5">Parâmetro {index + 1}</label><input id={`broadcast-template-param-${index}`} value={parameter} maxLength={1024} onChange={(event) => setTemplateParameters((current) => current.map((value, parameterIndex) => parameterIndex === index ? event.target.value : value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" /></div>)}
+            </>}
 
             <div>
               <label htmlFor="broadcast-queue" className="block text-sm font-medium text-slate-700 mb-1.5">Fila de atendimento</label>
@@ -174,7 +209,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               />
             </div>
 
-            <div>
+            {deliveryMode === 'QrCodeText' && <div>
               <label htmlFor="broadcast-message" className="block text-sm font-medium text-slate-700 mb-1.5">Mensagem *</label>
               <textarea
                 id="broadcast-message"
@@ -187,7 +222,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
               />
               <p className="text-xs text-slate-400 mt-1 text-right">{message.length}/4096</p>
-            </div>
+            </div>}
 
             {!selectedQueueId && <div>
               <div className="flex items-center justify-between mb-2">
@@ -258,7 +293,8 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               disabled={
                 createMutation.isPending ||
                 !name.trim() ||
-                !message.trim() ||
+                (deliveryMode === 'QrCodeText' && !message.trim()) ||
+                (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
                 (!selectedQueueId && (selectedIds.size === 0 || selectedIds.size > 500))
               }
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
@@ -369,6 +405,7 @@ function DispatchDialog({
   const { user, isOperator } = useAuth()
   const queryClient = useQueryClient()
   const [selectedLine, setSelectedLine] = useState('')
+  const isOfficialTemplate = broadcast.deliveryMode === 'OfficialApiTemplate'
 
   const assignedQrLineNumbers = new Set(
     user?.assignedLines
@@ -387,9 +424,10 @@ function DispatchDialog({
     queryKey: ['whatsapp-lines'],
     queryFn: () => api.whatsapp.getLines(),
     select: (data) => data.filter((line) =>
-      line.connectionType === 'QrCode' &&
+      line.connectionType === (isOfficialTemplate ? 'OfficialApi' : 'QrCode') &&
       line.isActive &&
-      (!isOperator || assignedQrLineNumbers.has(line.lineNumber))
+      (!isOfficialTemplate || line.phoneNumberId === broadcast.linePhoneNumberId) &&
+      (!isOperator || (isOfficialTemplate || assignedQrLineNumbers.has(line.lineNumber)))
     ),
   })
 
@@ -405,6 +443,10 @@ function DispatchDialog({
 
   const operatorLine = isOperator && lines?.length === 1 ? lines[0] : null
   const operatorPhoneNumberId = operatorLine?.phoneNumberId ?? null
+
+  useEffect(() => {
+    if (isOfficialTemplate && lines?.length === 1) setSelectedLine(lines[0].phoneNumberId)
+  }, [isOfficialTemplate, lines])
 
   const dispatchMutation = useMutation({
     mutationFn: ({ linePhoneNumberId }: { linePhoneNumberId: string }) =>
@@ -461,7 +503,7 @@ function DispatchDialog({
               <div className="flex flex-col items-center gap-3 py-2">
                 <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
                 <p className="text-sm text-slate-600">
-                  Disparando via linha QR Code {operatorLine.lineNumber}…
+                  Disparando via {isOfficialTemplate ? 'API Oficial' : 'linha QR Code'} {operatorLine.lineNumber}…
                 </p>
               </div>
             )}
@@ -504,12 +546,12 @@ function DispatchDialog({
           ) : !lines || lines.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-4">
               {isOperator
-                ? 'Nenhuma linha QR Code ativa está atribuída ao seu usuário.'
-                : 'Nenhuma linha QR Code ativa encontrada.'}
+                ? 'A linha atribuída não está disponível para este disparo.'
+                : 'A linha necessária para este disparo não está ativa.'}
             </p>
           ) : (
             <div className="space-y-2">
-              <label htmlFor="broadcast-line" className="text-sm font-medium text-slate-700">Linha QR Code</label>
+              <label htmlFor="broadcast-line" className="text-sm font-medium text-slate-700">{isOfficialTemplate ? 'Linha oficial configurada' : 'Linha QR Code'}</label>
               <select
                 id="broadcast-line"
                 value={selectedLine}
@@ -757,7 +799,7 @@ export function BroadcastPage() {
           <div>
             <h1 className="text-xl font-semibold text-slate-800">Disparo em Massa</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Envie mensagens em massa via linha QR Code
+              Envie texto livre pelo QR Code ou templates transacionais pela API Oficial
             </p>
           </div>
           <button

@@ -204,32 +204,47 @@ internal sealed class WhatsAppClient(
     {
         try
         {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                $"{BaseUrl}/{wabaId}/message_templates?fields=name,language,status,components&limit=250");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            var templates = new List<WhatsAppTemplateSummary>();
+            var visitedPages = new HashSet<string>(StringComparer.Ordinal);
+            string? nextPageUrl = $"{BaseUrl}/{wabaId}/message_templates?fields=name,language,status,category,components&limit=250";
 
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            while (!string.IsNullOrWhiteSpace(nextPageUrl) && visitedPages.Add(nextPageUrl))
             {
-                logger.LogWarning("WhatsApp template API returned {StatusCode}", response.StatusCode);
-                return new WhatsAppTemplateListResult
+                using var request = new HttpRequestMessage(HttpMethod.Get, nextPageUrl);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+                using var response = await httpClient.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
                 {
-                    ErrorMessage = GetSanitizedErrorMessage(response.StatusCode)
-                };
-            }
+                    logger.LogWarning("WhatsApp template API returned {StatusCode}", response.StatusCode);
+                    return new WhatsAppTemplateListResult
+                    {
+                        ErrorMessage = GetSanitizedErrorMessage(response.StatusCode)
+                    };
+                }
 
-            var content = await response.Content.ReadFromJsonAsync<TemplateListResponse>(cancellationToken: cancellationToken);
-            return new WhatsAppTemplateListResult
-            {
-                IsSuccess = true,
-                Templates = (content?.Data ?? [])
-                    .Where(template => string.Equals(template.Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
-                        !string.IsNullOrWhiteSpace(template.Name) && !string.IsNullOrWhiteSpace(template.Language))
+                var content = await response.Content.ReadFromJsonAsync<TemplateListResponse>(
+                    cancellationToken: cancellationToken);
+                templates.AddRange((content?.Data ?? [])
+                    .Where(template =>
+                        string.Equals(template.Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(template.Category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(template.Name) &&
+                        !string.IsNullOrWhiteSpace(template.Language))
                     .Select(template => new WhatsAppTemplateSummary(
                         template.Name!,
                         template.Language!,
-                        CountBodyParameters(template.Components)))
+                        CountBodyParameters(template.Components))));
+
+                nextPageUrl = IsTrustedMetaPageUrl(content?.Paging?.Next)
+                    ? content?.Paging?.Next
+                    : null;
+            }
+
+            return new WhatsAppTemplateListResult
+            {
+                IsSuccess = true,
+                Templates = templates
                     .OrderBy(template => template.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(template => template.Language, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
@@ -306,6 +321,11 @@ internal sealed class WhatsAppClient(
             string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase));
         return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Matches(body.Text, @"\{\{\d+\}\}").Count;
     }
+
+    private static bool IsTrustedMetaPageUrl(string? pageUrl) =>
+        Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        string.Equals(uri.Host, "graph.facebook.com", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed class PhoneNumberResponse
@@ -336,6 +356,15 @@ internal sealed class TemplateListResponse
 {
     [JsonPropertyName("data")]
     public List<TemplateListItem> Data { get; init; } = [];
+
+    [JsonPropertyName("paging")]
+    public TemplateListPaging? Paging { get; init; }
+}
+
+internal sealed class TemplateListPaging
+{
+    [JsonPropertyName("next")]
+    public string? Next { get; init; }
 }
 
 internal sealed class TemplateListItem
@@ -348,6 +377,9 @@ internal sealed class TemplateListItem
 
     [JsonPropertyName("status")]
     public string? Status { get; init; }
+
+    [JsonPropertyName("category")]
+    public string? Category { get; init; }
 
     [JsonPropertyName("components")]
     public List<TemplateListComponent>? Components { get; init; }

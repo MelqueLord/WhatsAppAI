@@ -10,6 +10,8 @@ const apiMock = vi.hoisted(() => ({
     get: vi.fn(),
     getMessages: vi.fn(),
     close: vi.fn(),
+    listTemplates: vi.fn(),
+    sendMessage: vi.fn(),
     submitAiFeedback: vi.fn(),
   },
   serviceQueues: {
@@ -82,6 +84,8 @@ describe('MessagePanel conversation closing', () => {
     apiMock.conversations.get.mockReset()
     apiMock.conversations.getMessages.mockReset()
     apiMock.conversations.close.mockReset()
+    apiMock.conversations.listTemplates.mockReset()
+    apiMock.conversations.sendMessage.mockReset()
     apiMock.conversations.submitAiFeedback.mockReset()
     apiMock.serviceQueues.list.mockReset()
     apiMock.serviceQueues.assign.mockReset()
@@ -102,6 +106,8 @@ describe('MessagePanel conversation closing', () => {
       status: 'Closed',
       version: 3,
     })
+    apiMock.conversations.listTemplates.mockResolvedValue({ templates: [] })
+    apiMock.conversations.sendMessage.mockResolvedValue({ id: 'message-1', status: 'Queued' })
     apiMock.serviceQueues.list.mockResolvedValue([])
   })
 
@@ -199,5 +205,34 @@ describe('MessagePanel conversation closing', () => {
     expect(screen.getAllByText(formatTime(previousDayAt))).toHaveLength(1)
     expect(screen.getAllByText(formatTime(receivedAt))).toHaveLength(1)
     expect(screen.getAllByText(formatTime(sentAt))).toHaveLength(1)
+  })
+
+  it('requires the selected template body parameter count before sending', async () => {
+    apiMock.conversations.listTemplates.mockResolvedValue({
+      templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1 }],
+    })
+    const conversation = { ...createConversation(), isQrCode: false, isWindowOpen: false }
+
+    renderPanel(conversation)
+
+    await screen.findByRole('option', { name: 'service_update (pt_BR)' })
+    fireEvent.change(await screen.findByRole('combobox'), {
+      target: { value: 'service_update:pt_BR' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Enviar template' })).toBeDisabled()
+
+    fireEvent.change(screen.getByPlaceholderText('Informe 1 parâmetro(s), separados por vírgula'), {
+      target: { value: 'Maria' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar template' }))
+
+    await waitFor(() => {
+      expect(apiMock.conversations.sendMessage).toHaveBeenCalledWith(
+        'conversation-1',
+        '',
+        { name: 'service_update', language: 'pt_BR', parameters: ['Maria'] },
+      )
+    })
   })
 })

@@ -14,6 +14,7 @@ vi.mock('../../lib/api', () => ({
     broadcasts: {
       list: vi.fn(),
       get: vi.fn(),
+      listOfficialTemplates: vi.fn(),
       create: vi.fn(),
       dispatch: vi.fn(),
       update: vi.fn(),
@@ -61,6 +62,8 @@ describe('BroadcastPage', () => {
       sortOrder: 1,
       isActive: true,
     }])
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([])
+    vi.mocked(api.broadcasts.listOfficialTemplates).mockResolvedValue({ templates: [] })
   })
 
   it('saves the selected queue when creating a broadcast', async () => {
@@ -87,6 +90,11 @@ describe('BroadcastPage', () => {
     await waitFor(() => expect(api.broadcasts.create).toHaveBeenCalledWith({
       name: 'Aviso',
       message: 'Mensagem',
+      deliveryMode: 0,
+      linePhoneNumberId: undefined,
+      templateName: undefined,
+      templateLanguage: undefined,
+      templateBodyParameters: [],
       contactIds: [],
       queueId: 'queue-1',
     }))
@@ -100,6 +108,41 @@ describe('BroadcastPage', () => {
 
     expect(await screen.findByText(/Todos os contatos desta fila serão incluídos/)).toBeInTheDocument()
     expect(api.contacts.list).not.toHaveBeenCalledWith(undefined, 500, 'queue-1')
+  })
+
+  it('creates an official broadcast with the selected approved template and body parameters', async () => {
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
+      lineNumber: 2,
+      connectionType: 'OfficialApi',
+      phoneNumberId: 'official-2',
+      isActive: true,
+    }])
+    vi.mocked(api.broadcasts.listOfficialTemplates).mockResolvedValue({
+      templates: [{ name: 'status_update', language: 'pt_BR', bodyParameterCount: 1 }],
+    })
+    vi.mocked(api.broadcasts.create).mockResolvedValue({
+      id: 'broadcast-official', name: 'Atualização', message: '', deliveryMode: 'OfficialApiTemplate',
+      templateName: 'status_update', templateLanguage: 'pt_BR', status: 'Draft', totalCount: 1,
+      sentCount: 0, failedCount: 0, createdAt: '2026-09-11T00:00:00Z',
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    fireEvent.change(screen.getByLabelText('Canal de envio'), { target: { value: 'OfficialApiTemplate' } })
+    await screen.findByRole('option', { name: '2' })
+    fireEvent.change(screen.getByLabelText('Linha oficial'), { target: { value: 'official-2' } })
+    await waitFor(() => expect(screen.getByLabelText('Linha oficial')).toHaveValue('official-2'))
+    await waitFor(() => expect(api.broadcasts.listOfficialTemplates).toHaveBeenCalledWith('official-2'))
+    fireEvent.change(screen.getByLabelText('Template aprovado'), { target: { value: 'status_update:pt_BR' } })
+    fireEvent.change(screen.getByLabelText('Parâmetro 1'), { target: { value: 'Pedido 10' } })
+    fireEvent.change(screen.getByLabelText('Nome da lista *'), { target: { value: 'Atualização' } })
+    fireEvent.click(screen.getByText('Cliente').closest('label')!.querySelector('input')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Criar Lista' }))
+
+    await waitFor(() => expect(api.broadcasts.create).toHaveBeenCalledWith(expect.objectContaining({
+      deliveryMode: 1, linePhoneNumberId: 'official-2', templateName: 'status_update',
+      templateLanguage: 'pt_BR', templateBodyParameters: ['Pedido 10'],
+    })))
   })
 
   it('does not ask for a queue again when dispatching a saved broadcast', async () => {

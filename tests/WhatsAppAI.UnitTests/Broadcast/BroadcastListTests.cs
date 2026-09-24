@@ -6,6 +6,33 @@ namespace WhatsAppAI.UnitTests.Broadcast;
 public sealed class BroadcastListTests
 {
     [Fact]
+    public void Create_OfficialTemplate_RequiresTemplateLineAndLanguage()
+    {
+        Assert.Throws<ArgumentException>(() => BroadcastList.Create(
+            Guid.NewGuid(), "Aviso", string.Empty, Guid.NewGuid(),
+            deliveryMode: BroadcastDeliveryMode.OfficialApiTemplate));
+    }
+
+    [Fact]
+    public void StartDispatch_OfficialTemplate_CannotChangeTheConfiguredLine()
+    {
+        var broadcast = BroadcastList.Create(Guid.NewGuid(), "Aviso", string.Empty, Guid.NewGuid(),
+            deliveryMode: BroadcastDeliveryMode.OfficialApiTemplate, templateName: "status_update",
+            templateLanguage: "pt_BR", linePhoneNumberId: "123");
+
+        Assert.Throws<InvalidOperationException>(() => broadcast.StartDispatch("456", 1));
+    }
+
+    [Fact]
+    public void UpdateMessage_RejectsOfficialTemplateBroadcasts()
+    {
+        var broadcast = BroadcastList.Create(Guid.NewGuid(), "Aviso", string.Empty, Guid.NewGuid(),
+            deliveryMode: BroadcastDeliveryMode.OfficialApiTemplate, templateName: "status_update",
+            templateLanguage: "pt_BR", linePhoneNumberId: "123");
+
+        Assert.Throws<InvalidOperationException>(() => broadcast.UpdateMessage("Mensagem livre"));
+    }
+    [Fact]
     public void Create_PersistsSelectedQueueForLaterDispatch()
     {
         var queueId = Guid.NewGuid();

@@ -34,6 +34,7 @@ describe('WhatsAppConfigPage', () => {
       if (url.includes('/official/status/')) {
         return Promise.resolve(response({
           configured: true,
+          isActive: true,
           isConnected: true,
           phoneNumber: '+55 11 99999-9999',
           message: 'Connection successful.',
@@ -80,6 +81,20 @@ describe('WhatsAppConfigPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Desconectado')).toBeInTheDocument()
       expect(screen.getByText('Connection failed. Please check your credentials.')).toBeInTheDocument()
+    })
+  })
+
+  it('disconnects the selected official API line', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'API Oficial' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Desconectar API' }))
+
+    await waitFor(() => {
+      expect(fetchApiResponse).toHaveBeenCalledWith(
+        '/api/integrations/whatsapp/official/disconnect/1',
+        expect.objectContaining({ method: 'POST' }),
+      )
     })
   })
 })

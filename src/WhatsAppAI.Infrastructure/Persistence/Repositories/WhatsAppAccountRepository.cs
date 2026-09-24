@@ -34,6 +34,21 @@ public sealed class WhatsAppAccountRepository(AppDbContext context) : IWhatsAppA
                 cancellationToken);
     }
 
+    public async Task<WhatsAppAccount?> GetByTenantAndSlotIncludingInactiveAsync(
+        Guid tenantId,
+        WhatsAppConnectionType connectionType,
+        int lineNumber,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Set<WhatsAppAccount>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(account =>
+                account.TenantId == tenantId &&
+                account.ConnectionType == connectionType &&
+                account.LineNumber == lineNumber,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<WhatsAppAccount>> GetAllByTenantAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)

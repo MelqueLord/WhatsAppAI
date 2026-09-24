@@ -54,17 +54,27 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
-    public async Task WhatsAppClient_ListsOnlyApprovedTemplates()
+    public async Task WhatsAppClient_ListsOnlyApprovedUtilityTemplatesAcrossAllPages()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
 
         var result = await client.ListTemplatesAsync("waba-id", "token");
 
-        var template = Assert.Single(result.Templates);
         Assert.True(result.IsSuccess);
-        Assert.Equal("welcome_customer", template.Name);
-        Assert.Equal("pt_BR", template.Language);
-        Assert.Equal(1, template.BodyParameterCount);
+        Assert.Collection(result.Templates,
+            template =>
+            {
+                Assert.Equal("follow_up", template.Name);
+                Assert.Equal("pt_BR", template.Language);
+                Assert.Equal(0, template.BodyParameterCount);
+            },
+            template =>
+            {
+                Assert.Equal("welcome_customer", template.Name);
+                Assert.Equal("pt_BR", template.Language);
+                Assert.Equal(1, template.BodyParameterCount);
+            });
+        Assert.Equal(2, handler.TemplateRequests.Count);
     }
 
     [Fact]
@@ -132,6 +142,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     {
         public ConcurrentBag<string> Authorizations { get; } = [];
         public ConcurrentBag<string> RequestBodies { get; } = [];
+        public ConcurrentBag<string> TemplateRequests { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -151,7 +162,14 @@ public sealed class MetaClientAuthorizationTests : IDisposable
             }
             else if (request.RequestUri?.AbsolutePath.Contains("message_templates", StringComparison.Ordinal) == true)
             {
-                content = "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\"}]}";
+                TemplateRequests.Add(request.RequestUri.ToString());
+                var content = request.RequestUri.Query.Contains("after=next", StringComparison.Ordinal)
+                    ? "{\"data\":[{\"name\":\"follow_up\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá\"}]}]}"
+                    : "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"marketing_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\"},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\",\"category\":\"UTILITY\"}],\"paging\":{\"next\":\"https://graph.facebook.com/v21.0/waba-id/message_templates?after=next\"}}";
+                response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(content)
+                };
             }
             else
             {

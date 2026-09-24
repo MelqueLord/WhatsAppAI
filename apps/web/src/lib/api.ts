@@ -434,6 +434,9 @@ export interface BroadcastList {
   id: string
   name: string
   message: string
+  deliveryMode?: 'QrCodeText' | 'OfficialApiTemplate'
+  templateName?: string | null
+  templateLanguage?: string | null
   status: string
   linePhoneNumberId?: string
   queueId?: string | null
@@ -758,7 +761,10 @@ export const api = {
 
     get: (id: string) => fetchApi<BroadcastDetail>(`/api/broadcasts/${id}`),
 
-    create: (data: { name: string; message: string; contactIds: string[]; queueId?: string }) =>
+    listOfficialTemplates: (linePhoneNumberId: string) =>
+      fetchApi<{ templates: WhatsAppTemplate[] }>(`/api/broadcasts/official-templates?linePhoneNumberId=${encodeURIComponent(linePhoneNumberId)}`),
+
+    create: (data: { name: string; message: string; contactIds: string[]; queueId?: string; deliveryMode?: 0 | 1; linePhoneNumberId?: string; templateName?: string; templateLanguage?: string; templateBodyParameters?: string[] }) =>
       fetchApi<BroadcastList>('/api/broadcasts', {
         method: 'POST',
         body: JSON.stringify(data),

@@ -133,6 +133,13 @@ export function MessagePanel({
   })
 
   const templates = templatesData?.templates ?? []
+  const selectedTemplate = templates.find((template) =>
+    template.name === templateName && template.language === templateLanguage,
+  )
+  const selectedTemplateParameters = templateParameters
+    .split(',')
+    .map((parameter) => parameter.trim())
+    .filter(Boolean)
 
   const selectTemplate = (template: WhatsAppTemplate) => {
     setTemplateName(template.name)
@@ -376,17 +383,23 @@ export function MessagePanel({
   const handleTemplateSend = () => {
     const name = templateName.trim()
     const language = templateLanguage.trim()
-    if (!name || !language) return
+    if (!name || !language || !selectedTemplate) {
+      setSendError('Selecione um template transacional aprovado pela Meta.')
+      return
+    }
 
+    if (selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount) {
+      setSendError(`Este template exige exatamente ${selectedTemplate.bodyParameterCount} parâmetro(s) no corpo.`)
+      return
+    }
+
+    setSendError(null)
     sendMutation.mutate({
       content: '',
       template: {
         name,
         language,
-        parameters: templateParameters
-          .split(',')
-          .map((parameter) => parameter.trim())
-          .filter(Boolean),
+        parameters: selectedTemplateParameters,
       },
     })
   }
@@ -875,7 +888,8 @@ export function MessagePanel({
               </select>
               <input
                 value={templateLanguage}
-                onChange={(event) => setTemplateLanguage(event.target.value)}
+                readOnly
+                aria-label="Idioma do template"
                 placeholder="Idioma (ex.: pt_BR)"
                 maxLength={20}
                 className="rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
@@ -885,12 +899,17 @@ export function MessagePanel({
               <input
                 value={templateParameters}
                 onChange={(event) => setTemplateParameters(event.target.value)}
-                placeholder="Parâmetros do corpo, separados por vírgula (opcional)"
+                placeholder={selectedTemplate
+                  ? selectedTemplate.bodyParameterCount === 0
+                    ? 'Este template não possui parâmetros no corpo'
+                    : `Informe ${selectedTemplate.bodyParameterCount} parâmetro(s), separados por vírgula`
+                  : 'Selecione um template primeiro'}
+                disabled={!selectedTemplate || selectedTemplate.bodyParameterCount === 0}
                 className="flex-1 rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
               />
               <button
                 onClick={handleTemplateSend}
-                disabled={!templateName.trim() || !templateLanguage.trim() || sendMutation.isPending}
+                disabled={!selectedTemplate || selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount || sendMutation.isPending}
                 className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
               >
                 {sendMutation.isPending ? 'Enviando…' : 'Enviar template'}
