@@ -8,6 +8,7 @@ using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.Infrastructure.Secrets;
 
 namespace WhatsAppAI.Infrastructure.Workers;
 
@@ -102,6 +103,9 @@ public sealed class OutboxProcessingWorker(
         var whatsAppAccountRepository = scopedServices.GetRequiredService<IWhatsAppAccountRepository>();
         var whatsAppClientResolver = scopedServices.GetRequiredService<IWhatsAppClientResolver>();
         var secretStore = scopedServices.GetRequiredService<ISecretStore>();
+        var mediaAttachmentRepository = scopedServices.GetRequiredService<IOutboundMediaAttachmentRepository>();
+        var encryptionService = scopedServices.GetRequiredService<IEncryptionService>();
+        OutboundMediaAttachment? mediaAttachment = null;
 
         try
         {
@@ -213,11 +217,42 @@ public sealed class OutboxProcessingWorker(
             }
 
             SendMessageResult result;
-            if (!string.IsNullOrWhiteSpace(message.MediaUrl))
+            if (message.Type == MessageType.Image)
             {
+                mediaAttachment = await mediaAttachmentRepository.GetByMessageIdAsync(
+                    message.TenantId,
+                    message.Id,
+                    cancellationToken);
+                if (mediaAttachment is null || mediaAttachment.PurgedAt is not null)
+                {
+                    message.MarkFailed("Image attachment is no longer available");
+                    outboxMessage.MarkDead("Image attachment is no longer available");
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                    return;
+                }
+
+                string encodedContent;
+                try
+                {
+                    encodedContent = encryptionService.Decrypt(mediaAttachment.EncryptedContent);
+                }
+                catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or FormatException)
+                {
+                    message.MarkFailed("Image attachment cannot be processed");
+                    outboxMessage.MarkDead("Image attachment cannot be processed");
+                    mediaAttachment.Purge();
+                    await SaveMessageOutboxAndAttachmentAsync(
+                        dbContext,
+                        message,
+                        outboxMessage,
+                        mediaAttachment,
+                        cancellationToken);
+                    return;
+                }
+
                 result = await whatsAppClient.SendMediaMessageAsync(
                     outboundPhoneNumberId, token, contact.PhoneNumber,
-                    message.Type.ToString().ToLowerInvariant(), message.MediaUrl,
+                    "image", $"data:{mediaAttachment.ContentType};base64,{encodedContent}",
                     message.Caption, null, cancellationToken);
             }
             else if (message.Type == MessageType.Template)
@@ -279,7 +314,20 @@ public sealed class OutboxProcessingWorker(
             {
                 message.MarkSent(result.MessageId ?? string.Empty);
                 outboxMessage.MarkCompleted();
-                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                if (mediaAttachment is not null)
+                {
+                    mediaAttachment.Purge();
+                    await SaveMessageOutboxAndAttachmentAsync(
+                        dbContext,
+                        message,
+                        outboxMessage,
+                        mediaAttachment,
+                        cancellationToken);
+                }
+                else
+                {
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                }
 
                 logger.LogInformation("Outbox {OutboxId} completed, message {MessageId} sent", outboxMessage.Id, message.Id);
             }
@@ -299,7 +347,20 @@ public sealed class OutboxProcessingWorker(
                     outboxMessage.MarkDead(error);
                     message.MarkFailed(error);
                 }
-                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                if (mediaAttachment is not null && outboxMessage.Status == OutboxStatus.Dead)
+                {
+                    mediaAttachment.Purge();
+                    await SaveMessageOutboxAndAttachmentAsync(
+                        dbContext,
+                        message,
+                        outboxMessage,
+                        mediaAttachment,
+                        cancellationToken);
+                }
+                else
+                {
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                }
 
                 logger.LogWarning("Outbox {OutboxId} failed: {Error}", outboxMessage.Id, outboxMessage.LastError);
             }
@@ -347,6 +408,19 @@ public sealed class OutboxProcessingWorker(
         // EF batch to avoid two round-trips while keeping the outbox claim durable.
         dbContext.Set<Message>().Update(message);
         dbContext.Set<OutboxMessage>().Update(outboxMessage);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SaveMessageOutboxAndAttachmentAsync(
+        AppDbContext dbContext,
+        Message message,
+        OutboxMessage outboxMessage,
+        OutboundMediaAttachment attachment,
+        CancellationToken cancellationToken)
+    {
+        dbContext.Set<Message>().Update(message);
+        dbContext.Set<OutboxMessage>().Update(outboxMessage);
+        dbContext.Set<OutboundMediaAttachment>().Update(attachment);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
