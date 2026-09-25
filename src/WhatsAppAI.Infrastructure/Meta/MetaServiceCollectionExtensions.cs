@@ -21,11 +21,14 @@ public static class MetaServiceCollectionExtensions
 
         if (useBridge)
         {
-            var bridgeSecret = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
-                ?? configuration["WhatsAppWeb:WebhookSecret"]
-                ?? throw new InvalidOperationException("WhatsAppWeb:WebhookSecret is required when the WhatsApp Web bridge is enabled.");
+            var serviceToken = configuration["WhatsAppWeb:ServiceToken"]
+                ?? throw new InvalidOperationException("WhatsAppWeb:ServiceToken is required when the WhatsApp Web bridge is enabled.");
+            var serviceId = configuration["WhatsAppWeb:ApiServiceId"] ?? "webapi";
             qrClient.ConfigureHttpClient(client =>
-                client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Secret", bridgeSecret));
+            {
+                client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Id", serviceId);
+                client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Token", serviceToken);
+            });
         }
 
         services.AddScoped<IWhatsAppClientResolver, WhatsAppClientResolver>();

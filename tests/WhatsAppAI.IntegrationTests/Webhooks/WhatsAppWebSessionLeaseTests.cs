@@ -9,7 +9,8 @@ namespace WhatsAppAI.IntegrationTests.Webhooks;
 [Collection("IntegrationTests")]
 public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
 {
-    private const string SharedSecret = "integration-test-whatsapp-web-secret-at-least-32-bytes";
+    private const string ServiceToken = "integration-test-whatsapp-web-service-token-at-least-32-bytes";
+    private const string PreviousServiceToken = "integration-test-whatsapp-web-previous-service-token";
     private readonly TestWebApplicationFactory _factory;
 
     public WhatsAppWebSessionLeaseTests(TestWebApplicationFactory factory)
@@ -28,6 +29,44 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
+    public async Task Internal_bridge_routes_require_service_identity_and_the_legacy_webhook_route_is_unavailable()
+    {
+        var sessionId = $"{Guid.NewGuid():D}-qr-1";
+        var leaseRequest = new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" };
+
+        using var unauthenticated = _factory.CreateClient();
+        var noIdentity = await unauthenticated.PutAsJsonAsync(
+            $"/internal/whatsapp-web/sessions/{sessionId}/lease", leaseRequest);
+
+        using var incorrectIdentity = _factory.CreateClient();
+        incorrectIdentity.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Id", "untrusted-service");
+        incorrectIdentity.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Token", ServiceToken);
+        var wrongService = await incorrectIdentity.PutAsJsonAsync(
+            $"/internal/whatsapp-web/sessions/{sessionId}/lease", leaseRequest);
+
+        var legacyRoute = await unauthenticated.PostAsync("/api/webhooks/whatsapp-web", null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, noIdentity.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, wrongService.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, legacyRoute.StatusCode);
+    }
+
+    [Fact]
+    public async Task Internal_bridge_routes_accept_the_previous_token_during_rotation()
+    {
+        var sessionId = $"{Guid.NewGuid():D}-qr-1";
+        using var bridge = _factory.CreateClient();
+        bridge.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Id", "whatsapp-web");
+        bridge.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Token", PreviousServiceToken);
+
+        var response = await bridge.PutAsJsonAsync(
+            $"/internal/whatsapp-web/sessions/{sessionId}/lease",
+            new { instanceId = "bridge-rotation", instanceUrl = "http://whatsapp-web-rotation:3020" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Lease_allows_one_owner_blocks_competitor_and_transfers_after_expiration()
     {
         var tenantId = Guid.NewGuid();
@@ -40,8 +79,8 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         var secondRequest = new { instanceId = "bridge-b", instanceUrl = "http://whatsapp-web-b:3020" };
 
         var acquireResponses = await Task.WhenAll(
-            firstBridge.PutAsJsonAsync($"/api/webhooks/whatsapp-web/session/{sessionId}/lease", firstRequest),
-            secondBridge.PutAsJsonAsync($"/api/webhooks/whatsapp-web/session/{sessionId}/lease", secondRequest));
+            firstBridge.PutAsJsonAsync($"/internal/whatsapp-web/sessions/{sessionId}/lease", firstRequest),
+            secondBridge.PutAsJsonAsync($"/internal/whatsapp-web/sessions/{sessionId}/lease", secondRequest));
 
         Assert.Single(acquireResponses, response => response.StatusCode == HttpStatusCode.OK);
         var conflict = Assert.Single(acquireResponses, response => response.StatusCode == HttpStatusCode.Conflict);
@@ -53,12 +92,12 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         var losingBridge = acquireResponses[0].StatusCode == HttpStatusCode.OK ? secondBridge : firstBridge;
 
         var rejectedSave = await losingBridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{sessionId}",
+            $"/internal/whatsapp-web/sessions/{sessionId}",
             new { payload = "encrypted-session-state" });
         Assert.Equal(HttpStatusCode.BadRequest, rejectedSave.StatusCode);
 
         var acceptedSave = await winningBridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{sessionId}",
+            $"/internal/whatsapp-web/sessions/{sessionId}",
             new { payload = "encrypted-session-state" });
         Assert.Equal(HttpStatusCode.NoContent, acceptedSave.StatusCode);
 
@@ -71,7 +110,7 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         }
 
         var takeover = await losingBridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{sessionId}/lease",
+            $"/internal/whatsapp-web/sessions/{sessionId}/lease",
             acquireResponses[0].StatusCode == HttpStatusCode.OK ? secondRequest : firstRequest);
         Assert.Equal(HttpStatusCode.OK, takeover.StatusCode);
 
@@ -92,11 +131,11 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         using var formerBridge = CreateBridgeClient("bridge-b");
 
         var lease = await ownerBridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{sessionId}/lease",
+            $"/internal/whatsapp-web/sessions/{sessionId}/lease",
             new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
         Assert.Equal(HttpStatusCode.OK, lease.StatusCode);
 
-        var webhook = await formerBridge.PostAsJsonAsync("/api/webhooks/whatsapp-web", new
+        var webhook = await formerBridge.PostAsJsonAsync("/internal/whatsapp-web/events", new
         {
             entry = new[]
             {
@@ -128,10 +167,10 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
         using var bridge = CreateBridgeClient("bridge-a");
 
         var lineOne = await bridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{tenantId:D}-qr-1/lease",
+            $"/internal/whatsapp-web/sessions/{tenantId:D}-qr-1/lease",
             new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
         var lineTwo = await bridge.PutAsJsonAsync(
-            $"/api/webhooks/whatsapp-web/session/{tenantId:D}-qr-2/lease",
+            $"/internal/whatsapp-web/sessions/{tenantId:D}-qr-2/lease",
             new { instanceId = "bridge-a", instanceUrl = "http://whatsapp-web-a:3020" });
 
         Assert.Equal(HttpStatusCode.OK, lineOne.StatusCode);
@@ -149,7 +188,8 @@ public sealed class WhatsAppWebSessionLeaseTests : IClassFixture<TestWebApplicat
     private HttpClient CreateBridgeClient(string instanceId)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Secret", SharedSecret);
+        client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Id", "whatsapp-web");
+        client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Service-Token", ServiceToken);
         client.DefaultRequestHeaders.Add("X-WhatsApp-Web-Instance", instanceId);
         return client;
     }

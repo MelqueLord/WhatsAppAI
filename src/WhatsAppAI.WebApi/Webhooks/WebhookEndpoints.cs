@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -35,39 +36,22 @@ public static class WebhookEndpoints
             .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
-        app.MapPost("/api/webhooks/whatsapp-web", ReceiveWhatsAppWebEventAsync)
-            .WithTags("Webhooks - WhatsApp Web")
+        var bridge = app.MapGroup("/internal/whatsapp-web")
+            .WithTags("Internal - WhatsApp Web")
             .AllowAnonymous()
-            .RequireRateLimiting("webhook")
             .DisableAntiforgery();
 
-        app.MapGet("/api/webhooks/whatsapp-web/session/{sessionId}", GetWhatsAppWebSessionAsync)
-            .WithTags("Webhooks - WhatsApp Web")
-            .AllowAnonymous();
-
-        app.MapPut("/api/webhooks/whatsapp-web/session/{sessionId}", SaveWhatsAppWebSessionAsync)
-            .WithTags("Webhooks - WhatsApp Web")
-            .AllowAnonymous()
-            .RequireRateLimiting("webhook")
-            .DisableAntiforgery();
-
-        app.MapDelete("/api/webhooks/whatsapp-web/session/{sessionId}", DeleteWhatsAppWebSessionAsync)
-            .WithTags("Webhooks - WhatsApp Web")
-            .AllowAnonymous()
-            .RequireRateLimiting("webhook")
-            .DisableAntiforgery();
-
-        app.MapPut("/api/webhooks/whatsapp-web/session/{sessionId}/lease", AcquireWhatsAppWebSessionLeaseAsync)
-            .WithTags("Webhooks - WhatsApp Web")
-            .AllowAnonymous()
-            .RequireRateLimiting("webhook")
-            .DisableAntiforgery();
-
-        app.MapDelete("/api/webhooks/whatsapp-web/session/{sessionId}/lease", ReleaseWhatsAppWebSessionLeaseAsync)
-            .WithTags("Webhooks - WhatsApp Web")
-            .AllowAnonymous()
-            .RequireRateLimiting("webhook")
-            .DisableAntiforgery();
+        bridge.MapPost("/events", ReceiveWhatsAppWebEventAsync)
+            .RequireRateLimiting("webhook");
+        bridge.MapGet("/sessions/{sessionId}", GetWhatsAppWebSessionAsync);
+        bridge.MapPut("/sessions/{sessionId}", SaveWhatsAppWebSessionAsync)
+            .RequireRateLimiting("webhook");
+        bridge.MapDelete("/sessions/{sessionId}", DeleteWhatsAppWebSessionAsync)
+            .RequireRateLimiting("webhook");
+        bridge.MapPut("/sessions/{sessionId}/lease", AcquireWhatsAppWebSessionLeaseAsync)
+            .RequireRateLimiting("webhook");
+        bridge.MapDelete("/sessions/{sessionId}/lease", ReleaseWhatsAppWebSessionLeaseAsync)
+            .RequireRateLimiting("webhook");
 
         return app;
     }
@@ -222,11 +206,29 @@ public static class WebhookEndpoints
 
     private static bool IsAuthorizedWhatsAppWebRequest(HttpContext httpContext, IConfiguration configuration)
     {
-        var expected = configuration["WHATSAPP_WEB_WEBHOOK_SECRET"]
-            ?? configuration["WhatsAppWeb:WebhookSecret"];
-        var received = httpContext.Request.Headers["X-WhatsApp-Web-Secret"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(received))
+        var expectedServiceId = configuration["WhatsAppWeb:BridgeServiceId"] ?? "whatsapp-web";
+        var receivedServiceId = httpContext.Request.Headers["X-WhatsApp-Web-Service-Id"].FirstOrDefault();
+        var receivedToken = httpContext.Request.Headers["X-WhatsApp-Web-Service-Token"].FirstOrDefault();
+        if (!string.Equals(expectedServiceId, receivedServiceId, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(receivedToken))
             return false;
+
+        return MatchesToken(configuration["WhatsAppWeb:ServiceToken"], receivedToken) ||
+            (IsPreviousTokenActive(configuration) &&
+             MatchesToken(configuration["WhatsAppWeb:PreviousServiceToken"], receivedToken));
+    }
+
+    private static bool IsPreviousTokenActive(IConfiguration configuration) =>
+        DateTimeOffset.TryParse(
+            configuration["WhatsAppWeb:PreviousServiceTokenExpiresAt"],
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal,
+            out var expiresAt) &&
+        expiresAt > DateTimeOffset.UtcNow;
+
+    private static bool MatchesToken(string? expected, string received)
+    {
+        if (string.IsNullOrWhiteSpace(expected)) return false;
 
         var expectedBytes = Encoding.UTF8.GetBytes(expected);
         var receivedBytes = Encoding.UTF8.GetBytes(received);

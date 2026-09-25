@@ -39,13 +39,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog();
 
-var bridgeWebhookSecret = builder.Configuration["WHATSAPP_WEB_WEBHOOK_SECRET"];
-if (!string.IsNullOrWhiteSpace(bridgeWebhookSecret))
+var bridgeServiceToken = ReadSecretFile(builder.Configuration["WHATSAPP_WEB_SERVICE_TOKEN_FILE"])
+    ?? builder.Configuration["WHATSAPP_WEB_SERVICE_TOKEN"];
+var previousBridgeServiceToken = ReadSecretFile(builder.Configuration["WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN_FILE"])
+    ?? builder.Configuration["WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN"];
+var previousBridgeServiceTokenExpiresAt = builder.Configuration["WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN_EXPIRES_AT"];
+if (!string.IsNullOrWhiteSpace(bridgeServiceToken) || !string.IsNullOrWhiteSpace(previousBridgeServiceToken))
 {
     builder.Configuration.AddInMemoryCollection(
         new Dictionary<string, string?>
         {
-            ["WhatsAppWeb:WebhookSecret"] = bridgeWebhookSecret
+            ["WhatsAppWeb:ServiceToken"] = bridgeServiceToken,
+            ["WhatsAppWeb:PreviousServiceToken"] = previousBridgeServiceToken,
+            ["WhatsAppWeb:PreviousServiceTokenExpiresAt"] = previousBridgeServiceTokenExpiresAt
         });
 }
 
@@ -434,3 +440,13 @@ app.MapHub<InboxHub>(
     "/hubs/inbox");
 
 await app.RunAsync();
+
+static string? ReadSecretFile(string? path)
+{
+    if (string.IsNullOrWhiteSpace(path)) return null;
+    if (!File.Exists(path))
+        throw new InvalidOperationException("Configured WhatsApp Web service-token file does not exist.");
+
+    var value = File.ReadAllText(path).Trim();
+    return string.IsNullOrWhiteSpace(value) ? null : value;
+}

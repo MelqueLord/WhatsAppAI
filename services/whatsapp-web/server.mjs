@@ -1,5 +1,6 @@
 import express from 'express'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
@@ -8,9 +9,14 @@ import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeys
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
-const apiWebhookUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/api/webhooks/whatsapp-web'
-const apiWebhookSecret = process.env.WHATSAPP_WEB_WEBHOOK_SECRET ?? 'development-whatsapp-web-secret'
+const apiInternalUrl = process.env.WHATSAPP_WEB_API_URL ?? 'http://localhost:5000/internal/whatsapp-web'
+const apiWebhookUrl = `${apiInternalUrl}/events`
 const isProduction = process.env.NODE_ENV === 'production'
+const apiServiceId = process.env.WHATSAPP_WEB_API_SERVICE_ID ?? 'webapi'
+const bridgeServiceId = process.env.WHATSAPP_WEB_BRIDGE_SERVICE_ID ?? 'whatsapp-web'
+const serviceToken = readServiceToken('WHATSAPP_WEB_SERVICE_TOKEN_FILE', 'WHATSAPP_WEB_SERVICE_TOKEN', 'development-whatsapp-web-service-token-at-least-32')
+const previousServiceToken = readServiceToken('WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN_FILE', 'WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN')
+const previousServiceTokenExpiresAt = process.env.WHATSAPP_WEB_PREVIOUS_SERVICE_TOKEN_EXPIRES_AT
 const configuredInstanceId = process.env.WHATSAPP_WEB_INSTANCE_ID
 const instanceId = `${configuredInstanceId ?? 'local'}-${randomUUID()}`
 const instanceUrl = normalizeInstanceUrl(process.env.WHATSAPP_WEB_INSTANCE_URL ?? `http://localhost:${port}`)
@@ -25,11 +31,10 @@ const leaseRenewTimers = new Map()
 const gzipAsync = promisify(gzip)
 const gunzipAsync = promisify(gunzip)
 const sessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-qr-(?:[1-9]\d?|100)$/i
-const bridgeSecretHeader = 'x-whatsapp-web-secret'
 let isShuttingDown = false
 
-if (isProduction && (apiWebhookSecret === 'development-whatsapp-web-secret' || apiWebhookSecret.length < 32)) {
-  throw new Error('WHATSAPP_WEB_WEBHOOK_SECRET must be a production secret with at least 32 characters.')
+if (isProduction && (!serviceToken || serviceToken === 'development-whatsapp-web-service-token-at-least-32' || serviceToken.length < 32)) {
+  throw new Error('WHATSAPP_WEB_SERVICE_TOKEN_FILE must provide a production token with at least 32 characters.')
 }
 
 if (isProduction && (!configuredInstanceId || !process.env.WHATSAPP_WEB_INSTANCE_URL)) {
@@ -61,8 +66,7 @@ app.use(express.json({ limit: '2mb' }))
 app.get('/health', (_req, res) => res.json({ ok: true, status: isShuttingDown ? 'shutting_down' : 'ready' }))
 
 app.use('/sessions', (req, res, next) => {
-  const received = req.get(bridgeSecretHeader)
-  if (!isAuthorizedBridgeRequest(received)) return res.status(401).json({ error: 'Unauthorized.' })
+  if (!isAuthorizedApiService(req)) return res.status(401).json({ error: 'Unauthorized.' })
   next()
 })
 
@@ -460,7 +464,8 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-WhatsApp-Web-Secret': apiWebhookSecret,
+          'X-WhatsApp-Web-Service-Id': bridgeServiceId,
+          'X-WhatsApp-Web-Service-Token': serviceToken,
         },
         body: JSON.stringify(payload),
       })
@@ -573,7 +578,7 @@ function sessionDirectory(tenantId) {
 }
 
 function sessionStateUrl(tenantId) {
-  return `${apiWebhookUrl}/session/${encodeURIComponent(tenantId)}`
+  return `${apiInternalUrl}/sessions/${encodeURIComponent(tenantId)}`
 }
 
 async function resolvePhoneNumber(session, jid, alternateJid) {
@@ -735,7 +740,6 @@ async function backupAuthState(tenantId) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'X-WhatsApp-Web-Secret': apiWebhookSecret,
       },
       body: JSON.stringify({ payload }),
     })
@@ -754,7 +758,6 @@ async function restoreAuthState(tenantId) {
 
   try {
     const response = await fetchWithTimeout(sessionStateUrl(tenantId), {
-      headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
     })
     if (response.status === 404) return
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -780,7 +783,6 @@ async function deleteRemoteAuthState(tenantId) {
   try {
     const response = await fetchWithTimeout(sessionStateUrl(tenantId), {
       method: 'DELETE',
-      headers: { 'X-WhatsApp-Web-Secret': apiWebhookSecret },
     })
     if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`)
   } catch (error) {
@@ -788,9 +790,22 @@ async function deleteRemoteAuthState(tenantId) {
   }
 }
 
-function isAuthorizedBridgeRequest(received) {
-  if (!received) return false
-  const expectedBytes = Buffer.from(apiWebhookSecret)
+function isAuthorizedApiService(req) {
+  const receivedServiceId = req.get('X-WhatsApp-Web-Service-Id')
+  const receivedToken = req.get('X-WhatsApp-Web-Service-Token')
+  return receivedServiceId === apiServiceId &&
+    (matchesServiceToken(serviceToken, receivedToken) ||
+      (isPreviousServiceTokenActive() && matchesServiceToken(previousServiceToken, receivedToken)))
+}
+
+function isPreviousServiceTokenActive() {
+  const expiresAt = Date.parse(previousServiceTokenExpiresAt ?? '')
+  return Number.isFinite(expiresAt) && expiresAt > Date.now()
+}
+
+function matchesServiceToken(expected, received) {
+  if (!expected || !received) return false
+  const expectedBytes = Buffer.from(expected)
   const receivedBytes = Buffer.from(received)
   return expectedBytes.length === receivedBytes.length && timingSafeEqual(expectedBytes, receivedBytes)
 }
@@ -805,9 +820,20 @@ function isValidMessageText(text) {
 
 function fetchWithTimeout(url, options = {}) {
   const headers = new Headers(options.headers)
-  headers.set('X-WhatsApp-Web-Secret', apiWebhookSecret)
+  headers.set('X-WhatsApp-Web-Service-Id', bridgeServiceId)
+  headers.set('X-WhatsApp-Web-Service-Token', serviceToken)
   headers.set('X-WhatsApp-Web-Instance', instanceId)
   return fetch(url, { ...options, headers, signal: AbortSignal.timeout(15_000) })
+}
+
+function readServiceToken(fileVariable, valueVariable, fallback = null) {
+  const filePath = process.env[fileVariable]
+  if (filePath) {
+    const value = readFileSync(filePath, 'utf8').trim()
+    if (!value) throw new Error(`${fileVariable} is empty.`)
+    return value
+  }
+  return process.env[valueVariable] || fallback
 }
 
 function clearReconnect(tenantId) {

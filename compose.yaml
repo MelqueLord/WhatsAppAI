@@ -53,8 +53,8 @@ services:
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
       WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
-      WhatsAppWeb__BaseUrl: http://whatsapp-web:3020
-      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+      WhatsAppWeb__BaseUrl: http://whatsapp-web-internal:3020
+      WHATSAPP_WEB_SERVICE_TOKEN_FILE: /run/secrets/whatsapp-web-service-token
       Workers__Enabled: "false"
     depends_on:
       postgres:
@@ -66,6 +66,13 @@ services:
     volumes:
       - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
       - ${DATAPROTECTION_CERTIFICATE_FILE:?DATAPROTECTION_CERTIFICATE_FILE is required}:/run/secrets/dataprotection.pfx:ro
+    secrets:
+      - whatsapp-web-service-token
+    networks:
+      default:
+      bridge-internal:
+        aliases:
+          - api-internal
 
   worker:
     build:
@@ -89,8 +96,8 @@ services:
       Meta__VerifyToken: ${Meta__VerifyToken:?Meta__VerifyToken is required}
       Meta__AppSecret: ${Meta__AppSecret:?Meta__AppSecret is required}
       WhatsAppWeb__Enabled: ${WhatsAppWeb__Enabled:-true}
-      WhatsAppWeb__BaseUrl: http://whatsapp-web:3020
-      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+      WhatsAppWeb__BaseUrl: http://whatsapp-web-internal:3020
+      WHATSAPP_WEB_SERVICE_TOKEN_FILE: /run/secrets/whatsapp-web-service-token
       Workers__Enabled: "true"
     depends_on:
       postgres:
@@ -101,6 +108,11 @@ services:
     volumes:
       - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
       - ${DATAPROTECTION_CERTIFICATE_FILE:?DATAPROTECTION_CERTIFICATE_FILE is required}:/run/secrets/dataprotection.pfx:ro
+    secrets:
+      - whatsapp-web-service-token
+    networks:
+      default:
+      bridge-internal:
     profiles:
       - worker
       - production
@@ -113,14 +125,20 @@ services:
     environment:
       NODE_ENV: ${ASPNETCORE_ENVIRONMENT:-Production}
       PORT: "3020"
-      WHATSAPP_WEB_API_URL: http://api:5000/api/webhooks/whatsapp-web
-      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+      WHATSAPP_WEB_API_URL: http://api-internal:5000/internal/whatsapp-web
+      WHATSAPP_WEB_SERVICE_TOKEN_FILE: /run/secrets/whatsapp-web-service-token
       WHATSAPP_WEB_INSTANCE_ID: ${WHATSAPP_WEB_INSTANCE_ID:?WHATSAPP_WEB_INSTANCE_ID is required}
       WHATSAPP_WEB_INSTANCE_URL: ${WHATSAPP_WEB_INSTANCE_URL:?WHATSAPP_WEB_INSTANCE_URL is required}
     expose:
       - "3020"
     volumes:
       - whatsapp-web-sessions:/app/sessions
+    secrets:
+      - whatsapp-web-service-token
+    networks:
+      bridge-internal:
+        aliases:
+          - whatsapp-web-internal
     depends_on:
       api:
         condition: service_started
@@ -135,14 +153,20 @@ services:
     environment:
       NODE_ENV: ${ASPNETCORE_ENVIRONMENT:-Production}
       PORT: "3020"
-      WHATSAPP_WEB_API_URL: http://api:5000/api/webhooks/whatsapp-web
-      WHATSAPP_WEB_WEBHOOK_SECRET: ${WHATSAPP_WEB_WEBHOOK_SECRET:?WHATSAPP_WEB_WEBHOOK_SECRET is required}
+      WHATSAPP_WEB_API_URL: http://api-internal:5000/internal/whatsapp-web
+      WHATSAPP_WEB_SERVICE_TOKEN_FILE: /run/secrets/whatsapp-web-service-token
       WHATSAPP_WEB_INSTANCE_ID: ${WHATSAPP_WEB_INSTANCE_2_ID:-whatsapp-web-2}
       WHATSAPP_WEB_INSTANCE_URL: ${WHATSAPP_WEB_INSTANCE_2_URL:-http://whatsapp-web-2:3020}
     expose:
       - "3020"
     volumes:
       - whatsapp-web-sessions-2:/app/sessions
+    secrets:
+      - whatsapp-web-service-token
+    networks:
+      bridge-internal:
+        aliases:
+          - whatsapp-web-2
     depends_on:
       api:
         condition: service_started
@@ -182,3 +206,11 @@ volumes:
   whatsapp-web-sessions:
   whatsapp-web-sessions-2:
   dataprotection-keys:
+
+networks:
+  bridge-internal:
+    internal: true
+
+secrets:
+  whatsapp-web-service-token:
+    file: ${WHATSAPP_WEB_SERVICE_TOKEN_FILE:?WHATSAPP_WEB_SERVICE_TOKEN_FILE is required}

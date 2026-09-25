@@ -10,4 +10,6 @@ Somente TenantOwner configura, consulta o estado ou desconecta linhas. Desconect
 
 A Inbox pode encaminhar uma imagem JPEG ou PNG de até 5 MB por linha oficial, exclusivamente dentro da janela de atendimento de 24 horas. O navegador aplica a mesma restrição para orientar a pessoa usuária, mas o servidor valida tipo, tamanho e assinatura do arquivo; o binário é cifrado até a Outbox enviá-lo à Meta e não é exposto pela mensagem, pela resposta HTTP ou pelo SignalR. O envio de imagem por QR Code permanece bloqueado até a conclusão das decisões e controles de segurança próprios da ponte.
 
+A ponte QR usa uma rede Docker interna para comandos de sessão, lease, credenciais e eventos. Esses comandos exigem identificação de serviço e token montado como segredo de arquivo, com token anterior aceito apenas até o vencimento explícito da rotação; o segredo de callbacks não é usado. A superfície pública não encaminha essas rotas e a ponte não publica porta no host. Cada mutação confirma a propriedade do lease da linha antes de alterar estado ou encaminhar eventos.
+
 Fonte: [integração WhatsApp](../design/integracao-whatsapp.md) e [regras de WhatsApp](../regras/whatsapp.md).
