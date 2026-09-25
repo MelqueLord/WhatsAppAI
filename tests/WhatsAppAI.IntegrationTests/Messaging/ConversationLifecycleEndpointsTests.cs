@@ -41,7 +41,7 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
     }
 
     [Fact]
-    public async Task SendImage_AcceptsMultipartRequestForOwnOpenConversation()
+    public async Task SendImage_UsesDetectedContentTypeWhenMultipartTypeIsIncorrect()
     {
         var setup = await CreateTenantOwnerAsync();
         var contact = Contact.Create(setup.TenantId, "5511999999911", "Image Recipient");
@@ -57,7 +57,7 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
 
         using var form = new MultipartFormDataContent();
         using var image = new ByteArrayContent([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-        image.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        image.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
         form.Add(image, "file", "own-conversation.png");
 
         var response = await setup.Client.PostAsync(

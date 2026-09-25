@@ -421,8 +421,8 @@ public static class ConversationEndpoints
         if (string.IsNullOrWhiteSpace(file.ContentType))
             return Results.BadRequest(new { error = "Attachment content type is required." });
 
-        var contentType = file.ContentType.Split(';')[0].Trim().ToLowerInvariant();
-        if (contentType is not ("image/jpeg" or "image/png"))
+        var declaredContentType = file.ContentType.Split(';')[0].Trim().ToLowerInvariant();
+        if (declaredContentType is not ("image/jpeg" or "image/png"))
             return Results.BadRequest(new { error = "Only JPEG and PNG images are supported." });
         if (caption?.Length > 1024)
             return Results.BadRequest(new { error = "Caption must be at most 1024 characters." });
@@ -457,7 +457,8 @@ public static class ConversationEndpoints
         await using var memory = new MemoryStream();
         await stream.CopyToAsync(memory);
         var content = memory.ToArray();
-        if (!HasValidImageSignature(contentType, content))
+        var contentType = DetectImageContentType(content);
+        if (contentType is null)
             return Results.BadRequest(new { error = "Image contents do not match its type." });
         var message = Message.CreateOutbound(
             currentTenant.TenantId.Value, conversationId, conversation.ContactId,
@@ -483,10 +484,16 @@ public static class ConversationEndpoints
         return Results.Ok(new { id = message.Id, status = message.Status.ToString(), type = message.Type.ToString(), hasCaption = !string.IsNullOrWhiteSpace(message.Caption), createdAt = message.CreatedAt });
     }
 
-    private static bool HasValidImageSignature(string contentType, byte[] content) =>
-        contentType == "image/png"
-            ? content.Length >= 8 && content.AsSpan(0, 8).SequenceEqual("\x89PNG\r\n\x1a\n"u8)
-            : content.Length >= 3 && content[0] == 0xff && content[1] == 0xd8 && content[2] == 0xff;
+    private static string? DetectImageContentType(byte[] content)
+    {
+        if (content.Length >= 8 && content.AsSpan(0, 8).SequenceEqual("\x89PNG\r\n\x1a\n"u8))
+            return "image/png";
+
+        if (content.Length >= 3 && content[0] == 0xff && content[1] == 0xd8 && content[2] == 0xff)
+            return "image/jpeg";
+
+        return null;
+    }
 
     private static async Task<IResult> CloseConversationAsync(
         Guid conversationId,
