@@ -41,6 +41,32 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task SendImage_AcceptsMultipartRequestForOwnOpenConversation()
+    {
+        var setup = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(setup.TenantId, "5511999999911", "Image Recipient");
+        var conversation = Conversation.Create(setup.TenantId, contact.Id, "manual");
+        conversation.RenewWindow();
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.Add(contact);
+            db.Conversations.Add(conversation);
+            await db.SaveChangesAsync();
+        }
+
+        using var form = new MultipartFormDataContent();
+        using var image = new ByteArrayContent([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        image.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(image, "file", "own-conversation.png");
+
+        var response = await setup.Client.PostAsync(
+            $"/api/conversations/{conversation.Id}/media", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task TemplateAvailability_FollowsTheConversationOfficialLine()
     {
         var setup = await CreateTenantOwnerAsync();

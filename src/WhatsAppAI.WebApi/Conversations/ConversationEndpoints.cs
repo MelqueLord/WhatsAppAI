@@ -41,7 +41,11 @@ public static class ConversationEndpoints
             .WithName("SendMessage");
 
         group.MapPost("/{conversationId:guid}/media", SendMediaMessageAsync)
-            .WithName("SendMediaMessage");
+            .WithName("SendMediaMessage")
+            // Production CSRF validation is performed by the authenticated API middleware.
+            // This prevents the minimal-API form binding metadata from requiring a second
+            // antiforgery middleware before the handler can run.
+            .DisableAntiforgery();
 
         group.MapPost("/{conversationId:guid}/close", CloseConversationAsync)
             .WithName("CloseConversation");
