@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,9 +58,12 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     public async Task WhatsAppClient_UploadsImageThenSendsItsMediaId()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
-        var image = $"data:image/png;base64,{Convert.ToBase64String([1, 2, 3])}";
+        var image = new byte[] { 1, 2, 3 };
+        await using var imageStream = new MemoryStream(image, writable: false);
 
-        var result = await client.SendMediaMessageAsync("phone-image", "token-image", "recipient", "image", image, "Legenda", "photo.png");
+        var result = await client.SendMediaMessageAsync(
+            "phone-image", "token-image", "recipient", imageStream, "image/png", image.Length,
+            Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant(), "Legenda", "photo.png", "image-1");
 
         Assert.True(result.IsSuccess);
         Assert.Equal("wamid-image", result.MessageId);

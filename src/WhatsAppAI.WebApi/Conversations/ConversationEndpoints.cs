@@ -446,10 +446,6 @@ public static class ConversationEndpoints
         if (account is null && conversation.PhoneNumberId == "manual")
             account = await accountRepository.GetByTenantAndSlotAsync(
                 currentTenant.TenantId.Value, WhatsAppConnectionType.QrCode, 1);
-        var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
-            account?.ConnectionType == WhatsAppConnectionType.QrCode;
-        if (isQrConversation)
-            return Results.BadRequest(new { error = "Image sending through QR Code is not available yet." });
         if (!conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates are allowed." });
 

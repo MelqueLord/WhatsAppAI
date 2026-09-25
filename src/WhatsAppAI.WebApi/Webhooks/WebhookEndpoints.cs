@@ -10,6 +10,7 @@ using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.Infrastructure.Secrets;
 
 namespace WhatsAppAI.WebApi.Webhooks;
 
@@ -42,6 +43,8 @@ public static class WebhookEndpoints
             .DisableAntiforgery();
 
         bridge.MapPost("/events", ReceiveWhatsAppWebEventAsync)
+            .RequireRateLimiting("webhook");
+        bridge.MapPut("/sessions/{sessionId}/inbound-media/{messageId}", StoreWhatsAppWebInboundMediaAsync)
             .RequireRateLimiting("webhook");
         bridge.MapGet("/sessions/{sessionId}", GetWhatsAppWebSessionAsync);
         bridge.MapPut("/sessions/{sessionId}", SaveWhatsAppWebSessionAsync)
@@ -332,6 +335,53 @@ public static class WebhookEndpoints
         logger.LogInformation("WhatsApp Web event {EventId} received for {PhoneNumberId}",
             webhookEvent.Id, phoneNumberId);
         return Results.Ok("OK");
+    }
+
+    private static async Task<IResult> StoreWhatsAppWebInboundMediaAsync(
+        string sessionId,
+        string messageId,
+        HttpContext httpContext,
+        IConfiguration configuration,
+        AppDbContext dbContext,
+        IEncryptionService encryptionService,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedWhatsAppWebRequest(httpContext, configuration))
+            return Results.Unauthorized();
+        if (!TryParseSessionId(sessionId, out var tenantId, out _) ||
+            string.IsNullOrWhiteSpace(messageId) || messageId.Length > 200 ||
+            !await HasCurrentLeaseOwnershipAsync(sessionId, httpContext, dbContext))
+            return Results.BadRequest();
+
+        var contentType = httpContext.Request.ContentType?.Split(';', 2)[0];
+        var declaredLength = httpContext.Request.ContentLength;
+        var declaredHash = httpContext.Request.Headers["X-WhatsApp-Web-Media-Sha256"].FirstOrDefault();
+        if (contentType is not ("image/jpeg" or "image/png") || declaredLength is not (> 0 and <= 5 * 1024 * 1024) ||
+            string.IsNullOrWhiteSpace(declaredHash) || declaredHash.Length != 64 || !declaredHash.All(Uri.IsHexDigit))
+            return Results.BadRequest();
+
+        await using var buffer = new MemoryStream((int)declaredLength.Value);
+        await httpContext.Request.Body.CopyToAsync(buffer, cancellationToken);
+        var bytes = buffer.ToArray();
+        if (bytes.LongLength != declaredLength ||
+            !CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(declaredHash), SHA256.HashData(bytes)))
+            return Results.BadRequest();
+
+        var existing = await dbContext.InboundMediaAttachments
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.TenantId == tenantId && item.ExternalMessageId == messageId, cancellationToken);
+        if (existing is not null)
+            return Results.NoContent();
+
+        dbContext.InboundMediaAttachments.Add(InboundMediaAttachment.Create(
+            tenantId,
+            messageId,
+            contentType,
+            bytes.LongLength,
+            encryptionService.Encrypt(Convert.ToBase64String(bytes))));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static async Task EnsureWhatsAppWebAccountAsync(

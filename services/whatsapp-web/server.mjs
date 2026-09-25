@@ -1,11 +1,12 @@
 import express from 'express'
-import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
+import { Transform } from 'node:stream'
 import QRCode from 'qrcode'
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys'
+import makeWASocket, { DisconnectReason, downloadMediaMessage, useMultiFileAuthState } from '@whiskeysockets/baileys'
 import { rememberInboundMessage } from './retention.mjs'
 
 const app = express()
@@ -85,6 +86,7 @@ async function getSession(tenantId) {
     phoneNumber: null,
     sock: null,
     seenMessageIds: new Map(),
+    sentMediaMessageIds: new Map(),
     connecting: null,
   }
 
@@ -266,6 +268,52 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
   }
 }))
 
+app.post('/sessions/:tenantId/send-media', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
+  const socket = session?.sock
+  const contentType = req.get('content-type')?.split(';', 1)[0]
+  const recipientPhone = req.get('X-WhatsApp-Web-Recipient')
+  const declaredLength = Number(req.get('X-WhatsApp-Web-Media-Length'))
+  const requestLength = Number(req.get('content-length'))
+  const contentSha256 = req.get('X-WhatsApp-Web-Media-Sha256')
+  const idempotencyKey = req.get('X-WhatsApp-Web-Message-Id')
+  const caption = decodeCaption(req.get('X-WhatsApp-Web-Caption'))
+
+  if (!socket || session.status !== 'connected')
+    return res.status(503).json({ success: false, error: 'WhatsApp Web session is reconnecting.' })
+  if (!isValidRecipient(recipientPhone) || !isValidMediaRequest(contentType, declaredLength, requestLength, contentSha256, idempotencyKey, caption))
+    return res.status(400).json({ success: false, error: 'Invalid image request.' })
+
+  const prior = getRememberedMediaSend(session, idempotencyKey)
+  if (prior) return res.json({ success: true, messageId: prior })
+
+  try {
+    const phoneJid = `${recipientPhone}@s.whatsapp.net`
+    const mappedLid = await getLidForPhone(session, phoneJid)
+    const recipientJid = mappedLid ?? phoneJid
+    const registeredContact = (await socket.onWhatsApp(recipientPhone))
+      ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
+    if (!registeredContact?.jid)
+      return res.status(422).json({ success: false, error: 'The recipient is not registered on WhatsApp.' })
+
+    const verifiedStream = createVerifiedImageStream(req, declaredLength, contentSha256)
+    const [result] = await Promise.all([
+      socket.sendMessage(registeredContact.jid || recipientJid, {
+        image: verifiedStream,
+        caption: caption ?? undefined,
+        mimetype: contentType,
+      }),
+      verifiedStream.verified,
+    ])
+    const messageId = result?.key?.id ?? `bridge-${Date.now()}`
+    rememberMediaSend(session, idempotencyKey, messageId)
+    res.json({ success: true, messageId })
+  } catch (error) {
+    logError('Failed to send WhatsApp image', req.params.tenantId, error)
+    res.status(502).json({ success: false, error: 'WhatsApp Web image could not be sent.' })
+  }
+}))
+
 app.get('/sessions/:tenantId/bot-config', async (req, res) => {
   res.json(await getBotConfig(req.params.tenantId))
 })
@@ -287,6 +335,74 @@ function normalizeContactName(value) {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (!normalized) return null
   return normalized.slice(0, 200).trim()
+}
+
+function isValidMediaRequest(contentType, declaredLength, requestLength, contentSha256, idempotencyKey, caption) {
+  return contentType === 'image/jpeg' || contentType === 'image/png'
+    ? Number.isInteger(declaredLength) && declaredLength > 0 && declaredLength <= 5 * 1024 * 1024 &&
+      declaredLength === requestLength && /^[a-f0-9]{64}$/i.test(contentSha256 ?? '') &&
+      typeof idempotencyKey === 'string' && idempotencyKey.length > 0 && idempotencyKey.length <= 200 &&
+      caption !== null
+    : false
+}
+
+function decodeCaption(value) {
+  if (value === undefined) return undefined
+  try {
+    const caption = Buffer.from(value, 'base64').toString('utf8')
+    return caption.length <= 160 && Buffer.from(caption, 'utf8').toString('base64') === value ? caption : null
+  } catch {
+    return null
+  }
+}
+
+function createVerifiedImageStream(source, expectedLength, expectedSha256) {
+  const hash = createHash('sha256')
+  let length = 0
+  let resolveVerified
+  let rejectVerified
+  const verified = new Promise((resolve, reject) => {
+    resolveVerified = resolve
+    rejectVerified = reject
+  })
+  const stream = new Transform({
+    transform(chunk, _encoding, callback) {
+      length += chunk.length
+      if (length > expectedLength) return callback(new Error('Image exceeds declared length.'))
+      hash.update(chunk)
+      callback(null, chunk)
+    },
+    flush(callback) {
+      if (length !== expectedLength || hash.digest('hex') !== expectedSha256.toLowerCase()) {
+        const error = new Error('Image integrity check failed.')
+        rejectVerified(error)
+        return callback(error)
+      }
+      resolveVerified()
+      callback()
+    },
+  })
+  stream.verified = verified
+  stream.once('error', rejectVerified)
+  source.pipe(stream)
+  return stream
+}
+
+function getRememberedMediaSend(session, idempotencyKey) {
+  const now = Date.now()
+  for (const [key, item] of session.sentMediaMessageIds) {
+    if (item.expiresAt <= now) session.sentMediaMessageIds.delete(key)
+  }
+  return session.sentMediaMessageIds.get(idempotencyKey)?.messageId ?? null
+}
+
+function rememberMediaSend(session, idempotencyKey, messageId) {
+  session.sentMediaMessageIds.set(idempotencyKey, {
+    messageId,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  })
+  while (session.sentMediaMessageIds.size > 5_000)
+    session.sentMediaMessageIds.delete(session.sentMediaMessageIds.keys().next().value)
 }
 
 function addMessage(session, msg) {
@@ -318,6 +434,8 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
   const [, tenantId, lineNumber] = match
   const remoteJid = msg.key.remoteJid
   const phoneNumber = await resolvePhoneNumber(session, remoteJid, msg.key.remoteJidAlt)
+  const image = msg.message?.imageMessage
+  const imageStored = image ? await storeInboundImage(session, msg, image) : false
   const payload = {
     object: 'whatsapp_business_account',
     entry: [{
@@ -338,8 +456,13 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
             from: phoneNumber,
             id: msg.key.id,
             timestamp: Math.floor(new Date(createdAt).getTime() / 1000),
-            type: msg.message?.conversation || msg.message?.extendedTextMessage?.text ? 'text' : 'image',
+            type: image ? 'image' : 'text',
             text: text !== '[midia]' ? { body: text } : undefined,
+            image: image && imageStored ? {
+              id: msg.key.id,
+              mime: image.mimetype,
+              caption: image.caption,
+            } : undefined,
           }],
         },
       }],
@@ -397,6 +520,30 @@ function sessionDirectory(tenantId) {
 
 function sessionStateUrl(tenantId) {
   return `${apiInternalUrl}/sessions/${encodeURIComponent(tenantId)}`
+}
+
+async function storeInboundImage(session, msg, image) {
+  if (image.mimetype !== 'image/jpeg' && image.mimetype !== 'image/png') return false
+  try {
+    const content = await downloadMediaMessage(msg, 'buffer', {}, { logger: undefined })
+    const bytes = Buffer.from(content)
+    if (bytes.length === 0 || bytes.length > 5 * 1024 * 1024) return false
+    const response = await fetchWithTimeout(
+      `${apiInternalUrl}/sessions/${encodeURIComponent(session.tenantId)}/inbound-media/${encodeURIComponent(msg.key.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': image.mimetype,
+          'Content-Length': String(bytes.length),
+          'X-WhatsApp-Web-Media-Sha256': createHash('sha256').update(bytes).digest('hex'),
+        },
+        body: bytes,
+      })
+    return response.ok
+  } catch (error) {
+    logError('Failed to preserve WhatsApp Web image', session.tenantId, error)
+    return false
+  }
 }
 
 async function resolvePhoneNumber(session, jid, alternateJid) {

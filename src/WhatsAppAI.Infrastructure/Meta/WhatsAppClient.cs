@@ -122,16 +122,18 @@ internal sealed class WhatsAppClient(
 
     public async Task<SendMessageResult> SendMediaMessageAsync(
         string phoneNumberId, string accessToken, string recipientPhone,
-        string mediaType, string mediaContent, string? caption, string? fileName,
+        Stream mediaStream, string contentType, long contentLength, string contentSha256,
+        string? caption, string? fileName, string? idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        if (mediaType != "image" || !TryReadImageDataUrl(mediaContent, out var contentType, out var bytes))
+        if (contentType is not ("image/jpeg" or "image/png") || contentLength is <= 0 or > 5 * 1024 * 1024 ||
+            !IsSha256(contentSha256))
             return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Unsupported image content." };
 
         try
         {
             using var upload = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent(bytes);
+            var fileContent = new StreamContent(mediaStream);
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
             upload.Add(fileContent, "file", fileName ?? "image");
             upload.Add(new StringContent("whatsapp"), "messaging_product");
@@ -167,18 +169,8 @@ internal sealed class WhatsAppClient(
         }
     }
 
-    private static bool TryReadImageDataUrl(string value, out string contentType, out byte[] bytes)
-    {
-        contentType = string.Empty;
-        bytes = [];
-        var separator = value.IndexOf(',');
-        if (separator <= 5 || !value.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
-            !value[..separator].EndsWith(";base64", StringComparison.OrdinalIgnoreCase)) return false;
-        contentType = value[5..(separator - ";base64".Length)];
-        if (contentType is not ("image/jpeg" or "image/png")) return false;
-        try { bytes = Convert.FromBase64String(value[(separator + 1)..]); return bytes.Length is > 0 and <= 5 * 1024 * 1024; }
-        catch (FormatException) { return false; }
-    }
+    private static bool IsSha256(string value) =>
+        value.Length == 64 && value.All(Uri.IsHexDigit);
 
     public async Task<SendMessageResult> SendTemplateMessageAsync(
         string phoneNumberId,

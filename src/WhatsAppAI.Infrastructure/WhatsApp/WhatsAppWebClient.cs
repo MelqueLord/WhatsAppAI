@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using WhatsAppAI.Application.Integrations;
 
@@ -54,14 +56,21 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
 
     public Task<SendMessageResult> SendMediaMessageAsync(
         string phoneNumberId, string accessToken, string recipientPhone,
-        string mediaType, string mediaContent, string? caption, string? fileName,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new SendMessageResult
-        {
-            IsSuccess = false,
-            IsRetryable = false,
-            ErrorMessage = "Media sending is not available yet."
-        });
+        Stream mediaStream, string contentType, long contentLength, string contentSha256,
+        string? caption, string? fileName, string? idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." });
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3 || contentType is not ("image/jpeg" or "image/png") || contentLength is <= 0 or > 5 * 1024 * 1024 ||
+            contentSha256.Length != 64 || string.IsNullOrWhiteSpace(idempotencyKey))
+            return Task.FromResult(new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid image request." });
+
+        return SendWhatsAppWebMediaAsync(parts[1], parts[2], recipientPhone, mediaStream, contentType,
+            contentLength, contentSha256, caption, idempotencyKey, cancellationToken);
+    }
 
     public Task<SendMessageResult> SendTemplateMessageAsync(
         string phoneNumberId,
@@ -195,6 +204,45 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
                 HttpMethod.Post,
                 $"{baseUrl}/sessions/{tenantId:D}-qr-{lineNumber}/logout"),
             cancellationToken);
+    }
+
+    private async Task<SendMessageResult> SendWhatsAppWebMediaAsync(
+        string tenantId, string lineNumber, string recipientPhone, Stream mediaStream,
+        string contentType, long contentLength, string contentSha256, string? caption,
+        string idempotencyKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await SendToSessionOwnerAsync(baseUrl =>
+            {
+                if (mediaStream.CanSeek) mediaStream.Position = 0;
+                var request = new HttpRequestMessage(HttpMethod.Post,
+                    $"{baseUrl}/sessions/{tenantId}-qr-{lineNumber}/send-media");
+                var content = new StreamContent(mediaStream);
+                content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+                content.Headers.ContentLength = contentLength;
+                request.Content = content;
+                request.Headers.Add("X-WhatsApp-Web-Recipient", recipientPhone);
+                request.Headers.Add("X-WhatsApp-Web-Media-Length", contentLength.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                request.Headers.Add("X-WhatsApp-Web-Media-Sha256", contentSha256);
+                request.Headers.Add("X-WhatsApp-Web-Message-Id", idempotencyKey);
+                if (!string.IsNullOrWhiteSpace(caption))
+                    request.Headers.Add("X-WhatsApp-Web-Caption", Convert.ToBase64String(Encoding.UTF8.GetBytes(caption)));
+                return request;
+            }, cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult
+            {
+                IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                IsRetryable = IsRetryableStatus(response.StatusCode),
+                MessageId = result?.MessageId,
+                ErrorMessage = result?.Error ?? "WhatsApp Web image could not be sent."
+            };
+        }
+        catch
+        {
+            return new SendMessageResult { IsSuccess = false, ErrorMessage = "Serviço WhatsApp Web indisponível." };
+        }
     }
 
     private static bool IsRetryableStatus(HttpStatusCode statusCode) =>

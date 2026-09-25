@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Integrations;
@@ -231,10 +232,10 @@ public sealed class OutboxProcessingWorker(
                     return;
                 }
 
-                string encodedContent;
+                byte[] mediaBytes;
                 try
                 {
-                    encodedContent = encryptionService.Decrypt(mediaAttachment.EncryptedContent);
+                    mediaBytes = Convert.FromBase64String(encryptionService.Decrypt(mediaAttachment.EncryptedContent));
                 }
                 catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or FormatException)
                 {
@@ -250,10 +251,12 @@ public sealed class OutboxProcessingWorker(
                     return;
                 }
 
+                await using var mediaStream = new MemoryStream(mediaBytes, writable: false);
                 result = await whatsAppClient.SendMediaMessageAsync(
                     outboundPhoneNumberId, token, contact.PhoneNumber,
-                    "image", $"data:{mediaAttachment.ContentType};base64,{encodedContent}",
-                    message.Caption, null, cancellationToken);
+                    mediaStream, mediaAttachment.ContentType, mediaAttachment.Length,
+                    Convert.ToHexString(SHA256.HashData(mediaBytes)).ToLowerInvariant(),
+                    message.Caption, null, message.IdempotencyKey, cancellationToken);
             }
             else if (message.Type == MessageType.Template)
             {

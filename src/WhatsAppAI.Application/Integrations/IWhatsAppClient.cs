@@ -20,10 +20,13 @@ public interface IWhatsAppClient
         string phoneNumberId,
         string accessToken,
         string recipientPhone,
-        string mediaType,
-        string mediaContent,
+        Stream mediaStream,
+        string contentType,
+        long contentLength,
+        string contentSha256,
         string? caption,
         string? fileName,
+        string? idempotencyKey,
         CancellationToken cancellationToken = default);
 
     Task<SendMessageResult> SendTemplateMessageAsync(

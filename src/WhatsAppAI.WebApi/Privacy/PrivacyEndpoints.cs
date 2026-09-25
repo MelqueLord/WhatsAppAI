@@ -350,6 +350,18 @@ public static class PrivacyEndpoints
             .Where(x => x.ContactId == contact.Id && x.TenantId == tenantId)
             .ToListAsync(cancellationToken);
 
+        var externalMessageIds = messages
+            .Where(message => !string.IsNullOrWhiteSpace(message.ExternalId))
+            .Select(message => message.ExternalId!)
+            .ToArray();
+        if (externalMessageIds.Length > 0)
+        {
+            var inboundAttachments = await dbContext.InboundMediaAttachments
+                .Where(item => item.TenantId == tenantId && externalMessageIds.Contains(item.ExternalMessageId))
+                .ToListAsync(cancellationToken);
+            dbContext.InboundMediaAttachments.RemoveRange(inboundAttachments);
+        }
+
         contact.Anonymize();
         foreach (var message in messages)
             message.RedactPersonalData();

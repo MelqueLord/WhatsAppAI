@@ -18,4 +18,4 @@
 
 ## Fase 2 — QR Code
 
-- [ ] **T275** Implementar transporte interno e mídia QR conforme ADR-0015 aceito. **Refs:** CR-006, CR-007, FR-010, FR-023. **Depends:** T262, T263, T264, T271. **Aceite:** rota pública não envia mídia; ponte usa lease, identidade interna e stream; entrada QR preserva referência recuperável sem snapshot de conversa.
+- [ ] **T275** Implementar transporte interno e mídia QR conforme ADR-0015 aceito. **Refs:** CR-006, CR-007, FR-010, FR-023. **Depends:** T262, T263, T264, T271. **Progresso:** rota interna autenticada envia JPEG/PNG por stream com lease, hash, tamanho e chave de idempotência; imagens QR recebidas são transferidas uma vez à persistência cifrada do backend, sem snapshot na ponte. A migration `20260925181918_AddInboundQrMediaAttachments` foi gerada, mas sua aplicação aguarda PostgreSQL local disponível. **Aceite:** rota pública não envia mídia; ponte usa lease, identidade interna e stream; entrada QR preserva referência recuperável sem snapshot de conversa.

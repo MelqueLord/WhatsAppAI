@@ -18,4 +18,6 @@ test('deduplication IDs expire and are not persisted', async () => {
   assert.doesNotMatch(server, /inbox\\.json/)
   assert.doesNotMatch(server, /messaging-history\\.set/)
   assert.doesNotMatch(server, /conversations/)
+  assert.match(server, /\/sessions\/:tenantId\/send-media/)
+  assert.match(server, /X-WhatsApp-Web-Media-Sha256/)
 })
