@@ -194,6 +194,22 @@ export function MessagePanel({
     },
   })
 
+  const sendImageMutation = useMutation({
+    mutationFn: (payload: { image: File; caption?: string }) =>
+      api.conversations.sendImage(conversation.id, payload.image, payload.caption),
+
+    onSuccess: () => {
+      setSelectedFile(null)
+      setMessage('')
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+
+    onError: (error) => {
+      setSendError(error instanceof Error ? error.message : 'Não foi possível enviar a imagem.')
+    },
+  })
+
   const modeMutation = useMutation({
     mutationFn: async (newMode: string) => {
       // The selected conversation may be older than the row refreshed by
@@ -388,6 +404,12 @@ export function MessagePanel({
     modeOverride ?? conversation.mode
 
   const handleSend = () => {
+    if (selectedFile) {
+      setSendError(null)
+      sendImageMutation.mutate({ image: selectedFile, caption: message })
+      return
+    }
+
     if (!message.trim()) {
       return
     }
@@ -400,8 +422,23 @@ export function MessagePanel({
 
   const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
-    setSelectedFile(file)
     event.target.value = ''
+    if (!file) return
+
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      setSelectedFile(null)
+      setSendError('Selecione uma imagem JPEG ou PNG.')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedFile(null)
+      setSendError('A imagem deve ter no máximo 5 MB.')
+      return
+    }
+
+    setSendError(null)
+    setSelectedFile(file)
   }
 
   const handleTemplateSend = () => {
@@ -962,7 +999,7 @@ export function MessagePanel({
             <button
               type="button"
               onClick={() => setShowEmojiPicker((visible) => !visible)}
-              disabled={!isConversationOpen || sendMutation.isPending}
+              disabled={!isConversationOpen || sendMutation.isPending || sendImageMutation.isPending}
               aria-label="Abrir emojis"
               aria-expanded={showEmojiPicker}
               className="rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -994,7 +1031,7 @@ export function MessagePanel({
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept="image/jpeg,image/png"
             onChange={handleFileSelected}
             aria-label="Selecionar arquivo"
           />
@@ -1002,7 +1039,7 @@ export function MessagePanel({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!isConversationOpen || sendMutation.isPending}
+            disabled={!isConversationOpen || sendMutation.isPending || sendImageMutation.isPending}
             aria-label="Anexar arquivo"
             title="Anexar arquivo"
             className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -1026,10 +1063,10 @@ export function MessagePanel({
             }}
             rows={1}
             aria-label="Mensagem"
-            placeholder="Digite uma mensagem..."
+            placeholder={selectedFile ? 'Adicione uma legenda (opcional)...' : 'Digite uma mensagem...'}
             disabled={
               !isConversationOpen ||
-              sendMutation.isPending
+              sendMutation.isPending || sendImageMutation.isPending
             }
             className="min-w-0 flex-1 max-h-36 resize-none overflow-y-auto rounded-xl border border-white/10 bg-[#10223f] px-3 py-2.5 text-sm leading-5 text-white focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
           />
@@ -1037,13 +1074,13 @@ export function MessagePanel({
           <button
             onClick={handleSend}
             disabled={
-              !message.trim() ||
+              (!message.trim() && !selectedFile) ||
               !isConversationOpen ||
-              sendMutation.isPending
+              sendMutation.isPending || sendImageMutation.isPending
             }
             className="shrink-0 rounded-xl bg-emerald-500 p-2.5 text-white shadow-sm transition-all hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {sendMutation.isPending ? (
+            {sendMutation.isPending || sendImageMutation.isPending ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <Send className="w-5 h-5" />
@@ -1059,7 +1096,7 @@ export function MessagePanel({
 
         {selectedFile && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#10223f] px-3 py-2 text-xs text-slate-200">
-            <span className="min-w-0 truncate">{selectedFile.name}</span>
+            <span className="min-w-0 truncate">{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)</span>
             <button
               type="button"
               onClick={() => setSelectedFile(null)}

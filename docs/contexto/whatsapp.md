@@ -8,4 +8,6 @@ Na tela de integração, cada linha da API Oficial mostra `Conectado` somente ap
 
 Somente TenantOwner configura, consulta o estado ou desconecta linhas. Desconectar uma linha oficial desativa o canal e remove seu token do cofre, preservando o registro da linha para uma reconexão explícita com novas credenciais. Operators não têm acesso às credenciais e a Inbox aplica a linha atribuída, a fila atribuída ou ambas como escopo de acesso.
 
+A Inbox pode encaminhar uma imagem JPEG ou PNG de até 5 MB por linha oficial, exclusivamente dentro da janela de atendimento de 24 horas. O navegador aplica a mesma restrição para orientar a pessoa usuária, mas o servidor valida tipo, tamanho e assinatura do arquivo; o binário é cifrado até a Outbox enviá-lo à Meta e não é exposto pela mensagem, pela resposta HTTP ou pelo SignalR. O envio de imagem por QR Code permanece bloqueado até a conclusão das decisões e controles de segurança próprios da ponte.
+
 Fonte: [integração WhatsApp](../design/integracao-whatsapp.md) e [regras de WhatsApp](../regras/whatsapp.md).

@@ -12,6 +12,7 @@ using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
+using WhatsAppAI.Infrastructure.Secrets;
 using WhatsAppAI.WebApi.Hubs;
 
 namespace WhatsAppAI.WebApi.Conversations;
@@ -399,38 +400,28 @@ public static class ConversationEndpoints
         IFormFile file,
         ICurrentTenant currentTenant,
         IConversationRepository conversationRepository,
-        IMessageRepository messageRepository,
         ITenantMembershipRepository membershipRepository,
         IWhatsAppAccountRepository accountRepository,
-        IOutboxMessageRepository outboxMessageRepository,
+        IEncryptionService encryptionService,
         IClock clock,
         IHubContext<InboxHub> hubContext,
         AppDbContext dbContext,
         string? caption = null)
     {
-        const long maxBytes = 16 * 1024 * 1024;
+        const long maxBytes = 5 * 1024 * 1024;
         if (currentTenant.TenantId is null || currentTenant.UserId is null)
             return Results.Unauthorized();
         if (file is null || file.Length == 0 || file.Length > maxBytes)
-            return Results.BadRequest(new { error = "Attachment must be between 1 byte and 16 MB." });
+            return Results.BadRequest(new { error = "Image must be between 1 byte and 5 MB." });
 
         if (string.IsNullOrWhiteSpace(file.ContentType))
             return Results.BadRequest(new { error = "Attachment content type is required." });
 
         var contentType = file.ContentType.Split(';')[0].Trim().ToLowerInvariant();
-        var messageType = contentType switch
-        {
-            var type when type.StartsWith("image/") => MessageType.Image,
-            var type when type.StartsWith("audio/") => MessageType.Audio,
-            var type when type.StartsWith("video/") => MessageType.Video,
-            "application/pdf" or "text/plain" or "application/msword" or
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or
-                "application/vnd.ms-excel" or
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => MessageType.Document,
-            _ => (MessageType?)null
-        };
-        if (messageType is null)
-            return Results.BadRequest(new { error = "Unsupported attachment type." });
+        if (contentType is not ("image/jpeg" or "image/png"))
+            return Results.BadRequest(new { error = "Only JPEG and PNG images are supported." });
+        if (caption?.Length > 1024)
+            return Results.BadRequest(new { error = "Caption must be at most 1024 characters." });
 
         var conversation = await conversationRepository.GetByIdAsync(conversationId);
         if (conversation is null || conversation.TenantId != currentTenant.TenantId)
@@ -457,30 +448,45 @@ public static class ConversationEndpoints
                 currentTenant.TenantId.Value, WhatsAppConnectionType.QrCode, 1);
         var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
             account?.ConnectionType == WhatsAppConnectionType.QrCode;
-        if (!isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
+        if (isQrConversation)
+            return Results.BadRequest(new { error = "Image sending through QR Code is not available yet." });
+        if (!conversation.IsWindowOpen(clock.UtcNow))
             return Results.BadRequest(new { error = "Window closed. Only templates are allowed." });
 
         await using var stream = file.OpenReadStream();
         await using var memory = new MemoryStream();
         await stream.CopyToAsync(memory);
-        var dataUrl = $"data:{contentType};base64,{Convert.ToBase64String(memory.ToArray())}";
+        var content = memory.ToArray();
+        if (!HasValidImageSignature(contentType, content))
+            return Results.BadRequest(new { error = "Image contents do not match its type." });
         var message = Message.CreateOutbound(
             currentTenant.TenantId.Value, conversationId, conversation.ContactId,
-            messageType.Value, null, Guid.NewGuid().ToString(),
-            caption: caption?.Trim(), mediaUrl: dataUrl);
-        await messageRepository.AddAsync(message);
-        await outboxMessageRepository.AddAsync(OutboxMessage.Create(currentTenant.TenantId.Value, message.Id));
+            MessageType.Image, null, Guid.NewGuid().ToString(), caption: caption?.Trim());
+        var attachment = OutboundMediaAttachment.Create(
+            currentTenant.TenantId.Value, message.Id, contentType, content.LongLength,
+            encryptionService.Encrypt(Convert.ToBase64String(content)));
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        dbContext.Set<Message>().Add(message);
+        dbContext.Set<OutboundMediaAttachment>().Add(attachment);
+        dbContext.Set<OutboxMessage>().Add(OutboxMessage.Create(currentTenant.TenantId.Value, message.Id));
         conversation.RecordMessage();
-        await conversationRepository.UpdateAsync(conversation);
+        dbContext.Set<Conversation>().Update(conversation);
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
         await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}").SendAsync(
             InboxHubMethods.NewMessage, new
             {
                 id = message.Id, conversationId, direction = message.Direction.ToString(),
-                content = caption, type = message.Type.ToString(), status = message.Status.ToString(),
+                type = message.Type.ToString(), hasCaption = !string.IsNullOrWhiteSpace(message.Caption), status = message.Status.ToString(),
                 createdAt = message.CreatedAt
             });
-        return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
+        return Results.Ok(new { id = message.Id, status = message.Status.ToString(), type = message.Type.ToString(), hasCaption = !string.IsNullOrWhiteSpace(message.Caption), createdAt = message.CreatedAt });
     }
+
+    private static bool HasValidImageSignature(string contentType, byte[] content) =>
+        contentType == "image/png"
+            ? content.Length >= 8 && content.AsSpan(0, 8).SequenceEqual("\x89PNG\r\n\x1a\n"u8)
+            : content.Length >= 3 && content[0] == 0xff && content[1] == 0xd8 && content[2] == 0xff;
 
     private static async Task<IResult> CloseConversationAsync(
         Guid conversationId,

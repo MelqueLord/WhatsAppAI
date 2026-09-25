@@ -15,6 +15,32 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
     : IClassFixture<TestWebApplicationFactory>
 {
     [Fact]
+    public async Task SendImage_DoesNotAllowAnotherTenantConversation()
+    {
+        var requestingTenant = await CreateTenantOwnerAsync();
+        var otherTenant = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(otherTenant.TenantId, "5511999999910", "Other Tenant");
+        var conversation = Conversation.Create(otherTenant.TenantId, contact.Id, "official-phone-other");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.Add(contact);
+            db.Conversations.Add(conversation);
+            await db.SaveChangesAsync();
+        }
+
+        using var form = new MultipartFormDataContent();
+        using var image = new ByteArrayContent([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        image.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(image, "file", "tenant-isolation.png");
+
+        var response = await requestingTenant.Client.PostAsync(
+            $"/api/conversations/{conversation.Id}/media", form);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task TemplateAvailability_FollowsTheConversationOfficialLine()
     {
         var setup = await CreateTenantOwnerAsync();

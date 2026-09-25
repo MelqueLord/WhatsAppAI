@@ -121,12 +121,12 @@ public sealed class PrivacyEndpointsTests(TestWebApplicationFactory factory)
         var firstErase = await first.Client.PostAsync($"/api/privacy/requests/{requestId}/erase", null);
         var secondErase = await first.Client.PostAsync($"/api/privacy/requests/{requestId}/erase", null);
 
-        await using var db = await factory.GetDbContextAsync();
-        var erasedContact = await db.Contacts.IgnoreQueryFilters().SingleAsync(x => x.Id == firstContact);
-        var retainedContact = await db.Contacts.IgnoreQueryFilters().SingleAsync(x => x.Id == secondContact);
-        var erasedMessage = await db.Messages.IgnoreQueryFilters().SingleAsync(x => x.ContactId == firstContact);
-        var retainedMessage = await db.Messages.IgnoreQueryFilters().SingleAsync(x => x.ContactId == secondContact);
-        var erasedMemory = await db.CustomerMemories.IgnoreQueryFilters().SingleAsync(x => x.ContactId == firstContact);
+        await using var verifyDb = await factory.GetDbContextAsync();
+        var erasedContact = await verifyDb.Contacts.IgnoreQueryFilters().SingleAsync(x => x.Id == firstContact);
+        var retainedContact = await verifyDb.Contacts.IgnoreQueryFilters().SingleAsync(x => x.Id == secondContact);
+        var erasedMessage = await verifyDb.Messages.IgnoreQueryFilters().SingleAsync(x => x.ContactId == firstContact);
+        var retainedMessage = await verifyDb.Messages.IgnoreQueryFilters().SingleAsync(x => x.ContactId == secondContact);
+        var erasedMemory = await verifyDb.CustomerMemories.IgnoreQueryFilters().SingleAsync(x => x.ContactId == firstContact);
 
         Assert.Equal(HttpStatusCode.OK, firstErase.StatusCode);
         Assert.Equal(HttpStatusCode.OK, secondErase.StatusCode);

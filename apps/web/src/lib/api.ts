@@ -571,6 +571,22 @@ export const api = {
         }
       ),
 
+    sendImage: (id: string, image: File, caption?: string) => {
+      const formData = new FormData()
+      formData.append('file', image)
+      if (caption?.trim()) formData.append('caption', caption.trim())
+      return fetchApi<{
+        id: string
+        status: string
+        type: string
+        hasCaption: boolean
+        createdAt: string
+      }>(`/api/conversations/${id}/media`, {
+        method: 'POST',
+        body: formData,
+      })
+    },
+
     listTemplates: (id: string) =>
       fetchApi<{ templates: WhatsAppTemplate[]; error?: string }>(
         `/api/conversations/${id}/templates`
