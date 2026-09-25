@@ -16,8 +16,8 @@ public static class AiGroundingPolicy
         @"(?:\b(?:r\$|rs\$|us\$|\$)\s*\d+(?:[.,]\d{1,2})?|\b\d{1,2}(?::\d{2})?\s*(?:h|hrs?|horas?|min(?:utos?)?)\b|\b\d+(?:[.,]\d+)?\s*(?:%|reais?|centavos?|dias?|semanas?|mes(?:es)?|anos?|km|quil[oô]metros?)\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b|\b(?:19|20)\d{2}\b|https?://\S+|www\.\S+|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|\+?\d[\d\s().-]{7,}\d)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    public static string BuildInstructions() =>
-        "Segurança factual: antes de responder, confira se cada preço, horário, prazo, percentual, data, link ou contato concreto aparece no contexto autorizado. Se não aparecer, não complete a informação por plausibilidade: use handoff com handoff_reason \"out_of_scope\". Afirmações gerais sem valores concretos podem ser respondidas somente quando forem sustentadas pelo perfil, diretrizes ou conhecimento fornecidos.";
+    public const string Instructions =
+        "Segurança factual: confira se cada preço, horário, prazo, percentual, data, link ou contato concreto aparece no contexto autorizado; se faltar, use handoff com handoff_reason \"out_of_scope\".";
 
     public static AiResponse Validate(
         AiResponse response,

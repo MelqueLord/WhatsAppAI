@@ -113,7 +113,7 @@ public static class BroadcastEndpoints
         if (request.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate &&
             (string.IsNullOrWhiteSpace(request.LinePhoneNumberId) || string.IsNullOrWhiteSpace(request.TemplateName) ||
              string.IsNullOrWhiteSpace(request.TemplateLanguage) || templateBodyParameters.Count > 10 ||
-             templateBodyParameters.Any(value => value is null || value.Length > 1024)))
+             templateBodyParameters.Exists(value => value is null || value.Length > 1024)))
             return Results.BadRequest(new { error = "An official template broadcast requires a line, template, language and valid body parameters." });
 
         var tenantId = currentTenant.TenantId.Value;
@@ -175,7 +175,7 @@ public static class BroadcastEndpoints
 
         if (currentTenant.UserRole == "Operator")
         {
-            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, tenantId);
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, tenantId, cancellationToken);
             membership?.LoadAssignedLinesFromJson();
             if (membership is null || !membership.CanAccessQueue(queueId)) return Results.Forbid();
             if (request.DeliveryMode == BroadcastDeliveryMode.OfficialApiTemplate)
@@ -309,19 +309,19 @@ public static class BroadcastEndpoints
 
             var membership = await membershipRepo.GetByUserAndTenantAsync(
                 currentTenant.UserId.Value,
-                tenantId);
+                tenantId,
+                CancellationToken.None);
             membership?.LoadAssignedLinesFromJson();
 
             if (membership is null || !membership.CanAccessQueue(broadcast.QueueId))
                 return Results.Forbid();
 
-            var hasAssignedLine = membership is not null &&
-                (membership.AssignedLines.Any(assigned =>
+            var hasAssignedLine = membership.AssignedLines.Any(assigned =>
                     assigned.ConnectionType == expectedConnectionType &&
                     assigned.LineNumber == line.LineNumber) ||
                  (membership.AssignedLines.Count == 0 &&
                   membership.AssignedConnectionType == expectedConnectionType &&
-                  membership.AssignedLineNumber == line.LineNumber));
+                  membership.AssignedLineNumber == line.LineNumber);
 
             if (!hasAssignedLine)
                 return Results.Forbid();
@@ -388,19 +388,19 @@ public static class BroadcastEndpoints
 
             var membership = await membershipRepo.GetByUserAndTenantAsync(
                 currentTenant.UserId.Value,
-                tenantId);
+                tenantId,
+                CancellationToken.None);
             membership?.LoadAssignedLinesFromJson();
 
             if (membership is null || !membership.CanAccessQueue(broadcast.QueueId))
                 return Results.Forbid();
 
-            var hasAssignedLine = membership is not null &&
-                (membership.AssignedLines.Any(assigned =>
+            var hasAssignedLine = membership.AssignedLines.Any(assigned =>
                     assigned.ConnectionType == expectedConnectionType &&
                     assigned.LineNumber == line.LineNumber) ||
                  (membership.AssignedLines.Count == 0 &&
                   membership.AssignedConnectionType == expectedConnectionType &&
-                  membership.AssignedLineNumber == line.LineNumber));
+                  membership.AssignedLineNumber == line.LineNumber);
 
             if (!hasAssignedLine)
                 return Results.Forbid();
@@ -513,7 +513,7 @@ public static class BroadcastEndpoints
         if (currentTenant.UserRole == "Operator")
         {
             if (currentTenant.UserId is null) return Results.Forbid();
-            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value);
+            var membership = await membershipRepository.GetByUserAndTenantAsync(currentTenant.UserId.Value, currentTenant.TenantId.Value, cancellationToken);
             membership?.LoadAssignedLinesFromJson();
             var hasLine = membership is not null &&
                 (membership.AssignedLines.Any(assignment =>
@@ -527,7 +527,7 @@ public static class BroadcastEndpoints
             return Results.BadRequest(new { error = "Access token not available." });
 
         var result = await whatsAppClientResolver.GetClient(WhatsAppConnectionType.OfficialApi)
-            .ListTemplatesAsync(account.WabaId, token);
+            .ListTemplatesAsync(account.WabaId, token, cancellationToken);
         if (!result.IsSuccess)
             return Results.BadRequest(new { error = result.ErrorMessage ?? "Unable to load templates." });
 

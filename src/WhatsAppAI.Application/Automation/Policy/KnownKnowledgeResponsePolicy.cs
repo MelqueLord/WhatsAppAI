@@ -15,8 +15,8 @@ public static class KnownKnowledgeResponsePolicy
             .ToArray())
             .ToLowerInvariant();
 
-        return normalized.Split([' ', '\t', '\r', '\n', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '/', '\\', '-'], StringSplitOptions.RemoveEmptyEntries)
-            .Any(term => term is "preco" or "precos" or "valor" or "valores" or "quanto" or "custa" or "custam" or "mensalidade" or "mensalidades" or "assinatura" or "assinaturas" or "plano" or "planos");
+        return Array.Exists(normalized.Split([' ', '\t', '\r', '\n', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '/', '\\', '-'], StringSplitOptions.RemoveEmptyEntries),
+            term => term is "preco" or "precos" or "valor" or "valores" or "quanto" or "custa" or "custam" or "mensalidade" or "mensalidades" or "assinatura" or "assinaturas" or "plano" or "planos");
     }
 
     public static bool IsPlanSelectionQuestion(string? message)
@@ -72,7 +72,7 @@ public static class KnownKnowledgeResponsePolicy
         response.Decision.HandoffReason is "out_of_scope" or "low_confidence" or "escalation_needed" &&
         relevantKnowledge.Count > 0;
 
-    public static string BuildInferenceInstruction() =>
+    public const string InferenceInstruction =
         "Reavalie a pergunta usando os fatos autorizados já fornecidos no contexto. A resposta pode ser inferida pela combinação de fatos compatíveis, mesmo que a pergunta use outras palavras. Responda diretamente em action reply quando houver suporte suficiente; não invente, não use exemplos como fatos e só mantenha out_of_scope se a conclusão exigir informação ausente.";
 
     public static AiResponse RecoverKnownAnswer(

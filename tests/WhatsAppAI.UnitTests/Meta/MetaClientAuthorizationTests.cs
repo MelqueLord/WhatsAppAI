@@ -54,6 +54,24 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatsAppClient_UploadsImageThenSendsItsMediaId()
+    {
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+        var image = $"data:image/png;base64,{Convert.ToBase64String([1, 2, 3])}";
+
+        var result = await client.SendMediaMessageAsync("phone-image", "token-image", "recipient", "image", image, "Legenda", "photo.png");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("wamid-image", result.MessageId);
+        Assert.Contains("Bearer token-image", handler.Authorizations);
+        Assert.Contains(handler.RequestUris, uri => uri.EndsWith("/phone-image/media", StringComparison.Ordinal));
+        var messagePayload = Assert.Single(handler.RequestBodies, body => body.StartsWith('{'));
+        using var document = JsonDocument.Parse(messagePayload);
+        Assert.Equal("image", document.RootElement.GetProperty("type").GetString());
+        Assert.Equal("media-image", document.RootElement.GetProperty("image").GetProperty("id").GetString());
+    }
+
+    [Fact]
     public async Task WhatsAppClient_ListsAllTemplateCategoriesAndStatusesAcrossAllPages()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
@@ -85,7 +103,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         Assert.False(unsupported.IsCompatible);
         Assert.False(unsupported.CanSendInInbox);
 
-        Assert.True(result.Templates.Any(template => template.Name == "follow_up"));
+        Assert.Contains(result.Templates, template => template.Name == "follow_up");
         Assert.Equal(2, handler.TemplateRequests.Count);
     }
 
@@ -155,12 +173,14 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         public ConcurrentBag<string> Authorizations { get; } = [];
         public ConcurrentBag<string> RequestBodies { get; } = [];
         public ConcurrentBag<string> TemplateRequests { get; } = [];
+        public ConcurrentBag<string> RequestUris { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Authorizations.Add(request.Headers.Authorization?.ToString() ?? string.Empty);
+            RequestUris.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
             if (request.Content is not null)
                 RequestBodies.Add(await request.Content.ReadAsStringAsync(cancellationToken));
 
@@ -171,6 +191,14 @@ public sealed class MetaClientAuthorizationTests : IDisposable
                 {
                     Content = new ByteArrayContent([1, 2, 3])
                 };
+            }
+            else if (request.RequestUri?.AbsolutePath.EndsWith("/media", StringComparison.Ordinal) == true)
+            {
+                response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"media-image\"}") };
+            }
+            else if (request.RequestUri?.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal) == true)
+            {
+                response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"messages\":[{\"id\":\"wamid-image\"}]}") };
             }
             else if (request.RequestUri?.AbsolutePath.Contains("message_templates", StringComparison.Ordinal) == true)
             {

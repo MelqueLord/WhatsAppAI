@@ -377,7 +377,7 @@ public static class BotConfigurationEndpoints
             (Name: "Transferência para fila", Value: queueTransferMessage),
             (Name: "Recebimento de mídia", Value: mediaMessage)
         };
-        var invalid = messages.FirstOrDefault(message => message.Value?.Length > MaxBotMessageLength);
+        var invalid = Array.Find(messages, message => message.Value?.Length > MaxBotMessageLength);
         if (invalid.Value is not null)
         {
             error = $"{invalid.Name} deve ter no máximo {MaxBotMessageLength} caracteres.";

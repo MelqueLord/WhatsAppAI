@@ -137,9 +137,6 @@ public sealed class AiOrchestrationWorker(
                 return;
             }
 
-            // Human takeover and pause are terminal for this inbound automation pass.
-            // Queue keywords may route only while the bot already owns the conversation;
-            // customer text must never silently take control back from an operator.
             if (!AiReplyDeliveryGuard.IsAutomationOwned(conversation))
             {
                 message.MarkProcessedByAi();
@@ -177,8 +174,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, null, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("Bot configuration not available for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -352,8 +349,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("AI not enabled for tenant {TenantId} plan", message.TenantId);
                 return;
             }
@@ -363,8 +360,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("No active AI credential for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -376,8 +373,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("API key not available for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -385,8 +382,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("AI model is not allowed for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -395,8 +392,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning("AI model has no approved evaluation for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -438,8 +435,8 @@ public sealed class AiOrchestrationWorker(
             {
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning(ex, "AI provider '{Provider}' not available for tenant {TenantId}", credential.Provider, message.TenantId);
                 return;
             }
@@ -474,20 +471,22 @@ public sealed class AiOrchestrationWorker(
                 ? activeQueues.FirstOrDefault(queue => queue.Id == conversation.QueueId.Value)?.Name
                 : null;
             var context = await contextAssembler.BuildAsync(
-                message.TenantId, message.ConversationId, credential.SystemPrompt,
-                routingQueues
+                tenantId: message.TenantId,
+                conversationId: message.ConversationId,
+                systemPrompt: credential.SystemPrompt,
+                routingQueues: routingQueues
                     .Select(queue => new RoutingQueueContext(queue.Name, queue.Description))
                     .ToList(),
-                routingTags
+                routingTags: routingTags
                     .Select(tag => new RoutingTagContext(tag.Name, tag.Description))
                     .ToList(),
-                cancellationToken,
-                welcomeMessage,
-                isFirstInbound,
-                tenant?.Name,
-                new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName),
+                welcomeMessage: welcomeMessage,
+                isFirstInbound: isFirstInbound,
+                businessName: tenant?.Name,
+                customerContext: new CustomerServiceContext(contactName, !isFirstInbound, currentQueueName),
                 contactId: message.ContactId,
-                currentMessageId: message.Id);
+                currentMessageId: message.Id,
+                cancellationToken: cancellationToken);
             var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
                 message.Content,
                 context.RelevantKnowledge);
@@ -498,7 +497,7 @@ public sealed class AiOrchestrationWorker(
                 ApiKey = apiKey,
                 Messages = context.Messages,
                 SystemPrompt = allowPublicWebSearch
-                    ? $"{context.SystemPrompt}\n\n{PublicKnowledgePolicy.BuildInstruction()}"
+                    ? $"{context.SystemPrompt}\n\n{PublicKnowledgePolicy.Instruction}"
                     : context.SystemPrompt,
                 MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
                 AllowPublicWebSearch = allowPublicWebSearch
@@ -528,7 +527,7 @@ public sealed class AiOrchestrationWorker(
                     conversationRepository, outboxRepository, auditLogRepository, handoffEventRepository,
                     quotaResult.Snapshot.EffectiveLimit,
                     checked(quotaResult.Snapshot.CommittedResponses + quotaResult.Snapshot.PendingReservations),
-                    cancellationToken, botConfigRepository);
+                    botConfigRepository, cancellationToken);
                 logger.LogWarning("Monthly AI response quota exhausted for tenant {TenantId}", message.TenantId);
                 return;
             }
@@ -546,8 +545,8 @@ public sealed class AiOrchestrationWorker(
                 responseQuotaFinalized = true;
                 await FinalizeUnavailableAiAsync(
                     message, conversation, botConfig, messageRepository, conversationRepository,
-                    outboxRepository, handoffEventRepository, dbContext, cancellationToken,
-                    botConfigRepository);
+                    outboxRepository, handoffEventRepository, dbContext, botConfigRepository,
+                    cancellationToken);
                 logger.LogWarning(
                     "AI provider circuit is open for tenant {TenantId} and provider {Provider}",
                     message.TenantId, credential.Provider);
@@ -580,7 +579,7 @@ public sealed class AiOrchestrationWorker(
                     var inferenceResponse = await aiProvider.GetResponseAsync(
                         request with
                         {
-                            SystemPrompt = $"{request.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.BuildInferenceInstruction()}"
+                            SystemPrompt = $"{request.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.InferenceInstruction}"
                         },
                         cancellationToken);
                     if (inferenceResponse.Decision.Action == AiAction.Reply)
@@ -701,7 +700,7 @@ public sealed class AiOrchestrationWorker(
             // the only customer-facing response for this routing decision.
             if (routingResult.QueueId is Guid routingQueueId && conversation.QueueId != routingQueueId)
             {
-                var selectedRoutingQueue = routingQueues.FirstOrDefault(queue => queue.Id == routingQueueId);
+                var selectedRoutingQueue = routingQueues.Find(queue => queue.Id == routingQueueId);
                 if (selectedRoutingQueue is not null)
                 {
                     await responseQuotaService.ReleaseAsync(
@@ -779,10 +778,9 @@ public sealed class AiOrchestrationWorker(
                         outboxRepository, handoffEventRepository, cancellationToken,
                         botConfigRepository: botConfigRepository);
                     logger.LogWarning(
-                        handedOff
-                            ? "AI returned an empty reply; conversation {ConversationId} transferred to human"
-                            : "AI returned an empty reply after BOT activation; conversation {ConversationId} remained automatic",
-                        message.ConversationId);
+                        "AI returned an empty reply; conversation {ConversationId} {Disposition}",
+                        message.ConversationId,
+                        handedOff ? "transferred to human" : "remained automatic after BOT activation");
                     return;
                 }
 
@@ -962,10 +960,9 @@ public sealed class AiOrchestrationWorker(
                         conversationRepository, outboxRepository, handoffEventRepository, cancellationToken,
                         botConfigRepository: botConfigRepository);
                     logger.LogWarning(
-                        handedOff
-                            ? "AI quota exhausted; conversation {ConversationId} transferred to human"
-                            : "AI quota exhausted after BOT activation; conversation {ConversationId} remained automatic",
-                        message.ConversationId);
+                        "AI quota exhausted; conversation {ConversationId} {Disposition}",
+                        message.ConversationId,
+                        handedOff ? "transferred to human" : "remained automatic after BOT activation");
                 }
                 else
                 {
@@ -994,10 +991,9 @@ public sealed class AiOrchestrationWorker(
                     conversationRepository, outboxRepository, handoffEventRepository, cancellationToken,
                     botConfigRepository: botConfigRepository);
                 logger.LogWarning(
-                    handedOff
-                        ? "AI retries exhausted; conversation {ConversationId} transferred to human"
-                        : "AI retries exhausted after BOT activation; conversation {ConversationId} remained automatic",
-                    message.ConversationId);
+                    "AI retries exhausted; conversation {ConversationId} {Disposition}",
+                    message.ConversationId,
+                    handedOff ? "transferred to human" : "remained automatic after BOT activation");
             }
             else
             {
@@ -1017,8 +1013,8 @@ public sealed class AiOrchestrationWorker(
         IOutboxMessageRepository outboxRepository,
         IHandoffEventRepository handoffEventRepository,
         AppDbContext dbContext,
-        CancellationToken cancellationToken,
-        IBotConfigurationRepository botConfigRepository)
+        IBotConfigurationRepository botConfigRepository,
+        CancellationToken cancellationToken)
     {
         if (!conversation.IsWindowOpen(DateTime.UtcNow))
         {
@@ -1047,8 +1043,8 @@ public sealed class AiOrchestrationWorker(
         IHandoffEventRepository handoffEventRepository,
         int? monthlyLimit,
         long monthlyResponsesUsed,
-        CancellationToken cancellationToken,
-        IBotConfigurationRepository botConfigRepository)
+        IBotConfigurationRepository botConfigRepository,
+        CancellationToken cancellationToken)
     {
         await dbContext.Entry(conversation).ReloadAsync(cancellationToken);
         if (!AiReplyDeliveryGuard.CanSend(
@@ -1304,16 +1300,16 @@ public sealed class AiOrchestrationWorker(
             ? activeQueues.FirstOrDefault(queue => queue.Id == currentQueueId)
             : null;
         var routingQueues = authorizedQueues ?? activeQueues;
-        var selectedQueue = SelectBotRoutingQueue(
+        var routedQueue = SelectBotRoutingQueue(
             conversation.QueueId, routingQueues, message.Content);
 
-        if (currentQueue is null && selectedQueue is null)
+        ServiceLine selectedQueue;
+        if (routedQueue is not null)
+            selectedQueue = routedQueue;
+        else if (currentQueue is not null)
+            selectedQueue = currentQueue;
+        else
             return false;
-
-        selectedQueue ??= currentQueue;
-        if (selectedQueue is null)
-            return false;
-
         var isWaitingInCurrentQueue = currentQueue is not null && currentQueue.Id == selectedQueue.Id;
         if (isWaitingInCurrentQueue && !includeWaitingResponse)
             return false;
@@ -1456,7 +1452,7 @@ public sealed class AiOrchestrationWorker(
         // A matching current assignment remains preferred, but an explicit keyword
         // may replace an earlier automatic classification while the bot owns the conversation.
         return assignedQueueId is Guid queueId
-            ? matchingQueues.FirstOrDefault(queue => queue.Id == queueId) ?? matchingQueues[0]
+            ? matchingQueues.Find(queue => queue.Id == queueId) ?? matchingQueues[0]
             : matchingQueues[0];
     }
 

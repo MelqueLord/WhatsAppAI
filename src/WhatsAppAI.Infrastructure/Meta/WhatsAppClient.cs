@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -119,16 +120,65 @@ internal sealed class WhatsAppClient(
         }
     }
 
-    public Task<SendMessageResult> SendMediaMessageAsync(
+    public async Task<SendMessageResult> SendMediaMessageAsync(
         string phoneNumberId, string accessToken, string recipientPhone,
         string mediaType, string mediaContent, string? caption, string? fileName,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new SendMessageResult
+        CancellationToken cancellationToken = default)
+    {
+        if (mediaType != "image" || !TryReadImageDataUrl(mediaContent, out var contentType, out var bytes))
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Unsupported image content." };
+
+        try
         {
-            IsSuccess = false,
-            IsRetryable = false,
-            ErrorMessage = "Media sending is not available yet."
-        });
+            using var upload = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(bytes);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            upload.Add(fileContent, "file", fileName ?? "image");
+            upload.Add(new StringContent("whatsapp"), "messaging_product");
+            upload.Add(new StringContent(contentType), "type");
+            using var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/{phoneNumberId}/media") { Content = upload };
+            uploadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var uploadResponse = await httpClient.SendAsync(uploadRequest, cancellationToken);
+            if (!uploadResponse.IsSuccessStatusCode)
+                return new SendMessageResult { IsSuccess = false, IsRetryable = uploadResponse.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)uploadResponse.StatusCode >= 500, ErrorMessage = "Failed to upload image." };
+
+            var media = await uploadResponse.Content.ReadFromJsonAsync<UploadMediaResponse>(cancellationToken: cancellationToken);
+            if (string.IsNullOrWhiteSpace(media?.Id))
+                return new SendMessageResult { IsSuccess = false, IsRetryable = true, ErrorMessage = "Image upload did not return an identifier." };
+
+            var payload = new SendImageMessageRequest
+            {
+                To = recipientPhone,
+                Image = new ImageBody { Id = media.Id, Caption = string.IsNullOrWhiteSpace(caption) ? null : caption }
+            };
+            using var sendRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/{phoneNumberId}/messages") { Content = JsonContent.Create(payload) };
+            sendRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var sendResponse = await httpClient.SendAsync(sendRequest, cancellationToken);
+            if (!sendResponse.IsSuccessStatusCode)
+                return new SendMessageResult { IsSuccess = false, IsRetryable = sendResponse.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)sendResponse.StatusCode >= 500, ErrorMessage = "Failed to send image." };
+
+            var sent = await sendResponse.Content.ReadFromJsonAsync<SendMessageResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult { IsSuccess = true, MessageId = sent?.Messages?.FirstOrDefault()?.Id };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send WhatsApp image");
+            return new SendMessageResult { IsSuccess = false, ErrorMessage = "Failed to send image." };
+        }
+    }
+
+    private static bool TryReadImageDataUrl(string value, out string contentType, out byte[] bytes)
+    {
+        contentType = string.Empty;
+        bytes = [];
+        var separator = value.IndexOf(',');
+        if (separator <= 5 || !value.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+            !value[..separator].EndsWith(";base64", StringComparison.OrdinalIgnoreCase)) return false;
+        contentType = value[5..(separator - ";base64".Length)];
+        if (contentType is not ("image/jpeg" or "image/png")) return false;
+        try { bytes = Convert.FromBase64String(value[(separator + 1)..]); return bytes.Length is > 0 and <= 5 * 1024 * 1024; }
+        catch (FormatException) { return false; }
+    }
 
     public async Task<SendMessageResult> SendTemplateMessageAsync(
         string phoneNumberId,
@@ -320,7 +370,7 @@ internal sealed class WhatsAppClient(
     {
         var body = components?.FirstOrDefault(component =>
             string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase));
-        return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Matches(body.Text, @"\{\{\d+\}\}").Count;
+        return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Count(body.Text, @"\{\{\d+\}\}");
     }
 
     private static bool HasOnlySupportedTemplateComponents(IReadOnlyList<TemplateListComponent>? components) =>
@@ -467,6 +517,33 @@ internal sealed class SendMessageResponse
 {
     [JsonPropertyName("messages")]
     public List<MessageId>? Messages { get; init; }
+}
+
+internal sealed class UploadMediaResponse
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+}
+
+internal sealed class SendImageMessageRequest
+{
+    [JsonPropertyName("messaging_product")]
+    public string MessagingProduct { get; init; } = "whatsapp";
+    [JsonPropertyName("to")]
+    public string To { get; init; } = string.Empty;
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "image";
+    [JsonPropertyName("image")]
+    public ImageBody Image { get; init; } = new();
+}
+
+internal sealed class ImageBody
+{
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = string.Empty;
+    [JsonPropertyName("caption")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Caption { get; init; }
 }
 
 internal sealed class MessageId

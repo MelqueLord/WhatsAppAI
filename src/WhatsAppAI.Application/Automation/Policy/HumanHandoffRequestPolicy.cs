@@ -36,7 +36,7 @@ public static class HumanHandoffRequestPolicy
     public static bool IsExplicitHumanRequest(string? messageContent)
     {
         var normalizedMessage = $" {Normalize(messageContent)} ";
-        return HumanRequestTerms.Any(term =>
+        return Array.Exists(HumanRequestTerms, term =>
             normalizedMessage.Contains($" {Normalize(term)} ", StringComparison.Ordinal));
     }
 

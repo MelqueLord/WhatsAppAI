@@ -58,6 +58,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ContactImportService>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<IOutboundMediaAttachmentRepository, OutboundMediaAttachmentRepository>();
         services.AddScoped<IHandoffEventRepository, HandoffEventRepository>();
         services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<IAiProviderCredentialRepository, AiProviderCredentialRepository>();

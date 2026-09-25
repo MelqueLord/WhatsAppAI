@@ -58,7 +58,7 @@ public static class AiFeedbackEndpoints
         if (currentTenant.UserRole == "Operator")
         {
             var membership = await membershipRepository.GetByUserAndTenantAsync(
-                currentTenant.UserId.Value, currentTenant.TenantId.Value);
+                currentTenant.UserId.Value, currentTenant.TenantId.Value, cancellationToken);
             if (membership is null || !membership.CanAccessQueue(conversation.QueueId))
                 return Results.Forbid();
         }

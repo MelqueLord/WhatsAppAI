@@ -7,7 +7,7 @@ public sealed class NaturalResponsePolicyTests
     [Fact]
     public void BuildInstructions_PrioritizesContextualConversationalReplies()
     {
-        var instructions = NaturalResponsePolicy.BuildInstructions();
+        var instructions = NaturalResponsePolicy.Instructions;
 
         Assert.Contains("comece pela resposta mais útil", instructions, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("histórico", instructions, StringComparison.OrdinalIgnoreCase);

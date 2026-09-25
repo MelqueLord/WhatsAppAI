@@ -44,7 +44,7 @@ public sealed class BroadcastList
 
         if (deliveryMode == BroadcastDeliveryMode.OfficialApiTemplate &&
             (string.IsNullOrWhiteSpace(templateName) || string.IsNullOrWhiteSpace(templateLanguage) || string.IsNullOrWhiteSpace(linePhoneNumberId)))
-            throw new ArgumentException("Official template broadcasts require a line, template name and language.");
+            throw new ArgumentException("Official template broadcasts require a line, template name and language.", nameof(templateName));
 
         return new BroadcastList
         {

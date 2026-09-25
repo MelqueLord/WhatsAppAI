@@ -35,13 +35,13 @@ public static class PublicKnowledgePolicy
             return false;
 
         var normalized = Normalize(customerMessage);
-        if (RestrictedCompanyFacts.Any(normalized.Contains) || SensitiveTopics.Any(normalized.Contains))
+        if (Array.Exists(RestrictedCompanyFacts, normalized.Contains) || Array.Exists(SensitiveTopics, normalized.Contains))
             return false;
 
-        return GenericQuestionSignals.Any(normalized.Contains);
+        return Array.Exists(GenericQuestionSignals, normalized.Contains);
     }
 
-    public static string BuildInstruction() =>
+    public const string Instruction =
         "Conhecimento público permitido: esta é uma pergunta genérica sem fato correspondente da empresa. Você pode usar conhecimento público geral e, quando o provedor disponibilizar, pesquisa web atual. Diferencie claramente conhecimento geral de fatos da empresa. Não atribua à empresa preço, prazo, serviço, disponibilidade, política ou promessa que não esteja no contexto autorizado. Não inclua links, citações ou Markdown na resposta ao cliente.";
 
     private static string Normalize(string value)

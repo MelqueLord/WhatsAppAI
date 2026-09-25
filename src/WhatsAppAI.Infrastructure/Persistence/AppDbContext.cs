@@ -35,6 +35,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<OutboundMediaAttachment> OutboundMediaAttachments => Set<OutboundMediaAttachment>();
     public DbSet<HandoffEvent> HandoffEvents => Set<HandoffEvent>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AiProviderCredential> AiProviderCredentials => Set<AiProviderCredential>();
@@ -80,6 +81,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Conversation>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Message>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<OutboundMediaAttachment>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OutboxMessage>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);

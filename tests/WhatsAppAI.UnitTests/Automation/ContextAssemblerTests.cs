@@ -440,7 +440,7 @@ public sealed class ContextAssemblerTests
         };
 
         Assert.True(KnownKnowledgeResponsePolicy.ShouldRequestInference(response, ["Serviço: Fato autorizado."]));
-        Assert.Contains("combinação de fatos compatíveis", KnownKnowledgeResponsePolicy.BuildInferenceInstruction(), StringComparison.Ordinal);
+        Assert.Contains("combinação de fatos compatíveis", KnownKnowledgeResponsePolicy.InferenceInstruction, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -600,7 +600,7 @@ public sealed class ContextAssemblerTests
     }
 
     [Fact]
-    public void ContextAssembler_PricingQuestionPrefersPricingCategoryItems()
+    public async Task ContextAssembler_PricingQuestionPrefersPricingCategoryItems()
     {
         var tenantId = Guid.NewGuid();
         var knowledge = new FakeKnowledgeRepository(
@@ -610,13 +610,13 @@ public sealed class ContextAssemblerTests
             KnowledgeItem.Create(tenantId, "Atendimento", "Atendemos pelo WhatsApp.", 100)
         ]);
 
-        var context = new ContextAssembler(
+        var context = await new ContextAssembler(
             new FakeConversationQueries([]),
             knowledge).BuildSimulationAsync(
                 tenantId,
                 "Quais são os preços?",
                 null,
-                CancellationToken.None).GetAwaiter().GetResult();
+                cancellationToken: CancellationToken.None);
 
         Assert.Contains("Plano real", context.SystemPrompt, StringComparison.Ordinal);
         Assert.DoesNotContain("Plano antigo", context.SystemPrompt, StringComparison.Ordinal);
@@ -774,7 +774,7 @@ public sealed class ContextAssemblerTests
                 tenantId,
                 "Qual o preço da consulta? Meu e-mail é cliente@example.com",
                 "Seja acolhedor.",
-                CancellationToken.None);
+                cancellationToken: CancellationToken.None);
 
         Assert.Single(context.Messages);
         Assert.Contains("[redacted]", context.Messages[0].Content, StringComparison.Ordinal);
@@ -1046,7 +1046,7 @@ public sealed class ContextAssemblerTests
 
         public Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
             Guid tenantId, Guid conversationId, CursorPaginationRequest request,
-            CancellationToken cancellationToken = default, Guid? throughMessageId = null)
+            Guid? throughMessageId = null, CancellationToken cancellationToken = default)
         {
             var selected = messages;
             if (throughMessageId.HasValue)

@@ -39,7 +39,7 @@ public static class CustomerServicePersonalizationPolicy
         var builder = new StringBuilder(normalized.Length);
         foreach (var character in normalized)
         {
-            if (char.IsLetter(character) || character is ' ' or '-' or '\'' or '’')
+            if (char.IsLetter(character) || character is ' ' or '\'' or '’')
                 builder.Append(character);
         }
 

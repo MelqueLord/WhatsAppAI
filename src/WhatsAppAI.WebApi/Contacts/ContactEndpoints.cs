@@ -443,7 +443,7 @@ public static class ContactEndpoints
 
         if (!string.IsNullOrWhiteSpace(requestedPhoneNumberId))
         {
-            var selected = accounts.FirstOrDefault(account =>
+            var selected = accounts.Find(account =>
                 account.PhoneNumberId == requestedPhoneNumberId);
             if (selected is null)
                 return null;
@@ -451,13 +451,9 @@ public static class ContactEndpoints
             if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
             {
                 var membership = await membershipRepository.GetByUserAndTenantAsync(
-                    currentTenant.UserId.Value, tenantId);
+                    currentTenant.UserId.Value, tenantId, cancellationToken);
                 membership?.LoadAssignedLinesFromJson();
-                var assignedLines = membership is not null && membership.AssignedLines.Count > 0
-                    ? membership.AssignedLines
-                    : membership?.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
-                        ? [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)]
-                        : [];
+                var assignedLines = ResolveAssignedLines(membership);
                 if (!assignedLines.Any(line =>
                         line.ConnectionType == selected.ConnectionType &&
                         line.LineNumber == selected.LineNumber))
@@ -470,19 +466,15 @@ public static class ContactEndpoints
         if (currentTenant.UserRole == "Operator" && currentTenant.UserId is not null)
         {
             var membership = await membershipRepository.GetByUserAndTenantAsync(
-                currentTenant.UserId.Value, tenantId);
+                currentTenant.UserId.Value, tenantId, cancellationToken);
             if (membership is not null)
             {
                 membership.LoadAssignedLinesFromJson();
-                var assignedLines = membership.AssignedLines.Count > 0
-                    ? membership.AssignedLines
-                    : membership.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
-                        ? [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)]
-                        : [];
+                var assignedLines = ResolveAssignedLines(membership);
 
                 foreach (var line in assignedLines)
                 {
-                    var assignedAccount = accounts.FirstOrDefault(account =>
+                    var assignedAccount = accounts.Find(account =>
                         account.ConnectionType == line.ConnectionType &&
                         account.LineNumber == line.LineNumber);
                     if (assignedAccount is not null)
@@ -511,6 +503,17 @@ public static class ContactEndpoints
             .OrderBy(account => account.LineNumber)
             .Select(account => account.PhoneNumberId)
             .FirstOrDefault();
+    }
+
+    private static IReadOnlyList<LineAssignment> ResolveAssignedLines(TenantMembership? membership)
+    {
+        if (membership is null)
+            return [];
+        if (membership.AssignedLines.Count > 0)
+            return membership.AssignedLines;
+        return membership.AssignedConnectionType is not null && membership.AssignedLineNumber is not null
+            ? [new LineAssignment(membership.AssignedConnectionType.Value, membership.AssignedLineNumber.Value)]
+            : [];
     }
 
     private static async Task<IResult> DeleteContactAsync(

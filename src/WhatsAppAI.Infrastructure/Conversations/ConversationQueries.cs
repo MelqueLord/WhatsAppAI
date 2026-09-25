@@ -148,7 +148,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 
     public async Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
         Guid tenantId, Guid conversationId, CursorPaginationRequest request,
-        CancellationToken cancellationToken = default, Guid? throughMessageId = null)
+        Guid? throughMessageId = null, CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
 
@@ -232,18 +232,26 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 .Where(interaction => interaction.ResponseMessageId.HasValue)
                 .ToDictionary(interaction => interaction.ResponseMessageId!.Value);
             messages = messages
-                .Select(message => interactionByMessageId.TryGetValue(message.Id, out var interaction)
-                    ? message with
+                .Select(message =>
+                {
+                    if (!interactionByMessageId.TryGetValue(message.Id, out var interaction))
+                        return message;
+
+                    AiFeedbackDto? feedback = null;
+                    if (interaction.FeedbackRating.HasValue)
+                    {
+                        feedback = new AiFeedbackDto(
+                            interaction.FeedbackRating.Value.ToString(),
+                            interaction.FeedbackNote,
+                            interaction.CorrectedResponse);
+                    }
+
+                    return message with
                     {
                         AiInteractionId = interaction.Id,
-                        AiFeedback = interaction.FeedbackRating.HasValue
-                            ? new AiFeedbackDto(
-                                interaction.FeedbackRating.Value.ToString(),
-                                interaction.FeedbackNote,
-                                interaction.CorrectedResponse)
-                            : null
-                    }
-                    : message)
+                        AiFeedback = feedback
+                    };
+                })
                 .ToList();
         }
 

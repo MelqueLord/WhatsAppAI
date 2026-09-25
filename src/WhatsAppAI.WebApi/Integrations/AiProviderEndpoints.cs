@@ -567,15 +567,15 @@ public static class AiProviderEndpoints
             credential.SystemPrompt,
             tenant?.Name);
         var simulationContext = await contextAssembler.BuildSimulationAsync(
-            currentTenant.TenantId.Value,
-            request.Message,
-            credential.SystemPrompt,
-            httpContext.RequestAborted,
-            welcomeMessage,
-            tenant?.Name,
-            routingQueues
+            tenantId: currentTenant.TenantId.Value,
+            message: request.Message,
+            systemPrompt: credential.SystemPrompt,
+            welcomeMessage: welcomeMessage,
+            businessName: tenant?.Name,
+            routingQueues: routingQueues
                 .Select(queue => new RoutingQueueContext(queue.Name, queue.Description))
-                .ToList());
+                .ToList(),
+            cancellationToken: httpContext.RequestAborted);
         var allowPublicWebSearch = PublicKnowledgePolicy.CanUsePublicKnowledge(
             request.Message,
             simulationContext.RelevantKnowledge);
@@ -584,7 +584,7 @@ public static class AiProviderEndpoints
             ModelId = credential.ModelId,
             ApiKey = apiKey,
             SystemPrompt = allowPublicWebSearch
-                ? $"{simulationContext.SystemPrompt}\n\n{PublicKnowledgePolicy.BuildInstruction()}"
+                ? $"{simulationContext.SystemPrompt}\n\n{PublicKnowledgePolicy.Instruction}"
                 : simulationContext.SystemPrompt,
             MaxTokens = Math.Clamp(credential.MaxTokensPerResponse, 48, 120),
             Messages = simulationContext.Messages,
@@ -608,7 +608,7 @@ public static class AiProviderEndpoints
             var inferenceResponse = await aiProvider.GetResponseAsync(
                 simulationRequest with
                 {
-                    SystemPrompt = $"{simulationRequest.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.BuildInferenceInstruction()}"
+                    SystemPrompt = $"{simulationRequest.SystemPrompt}\n\n{KnownKnowledgeResponsePolicy.InferenceInstruction}"
                 });
             if (inferenceResponse.Decision.Action == AiAction.Reply)
             {

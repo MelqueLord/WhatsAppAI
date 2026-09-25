@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using System.Diagnostics.CodeAnalysis;
 
 #nullable disable
 
 namespace WhatsAppAI.Infrastructure.Migrations;
 
+[SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "EF Core migration names are part of migration history.")]
 public partial class AddContactImportQueue : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

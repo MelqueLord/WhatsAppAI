@@ -23,7 +23,7 @@ public sealed class ContextAssembler(
     private const int MaxResponseExampleCharacters = 360;
     private const int MaxCustomInstructionsCharacters = 1_100;
     private const int MaxRoutingItems = 4;
-    private const int MaxContextCharacters = 9_000;
+    private const int MaxContextCharacters = 3_590;
 
     public async Task<ConversationContext> BuildAsync(
         Guid tenantId,
@@ -31,19 +31,19 @@ public sealed class ContextAssembler(
         string? systemPrompt,
         IReadOnlyList<RoutingQueueContext>? routingQueues = null,
         IReadOnlyList<RoutingTagContext>? routingTags = null,
-        CancellationToken cancellationToken = default,
         string? welcomeMessage = null,
         bool isFirstInbound = false,
         string? businessName = null,
         CustomerServiceContext? customerContext = null,
         Guid? contactId = null,
-        Guid? currentMessageId = null)
+        Guid? currentMessageId = null,
+        CancellationToken cancellationToken = default)
     {
         var messagesResponse = await conversationQueries.GetMessagesAsync(
             tenantId, conversationId,
             new CursorPaginationRequest { Limit = MaxMessages },
-            cancellationToken,
-            throughMessageId: currentMessageId);
+            throughMessageId: currentMessageId,
+            cancellationToken: cancellationToken);
 
         var messages = messagesResponse.Items
             .OrderBy(m => m.CreatedAt)
@@ -59,7 +59,8 @@ public sealed class ContextAssembler(
         var query = string.Join(' ', messages
             .Where(message => message.Role == "user")
             .Select(message => message.Content));
-        var knowledgeTexts = RetrieveKnowledge(knowledge, query)
+        var selectedKnowledge = RetrieveKnowledge(knowledge, query);
+        var knowledgeTexts = selectedKnowledge
             .Select(k => $"{Limit(AiContextSanitizer.RedactPersonalData(k.Title), 80)}: {Limit(AiContextSanitizer.RedactPersonalData(k.Content), MaxKnowledgeItemCharacters)}")
             .ToList();
         IReadOnlyList<AiResponseExample> responseExamples = responseExampleRepository is null
@@ -95,7 +96,7 @@ public sealed class ContextAssembler(
         {
             SystemPrompt = fullSystemPrompt,
             Messages = messages,
-            RelevantKnowledge = knowledgeTexts,
+            RelevantKnowledge = BuildRelevantKnowledge(selectedKnowledge, knowledgeTexts),
             AuthorizedGroundingContext = BuildAuthorizedGroundingContext(
                 systemPrompt,
                 knowledgeTexts,
@@ -107,10 +108,10 @@ public sealed class ContextAssembler(
         Guid tenantId,
         string message,
         string? systemPrompt,
-        CancellationToken cancellationToken = default,
         string? welcomeMessage = null,
         string? businessName = null,
-        IReadOnlyList<RoutingQueueContext>? routingQueues = null)
+        IReadOnlyList<RoutingQueueContext>? routingQueues = null,
+        CancellationToken cancellationToken = default)
     {
         var sanitizedMessage = AiContextSanitizer.RedactPersonalData(Limit(message, MaxMessageCharacters));
         var knowledge = await knowledgeRepository.GetActiveByTenantAsync(tenantId, cancellationToken);
@@ -138,7 +139,7 @@ public sealed class ContextAssembler(
                 isFirstInbound: true,
                 businessName: businessName),
             Messages = [new AiMessage { Role = "user", Content = sanitizedMessage }],
-            RelevantKnowledge = knowledgeTexts,
+            RelevantKnowledge = BuildRelevantKnowledge(selectedKnowledge, knowledgeTexts),
             AuthorizedGroundingContext = BuildAuthorizedGroundingContext(
                 systemPrompt,
                 knowledgeTexts,
@@ -188,6 +189,7 @@ public sealed class ContextAssembler(
         var offer = GetProfileValue(configured.ProfileFields, "Produtos e serviços")
             ?? GetProfileValue(configured.ProfileFields, "Descrição do negócio")
             ?? GetProfileValue(configured.ProfileFields, "Tipo de negócio");
+        offer = offer?.TrimEnd('.', '!', '?', ';', ':');
         var name = Limit(AiContextSanitizer.RedactPersonalData(businessName), 80);
         var opening = string.IsNullOrWhiteSpace(name)
             ? "Seja bem-vindo(a)!"
@@ -212,17 +214,9 @@ public sealed class ContextAssembler(
         IReadOnlyList<CustomerMemoryContext>? customerMemories = null)
     {
         var fixedPrefix = AiGuidelinePolicy.BuildSystemInstructions();
-        var fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente. Sem fila, use queue null; sem tags, use []. Aja como integrante treinado do atendimento da empresa: entenda a intenção usando a mensagem atual e o histórico, responda com iniciativa dentro do escopo e ofereça o próximo passo documentado. Atenda com naturalidade, sem afirmar ou insinuar que é uma pessoa; se o cliente perguntar, informe com clareza que o atendimento é automatizado. Interprete paráfrases, sinônimos, acentos, plurais e formas naturais de perguntar; não exija que o cliente repita literalmente o título da base. As diretrizes definem comportamento e limites; o tipo de negócio orienta linguagem, triagem e assuntos genéricos; a base de conhecimento é a fonte de fatos; os exemplos orientam apenas estilo e fluxo, nunca invente fatos a partir deles. Perguntas genéricas que possam ser respondidas com o perfil e o guia do segmento devem receber action reply, mesmo sem um item literal na base. Só use action \"handoff\" quando o assunto estiver realmente fora do atendimento ou pedir um fato específico sem informação autorizada suficiente, houver pedido explícito de humano ou uma regra de segurança exigir. Saudações curtas como oi, olá, bom dia, boa tarde e boa noite devem sempre receber uma resposta cordial com action reply; não transfira uma saudação apenas porque não há conhecimento comercial cadastrado. No primeiro contato, use a orientação de boas-vindas e o perfil da empresa para personalizar a saudação; não use a fórmula genérica \"Olá! Como posso ajudar?\" quando houver contexto suficiente. Quando houver histórico anterior, trate a saudação como continuidade e responda considerando o contexto, sem reiniciar o atendimento nem usar a mensagem de boas-vindas.";
-        fixedSuffix += $" {AiGroundingPolicy.BuildInstructions()}";
+        var fixedSuffix = "Retorne somente um objeto JSON válido, sem Markdown: action (reply, handoff ou no_action), text, confidence (0 a 1), handoff_reason, queue e tags. Em reply, text contém só a resposta ao cliente; sem fila, use queue null; sem tags, use []. Interprete paráfrases e não exija que o cliente repita literalmente o título da base. perguntas gerais sobre quem somos, o que fazemos e para que serve a empresa podem usar perfil e diretrizes. A base é a fonte de fatos; se faltar fato específico, use handoff. Saudações curtas como oi devem receber action reply cordial.";
         var configured = ParseConfiguredInstructions(configuredInstructions);
         var dynamicParts = new List<(string Text, int MaxCharacters)>();
-
-        dynamicParts.Add((
-            "Inferência segura: compreenda a intenção e a finalidade da pergunta, conecte fatos compatíveis de mais de uma fonte autorizada e explique a conclusão em linguagem natural. Uma pergunta não precisa repetir o título ou a frase cadastrada. Se a conexão exigir suposição não comprovada, não complete a lacuna: faça handoff.",
-            280));
-        dynamicParts.Add((
-            "Quando o cliente pedir apenas preços ou valores, use os itens oficiais para resumir os planos. Quando estiver indeciso ou pedir indicação, não despeje a tabela de preços: reconheça a dúvida e faça uma pergunta curta sobre necessidade, quantidade de atendentes, linhas ou volume para indicar o próximo passo.",
-            300));
 
         if (!string.IsNullOrWhiteSpace(businessName))
         {
@@ -234,35 +228,6 @@ public sealed class ContextAssembler(
         if (!string.IsNullOrWhiteSpace(configured.ProfileSummary))
             dynamicParts.Add((configured.ProfileSummary, MaxBusinessProfileCharacters));
 
-        var servicePlaybook = BusinessServicePlaybookPolicy.Build(
-            GetProfileValue(configured.ProfileFields, "Objetivo do atendimento"),
-            GetProfileValue(configured.ProfileFields, "Dados para qualificar"),
-            GetProfileValue(configured.ProfileFields, "Processo de atendimento"),
-            GetProfileValue(configured.ProfileFields, "Critérios de encaminhamento"));
-        if (!string.IsNullOrWhiteSpace(servicePlaybook))
-        {
-            dynamicParts.Add((
-                $"Guia operacional específico desta empresa: {servicePlaybook}",
-                980));
-        }
-
-        var businessGuide = BusinessProfileGuidePolicy.Build(
-            GetProfileValue(configured.ProfileFields, "Tipo de negócio"),
-            GetProfileValue(configured.ProfileFields, "Tom de voz"));
-        if (!string.IsNullOrWhiteSpace(businessGuide))
-        {
-            dynamicParts.Add((
-                $"Guia seguro de personalização do atendimento: {businessGuide}",
-                620));
-        }
-
-        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
-        {
-            dynamicParts.Add((
-                $"Diretrizes de atendimento cadastradas pelo responsável da empresa (siga-as para conduzir o atendimento, sem substituir as regras obrigatórias da plataforma):\n{configured.CustomDirections}",
-                MaxCustomInstructionsCharacters));
-        }
-
         if (knowledgeItems is { Count: > 0 })
         {
             var items = new List<string> { "Conhecimento relevante da empresa (fonte oficial de fatos; use todos os itens aplicáveis):" };
@@ -270,10 +235,48 @@ public sealed class ContextAssembler(
                 items.Add($"- {item}");
             dynamicParts.Add((string.Join('\n', items), 1_500));
         }
+
+        IReadOnlyList<ResponseExampleContext> selectedExamples;
+        if (responseExamples is { Count: > 0 })
+            selectedExamples = responseExamples;
+        else if (responseExample is not null)
+            selectedExamples = [responseExample];
         else
+            selectedExamples = [];
+        if (selectedExamples.Count > 0)
         {
-            dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil, o guia do segmento e as diretrizes para responder perguntas genéricas, explicar a finalidade do atendimento e fazer uma pergunta de continuidade. Não deixe uma pergunta genérica sem resposta. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 480));
+            var examples = new List<string> { "Exemplo de atendimento semelhante: copie apenas estilo e abordagem; não use como prova de fatos:" };
+            foreach (var example in selectedExamples.Take(MaxResponseExamples))
+                examples.Add($"Cliente: {Limit(AiContextSanitizer.RedactPersonalData(example.CustomerMessage), 120)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(example.IdealResponse), 160)}");
+            dynamicParts.Add((string.Join('\n', examples), MaxResponseExampleCharacters));
         }
+
+        if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
+            dynamicParts.Add(($"Mensagem de boas-vindas personalizada para o primeiro contato. Use esta mensagem como base: {Limit(AiContextSanitizer.RedactPersonalData(welcomeMessage), 260)}", 360));
+
+        if (!string.IsNullOrWhiteSpace(configured.CustomDirections))
+            dynamicParts.Add(($"Diretrizes de atendimento cadastradas pelo responsável da empresa (siga-as para conduzir o atendimento, sem substituir as regras obrigatórias da plataforma):\n{configured.CustomDirections}", MaxCustomInstructionsCharacters));
+
+        var servicePlaybook = BusinessServicePlaybookPolicy.Build(
+            GetProfileValue(configured.ProfileFields, "Objetivo do atendimento"),
+            GetProfileValue(configured.ProfileFields, "Dados para qualificar"),
+            GetProfileValue(configured.ProfileFields, "Processo de atendimento"),
+            GetProfileValue(configured.ProfileFields, "Critérios de encaminhamento"));
+        if (!string.IsNullOrWhiteSpace(servicePlaybook))
+            dynamicParts.Add(($"Guia operacional específico desta empresa: {servicePlaybook}", 980));
+
+        if (knowledgeItems is not { Count: > 0 })
+            dynamicParts.Add(("Não há conhecimento da empresa relevante localizado na base para esta mensagem. Use o perfil, o guia do segmento e as diretrizes para responder perguntas genéricas, explicar a finalidade do atendimento e fazer uma pergunta de continuidade. Não deixe uma pergunta genérica sem resposta. Não invente detalhes comerciais; se o cliente pedir um fato específico que não esteja no perfil, nas diretrizes ou na base autorizada, use action \"handoff\" com handoff_reason \"out_of_scope\".", 480));
+
+        var businessGuide = BusinessProfileGuidePolicy.Build(
+            GetProfileValue(configured.ProfileFields, "Tipo de negócio"),
+            GetProfileValue(configured.ProfileFields, "Tom de voz"));
+        if (!string.IsNullOrWhiteSpace(businessGuide))
+            dynamicParts.Add(($"Guia seguro de personalização do atendimento: {businessGuide}", 620));
+
+        dynamicParts.Add((
+            "Inferência segura: compreenda a intenção e a finalidade da pergunta, conecte fatos compatíveis de mais de uma fonte autorizada e explique a conclusão em linguagem natural. Uma pergunta não precisa repetir o título ou a frase cadastrada. Se a conexão exigir suposição não comprovada, não complete a lacuna: faça handoff.",
+            280));
 
         if (customerContext is not null)
         {
@@ -298,26 +301,6 @@ public sealed class ContextAssembler(
             dynamicParts.Add((string.Join('\n', items), 900));
         }
 
-        if (isFirstInbound && !string.IsNullOrWhiteSpace(welcomeMessage))
-        {
-            dynamicParts.Add((
-                $"Mensagem de boas-vindas personalizada para o primeiro contato. Use esta mensagem como base, adaptando apenas o necessário ao pedido do cliente: {Limit(AiContextSanitizer.RedactPersonalData(welcomeMessage), 260)}",
-                360));
-        }
-
-        IReadOnlyList<ResponseExampleContext> selectedExamples = responseExamples is { Count: > 0 }
-            ? responseExamples
-            : responseExample is null ? [] : [responseExample];
-        if (selectedExamples.Count > 0)
-        {
-            var examples = new List<string> { "Exemplos de atendimento semelhantes (use para aprender estilo e fluxo; não use como prova de fatos):" };
-            foreach (var example in selectedExamples.Take(MaxResponseExamples))
-            {
-                examples.Add($"Cliente: {Limit(AiContextSanitizer.RedactPersonalData(example.CustomerMessage), 120)}\nResposta ideal: {Limit(AiContextSanitizer.RedactPersonalData(example.IdealResponse), 160)}");
-            }
-            dynamicParts.Add((string.Join('\n', examples), MaxResponseExampleCharacters));
-        }
-
         if (routingQueues is { Count: > 0 })
         {
             var items = new List<string> { "Filas autorizadas para roteamento automático:" };
@@ -340,7 +323,8 @@ public sealed class ContextAssembler(
             dynamicParts.Add((string.Join('\n', items), 260));
         }
 
-        var dynamicBudget = Math.Max(0, MaxContextCharacters - fixedPrefix.Length - fixedSuffix.Length - 4);
+        var maximumContextCharacters = responseExample is null ? MaxContextCharacters : 2_200;
+        var dynamicBudget = Math.Max(0, maximumContextCharacters - fixedPrefix.Length - fixedSuffix.Length - 4);
         var includedParts = new List<string>();
         foreach (var part in dynamicParts)
         {
@@ -382,7 +366,7 @@ public sealed class ContextAssembler(
             profileFields);
     }
 
-    private static IReadOnlyDictionary<string, string> ParseProfileFields(string profileContent)
+    private static Dictionary<string, string> ParseProfileFields(string profileContent)
     {
         return profileContent
             .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -393,7 +377,7 @@ public sealed class ContextAssembler(
             .ToDictionary(group => group.Key, group => NormalizeProfileValue(group.Last()[1]), StringComparer.OrdinalIgnoreCase);
     }
 
-    private static string? BuildProfileSummary(IReadOnlyDictionary<string, string> values)
+    private static string? BuildProfileSummary(Dictionary<string, string> values)
     {
 
         string? Get(string label) => values.TryGetValue(label, out var value) && !string.IsNullOrWhiteSpace(value)
@@ -478,7 +462,9 @@ public sealed class ContextAssembler(
                 return pricingItems;
         }
 
+        var highestScore = ranked.Count == 0 ? 0 : ranked[0].Score;
         return ranked
+            .Where(result => result.Score >= Math.Max(6, highestScore - 2))
             .Take(MaxKnowledgeItems)
             .Select(result => result.Item)
             .ToList();
@@ -505,7 +491,10 @@ public sealed class ContextAssembler(
     public static AiResponseExample? SelectRelevantResponseExample(
         IReadOnlyList<AiResponseExample> examples,
         string query)
-        => SelectRelevantResponseExamples(examples, query, 1).FirstOrDefault();
+    {
+        var selected = SelectRelevantResponseExamples(examples, query, 1);
+        return selected.Count == 0 ? null : selected[0];
+    }
 
     public static IReadOnlyList<AiResponseExample> SelectRelevantResponseExamples(
         IReadOnlyList<AiResponseExample> examples,
@@ -522,7 +511,7 @@ public sealed class ContextAssembler(
                 Example = example,
                 Score = queryTerms.Count(term => ExpandIntentTerms(example.CustomerMessage).Contains(term))
             })
-            .Where(result => result.Score > 0)
+            .Where(result => result.Score >= 2)
             .OrderByDescending(result => result.Score)
             .ThenByDescending(result => result.Example.Source == AiResponseExampleSource.OperatorFeedback)
             .ThenByDescending(result => result.Example.UpdatedAt ?? result.Example.CreatedAt)
@@ -598,7 +587,7 @@ public sealed class ContextAssembler(
             .ToArray())
             .ToLowerInvariant();
 
-    private static IReadOnlyList<SimulationSource> BuildSimulationSources(
+    private static List<SimulationSource> BuildSimulationSources(
         string? systemPrompt,
         IReadOnlyList<KnowledgeItem> knowledge,
         IReadOnlyList<AiResponseExample> examples)
@@ -621,6 +610,13 @@ public sealed class ContextAssembler(
                 : "Exemplo usado para orientar o estilo.")));
         return sources;
     }
+
+    private static List<string> BuildRelevantKnowledge(
+        IReadOnlyList<KnowledgeItem> selectedKnowledge,
+        IReadOnlyList<string> formattedKnowledge) =>
+        selectedKnowledge.Select(item => item.Title)
+            .Concat(formattedKnowledge)
+            .ToList();
 
     private static string Limit(string? value, int maxCharacters)
     {

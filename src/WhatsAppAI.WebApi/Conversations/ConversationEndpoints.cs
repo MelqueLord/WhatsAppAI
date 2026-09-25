@@ -414,7 +414,10 @@ public static class ConversationEndpoints
         if (file is null || file.Length == 0 || file.Length > maxBytes)
             return Results.BadRequest(new { error = "Attachment must be between 1 byte and 16 MB." });
 
-        var contentType = file.ContentType?.Split(';')[0].Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(file.ContentType))
+            return Results.BadRequest(new { error = "Attachment content type is required." });
+
+        var contentType = file.ContentType.Split(';')[0].Trim().ToLowerInvariant();
         var messageType = contentType switch
         {
             var type when type.StartsWith("image/") => MessageType.Image,
@@ -599,12 +602,17 @@ public static class ConversationEndpoints
     private static bool HasAssignedLine(
         TenantMembership? membership,
         WhatsAppConnectionType connectionType,
-        int lineNumber) =>
-        membership?.AssignedLines.Any(line =>
-            line.ConnectionType == connectionType && line.LineNumber == lineNumber) == true ||
-        (membership?.AssignedLines.Count == 0 &&
-         membership?.AssignedConnectionType == connectionType &&
-         membership?.AssignedLineNumber == lineNumber);
+        int lineNumber)
+    {
+        if (membership is null)
+            return false;
+
+        return membership.AssignedLines.Any(line =>
+            line.ConnectionType == connectionType && line.LineNumber == lineNumber) ||
+            (membership.AssignedLines.Count == 0 &&
+             membership.AssignedConnectionType == connectionType &&
+             membership.AssignedLineNumber == lineNumber);
+    }
 
     // Resolves all assigned lines of a membership to their WhatsApp account PhoneNumberIds.
     // Falls back to the legacy single-line fields when AssignedLines is empty.

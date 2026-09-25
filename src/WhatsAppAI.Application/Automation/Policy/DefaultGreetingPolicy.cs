@@ -6,7 +6,7 @@ namespace WhatsAppAI.Application.Automation.Policy;
 
 public static class DefaultGreetingPolicy
 {
-    private static readonly IReadOnlySet<string> Greetings = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly HashSet<string> Greetings = new(StringComparer.Ordinal)
     {
         "oi",
         "ola",
@@ -22,7 +22,7 @@ public static class DefaultGreetingPolicy
         "boa noite tudo bem"
     };
 
-    private static readonly IReadOnlySet<string> GenericGreetings = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly HashSet<string> GenericGreetings = new(StringComparer.Ordinal)
     {
         "ola como posso ajudar",
         "ola como podemos ajudar",
