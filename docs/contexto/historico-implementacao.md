@@ -225,7 +225,7 @@ filtro **Conversas encerradas**, com status `Closed`, atribuição ativa removid
 histórico preservado. O backend continua mantendo a proteção de concorrência e
 o retorno automático da conversa quando o cliente enviar nova mensagem.
 
-## 16. Nome do contato vindo do WhatsApp (2026-09-05)
+## 16. Nome do contato vindo do WhatsApp (2026-09-05; revisado em 2026-09-25)
 
 O recebimento de contatos passou a priorizar o nome enviado pelo WhatsApp na
 mensagem e no catálogo de contatos da ponte QR. A associação do perfil agora é
@@ -234,10 +234,12 @@ feita pelo número exato do remetente; um contato diferente no mesmo lote nunca
 importado anteriormente, enquanto eventos sem nome preservam o último nome
 conhecido.
 
-A ponte também mantém nomes recebidos nos eventos `messaging-history.set`,
-`contacts.upsert` e `contacts.update`. Quando disponível, o nome é encaminhado
-ao backend e ao contexto personalizado da IA, que pode usar somente o primeiro
-nome, de forma natural e no máximo uma vez, sem inferir gênero ou outros dados.
+A ponte encaminha o nome recebido na mensagem ao backend, que é a fonte de
+verdade do Inbox e do contexto personalizado da IA. A ponte QR não importa
+histórico nem mantém cópia de conversas, mensagens ou contatos; em memória,
+conserva somente IDs de eventos recentes por até 15 minutos para deduplicação.
+Quando disponível, a IA pode usar somente o primeiro nome, de forma natural e
+no máximo uma vez, sem inferir gênero ou outros dados.
 
 O script de publicação também passou a construir explicitamente o perfil
 `production`, garantindo que a imagem atualizada da ponte QR seja incluída no

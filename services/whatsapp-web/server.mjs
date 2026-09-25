@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
 import QRCode from 'qrcode'
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys'
+import { rememberInboundMessage } from './retention.mjs'
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
@@ -83,10 +84,7 @@ async function getSession(tenantId) {
     qr: null,
     phoneNumber: null,
     sock: null,
-    conversations: new Map(),
-    contactNames: new Map(),
-    messages: new Map(),
-    seenMessageIds: new Set(),
+    seenMessageIds: new Map(),
     connecting: null,
   }
 
@@ -94,10 +92,7 @@ async function getSession(tenantId) {
 
   if (existing?.sock) return existing
 
-  if (!existing) {
-    await loadSnapshot(tenantId, session)
-    sessions.set(tenantId, session)
-  }
+  if (!existing) sessions.set(tenantId, session)
 
   if (session.sock) return session
 
@@ -143,30 +138,10 @@ async function initializeSession(tenantId, session) {
         .catch((error) => logError('Failed to process WhatsApp connection update', tenantId, error))
     })
 
-    sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
-      const names = new Map((contacts ?? []).map((c) => [c.id, getWhatsAppContactName(c)]))
-      for (const chat of chats ?? []) upsertConversation(session, chat.id, names.get(chat.id), chat.conversationTimestamp)
-      for (const message of messages ?? []) addMessage(session, message, false)
-      void saveSnapshot(session)
-    })
-
-    sock.ev.on('contacts.upsert', (contacts) => {
-      for (const contact of contacts ?? []) {
-        upsertConversation(session, contact.id, getWhatsAppContactName(contact))
-      }
-      void saveSnapshot(session)
-    })
-
-    sock.ev.on('contacts.update', (contacts) => {
-      for (const contact of contacts ?? []) {
-        upsertConversation(session, contact.id, getWhatsAppContactName(contact))
-      }
-      void saveSnapshot(session)
-    })
-
     sock.ev.on('messages.upsert', ({ messages, type }) => {
       console.log(`WhatsApp messages received: session=${tenantId} type=${type} count=${messages?.length ?? 0}`)
-      for (const message of messages ?? []) addMessage(session, message, type === 'notify')
+      if (type !== 'notify') return
+      for (const message of messages ?? []) addMessage(session, message)
     })
   } catch (error) {
     session.status = 'disconnected'
@@ -239,23 +214,6 @@ app.get('/sessions/:tenantId/status', withSessionOwnership(async (req, res) => {
   })
 }))
 
-app.get('/sessions/:tenantId/conversations', withSessionOwnership(async (req, res) => {
-  const session = await getSession(req.params.tenantId)
-  const items = Array.from(session.conversations.values())
-    .sort((a, b) => new Date(b.lastMessageAt ?? 0) - new Date(a.lastMessageAt ?? 0))
-  res.json({ items, nextCursor: null, hasMore: false })
-}))
-
-app.get('/sessions/:tenantId/conversations/:id/messages', withSessionOwnership(async (req, res) => {
-  const session = await getSession(req.params.tenantId)
-  const key = req.params.id.includes('@') ? encodeURIComponent(req.params.id) : req.params.id
-  res.json({
-    items: session.messages.get(key) ?? [],
-    nextCursor: null,
-    hasMore: false,
-  })
-}))
-
 app.post('/sessions/:tenantId/logout', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
   clearReconnect(req.params.tenantId)
@@ -286,13 +244,9 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
   }
 
   try {
-    const lidJid = `${recipientPhone}@lid`
     const phoneJid = `${recipientPhone}@s.whatsapp.net`
-    let recipientJid = session.conversations.has(lidJid) ? lidJid : phoneJid
-    if (recipientJid === phoneJid) {
-      const mappedLid = await getLidForPhone(session, phoneJid)
-      if (mappedLid) recipientJid = mappedLid
-    }
+    const mappedLid = await getLidForPhone(session, phoneJid)
+    let recipientJid = mappedLid ?? phoneJid
 
     const registeredContact = (await socket.onWhatsApp(recipientPhone))
       ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
@@ -321,51 +275,12 @@ app.post('/sessions/:tenantId/bot-config', async (req, res) => {
   const next = { ...current, ...req.body, configured: true, version: current.version + 1 }
   botConfigs.set(req.params.tenantId, next)
   await saveBotConfig(req.params.tenantId, next)
-  const session = sessions.get(req.params.tenantId)
-  if (next.enabled && session) {
-    for (const conv of session.conversations.values()) conv.mode = 'Automatic'
-    await saveSnapshot(session)
-  }
   res.json(next)
 })
 
 const server = app.listen(port, () => {
   console.log(`WhatsApp Web service listening on http://localhost:${port}`)
 })
-
-function upsertConversation(session, jid, name, timestamp) {
-  if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
-  const existing = session.conversations.get(jid)
-  const contactName = resolveContactName(session, jid, name)
-  if (contactName) session.contactNames.set(jid, contactName)
-  session.conversations.set(jid, {
-    id: encodeURIComponent(jid),
-    contactId: jid,
-    contactName: contactName || existing?.contactName || jid.split('@')[0],
-    contactPhone: jid.split('@')[0],
-    mode: existing?.mode ?? 'Automatic',
-    status: 'Open',
-    lastMessage: existing?.lastMessage,
-    lastMessageAt: timestamp ? new Date(Number(timestamp) * 1000).toISOString() : existing?.lastMessageAt,
-    isWindowOpen: true,
-  })
-  return contactName
-}
-
-function getWhatsAppContactName(contact) {
-  return normalizeContactName(contact?.name || contact?.notify || contact?.verifiedName)
-}
-
-function resolveContactName(session, jid, candidate) {
-  const incomingName = normalizeContactName(candidate)
-  if (incomingName) return incomingName
-
-  const knownName = normalizeContactName(
-    session.contactNames.get(jid) || session.conversations.get(jid)?.contactName,
-  )
-  const phonePart = jid.split('@')[0]
-  return knownName && knownName !== phonePart ? knownName : null
-}
 
 function normalizeContactName(value) {
   if (typeof value !== 'string') return null
@@ -374,19 +289,14 @@ function normalizeContactName(value) {
   return normalized.slice(0, 200).trim()
 }
 
-function addMessage(session, msg, isLiveInbound = false) {
+function addMessage(session, msg) {
   const jid = msg.key?.remoteJid
-  if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return
+  if (!jid || msg.key?.fromMe || jid.endsWith('@g.us') || jid === 'status@broadcast') return
 
   const messageId = msg.key?.id
-  if (messageId) {
-    if (!msg.key?.fromMe && session.seenMessageIds.has(messageId)) {
-      console.log(`Duplicate inbound message ignored: session=${session.tenantId}`)
-      return
-    }
-    if (!msg.key?.fromMe) {
-      session.seenMessageIds.add(messageId)
-    }
+  if (messageId && !rememberInboundMessage(session.seenMessageIds, messageId)) {
+    console.log(`Duplicate inbound message ignored: session=${session.tenantId}`)
+    return
   }
 
   const text =
@@ -397,30 +307,8 @@ function addMessage(session, msg, isLiveInbound = false) {
     '[midia]'
 
   const createdAt = new Date(Number(msg.messageTimestamp ?? Date.now() / 1000) * 1000).toISOString()
-  const contactName = upsertConversation(session, jid, msg.pushName, Number(msg.messageTimestamp ?? Date.now() / 1000))
-
-  const conv = session.conversations.get(jid)
-  if (conv) {
-    conv.lastMessage = text
-    conv.lastMessageAt = createdAt
-  }
-
-  const key = encodeURIComponent(jid)
-  const list = session.messages.get(key) ?? []
-  list.push({
-    id: messageId ?? `${key}-${Date.now()}`,
-    direction: msg.key?.fromMe ? 'Outbound' : 'Inbound',
-    status: 'Read',
-    type: 'Text',
-    content: text,
-    createdAt,
-    senderName: contactName ?? msg.pushName,
-  })
-  session.messages.set(key, list)
-  void saveSnapshot(session)
-  if (!msg.key?.fromMe && isLiveInbound) {
-    void forwardInboundMessage(session, msg, text, createdAt, contactName)
-  }
+  const contactName = normalizeContactName(msg.pushName)
+  void forwardInboundMessage(session, msg, text, createdAt, contactName)
 }
 
 async function forwardInboundMessage(session, msg, text, createdAt, contactName) {
@@ -483,76 +371,6 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
       await new Promise((resolve) => setTimeout(resolve, attempt * 2000))
     }
   }
-}
-
-async function sendAutoReply(session, jid, inboundText) {
-  const config = await getBotConfig(session.tenantId)
-  const conv = session.conversations.get(jid)
-  if (!config.enabled || config.mode === 'Manual' || conv?.mode !== 'Automatic') return
-
-  const content = buildBotReply(session, jid, inboundText, config)
-  if (!content) return
-
-  await session.sock?.sendMessage(jid, { text: content })
-  const createdAt = new Date().toISOString()
-  const key = encodeURIComponent(jid)
-  const list = session.messages.get(key) ?? []
-  list.push({
-    id: `bot-${Date.now()}`,
-    direction: 'Outbound',
-    status: 'Sent',
-    type: 'Text',
-    content,
-    createdAt,
-    senderName: 'Bot',
-  })
-  session.messages.set(key, list)
-  if (conv) {
-    conv.lastMessage = content
-    conv.lastMessageAt = createdAt
-  }
-  await saveSnapshot(session)
-}
-
-function buildBotReply(session, jid, text, config) {
-  const clean = String(text || '').trim()
-  const key = encodeURIComponent(jid)
-  const list = session.messages.get(key) ?? []
-  const inboundCount = list.filter((message) => message.direction === 'Inbound').length
-  const alreadyWelcomed = list.some((message) => message.direction === 'Outbound' && message.senderName === 'Bot')
-  if (/humano|atendente|gerente|pessoa/i.test(clean)) {
-    const conv = session.conversations.get(jid)
-    if (conv) conv.mode = 'Human'
-    return config.handoffMessage
-  }
-  if (clean === '[midia]') return config.mediaMessage || config.fallbackMessage
-  if (!alreadyWelcomed) {
-    return inboundCount <= 1 ? config.welcomeMessage : (config.returningMessage || config.welcomeMessage)
-  }
-  const step = (config.flowSteps ?? []).find((item) => {
-    const words = String(item.keywords ?? '').split(',').map((word) => word.trim()).filter(Boolean)
-    return words.some((word) => clean.toLowerCase().includes(word.toLowerCase()))
-  })
-  if (step?.response) return step.response
-  return config.fallbackMessage
-}
-
-async function loadSnapshot(tenantId, session) {
-  try {
-    const raw = await readFile(`${sessionDirectory(tenantId)}/inbox.json`, 'utf8')
-    const data = JSON.parse(raw)
-    session.conversations = new Map(data.conversations ?? [])
-    session.messages = new Map(data.messages ?? [])
-  } catch {}
-}
-
-async function saveSnapshot(session) {
-  const tenantId = session.tenantId
-  await mkdir(sessionDirectory(tenantId), { recursive: true })
-  await writeFile(`${sessionDirectory(tenantId)}/inbox.json`, JSON.stringify({
-    conversations: Array.from(session.conversations.entries()),
-    messages: Array.from(session.messages.entries()),
-  }))
 }
 
 async function getBotConfig(tenantId) {
@@ -727,7 +545,7 @@ async function backupAuthState(tenantId) {
     const entries = await readdir(directory, { withFileTypes: true })
     const files = {}
     for (const entry of entries) {
-      if (!entry.isFile() || entry.name === 'inbox.json' || entry.name === 'bot-config.json') continue
+      if (!entry.isFile() || entry.name === 'bot-config.json') continue
       files[entry.name] = (await readFile(`${directory}/${entry.name}`)).toString('base64')
     }
     if (!files['creds.json']) return
