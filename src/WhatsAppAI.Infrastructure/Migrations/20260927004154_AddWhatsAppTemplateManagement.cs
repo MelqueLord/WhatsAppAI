@@ -103,7 +103,7 @@ namespace WhatsAppAI.Infrastructure.Migrations
                       FROM whatsappai.whatsapp_business_accounts AS existing
                       WHERE existing.waba_id = whatsapp_accounts.waba_id
                   )
-                GROUP BY tenant_id, waba_id
+                GROUP BY tenant_id, waba_id;
 
                 UPDATE whatsappai.whatsapp_accounts AS line
                 SET whatsapp_business_account_id = waba.id
