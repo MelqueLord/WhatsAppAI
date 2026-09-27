@@ -42,7 +42,7 @@ public static class WebhookEventEndpoints
         return Results.Ok(events.Select(e => new WebhookEventResponse
         {
             Id = e.Id,
-            PhoneNumberId = e.PhoneNumberId,
+            PhoneNumberId = e.PhoneNumberId ?? e.RoutingId,
             Status = e.Status.ToString(),
             CreatedAt = e.CreatedAt,
             ProcessedAt = e.ProcessedAt,
@@ -62,7 +62,7 @@ public static class WebhookEventEndpoints
         return Results.Ok(new WebhookEventResponse
         {
             Id = webhookEvent.Id,
-            PhoneNumberId = webhookEvent.PhoneNumberId,
+            PhoneNumberId = webhookEvent.PhoneNumberId ?? webhookEvent.RoutingId,
             TenantId = webhookEvent.TenantId,
             Status = webhookEvent.Status.ToString(),
             CreatedAt = webhookEvent.CreatedAt,
@@ -99,7 +99,7 @@ public static class WebhookEventEndpoints
         return Results.Ok(new WebhookEventResponse
         {
             Id = webhookEvent.Id,
-            PhoneNumberId = webhookEvent.PhoneNumberId,
+            PhoneNumberId = webhookEvent.PhoneNumberId ?? webhookEvent.RoutingId,
             Status = webhookEvent.Status.ToString(),
             Message = "Event queued for reprocessing."
         });

@@ -16,6 +16,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<RetentionWorker>();
         services.AddHostedService<TenantSuspensionWorker>();
         services.AddHostedService<BroadcastDispatchWorker>();
+        services.AddHostedService<WhatsAppTemplateSubmissionWorker>();
         return services;
     }
 }

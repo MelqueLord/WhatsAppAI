@@ -30,6 +30,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Secret> Secrets => Set<Secret>();
     public DbSet<WhatsAppAccount> WhatsAppAccounts => Set<WhatsAppAccount>();
+    public DbSet<WhatsAppBusinessAccount> WhatsAppBusinessAccounts => Set<WhatsAppBusinessAccount>();
+    public DbSet<WhatsAppMessageTemplate> WhatsAppMessageTemplates => Set<WhatsAppMessageTemplate>();
+    public DbSet<WhatsAppTemplateSubmission> WhatsAppTemplateSubmissions => Set<WhatsAppTemplateSubmission>();
     public DbSet<WhatsAppWebSessionLease> WhatsAppWebSessionLeases => Set<WhatsAppWebSessionLease>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<Contact> Contacts => Set<Contact>();
@@ -92,6 +95,12 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<HandoffEvent>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<WhatsAppAccount>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<WhatsAppBusinessAccount>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<WhatsAppMessageTemplate>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<WhatsAppTemplateSubmission>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<AiProviderCredential>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);

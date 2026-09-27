@@ -1,7 +1,8 @@
 import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../lib/errors'
-import { ErrorNotifications, notifyError } from './ErrorNotifications'
+import { ErrorNotifications } from './ErrorNotifications'
+import { notifyError } from '../lib/errorNotifications'
 
 describe('ErrorNotifications', () => {
   it('presents a friendly message for global errors', () => {

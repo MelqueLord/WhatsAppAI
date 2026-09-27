@@ -18,7 +18,25 @@ public sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webhook
 
         builder.Property(e => e.PhoneNumberId)
             .HasColumnName("phone_number_id")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.RoutingKind)
+            .HasColumnName("routing_kind")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(WebhookRoutingKind.PhoneNumber)
+            .IsRequired();
+
+        builder.Property(e => e.RoutingId)
+            .HasColumnName("routing_id")
             .HasMaxLength(100)
+            .HasDefaultValue(string.Empty)
+            .IsRequired();
+
+        builder.Property(e => e.EventKind)
+            .HasColumnName("event_kind")
+            .HasMaxLength(100)
+            .HasDefaultValue(string.Empty)
             .IsRequired();
 
         builder.Property(e => e.TenantId)
@@ -73,5 +91,6 @@ public sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webhook
         builder.HasIndex(e => e.NextRetryAt);
 
         builder.HasIndex(e => new { e.Status, e.CreatedAt });
+        builder.HasIndex(e => new { e.RoutingKind, e.RoutingId, e.Status });
     }
 }

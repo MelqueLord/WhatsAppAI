@@ -1207,6 +1207,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("waba_id");
 
+                    b.Property<Guid?>("WhatsAppBusinessAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_business_account_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PhoneNumberId")
@@ -1214,10 +1218,313 @@ namespace WhatsAppAI.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("WhatsAppBusinessAccountId");
+
+                    b.HasIndex("TenantId", "WhatsAppBusinessAccountId");
+
                     b.HasIndex("TenantId", "ConnectionType", "LineNumber")
                         .IsUnique();
 
                     b.ToTable("whatsapp_accounts", "whatsappai");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppBusinessAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("version");
+
+                    b.Property<string>("WabaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("waba_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WabaId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("whatsapp_business_accounts", "whatsappai");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppMessageTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BodyExamplesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body_examples_json");
+
+                    b.Property<int>("BodyParameterCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("body_parameter_count");
+
+                    b.Property<string>("BodyText")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("body_text");
+
+                    b.Property<string>("ComponentsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("components_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EffectiveCategory")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("effective_category");
+
+                    b.Property<string>("FooterText")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("footer_text");
+
+                    b.Property<bool>("IsBroadcastCompatible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_broadcast_compatible");
+
+                    b.Property<bool>("IsInboxCompatible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_inbox_compatible");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("language");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("MetaTemplateId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("meta_template_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParameterFormat")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("parameter_format");
+
+                    b.Property<string>("ProviderRawStatus")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("provider_raw_status");
+
+                    b.Property<DateTime?>("ProviderUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_updated_at");
+
+                    b.Property<string>("Recommendation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("recommendation");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<string>("RequestedCategory")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("requested_category");
+
+                    b.Property<string>("ReviewStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("review_status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("WhatsAppBusinessAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_business_account_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WhatsAppBusinessAccountId");
+
+                    b.HasIndex("TenantId", "WhatsAppBusinessAccountId", "MetaTemplateId")
+                        .IsUnique()
+                        .HasFilter("meta_template_id IS NOT NULL");
+
+                    b.HasIndex("TenantId", "WhatsAppBusinessAccountId", "Name", "Language")
+                        .IsUnique()
+                        .HasDatabaseName("IX_whatsapp_message_templates_tenant_id_whatsapp_business_acc~1");
+
+                    b.ToTable("whatsapp_message_templates", "whatsappai");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppTemplateSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTime?>("ClaimExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claim_expires_at");
+
+                    b.Property<DateTime?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("LastErrorCategory")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("last_error_category");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_error_code");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_error_message");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_fingerprint");
+
+                    b.Property<Guid>("SourceWhatsAppAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_whatsapp_account_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("WhatsAppBusinessAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_business_account_id");
+
+                    b.Property<Guid>("WhatsAppMessageTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_message_template_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceWhatsAppAccountId");
+
+                    b.HasIndex("WhatsAppBusinessAccountId");
+
+                    b.HasIndex("WhatsAppMessageTemplateId");
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("whatsapp_template_submissions", "whatsappai");
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppWebSessionLease", b =>
@@ -1957,6 +2264,14 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("error_message");
 
+                    b.Property<string>("EventKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("")
+                        .HasColumnName("event_kind");
+
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -1968,7 +2283,6 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnName("next_retry_at");
 
                     b.Property<string>("PhoneNumberId")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("phone_number_id");
@@ -1984,6 +2298,22 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer")
                         .HasColumnName("retry_count");
+
+                    b.Property<string>("RoutingId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("")
+                        .HasColumnName("routing_id");
+
+                    b.Property<string>("RoutingKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("PhoneNumber")
+                        .HasColumnName("routing_kind");
 
                     b.Property<string>("Signature")
                         .HasMaxLength(200)
@@ -2010,6 +2340,8 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.HasIndex("Status");
 
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("RoutingKind", "RoutingId", "Status");
 
                     b.ToTable("webhook_events", "whatsappai");
                 });
@@ -2579,6 +2911,44 @@ namespace WhatsAppAI.Infrastructure.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppAccount", b =>
+                {
+                    b.HasOne("WhatsAppAI.Domain.Integrations.WhatsAppBusinessAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppBusinessAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppMessageTemplate", b =>
+                {
+                    b.HasOne("WhatsAppAI.Domain.Integrations.WhatsAppBusinessAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppBusinessAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WhatsAppAI.Domain.Integrations.WhatsAppTemplateSubmission", b =>
+                {
+                    b.HasOne("WhatsAppAI.Domain.Integrations.WhatsAppAccount", null)
+                        .WithMany()
+                        .HasForeignKey("SourceWhatsAppAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WhatsAppAI.Domain.Integrations.WhatsAppBusinessAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppBusinessAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WhatsAppAI.Domain.Integrations.WhatsAppMessageTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppMessageTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WhatsAppAI.Domain.Messaging.Contact", b =>

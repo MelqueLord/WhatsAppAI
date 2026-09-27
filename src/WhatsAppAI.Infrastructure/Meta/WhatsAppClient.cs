@@ -4,15 +4,26 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using WhatsAppAI.Application.Integrations;
 
 namespace WhatsAppAI.Infrastructure.Meta;
 
-internal sealed class WhatsAppClient(
-    HttpClient httpClient,
-    ILogger<WhatsAppClient> logger) : IWhatsAppClient
+internal sealed class WhatsAppClient : IWhatsAppClient
 {
-    private const string BaseUrl = "https://graph.facebook.com/v21.0";
+    private readonly HttpClient httpClient;
+    private readonly ILogger<WhatsAppClient> logger;
+    private readonly string baseUrl;
+
+    public WhatsAppClient(HttpClient httpClient, ILogger<WhatsAppClient> logger, IOptions<MetaGraphOptions> options)
+    {
+        this.httpClient = httpClient;
+        this.logger = logger;
+        baseUrl = options.Value.BaseUrl;
+    }
+
+    internal WhatsAppClient(HttpClient httpClient, ILogger<WhatsAppClient> logger)
+        : this(httpClient, logger, Options.Create(new MetaGraphOptions())) { }
 
     public async Task<WhatsAppConnectionResult> TestConnectionAsync(
         string phoneNumberId,
@@ -21,7 +32,7 @@ internal sealed class WhatsAppClient(
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/{phoneNumberId}");
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/{phoneNumberId}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
             var response = await httpClient.SendAsync(request, cancellationToken);
@@ -79,7 +90,7 @@ internal sealed class WhatsAppClient(
 
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                $"{BaseUrl}/{phoneNumberId}/messages")
+                $"{baseUrl}/{phoneNumberId}/messages")
             {
                 Content = JsonContent.Create(payload)
             };
@@ -138,7 +149,7 @@ internal sealed class WhatsAppClient(
             upload.Add(fileContent, "file", fileName ?? "image");
             upload.Add(new StringContent("whatsapp"), "messaging_product");
             upload.Add(new StringContent(contentType), "type");
-            using var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/{phoneNumberId}/media") { Content = upload };
+            using var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/{phoneNumberId}/media") { Content = upload };
             uploadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             using var uploadResponse = await httpClient.SendAsync(uploadRequest, cancellationToken);
             if (!uploadResponse.IsSuccessStatusCode)
@@ -153,7 +164,7 @@ internal sealed class WhatsAppClient(
                 To = recipientPhone,
                 Image = new ImageBody { Id = media.Id, Caption = string.IsNullOrWhiteSpace(caption) ? null : caption }
             };
-            using var sendRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/{phoneNumberId}/messages") { Content = JsonContent.Create(payload) };
+            using var sendRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/{phoneNumberId}/messages") { Content = JsonContent.Create(payload) };
             sendRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             using var sendResponse = await httpClient.SendAsync(sendRequest, cancellationToken);
             if (!sendResponse.IsSuccessStatusCode)
@@ -209,7 +220,7 @@ internal sealed class WhatsAppClient(
 
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                $"{BaseUrl}/{phoneNumberId}/messages")
+                $"{baseUrl}/{phoneNumberId}/messages")
             {
                 Content = JsonContent.Create(payload)
             };
@@ -248,7 +259,7 @@ internal sealed class WhatsAppClient(
         {
             var templates = new List<WhatsAppTemplateSummary>();
             var visitedPages = new HashSet<string>(StringComparer.Ordinal);
-            string? nextPageUrl = $"{BaseUrl}/{wabaId}/message_templates?fields=name,language,status,category,components&limit=250";
+            string? nextPageUrl = $"{baseUrl}/{wabaId}/message_templates?fields=id,name,language,status,category,parameter_format,components&limit=250";
 
             while (!string.IsNullOrWhiteSpace(nextPageUrl) && visitedPages.Add(nextPageUrl))
             {
@@ -277,7 +288,13 @@ internal sealed class WhatsAppClient(
                         CountBodyParameters(template.Components),
                         string.IsNullOrWhiteSpace(template.Category) ? "UNKNOWN" : template.Category.Trim().ToUpperInvariant(),
                         string.IsNullOrWhiteSpace(template.Status) ? "UNKNOWN" : template.Status.Trim().ToUpperInvariant(),
-                        HasOnlySupportedTemplateComponents(template.Components))));
+                        HasOnlySupportedTemplateComponents(template.Components))
+                    {
+                        MetaTemplateId = template.Id,
+                        BodyText = GetComponentText(template.Components, "BODY") ?? string.Empty,
+                        FooterText = GetComponentText(template.Components, "FOOTER"),
+                        ComponentsJson = JsonSerializer.Serialize(template.Components ?? [])
+                    }));
 
                 nextPageUrl = IsTrustedMetaPageUrl(content?.Paging?.Next)
                     ? content?.Paging?.Next
@@ -297,6 +314,79 @@ internal sealed class WhatsAppClient(
         {
             logger.LogError(ex, "Failed to list WhatsApp templates");
             return new WhatsAppTemplateListResult { ErrorMessage = "Unable to load templates." };
+        }
+    }
+
+    public async Task<WhatsAppTemplateCreateResult> CreateTemplateAsync(
+        string wabaId,
+        string accessToken,
+        WhatsAppTemplateCreateRequest template,
+        CancellationToken cancellationToken = default)
+    {
+        var validation = WhatsAppTemplateValidator.Validate(template);
+        if (validation.Count > 0)
+            return new WhatsAppTemplateCreateResult { FailureKind = WhatsAppTemplateFailureKind.Validation, ErrorMessage = "Template inválido." };
+
+        var components = new List<CreateTemplateComponent>
+        {
+            new()
+            {
+                Type = "BODY",
+                Text = template.BodyText,
+                Example = template.BodyExamples.Count == 0 ? null : new CreateTemplateExample { BodyText = [template.BodyExamples.ToArray()] }
+            }
+        };
+        if (!string.IsNullOrWhiteSpace(template.FooterText))
+            components.Add(new CreateTemplateComponent { Type = "FOOTER", Text = template.FooterText });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/{wabaId}/message_templates")
+        {
+            Content = JsonContent.Create(new CreateTemplatePayload
+            {
+                Name = template.Name,
+                Language = template.Language,
+                Category = template.Category,
+                Components = components
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        try
+        {
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var success = JsonSerializer.Deserialize<CreateTemplateResponse>(raw);
+                return new WhatsAppTemplateCreateResult
+                {
+                    IsSuccess = true,
+                    MetaTemplateId = success?.Id,
+                    Status = string.IsNullOrWhiteSpace(success?.Status) ? "PENDING" : success.Status.ToUpperInvariant(),
+                    Category = string.IsNullOrWhiteSpace(success?.Category) ? template.Category : success.Category.ToUpperInvariant()
+                };
+            }
+
+            var graphError = TryReadGraphError(raw);
+            var failure = ClassifyTemplateFailure(response.StatusCode, graphError?.Code, graphError?.ErrorSubcode);
+            logger.LogWarning("Meta template creation failed with HTTP {StatusCode}, Graph code {GraphCode}, subcode {Subcode}",
+                (int)response.StatusCode, graphError?.Code, graphError?.ErrorSubcode);
+            return new WhatsAppTemplateCreateResult
+            {
+                FailureKind = failure,
+                ErrorCode = graphError?.ErrorSubcode?.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    ?? graphError?.Code?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ErrorMessage = SanitizedTemplateError(failure)
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new WhatsAppTemplateCreateResult { FailureKind = WhatsAppTemplateFailureKind.OutcomeUnknown, ErrorMessage = "O resultado da submissão é incerto e será reconciliado." };
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Meta template creation ended without a confirmed response");
+            return new WhatsAppTemplateCreateResult { FailureKind = WhatsAppTemplateFailureKind.OutcomeUnknown, ErrorMessage = "O resultado da submissão é incerto e será reconciliado." };
         }
     }
 
@@ -379,6 +469,33 @@ internal sealed class WhatsAppClient(
         Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri) &&
         uri.Scheme == Uri.UriSchemeHttps &&
         string.Equals(uri.Host, "graph.facebook.com", StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetComponentText(IReadOnlyList<TemplateListComponent>? components, string type) =>
+        components?.FirstOrDefault(component => string.Equals(component.Type, type, StringComparison.OrdinalIgnoreCase))?.Text;
+
+    private static GraphError? TryReadGraphError(string raw)
+    {
+        try { return JsonSerializer.Deserialize<GraphErrorEnvelope>(raw)?.Error; }
+        catch (JsonException) { return null; }
+    }
+
+    private static WhatsAppTemplateFailureKind ClassifyTemplateFailure(HttpStatusCode status, int? code, int? subcode)
+    {
+        if (subcode == 2388024) return WhatsAppTemplateFailureKind.Duplicate;
+        if (status == HttpStatusCode.Forbidden || code == 200) return WhatsAppTemplateFailureKind.Authorization;
+        if (status == HttpStatusCode.TooManyRequests) return WhatsAppTemplateFailureKind.RateLimit;
+        if ((int)status >= 500 || status == HttpStatusCode.RequestTimeout) return WhatsAppTemplateFailureKind.Transient;
+        return WhatsAppTemplateFailureKind.Validation;
+    }
+
+    private static string SanitizedTemplateError(WhatsAppTemplateFailureKind kind) => kind switch
+    {
+        WhatsAppTemplateFailureKind.Duplicate => "Já existe um template com esse nome e idioma; o catálogo será reconciliado.",
+        WhatsAppTemplateFailureKind.Authorization => "A credencial não possui permissão para gerenciar templates.",
+        WhatsAppTemplateFailureKind.RateLimit => "O limite de criação da Meta foi atingido. Tente novamente mais tarde.",
+        WhatsAppTemplateFailureKind.Transient => "A Meta está temporariamente indisponível.",
+        _ => "A Meta rejeitou o template. Revise os dados informados."
+    };
 }
 
 internal sealed class PhoneNumberResponse
@@ -422,6 +539,8 @@ internal sealed class TemplateListPaging
 
 internal sealed class TemplateListItem
 {
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
     [JsonPropertyName("name")]
     public string? Name { get; init; }
 
@@ -509,6 +628,47 @@ internal sealed class SendMessageResponse
 {
     [JsonPropertyName("messages")]
     public List<MessageId>? Messages { get; init; }
+}
+
+internal sealed class CreateTemplatePayload
+{
+    [JsonPropertyName("name")] public string Name { get; init; } = string.Empty;
+    [JsonPropertyName("language")] public string Language { get; init; } = string.Empty;
+    [JsonPropertyName("category")] public string Category { get; init; } = string.Empty;
+    [JsonPropertyName("parameter_format")] public string ParameterFormat { get; init; } = "POSITIONAL";
+    [JsonPropertyName("components")] public List<CreateTemplateComponent> Components { get; init; } = [];
+}
+
+internal sealed class CreateTemplateComponent
+{
+    [JsonPropertyName("type")] public string Type { get; init; } = string.Empty;
+    [JsonPropertyName("text")] public string Text { get; init; } = string.Empty;
+    [JsonPropertyName("example")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CreateTemplateExample? Example { get; init; }
+}
+
+internal sealed class CreateTemplateExample
+{
+    [JsonPropertyName("body_text")] public List<string[]> BodyText { get; init; } = [];
+}
+
+internal sealed class CreateTemplateResponse
+{
+    [JsonPropertyName("id")] public string? Id { get; init; }
+    [JsonPropertyName("status")] public string? Status { get; init; }
+    [JsonPropertyName("category")] public string? Category { get; init; }
+}
+
+internal sealed class GraphErrorEnvelope
+{
+    [JsonPropertyName("error")] public GraphError? Error { get; init; }
+}
+
+internal sealed class GraphError
+{
+    [JsonPropertyName("code")] public int? Code { get; init; }
+    [JsonPropertyName("error_subcode")] public int? ErrorSubcode { get; init; }
 }
 
 internal sealed class UploadMediaResponse

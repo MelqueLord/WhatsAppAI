@@ -8,6 +8,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InboxPage } from './features/inbox/InboxPage'
 import { OperatorsPage } from './features/operators/OperatorsPage'
 import { WhatsAppConfigPage } from './features/integrations/whatsapp/WhatsAppConfigPage'
+import { WhatsAppTemplatesPage } from './features/integrations/whatsapp/templates/WhatsAppTemplatesPage'
 import { AiConfigPage } from './features/integrations/ai/AiConfigPage'
 import { AiExamplesPage } from './features/integrations/ai/AiExamplesPage'
 import { AiScenarioTestsPage } from './features/integrations/ai/AiScenarioTestsPage'
@@ -27,7 +28,8 @@ import { BroadcastPage } from './features/broadcast/BroadcastPage'
 import LandingPage from './features/landing/LandingPage'
 import { Loader2 } from 'lucide-react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
-import { ErrorNotifications, notifyError } from './components/ErrorNotifications'
+import { ErrorNotifications } from './components/ErrorNotifications'
+import { notifyError } from './lib/errorNotifications'
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -130,6 +132,7 @@ function App() {
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/operators" element={<OwnerRoute><OperatorsPage /></OwnerRoute>} />
               <Route path="/integrations/whatsapp" element={<OwnerRoute><WhatsAppConfigPage /></OwnerRoute>} />
+              <Route path="/integrations/whatsapp/templates" element={<OwnerRoute><WhatsAppTemplatesPage /></OwnerRoute>} />
               <Route path="/integrations/ai" element={<OwnerRoute><AiConfigPage /></OwnerRoute>} />
               <Route path="/integrations/ai/examples" element={<OwnerRoute><AiExamplesPage /></OwnerRoute>} />
               <Route path="/integrations/ai/scenarios" element={<OwnerRoute><AiScenarioTestsPage /></OwnerRoute>} />

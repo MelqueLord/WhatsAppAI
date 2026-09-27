@@ -9,6 +9,7 @@ public sealed class WhatsAppAccount
     public string WabaId { get; private set; } = string.Empty;
     public string PhoneNumberId { get; private set; } = string.Empty;
     public string AccessTokenRef { get; private set; } = string.Empty;
+    public Guid? WhatsAppBusinessAccountId { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -41,9 +42,20 @@ public sealed class WhatsAppAccount
 
     public void Update(string wabaId, string phoneNumberId, string accessTokenRef)
     {
+        if (!string.Equals(WabaId, wabaId, StringComparison.Ordinal))
+            WhatsAppBusinessAccountId = null;
         WabaId = wabaId;
         PhoneNumberId = phoneNumberId;
         AccessTokenRef = accessTokenRef;
+        UpdatedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public void AssignBusinessAccount(Guid businessAccountId)
+    {
+        if (ConnectionType != WhatsAppConnectionType.OfficialApi)
+            throw new InvalidOperationException("Only official API lines can reference a WABA.");
+        WhatsAppBusinessAccountId = businessAccountId;
         UpdatedAt = DateTime.UtcNow;
         Version++;
     }

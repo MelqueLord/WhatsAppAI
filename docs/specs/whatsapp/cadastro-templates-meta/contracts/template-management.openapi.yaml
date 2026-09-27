@@ -1,0 +1,317 @@
+openapi: 3.1.0
+info:
+  title: Gestão de templates da API Oficial
+  version: 1.0.0
+paths:
+  /api/integrations/whatsapp/official/{lineNumber}/templates:
+    get:
+      summary: Lista o catálogo local da WABA associada à linha
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LineNumber'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Catálogo tenant-scoped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/OfficialLineNotFound'
+    post:
+      summary: Enfileira o cadastro de um template textual na Meta
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LineNumber'
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '202':
+          description: Submissão durável aceita localmente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateOperation'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Chave idempotente reutilizada com outro conteúdo ou variante já existente com conteúdo divergente
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/integrations/whatsapp/official/{lineNumber}/templates/sync:
+    post:
+      summary: Enfileira sincronização completa do catálogo da WABA
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LineNumber'
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      responses:
+        '202':
+          description: Sincronização aceita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncOperation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/OfficialLineNotFound'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: .AspNetCore.Identity.Application
+  parameters:
+    LineNumber:
+      name: lineNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CsrfToken:
+      name: X-CSRF-TOKEN
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    CreateTemplateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - language
+        - category
+        - bodyText
+        - bodyExamples
+      properties:
+        name:
+          type: string
+          maxLength: 512
+          pattern: '^[a-z0-9_]+$'
+        language:
+          type: string
+          maxLength: 20
+          examples:
+            - pt_BR
+        category:
+          type: string
+          enum:
+            - UTILITY
+            - MARKETING
+        bodyText:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        bodyExamples:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            minLength: 1
+            maxLength: 1024
+        footerText:
+          type:
+            - string
+            - 'null'
+          maxLength: 60
+    TemplateOperation:
+      type: object
+      required:
+        - templateId
+        - submissionId
+        - submissionStatus
+        - reviewStatus
+      properties:
+        templateId:
+          type: string
+          format: uuid
+        submissionId:
+          type: string
+          format: uuid
+        submissionStatus:
+          $ref: '#/components/schemas/SubmissionStatus'
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+    SyncOperation:
+      type: object
+      required:
+        - operationId
+        - status
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - QUEUED
+    TemplatePage:
+      type: object
+      required:
+        - templates
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateSummary'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+    TemplateSummary:
+      type: object
+      required:
+        - id
+        - name
+        - language
+        - effectiveCategory
+        - reviewStatus
+        - providerRawStatus
+        - bodyText
+        - bodyParameterCount
+        - submissionStatus
+        - isInboxCompatible
+        - isBroadcastCompatible
+        - lastSyncedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        language:
+          type: string
+        requestedCategory:
+          type:
+            - string
+            - 'null'
+        effectiveCategory:
+          type: string
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+        providerRawStatus:
+          type: string
+        bodyText:
+          type: string
+        footerText:
+          type:
+            - string
+            - 'null'
+        bodyParameterCount:
+          type: integer
+          minimum: 0
+          maximum: 10
+        submissionStatus:
+          $ref: '#/components/schemas/SubmissionStatus'
+        rejectionReason:
+          type:
+            - string
+            - 'null'
+        recommendation:
+          type:
+            - string
+            - 'null'
+        isInboxCompatible:
+          type: boolean
+        isBroadcastCompatible:
+          type: boolean
+        lastSyncedAt:
+          type: string
+          format: date-time
+    SubmissionStatus:
+      type: string
+      enum:
+        - NONE
+        - QUEUED
+        - PROCESSING
+        - RETRY_SCHEDULED
+        - OUTCOME_UNKNOWN
+        - RECONCILING
+        - ACCEPTED
+        - FAILED_PERMANENT
+        - NEEDS_ATTENTION
+    ReviewStatus:
+      type: string
+      enum:
+        - UNKNOWN
+        - PENDING
+        - APPROVED
+        - REJECTED
+        - PAUSED
+        - DISABLED
+        - ARCHIVED
+        - DELETED
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+  responses:
+    Unauthorized:
+      description: Sessão ausente ou inválida
+    Forbidden:
+      description: Papel, tenant ou linha não autorizados
+    OfficialLineNotFound:
+      description: Linha oficial ativa não encontrada no tenant corrente
+    ValidationError:
+      description: Template inválido antes da submissão
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

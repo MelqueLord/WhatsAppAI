@@ -152,6 +152,18 @@ Como TenantOwner, quero que as avaliações e correções aprovadas pelos operad
 3. O contexto da IA recupera exemplos supervisionados relevantes da própria empresa antes de exemplos manuais equivalentes, sem usar exemplos como prova de preço, política, prazo ou disponibilidade.
 4. O TenantOwner pode editar, desativar e reativar o exemplo aprendido na tela de exemplos; a plataforma não executa fine-tuning nem compartilha o conteúdo entre tenants.
 
+### US-017 — Cadastrar templates na Meta (P2)
+
+Como TenantOwner, quero cadastrar templates textuais da API Oficial e acompanhar sua análise pela Meta para preparar mensagens permitidas fora da janela de atendimento sem sair da plataforma.
+
+**Aceite:**
+
+1. Somente o TenantOwner submete templates de Utilidade ou Marketing para uma WABA ativa do próprio tenant; Operator, QR Code, conta inativa ou conta de outro tenant são rejeitados.
+2. A primeira entrega aceita corpo textual, rodapé opcional e variáveis posicionais com exemplos, sem cabeçalho, mídia, botões, Autenticação, edição ou exclusão.
+3. A submissão é durável e idempotente; resultado incerto é reconciliado com a Meta antes de qualquer repetição.
+4. Aprovação, rejeição, mudança de categoria e demais estados aparecem no catálogo do tenant com motivo sanitizado, inclusive para templates criados diretamente no WhatsApp Manager.
+5. O cadastro não amplia as regras de envio: Marketing continua individual na Inbox e o disparo em massa continua restrito a Utilidade aprovada e compatível.
+
 ### US-007 — Auditar operação (P2)
 
 Como PlatformAdmin, quero identificar falhas e ações relevantes sem ler segredos ou misturar clientes.
@@ -307,6 +319,11 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-081:** apresentar o BOT como controle principal da automação e a IA como sua estratégia inteligente: ativar IA também mantém o BOT ativo; desativar IA em plano com BOT troca para respostas fixas sem interromper a automação; desligar o BOT pausa qualquer estratégia automática.
 - **FR-082:** permitir ao TenantOwner configurar por fila uma mensagem opcional de espera, enviada quando um contato já atribuído àquela fila interagir novamente e não houver uma resposta automática mais específica; a configuração e o envio permanecem isolados ao tenant e não alteram o modo da conversa.
 - **FR-083:** aplicar ao contato uma tag correspondente à fila sempre que o encaminhamento automático atribuir ou mantiver uma fila; se a tag não existir, o sistema deve criá-la no tenant da fila e a inbox deve exibi-la sem recarga manual.
+- **FR-084:** permitir ao TenantOwner cadastrar e sincronizar templates textuais de Utilidade ou Marketing na WABA de uma linha ativa da API Oficial, validando nome, idioma, corpo, rodapé e exemplos de variáveis posicionais antes da submissão.
+- **FR-085:** persistir o catálogo de templates por tenant e WABA, mantendo variantes por nome e idioma, identificação externa, categoria solicitada/efetiva, componentes sanitizados, estado, compatibilidade e horários de sincronização.
+- **FR-086:** processar submissões de template de forma durável e idempotente, reconciliando por WABA, nome e idioma após timeout, resposta incerta ou conflito antes de repetir uma criação na Meta.
+- **FR-087:** aceitar eventos autenticados de template identificados por WABA, persistir cada mudança de forma idempotente antes do processamento e atualizar somente o tenant proprietário da WABA.
+- **FR-088:** mostrar aprovação, rejeição, pausas, desativação, arquivamento, categoria efetiva e motivos sanitizados sem expor token, payload bruto, exemplos ou conteúdo completo em logs e auditoria.
 
 ## 6. Regras de negócio
 
@@ -362,6 +379,9 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-050:** `SimpleAutoReply` e `AiPowered` são estratégias internas mutuamente exclusivas para garantir uma única resposta por mensagem, mas não são recursos concorrentes na interface: em `AiPowered`, BOT e IA aparecem ativos; ao desligar somente a IA, planos com capacidade de BOT permanecem habilitados em `SimpleAutoReply`, enquanto planos sem BOT retornam a `Manual`.
 - **BR-051:** a mensagem de espera de uma fila é opcional e limitada a 160 caracteres; quando configurada, substitui somente o aviso genérico de espera da própria fila. Respostas válidas da IA, mensagens fora do expediente, pedido explícito de humano e regras de segurança mantêm precedência.
 - **BR-052:** a tag automática de fila usa o nome e a cor da fila, é criada somente no tenant correspondente quando ausente e é associada ao contato de modo idempotente. Tags manualmente desativadas não são reativadas pela automação.
+- **BR-053:** uma WABA pertence a exatamente um tenant na instalação e pode atender várias linhas oficiais desse tenant; templates pertencem à WABA, não ao número individual.
+- **BR-054:** nome e idioma identificam uma variante de template dentro da WABA; uma chave idempotente repetida com o mesmo conteúdo retorna a operação existente, e com conteúdo diferente é rejeitada.
+- **BR-055:** o estado informado pela Meta não é monotônico; somente templates `APPROVED` e compatíveis são enviáveis, e o catálogo local nunca substitui a revalidação remota já exigida antes do envio.
 
 ## 7. Requisitos não funcionais
 

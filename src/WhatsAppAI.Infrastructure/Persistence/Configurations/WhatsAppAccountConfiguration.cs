@@ -45,6 +45,9 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(a => a.WhatsAppBusinessAccountId)
+            .HasColumnName("whatsapp_business_account_id");
+
         builder.Property(a => a.IsActive)
             .HasColumnName("is_active")
             .IsRequired();
@@ -70,5 +73,12 @@ public sealed class WhatsAppAccountConfiguration : IEntityTypeConfiguration<What
 
         builder.HasIndex(a => a.PhoneNumberId)
             .IsUnique();
+
+        builder.HasIndex(a => new { a.TenantId, a.WhatsAppBusinessAccountId });
+
+        builder.HasOne<WhatsAppBusinessAccount>()
+            .WithMany()
+            .HasForeignKey(a => a.WhatsAppBusinessAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

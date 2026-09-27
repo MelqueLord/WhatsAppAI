@@ -11,6 +11,7 @@ public interface IWhatsAppAccountRepository
     Task<IReadOnlyList<WhatsAppAccount>> GetAllByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<WhatsAppAccount?> GetByPhoneNumberIdAsync(string phoneNumberId, CancellationToken cancellationToken = default);
     Task<WhatsAppAccount?> GetByTenantAndPhoneNumberIdAsync(Guid tenantId, string phoneNumberId, CancellationToken cancellationToken = default);
+    Task<WhatsAppAccount?> GetByTenantAndWabaIdAsync(Guid tenantId, string wabaId, CancellationToken cancellationToken = default);
     Task AddAsync(WhatsAppAccount account, CancellationToken cancellationToken = default);
     Task UpdateAsync(WhatsAppAccount account, CancellationToken cancellationToken = default);
 }

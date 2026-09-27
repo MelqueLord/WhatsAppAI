@@ -522,42 +522,49 @@ public static class WebhookEndpoints
             return Results.Ok("OK");
         }
 
-        // Extract phone_number_id for tenant resolution
-        var phoneNumberId = payload.Entry?
-            .FirstOrDefault()?.Changes?
-            .FirstOrDefault()?.Value?.Metadata?.PhoneNumberId;
-
-        if (string.IsNullOrEmpty(phoneNumberId))
+        for (var entryIndex = 0; entryIndex < payload.Entry.Count; entryIndex++)
         {
-            logger.LogWarning("Missing phone_number_id in webhook");
-            // Still accept the webhook to avoid retries
-            return Results.Ok("OK");
+            var entry = payload.Entry[entryIndex];
+            if (entry.Changes is null) continue;
+            for (var changeIndex = 0; changeIndex < entry.Changes.Count; changeIndex++)
+            {
+                var change = entry.Changes[changeIndex];
+                var eventKind = change.Field ?? string.Empty;
+                var templateEvent = eventKind is "message_template_status_update" or "template_category_update" or "message_template_components_update";
+                var routingId = templateEvent ? entry.Id : change.Value?.Metadata?.PhoneNumberId;
+                if (string.IsNullOrWhiteSpace(routingId))
+                {
+                    logger.LogWarning("Ignoring a Meta webhook fragment without its routing identifier for {EventKind}", eventKind);
+                    continue;
+                }
+
+                var fragment = JsonSerializer.Serialize(new WebhookPayload
+                {
+                    Object = payload.Object,
+                    Entry = [new WebhookEntry { Id = entry.Id, Time = entry.Time, Changes = [change] }]
+                }, JsonOptions);
+                var idempotencyKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                    $"{rawBody.Length}:{entryIndex}:{changeIndex}:{routingId}:{eventKind}"))).ToLowerInvariant();
+                if (await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey) is not null)
+                    continue;
+
+                var webhookEvent = WebhookEvent.CreateRouted(
+                    templateEvent ? WebhookRoutingKind.Waba : WebhookRoutingKind.PhoneNumber,
+                    routingId,
+                    eventKind,
+                    idempotencyKey,
+                    fragment,
+                    signature);
+                try
+                {
+                    await webhookEventRepository.AddAsync(webhookEvent);
+                }
+                catch (DbUpdateException)
+                {
+                    // A concurrent retry won the unique idempotency constraint.
+                }
+            }
         }
-
-        // Meta reuses the WABA entry ID for many deliveries. Hash the signed raw
-        // event instead so retries deduplicate without discarding later messages.
-        var idempotencyKey = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))).ToLowerInvariant();
-
-        // Check for duplicate
-        var existingEvent = await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey);
-        if (existingEvent is not null)
-        {
-            logger.LogInformation("Duplicate webhook event {IdempotencyKey}", idempotencyKey);
-            return Results.Ok("OK");
-        }
-
-        // Create webhook event
-        var webhookEvent = WebhookEvent.Create(
-            phoneNumberId: phoneNumberId,
-            idempotencyKey: idempotencyKey,
-            rawPayload: rawBody,
-            signature: signature);
-
-        await webhookEventRepository.AddAsync(webhookEvent);
-
-        logger.LogInformation("Webhook event {EventId} received for {PhoneNumberId}",
-            webhookEvent.Id, phoneNumberId);
 
         return Results.Ok("OK");
     }

@@ -417,6 +417,7 @@ app.MapSubscriptionPlanEndpoints();
 app.MapSupportSessionEndpoints();
 app.MapOperatorEndpoints();
 app.MapWhatsAppEndpoints();
+app.MapWhatsAppTemplateEndpoints();
 app.MapAiProviderEndpoints();
 app.MapModelEvaluationEndpoints();
 app.MapKnowledgeEndpoints();

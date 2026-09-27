@@ -43,6 +43,12 @@ public interface IWhatsAppClient
         string accessToken,
         CancellationToken cancellationToken = default);
 
+    Task<WhatsAppTemplateCreateResult> CreateTemplateAsync(
+        string wabaId,
+        string accessToken,
+        WhatsAppTemplateCreateRequest template,
+        CancellationToken cancellationToken = default);
+
     // QR Code connection for development/unofficial API
     Task<WhatsAppQrCodeResult> GetQrCodeAsync(
         Guid tenantId,
@@ -96,6 +102,10 @@ public sealed record WhatsAppTemplateSummary(
     string Status,
     bool IsCompatible)
 {
+    public string? MetaTemplateId { get; init; }
+    public string BodyText { get; init; } = string.Empty;
+    public string? FooterText { get; init; }
+    public string ComponentsJson { get; init; } = "[]";
     public bool CanSendInInbox =>
         string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
         (string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) ||
@@ -106,6 +116,36 @@ public sealed record WhatsAppTemplateSummary(
         string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
         string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
         IsCompatible;
+}
+
+public sealed record WhatsAppTemplateCreateRequest(
+    string Name,
+    string Language,
+    string Category,
+    string BodyText,
+    IReadOnlyList<string> BodyExamples,
+    string? FooterText);
+
+public sealed record WhatsAppTemplateCreateResult
+{
+    public bool IsSuccess { get; init; }
+    public string? MetaTemplateId { get; init; }
+    public string Status { get; init; } = "UNKNOWN";
+    public string Category { get; init; } = "UNKNOWN";
+    public WhatsAppTemplateFailureKind FailureKind { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+public enum WhatsAppTemplateFailureKind
+{
+    None,
+    Validation,
+    Duplicate,
+    Authorization,
+    RateLimit,
+    Transient,
+    OutcomeUnknown
 }
 
 public sealed record WhatsAppQrCodeResult

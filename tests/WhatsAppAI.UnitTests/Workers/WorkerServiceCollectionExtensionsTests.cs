@@ -35,6 +35,7 @@ public sealed class WorkerServiceCollectionExtensionsTests
             descriptor => Assert.Equal(typeof(AiResponseQuotaReconciliationWorker), descriptor.ImplementationType),
             descriptor => Assert.Equal(typeof(RetentionWorker), descriptor.ImplementationType),
             descriptor => Assert.Equal(typeof(TenantSuspensionWorker), descriptor.ImplementationType),
-            descriptor => Assert.Equal(typeof(BroadcastDispatchWorker), descriptor.ImplementationType));
+            descriptor => Assert.Equal(typeof(BroadcastDispatchWorker), descriptor.ImplementationType),
+            descriptor => Assert.Equal(typeof(WhatsAppTemplateSubmissionWorker), descriptor.ImplementationType));
     }
 }

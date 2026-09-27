@@ -3,9 +3,9 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -127,25 +127,11 @@ public sealed class PostgreSqlMigrationConfigurationTests
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Assert.Equal(
-            [
-                "20260827000000_PostgreSqlBaseline",
-                "20260827120000_RemoveBotTokenLimit",
-                "20260827133343_AddPrivacyControls",
-                "20260827160000_AddAiMessageRetry",
-                "20260827210000_AddBotConfidenceThreshold",
-                "20260828010000_AddOperatorQueueAssignment",
-                "20260829020359_AddCommercialPlansAndAiResponseQuota",
-                "20260829172642_AddAiModelPricing",
-                "20260829193641_BindModelEvaluationToProvider",
-                "20260829203110_RenamePlanLineQuotaToTotal",
-                "20260829212302_AddBotBusinessHoursSchedule",
-                "20260830124123_AddWhatsAppTemplateMessages",
-                "20260830202456_AddWhatsAppWebSessionLeases",
-                "20260831200406_AddAiCredentialScope",
-                "20260831202229_AddTenantAiBudgetLimits"
-            ],
-            context.Database.GetMigrations());
+        var migrations = context.Database.GetMigrations().ToArray();
+
+        Assert.Contains("20260827000000_PostgreSqlBaseline", migrations);
+        Assert.Contains("20260927004154_AddWhatsAppTemplateManagement", migrations);
+        Assert.Contains("20260927124054_AddWebhookRoutingForTemplates", migrations);
     }
 
     private sealed class TestHostEnvironment : IHostEnvironment

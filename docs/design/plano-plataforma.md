@@ -10,7 +10,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 ### Módulos
 
 - **Identity & Tenancy:** autenticação, papéis, tenant corrente e administração.
-- **Integrations:** configuração Meta Cloud, WhatsApp Web/Baileys, provedores de IA administrados pela plataforma, teste de conexão e segredos.
+- **Integrations:** configuração Meta Cloud, WABAs e catálogo/submissão de templates, WhatsApp Web/Baileys, provedores de IA administrados pela plataforma, teste de conexão e segredos.
 - **Messaging:** webhook, contatos, conversas, mensagens, Inbox/Outbox e status.
 - **Automation:** política, contexto, conversa natural, proteção contra informação inventada, exemplos de atendimento por tenant, aprendizado supervisionado a partir de feedback aprovado, testes diagnósticos por cenário, interação de IA e handoff.
 - **Routing policy:** decisão determinística de fila e handoff após a resposta do provedor, com prioridade para segurança/pedido humano, filas autorizadas em modo automático e fallback contextual.
@@ -60,7 +60,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 ## 4. Interfaces de borda
 
-- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, listar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox autoriza Utilidade e Marketing individuais; o disparo em massa continua restrito a Utilidade.
+- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, criar e listar templates da WABA, consultar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox autoriza Utilidade e Marketing individuais; o disparo em massa continua restrito a Utilidade.
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
 - `ISecretStore`: gravar, recuperar somente para uso interno, rotacionar e remover segredo; credenciais de IA são administradas pela plataforma e nunca retornadas ao tenant.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.
@@ -97,6 +97,14 @@ O comando de assumir conversa incrementa `Version`, muda para `Human` e registra
 2. A SPA solicita a mídia a endpoint autenticado da WebApi com conversa e mensagem no tenant corrente.
 3. A WebApi autoriza o acesso, usa internamente a credencial do canal do tenant para obter o conteúdo e transmite o arquivo com limites de tipo/tamanho.
 4. Credencial e URL privada do provedor nunca são enviados ao navegador (**FR-023**).
+
+### Cadastro de templates
+
+1. O TenantOwner seleciona uma linha oficial; o backend resolve a WABA tenant-owned e recupera internamente a credencial protegida da linha.
+2. Nome, idioma, categoria, corpo, rodapé e exemplos são validados antes de gravar template e submissão durável com chave idempotente.
+3. Worker reconcilia por WABA, nome e idioma antes de repetir resultado incerto e só então cria o template pela API oficial.
+4. Eventos autenticados de template são persistidos por `entry/change`, roteados pela WABA e atualizam categoria/estado sem confiar em `phone_number_id`.
+5. Sincronização paginada recupera eventos perdidos e inclui templates criados fora da plataforma; o envio continua revalidando a Meta (**US-017**, **FR-084–FR-088**, ADR-0016).
 
 ## 6. Dados e transações
 
@@ -160,6 +168,7 @@ Este plano reutiliza, sem duplicar, os ADRs aceitos:
 - `docs/decisoes/0006-hosting-and-secrets.md`;
 - `docs/decisoes/0009-baileys-production-qr.md`.
 - `docs/decisoes/0010-platform-managed-ai-allowances.md`.
+- `docs/decisoes/0016-waba-template-ownership.md`.
 
 A topologia de um Meta App compartilhado especializa ADR-0002/0003 e está registrada em **R-010**. A política normativa de IA é `docs/regras/inteligencia-artificial.md`.
 

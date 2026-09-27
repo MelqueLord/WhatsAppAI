@@ -16,6 +16,8 @@ public static class MetaServiceCollectionExtensions
     {
         var useBridge = configuration.GetValue<bool>("WhatsAppWeb:Enabled") || environment.IsDevelopment();
 
+        services.Configure<MetaGraphOptions>(configuration.GetSection(MetaGraphOptions.SectionName));
+
         services.AddHttpClient<WhatsAppClient>();
         var qrClient = services.AddHttpClient<WhatsAppWebClient>();
 

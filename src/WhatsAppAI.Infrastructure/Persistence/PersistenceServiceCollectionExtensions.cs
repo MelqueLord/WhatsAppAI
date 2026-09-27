@@ -52,6 +52,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<ISecretRepository, SecretRepository>();
         services.AddScoped<IWhatsAppAccountRepository, WhatsAppAccountRepository>();
+        services.AddScoped<IWhatsAppTemplateRepository, WhatsAppTemplateRepository>();
+        services.AddScoped<WhatsAppAI.Infrastructure.Workers.WhatsAppTemplateCatalogSyncService>();
         services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IContactRepository, ContactRepository>();
         services.AddScoped<IContactImportFileReader, ContactImportFileReader>();

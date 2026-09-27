@@ -3,7 +3,10 @@ namespace WhatsAppAI.Domain.Messaging;
 public sealed class WebhookEvent
 {
     public Guid Id { get; private set; }
-    public string PhoneNumberId { get; private set; } = string.Empty;
+    public string? PhoneNumberId { get; private set; }
+    public WebhookRoutingKind RoutingKind { get; private set; }
+    public string RoutingId { get; private set; } = string.Empty;
+    public string EventKind { get; private set; } = string.Empty;
     public Guid? TenantId { get; private set; }
     public string IdempotencyKey { get; private set; } = string.Empty;
     public WebhookEventStatus Status { get; private set; }
@@ -29,6 +32,8 @@ public sealed class WebhookEvent
         {
             Id = Guid.NewGuid(),
             PhoneNumberId = phoneNumberId,
+            RoutingKind = WebhookRoutingKind.PhoneNumber,
+            RoutingId = phoneNumberId,
             TenantId = tenantId,
             IdempotencyKey = idempotencyKey,
             Status = WebhookEventStatus.Pending,
@@ -37,6 +42,26 @@ public sealed class WebhookEvent
             CreatedAt = DateTime.UtcNow
         };
     }
+
+    public static WebhookEvent CreateRouted(
+        WebhookRoutingKind routingKind,
+        string routingId,
+        string eventKind,
+        string idempotencyKey,
+        string rawPayload,
+        string signature)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(routingId);
+        return new WebhookEvent
+        {
+            Id = Guid.NewGuid(), PhoneNumberId = routingKind == WebhookRoutingKind.PhoneNumber ? routingId : null,
+            RoutingKind = routingKind, RoutingId = routingId, EventKind = eventKind,
+            IdempotencyKey = idempotencyKey, Status = WebhookEventStatus.Pending,
+            EncryptedPayload = rawPayload, Signature = signature, CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public void ResolveTenant(Guid tenantId) => TenantId = tenantId;
 
     public void MarkProcessing()
     {
@@ -80,6 +105,8 @@ public sealed class WebhookEvent
         && NextRetryAt.Value <= DateTime.UtcNow
         && RetryCount < 5;
 }
+
+public enum WebhookRoutingKind { PhoneNumber = 0, Waba = 1 }
 
 public enum WebhookEventStatus
 {

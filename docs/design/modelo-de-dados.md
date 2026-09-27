@@ -34,6 +34,22 @@ Entidade tenant-owned. Purpose: `TenantOwnerActivation|OperatorActivation`. O to
 
 Únicos: `(tenant_id, connection_type, line_number)` e `phone_number_id` globalmente único na implantação. `connection_type` é `OfficialApi|QrCode`; `line_number` começa em 1 e não pode exceder a quota do tenant.
 
+Para linhas oficiais, `whatsapp_business_account_id` referencia a WABA tenant-owned definida no ADR-0016. Durante a migration, o `waba_id` legado é agrupado por tenant e a mesma WABA em tenants distintos bloqueia o avanço.
+
+### WhatsAppBusinessAccount
+
+`id`, `tenant_id`, `waba_id`, `created_at`, `updated_at`, `version`.
+
+`waba_id` é globalmente único na instalação. Uma WABA pode reunir várias linhas oficiais do mesmo tenant e é a fronteira de propriedade do catálogo e dos webhooks de templates (**BR-053**, ADR-0016).
+
+### WhatsAppMessageTemplate e WhatsAppTemplateSubmission
+
+`WhatsAppMessageTemplate`: `id`, `tenant_id`, `whatsapp_business_account_id`, `meta_template_id`, `name`, `language`, `requested_category`, `effective_category`, `parameter_format`, corpo/rodapé/exemplos sanitizados, componentes normalizados, estado de revisão, status bruto, compatibilidade, motivo/recomendação sanitizados, timestamps e `version`.
+
+Único `(tenant_id, whatsapp_business_account_id, name, language)` e, quando presente, por identificação externa dentro da WABA. Somente o snapshot aprovado e compatível orienta disponibilidade; o envio continua revalidando a Meta.
+
+`WhatsAppTemplateSubmission`: `id`, `tenant_id`, `whatsapp_business_account_id`, `whatsapp_message_template_id`, `source_whatsapp_account_id`, `idempotency_key`, `request_fingerprint`, estado operacional, tentativas/lease, erro sanitizado, correlação e timestamps. Único `(tenant_id, idempotency_key)`. Timeout após possível aceite exige reconciliação antes de novo POST (**US-017**, **FR-084–FR-088**, **BR-054**, **BR-055**).
+
 ### PlatformIntegrationSecret
 
 `id`, `provider`, `kind`, `secret_ref`, `status`, `rotated_at`, timestamps.
@@ -185,6 +201,7 @@ erDiagram
 | **US-001, FR-002, FR-003** | `Tenant`, `User`, `TenantMembership`; criação inclui convite do proprietário e suspensão altera status sem apagar histórico. |
 | **FR-001** | Sessão/antiforgery são controles WebApi; nenhum token antiforgery é persistido em entidade de negócio. |
 | **FR-004, FR-021, BR-008** | `PlatformIntegrationSecret`, `WhatsAppAccount` e `AiProviderCredential` guardam apenas `secret_ref`. |
+| **US-017, FR-084–FR-088, BR-053–BR-055** | `WhatsAppBusinessAccount` define propriedade inequívoca da WABA; `WhatsAppMessageTemplate` mantém catálogo por nome/idioma; `WhatsAppTemplateSubmission` garante operação durável, idempotente e reconciliável. |
 | **FR-005, FR-006, FR-007, FR-022, BR-011** | `WebhookEvent` autentica antes da resolução, deduplica, separa envelope sanitizado de payload cifrado e suporta estado `Unknown`. |
 | **FR-008, BR-001, BR-002** | `WhatsAppAccount`, `Contact`, `Conversation` e `Message` têm unicidade/relacionamento tenant-scoped. |
 | **US-010, FR-039, BR-019** | A importação cria somente `Contact` no tenant corrente; arquivo e erros são transitórios, a unicidade por tenant impede duplicação sem sobrescrever cadastro existente e uma fila ativa opcional agrupa somente contatos novos para o disparo. |

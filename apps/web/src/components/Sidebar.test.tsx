@@ -36,6 +36,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByRole('link', { name: 'Filas' })).toHaveAttribute('href', '/queues')
     expect(screen.getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/tags')
+    expect(screen.getByRole('link', { name: 'Templates WhatsApp' })).toHaveAttribute('href', '/integrations/whatsapp/templates')
     expect(screen.getByRole('link', { name: 'Teste IA' })).toHaveAttribute('href', '/integrations/ai/scenarios')
     expect(screen.getByRole('button', { name: 'Fechar menu' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeVisible()

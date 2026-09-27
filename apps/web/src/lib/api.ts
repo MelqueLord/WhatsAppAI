@@ -436,6 +436,31 @@ export interface WhatsAppLine {
   isActive: boolean
 }
 
+export interface ManagedWhatsAppTemplate {
+  id: string
+  name: string
+  language: string
+  requestedCategory?: string | null
+  effectiveCategory: string
+  reviewStatus: string
+  providerRawStatus: string
+  bodyText: string
+  footerText?: string | null
+  bodyParameterCount: number
+  isInboxCompatible: boolean
+  isBroadcastCompatible: boolean
+  rejectionReason?: string | null
+  recommendation?: string | null
+  lastSyncedAt?: string | null
+}
+
+export interface WhatsAppTemplateOperation {
+  templateId: string
+  submissionId: string
+  submissionStatus: string
+  reviewStatus: string
+}
+
 export interface BroadcastList {
   id: string
   name: string
@@ -823,6 +848,22 @@ export const api = {
       )
       return res.lines ?? []
     },
+    listTemplates: (lineNumber: number) =>
+      fetchApi<{ templates: ManagedWhatsAppTemplate[] }>(`/api/integrations/whatsapp/official/${lineNumber}/templates`),
+    createTemplate: (lineNumber: number, idempotencyKey: string, data: {
+      name: string
+      language: string
+      category: 'UTILITY' | 'MARKETING'
+      bodyText: string
+      bodyExamples: string[]
+      footerText?: string
+    }) => fetchApi<WhatsAppTemplateOperation>(`/api/integrations/whatsapp/official/${lineNumber}/templates`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    syncTemplates: (lineNumber: number) =>
+      fetchApi<{ status: string; count: number }>(`/api/integrations/whatsapp/official/${lineNumber}/templates/sync`, { method: 'POST' }),
   },
 
   admin: {

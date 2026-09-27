@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Integrations;
@@ -153,7 +154,7 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
         // Verify only one event was created
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var eventCount = context.WebhookEvents.Count();
+        var eventCount = await context.WebhookEvents.CountAsync();
         Assert.Equal(1, eventCount);
     }
 
@@ -178,7 +179,57 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
 
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(2, context.WebhookEvents.Count());
+        Assert.Equal(2, await context.WebhookEvents.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReceiveTemplateEvents_RoutesEachFragmentByWabaAndDeduplicatesRetries()
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            @object = "whatsapp_business_account",
+            entry = new object[]
+            {
+                new
+                {
+                    id = "waba-known",
+                    time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    changes = new object[]
+                    {
+                        new { field = "message_template_status_update", value = new { message_template_id = "template-1", status = "APPROVED" } }
+                    }
+                },
+                new
+                {
+                    id = "waba-unknown",
+                    time = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    changes = new object[]
+                    {
+                        new { field = "template_category_update", value = new { message_template_id = "template-2", category = "UTILITY" } }
+                    }
+                }
+            }
+        });
+
+        foreach (var _ in new[] { 1, 2 })
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/webhooks/meta")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Add("X-Hub-Signature-256", ComputeSignature(payload));
+            Assert.Equal(HttpStatusCode.OK, (await _client.SendAsync(request)).StatusCode);
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var events = await context.WebhookEvents.OrderBy(x => x.RoutingId).ToListAsync();
+
+        Assert.Equal(2, events.Count);
+        Assert.All(events, item => Assert.Equal(WebhookRoutingKind.Waba, item.RoutingKind));
+        Assert.Equal("message_template_status_update", events.Single(x => x.RoutingId == "waba-known").EventKind);
+        Assert.Equal("template_category_update", events.Single(x => x.RoutingId == "waba-unknown").EventKind);
+        Assert.All(events, item => Assert.Null(item.TenantId));
     }
 
     [Fact]
@@ -254,7 +305,7 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
         // Verify event count matches (each unique entry)
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var eventCount = context.WebhookEvents.Count();
+        var eventCount = await context.WebhookEvents.CountAsync();
         Assert.Equal(count, eventCount);
     }
 
@@ -319,4 +370,3 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
         return $"sha256={Convert.ToHexString(hash).ToLowerInvariant()}";
     }
 }
-

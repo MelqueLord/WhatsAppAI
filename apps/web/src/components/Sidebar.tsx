@@ -20,6 +20,7 @@ import {
   Settings,
   WalletCards,
   FlaskConical,
+  FileText,
 } from 'lucide-react'
 import atenzLogo from '../assets/atenz-logo-a.png'
 import { formatUserRole } from '../lib/utils'
@@ -167,6 +168,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
       ? [
           { to: '/operators', icon: Users, label: 'Operadores' },
           { to: '/integrations/whatsapp', icon: Zap, label: 'WhatsApp' },
+          { to: '/integrations/whatsapp/templates', icon: FileText, label: 'Templates WhatsApp' },
           ...(botEnabled ? [{ to: '/bot-config', icon: Settings, label: 'Fluxo do Bot' }] : []),
           ...(aiEnabled ? [{ to: '/integrations/ai', icon: Bot, label: 'Diretrizes IA' }] : []),
           ...(aiEnabled ? [{ to: '/integrations/ai/examples', icon: MessageSquare, label: 'Exemplos IA' }] : []),

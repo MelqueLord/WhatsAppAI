@@ -70,7 +70,7 @@ public sealed class WebhookProcessingWorker(
                 return false;
 
             await Parallel.ForEachAsync(
-                events.GroupBy(webhookEvent => webhookEvent.PhoneNumberId),
+                events.GroupBy(webhookEvent => webhookEvent.RoutingId),
                 new ParallelOptions
                 {
                     MaxDegreeOfParallelism = MaxConcurrency,
@@ -102,21 +102,52 @@ public sealed class WebhookProcessingWorker(
             webhookEvent.MarkProcessing();
             await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
 
+            if (webhookEvent.RoutingKind == WebhookRoutingKind.Waba)
+            {
+                var templateRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppTemplateRepository>();
+                var waba = await templateRepository.GetBusinessAccountByExternalIdAsync(webhookEvent.RoutingId, cancellationToken);
+                if (waba is null)
+                {
+                    webhookEvent.MarkDead();
+                    await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
+                    return;
+                }
+
+                var wabaAccountRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
+                var wabaAccount = await wabaAccountRepository.GetByTenantAndWabaIdAsync(waba.TenantId, waba.WabaId, cancellationToken);
+                if (wabaAccount is null)
+                {
+                    webhookEvent.MarkFailed("No active official line found for the WABA.");
+                    await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
+                    return;
+                }
+
+                webhookEvent.ResolveTenant(waba.TenantId);
+                var sync = scope.ServiceProvider.GetRequiredService<WhatsAppTemplateCatalogSyncService>();
+                var syncResult = await sync.SynchronizeAsync(wabaAccount, cancellationToken);
+                if (syncResult.IsSuccess)
+                    webhookEvent.MarkProcessed();
+                else
+                    webhookEvent.MarkFailed(syncResult.ErrorMessage ?? "Template catalog synchronization failed.");
+                await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
+                return;
+            }
+
             // Resolve tenant from phone_number_id
             var whatsAppAccountRepository = scope.ServiceProvider.GetRequiredService<IWhatsAppAccountRepository>();
 
             var account = await whatsAppAccountRepository.GetByPhoneNumberIdAsync(
-                webhookEvent.PhoneNumberId, cancellationToken);
+                webhookEvent.PhoneNumberId ?? webhookEvent.RoutingId, cancellationToken);
 
             Guid? tenantId = null;
-            if (TryGetWhatsAppWebTenant(webhookEvent.PhoneNumberId, out var webTenantId))
+            if (TryGetWhatsAppWebTenant(webhookEvent.PhoneNumberId ?? webhookEvent.RoutingId, out var webTenantId))
                 tenantId = webTenantId;
             else
                 tenantId = account?.TenantId;
 
             if (tenantId is null)
             {
-                logger.LogWarning("No WhatsApp account found for {PhoneNumberId}", webhookEvent.PhoneNumberId);
+                logger.LogWarning("No WhatsApp account found for {PhoneNumberId}", webhookEvent.RoutingId);
                 webhookEvent.MarkFailed("No account found");
                 await webhookEventRepository.UpdateAsync(webhookEvent, cancellationToken);
                 return;
@@ -197,7 +228,7 @@ public sealed class WebhookProcessingWorker(
                             await ProcessInboundMessageAsync(
                                 tenantId,
                                 whatsappMessage,
-                                change.Value.Metadata?.PhoneNumberId ?? webhookEvent.PhoneNumberId,
+                                change.Value.Metadata?.PhoneNumberId ?? webhookEvent.RoutingId,
                                 contactName,
                                 contactRepository,
                                 conversationRepository,
