@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -98,8 +98,12 @@ namespace WhatsAppAI.Infrastructure.Migrations
                 SELECT md5(tenant_id::text || ':' || waba_id)::uuid, tenant_id, waba_id, NOW(), 0
                 FROM whatsappai.whatsapp_accounts
                 WHERE connection_type = 'OfficialApi' AND waba_id <> ''
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM whatsappai.whatsapp_business_accounts AS existing
+                      WHERE existing.waba_id = whatsapp_accounts.waba_id
+                  )
                 GROUP BY tenant_id, waba_id
-                ON CONFLICT (waba_id) DO NOTHING;
 
                 UPDATE whatsappai.whatsapp_accounts AS line
                 SET whatsapp_business_account_id = waba.id
