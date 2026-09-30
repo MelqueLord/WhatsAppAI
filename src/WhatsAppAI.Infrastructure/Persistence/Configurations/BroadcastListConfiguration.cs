@@ -18,6 +18,7 @@ public sealed class BroadcastListConfiguration : IEntityTypeConfiguration<Broadc
         builder.Property(b => b.DeliveryMode).HasColumnName("delivery_mode").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(b => b.TemplateName).HasColumnName("template_name").HasMaxLength(512);
         builder.Property(b => b.TemplateLanguage).HasColumnName("template_language").HasMaxLength(20);
+        builder.Property(b => b.TemplateCategory).HasColumnName("template_category").HasMaxLength(40);
         builder.Property(b => b.TemplateParametersJson).HasColumnName("template_parameters_json").HasMaxLength(12000);
         builder.Property(b => b.Status)
             .HasColumnName("status")
@@ -29,6 +30,7 @@ public sealed class BroadcastListConfiguration : IEntityTypeConfiguration<Broadc
         builder.Property(b => b.TotalCount).HasColumnName("total_count").IsRequired();
         builder.Property(b => b.SentCount).HasColumnName("sent_count").IsRequired();
         builder.Property(b => b.FailedCount).HasColumnName("failed_count").IsRequired();
+        builder.Property(b => b.SkippedCount).HasColumnName("skipped_count").IsRequired();
         builder.Property(b => b.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
         builder.Property(b => b.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(b => b.StartedAt).HasColumnName("started_at").HasColumnType("timestamp with time zone");

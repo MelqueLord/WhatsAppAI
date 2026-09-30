@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.39.0
-**Data:** 2026-09-06
+**Versão:** 0.40.0
+**Data:** 2026-09-30
 
 ## 1. Problema
 
@@ -28,6 +28,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - Inbox em tempo real, histórico, texto e mídia básica.
 - Resposta humana e resposta automática textual por IA.
 - Templates aprovados pela Meta de Utilidade e Marketing para atendimento individual na Inbox da API Oficial fora da janela de 24 horas; outras categorias são visíveis, mas não enviáveis nesta entrega.
+- Disparo em massa por template aprovado de Utilidade ou Marketing na API Oficial; Marketing exige consentimento ativo, específico e revogável por contato.
 - Modos `Automatic`, `Human` e `Paused` por conversa.
 - Base de conhecimento textual simples.
 - Consumo real de tokens, custo operacional estimado e controle de franquia/orçamento por tenant; o faturamento comercial é administrado pela plataforma.
@@ -35,7 +36,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 
 ### Fora do escopo
 
-- Campanhas de marketing em massa, templates de Autenticação e mensagens proativas fora de uma conversa individual existente.
+- Templates de Autenticação, mídia, botões, cabeçalhos, agendamento e mensagens proativas fora de uma conversa individual ou de um disparo de template autorizado.
 - CRM, funil comercial, agenda, catálogo e integrações externas. O PlatformAdmin registra pagamentos manualmente; não há cobrança online integrada.
 - Construtor visual de fluxos, n8n no caminho crítico e múltiplos canais.
 - IA para áudio/imagem, treinamento de modelos e RAG vetorial no MVP.
@@ -162,7 +163,7 @@ Como TenantOwner, quero cadastrar templates textuais da API Oficial e acompanhar
 2. A primeira entrega aceita corpo textual, rodapé opcional e variáveis posicionais com exemplos, sem cabeçalho, mídia, botões, Autenticação, edição ou exclusão.
 3. A submissão é durável e idempotente; resultado incerto é reconciliado com a Meta antes de qualquer repetição.
 4. Aprovação, rejeição, mudança de categoria e demais estados aparecem no catálogo do tenant com motivo sanitizado, inclusive para templates criados diretamente no WhatsApp Manager.
-5. O cadastro não amplia as regras de envio: Marketing continua individual na Inbox e o disparo em massa continua restrito a Utilidade aprovada e compatível.
+5. O cadastro não amplia as regras de envio: Marketing pode ser usado no disparo em massa somente com consentimento ativo, específico e revogável por contato; Utilidade continua elegível quando aprovada e compatível.
 
 ### US-007 — Auditar operação (P2)
 
@@ -300,7 +301,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-056:** usar a base de conhecimento ativa do tenant como fonte prioritária para fatos da empresa; itens sem correspondência com a solicitação não podem ser injetados como contexto e, sem informação relevante, a IA deve evitar invenção e encaminhar quando a pergunta exigir um fato não documentado.
 - **FR-057:** coletar na tela de IA um perfil estruturado do negócio (descrição, público-alvo, produtos/serviços, tom, horário e localização), persistindo-o junto às diretrizes existentes para personalizar a abordagem sem substituir a base de conhecimento para fatos comerciais.
 - **FR-058:** permitir ao TenantOwner configurar expediente do BOT por dia da semana e fuso horário; quando habilitado, mensagens recebidas fora de um período aberto não podem seguir o fluxo automático e devem usar a mensagem configurada de fora do horário.
-- **FR-059:** listar na Inbox todos os templates da WABA da linha oficial, agrupados por categoria e com status visível; permitir ao operador enviar individualmente apenas templates aprovados de Utilidade ou Marketing com componentes suportados, idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas. O backend deve rejeitar templates não aprovados/incompatíveis e conexões QR Code e persistir a intenção na Outbox. O disparo em massa continua restrito a Utilidade.
+- **FR-059:** listar na Inbox todos os templates da WABA da linha oficial, agrupados por categoria e com status visível; permitir ao operador enviar individualmente apenas templates aprovados de Utilidade ou Marketing com componentes suportados, idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas. O backend deve rejeitar templates não aprovados/incompatíveis e conexões QR Code e persistir a intenção na Outbox. No disparo em massa, Marketing exige consentimento ativo, específico e revogável por contato.
 - **FR-060:** permitir executar múltiplas instâncias da ponte QR sem que duas instâncias controlem a mesma sessão; cada sessão deve ter lease exclusivo e renovável no PostgreSQL, e chamadas devem ser roteadas para a instância dona.
 - **FR-067:** manter a finalidade de atendimento automatizado por IA isolada por tenant para governança e auditoria, sem interromper o primeiro contato com uma solicitação de resposta `SIM`.
 - **FR-068:** permitir o atendimento automatizado por IA desde a primeira mensagem recebida ou iniciada pelo operador, sem solicitar confirmação textual ao contato; consentimento individual continua sendo exigido somente para memória pessoal do cliente.
@@ -359,7 +360,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura, nunca uma afirmação específica inventada, e não muda a conversa para `Human`. A transferência automática por regra de negócio ocorre por palavra-chave de fila humana autorizada ou pedido explícito de atendente; proteções críticas de segurança e indisponibilidade preservam o handoff seguro existente, e a transferência manual permanece disponível ao operador.
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 - **BR-028:** agenda desabilitada mantém compatibilidade 24 horas; agenda habilitada exige sete dias válidos, horários de abertura/fechamento coerentes e fuso permitido. Sem mensagem de fora do horário, o BOT finaliza a entrada sem criar resposta automática.
-- **BR-029:** template enviável exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres no corpo e ausência de componentes que exijam payload adicional; só pode ser despachado por uma conta `OfficialApi`. QR Code deve finalizar a Outbox sem chamada externa.
+- **BR-029:** template enviável exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres no corpo e ausência de componentes que exijam payload adicional; só pode ser despachado por uma conta `OfficialApi`. Em disparo Marketing, cada destinatário deve ter consentimento ativo para a finalidade específica no momento do dispatch e antes da materialização da Outbox; revogação impede o envio. QR Code deve finalizar a Outbox sem chamada externa.
 - **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem, publicar webhook de entrada ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
 - **BR-035:** a finalidade padrão de IA é isolada pelo tenant e usada para governança; ela não exige uma confirmação textual do contato para o atendimento automatizado.
 - **BR-036:** a palavra `SIM` não possui tratamento especial no atendimento automatizado e não gera mensagem de confirmação; consentimento permanece obrigatório apenas quando o operador registrar memória pessoal do contato.

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
+using WhatsAppAI.Application.Broadcast;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Broadcast;
 using WhatsAppAI.Domain.Integrations;
@@ -109,6 +110,13 @@ public sealed class BroadcastDispatchWorker(
             if (contact is null)
             {
                 await FailRecipientAsync(broadcastRepo, broadcast, recipient, "Contact not found", ct);
+                return;
+            }
+
+            if (MarketingBroadcastConsentPolicy.IsMarketing(broadcast.TemplateCategory) &&
+                !await HasActiveMarketingConsentAsync(dbContext, broadcast.TenantId, contact.Id, ct))
+            {
+                await SkipRecipientAsync(broadcastRepo, broadcast, recipient, ct);
                 return;
             }
 
@@ -285,4 +293,32 @@ public sealed class BroadcastDispatchWorker(
         broadcast.RecordFailed();
         await broadcastRepo.UpdateAsync(broadcast);
     }
+
+    private static async Task SkipRecipientAsync(
+        IBroadcastRepository broadcastRepo,
+        BroadcastList broadcast,
+        BroadcastRecipient recipient,
+        CancellationToken ct)
+    {
+        _ = ct;
+        recipient.MarkSkipped("Marketing consent is not active.");
+        await broadcastRepo.UpdateRecipientAsync(recipient);
+        broadcast.RecordSkipped();
+        await broadcastRepo.UpdateAsync(broadcast);
+    }
+
+    private static Task<bool> HasActiveMarketingConsentAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        Guid contactId,
+        CancellationToken cancellationToken) =>
+        dbContext.ConsentEvidence.IgnoreQueryFilters().AnyAsync(evidence =>
+            evidence.TenantId == tenantId &&
+            evidence.ContactId == contactId &&
+            evidence.RevokedAt == null &&
+            evidence.ProcessingPurpose.TenantId == tenantId &&
+            evidence.ProcessingPurpose.IsActive &&
+            evidence.ProcessingPurpose.LegalBasis == WhatsAppAI.Domain.Privacy.LegalBasis.Consent &&
+            evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName,
+            cancellationToken);
 }

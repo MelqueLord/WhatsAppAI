@@ -24,6 +24,31 @@ public sealed class BroadcastListTests
     }
 
     [Fact]
+    public void SetTemplateCategory_AcceptsMarketingForOfficialTemplate()
+    {
+        var broadcast = BroadcastList.Create(Guid.NewGuid(), "Oferta", string.Empty, Guid.NewGuid(),
+            deliveryMode: BroadcastDeliveryMode.OfficialApiTemplate, templateName: "offer",
+            templateLanguage: "pt_BR", linePhoneNumberId: "123");
+
+        broadcast.SetTemplateCategory("marketing");
+
+        Assert.Equal("MARKETING", broadcast.TemplateCategory);
+    }
+
+    [Fact]
+    public void RecordSkipped_CompletesDispatchWithoutMarkingRecipientAsFailed()
+    {
+        var broadcast = BroadcastList.Create(Guid.NewGuid(), "Oferta", "Mensagem", Guid.NewGuid());
+        broadcast.StartDispatch("qr:tenant:1:1", 1);
+
+        broadcast.RecordSkipped();
+
+        Assert.Equal(1, broadcast.SkippedCount);
+        Assert.Equal(BroadcastStatus.Completed, broadcast.Status);
+        Assert.Equal(0, broadcast.FailedCount);
+    }
+
+    [Fact]
     public void UpdateMessage_RejectsOfficialTemplateBroadcasts()
     {
         var broadcast = BroadcastList.Create(Guid.NewGuid(), "Aviso", string.Empty, Guid.NewGuid(),

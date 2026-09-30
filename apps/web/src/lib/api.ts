@@ -327,6 +327,7 @@ export interface Contact {
   profilePictureUrl?: string
   lastMessageAt?: string
   createdAt: string
+  hasMarketingConsent?: boolean
   conversationId?: string
   message?: string
 }
@@ -468,12 +469,14 @@ export interface BroadcastList {
   deliveryMode?: 'QrCodeText' | 'OfficialApiTemplate'
   templateName?: string | null
   templateLanguage?: string | null
+  templateCategory?: string | null
   status: string
   linePhoneNumberId?: string
   queueId?: string | null
   totalCount: number
   sentCount: number
   failedCount: number
+  skippedCount?: number
   createdAt: string
   startedAt?: string
   finishedAt?: string
@@ -727,6 +730,14 @@ export const api = {
 
     delete: (id: string) =>
       fetchApi<void>(`/api/contacts/${id}`, { method: 'DELETE' }),
+
+    grantMarketingConsent: (id: string) =>
+      fetchApi<{ contactId: string; hasMarketingConsent: boolean }>(`/api/contacts/${id}/marketing-consent`, {
+        method: 'POST',
+      }),
+
+    revokeMarketingConsent: (id: string) =>
+      fetchApi<void>(`/api/contacts/${id}/marketing-consent`, { method: 'DELETE' }),
 
     import: (file: File, queueId?: string) => {
       const data = new FormData()

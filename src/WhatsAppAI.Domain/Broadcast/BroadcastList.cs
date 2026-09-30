@@ -9,6 +9,7 @@ public sealed class BroadcastList
     public BroadcastDeliveryMode DeliveryMode { get; private set; }
     public string? TemplateName { get; private set; }
     public string? TemplateLanguage { get; private set; }
+    public string? TemplateCategory { get; private set; }
     public string? TemplateParametersJson { get; private set; }
     public BroadcastStatus Status { get; private set; }
     public string LinePhoneNumberId { get; private set; } = string.Empty;
@@ -16,6 +17,7 @@ public sealed class BroadcastList
     public int TotalCount { get; private set; }
     public int SentCount { get; private set; }
     public int FailedCount { get; private set; }
+    public int SkippedCount { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
@@ -82,6 +84,17 @@ public sealed class BroadcastList
         StartedAt = DateTime.UtcNow;
     }
 
+    public void SetTemplateCategory(string category)
+    {
+        if (DeliveryMode != BroadcastDeliveryMode.OfficialApiTemplate || Status != BroadcastStatus.Draft)
+            throw new InvalidOperationException("Only draft official template broadcasts can set a template category.");
+        if (!string.Equals(category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(category, "MARKETING", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Only utility or marketing templates can be broadcast.", nameof(category));
+
+        TemplateCategory = category.Trim().ToUpperInvariant();
+    }
+
     public void UpdateMessage(string message)
     {
         if (DeliveryMode != BroadcastDeliveryMode.QrCodeText)
@@ -121,6 +134,12 @@ public sealed class BroadcastList
         CheckCompletion();
     }
 
+    public void RecordSkipped()
+    {
+        SkippedCount++;
+        CheckCompletion();
+    }
+
     public void Cancel()
     {
         if (Status == BroadcastStatus.Completed || Status == BroadcastStatus.Cancelled)
@@ -135,7 +154,7 @@ public sealed class BroadcastList
         if (Status != BroadcastStatus.Sending)
             return;
 
-        if (SentCount + FailedCount >= TotalCount)
+        if (SentCount + FailedCount + SkippedCount >= TotalCount)
         {
             Status = BroadcastStatus.Completed;
             FinishedAt = DateTime.UtcNow;

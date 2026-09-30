@@ -12,6 +12,7 @@ interface Contact {
   name?: string
   lastMessageAt?: string
   createdAt: string
+  hasMarketingConsent?: boolean
 }
 
 function maskBrazilPhone(value: string) {
@@ -42,6 +43,7 @@ export function ContactsPage() {
   const [selectedLineId, setSelectedLineId] = useState('')
   const [conversationTarget, setConversationTarget] = useState<Contact | null>(null)
   const [startConversationOn, setStartConversationOn] = useState(false)
+  const [marketingConsentConfirmed, setMarketingConsentConfirmed] = useState(false)
 
   const { data: whatsappLines = [] } = useQuery({
     queryKey: ['whatsapp-lines'],
@@ -135,6 +137,20 @@ export function ContactsPage() {
     },
     onError: (error) => {
       setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir o contato.')
+    },
+  })
+
+  const marketingConsentMutation = useMutation({
+    mutationFn: async ({ contactId, granted }: { contactId: string; granted: boolean }) => {
+      if (granted) await api.contacts.grantMarketingConsent(contactId)
+      else await api.contacts.revokeMarketingConsent(contactId)
+    },
+    onSuccess: (_, { contactId, granted }) => {
+      queryClient.setQueryData<Contact[]>(['contacts'], (current = []) =>
+        current.map((contact) => contact.id === contactId ? { ...contact, hasMarketingConsent: granted } : contact))
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      setEditTarget((current) => current?.id === contactId ? { ...current, hasMarketingConsent: granted } : current)
+      setMarketingConsentConfirmed(false)
     },
   })
 
@@ -297,8 +313,10 @@ export function ContactsPage() {
                                 setEditTarget(contact)
                                 setMemoryKey('')
                                 setMemoryValue('')
+                                setMarketingConsentConfirmed(false)
                                 saveMemoryMutation.reset()
                                 removeMemoryMutation.reset()
+                                marketingConsentMutation.reset()
                               }}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
                               title="Editar contato"
@@ -491,6 +509,42 @@ export function ContactsPage() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
+              <section className="border-t border-slate-100 pt-4 space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Marketing por WhatsApp</h3>
+                  <p className="text-xs text-slate-500 mt-1">O consentimento é exigido antes de enviar um template de Marketing neste contato.</p>
+                </div>
+                {editTarget.hasMarketingConsent ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-sm text-emerald-800">Consentimento de Marketing ativo.</p>
+                    <button
+                      type="button"
+                      onClick={() => marketingConsentMutation.mutate({ contactId: editTarget.id, granted: false })}
+                      disabled={!isTenantOwner || marketingConsentMutation.isPending}
+                      className="mt-2 text-xs font-medium text-red-700 hover:underline disabled:opacity-50"
+                    >
+                      Revogar consentimento
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                    <p className="text-xs text-amber-900">Registre somente uma autorização já obtida diretamente com este contato.</p>
+                    <label className="flex items-start gap-2 text-xs text-slate-700">
+                      <input type="checkbox" checked={marketingConsentConfirmed} onChange={(event) => setMarketingConsentConfirmed(event.target.checked)} disabled={!isTenantOwner} className="mt-0.5 accent-emerald-600" />
+                      Confirmo que este contato autorizou receber mensagens de Marketing por WhatsApp.
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => marketingConsentMutation.mutate({ contactId: editTarget.id, granted: true })}
+                      disabled={!isTenantOwner || !marketingConsentConfirmed || marketingConsentMutation.isPending}
+                      className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                    >
+                      {marketingConsentMutation.isPending ? 'Registrando...' : 'Registrar consentimento'}
+                    </button>
+                  </div>
+                )}
+                {marketingConsentMutation.isError && <p className="text-xs text-red-600">{(marketingConsentMutation.error as Error).message}</p>}
+              </section>
               <section className="border-t border-slate-100 pt-4 space-y-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">Memória do cliente</h3>

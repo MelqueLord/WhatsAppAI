@@ -260,6 +260,7 @@ public static class BroadcastEndpoints
         ITenantMembershipRepository membershipRepo,
         ISecretStore secretStore,
         IWhatsAppClientResolver whatsAppClientResolver,
+        AppDbContext db,
         IHubContext<InboxHub> hub)
     {
         if (currentTenant.TenantId is null) return Results.Unauthorized();
@@ -295,11 +296,38 @@ public static class BroadcastEndpoints
                 .ListTemplatesAsync(line.WabaId, token);
             var parameterCount = string.IsNullOrWhiteSpace(broadcast.TemplateParametersJson) ? 0 :
                 JsonSerializer.Deserialize<List<string>>(broadcast.TemplateParametersJson)?.Count ?? 0;
-            if (!templates.IsSuccess || !templates.Templates.Any(template =>
+            var selectedTemplate = templates.Templates.SingleOrDefault(template =>
                 template.Name == broadcast.TemplateName && template.Language == broadcast.TemplateLanguage &&
                 template.CanSendInBroadcast &&
-                template.BodyParameterCount == parameterCount))
+                template.BodyParameterCount == parameterCount);
+            if (!templates.IsSuccess || selectedTemplate is null)
                 return Results.BadRequest(new { error = "The selected template is no longer eligible for sending." });
+
+            broadcast.SetTemplateCategory(selectedTemplate.Category);
+            if (MarketingBroadcastConsentPolicy.IsMarketing(selectedTemplate.Category))
+            {
+                var recipientsWithoutConsent = await db.BroadcastRecipients
+                    .IgnoreQueryFilters()
+                    .Where(recipient =>
+                        recipient.TenantId == tenantId &&
+                        recipient.BroadcastListId == broadcast.Id &&
+                        recipient.Status == BroadcastRecipientStatus.Pending &&
+                        !db.ConsentEvidence.IgnoreQueryFilters().Any(evidence =>
+                            evidence.TenantId == tenantId &&
+                            evidence.ContactId == recipient.ContactId &&
+                            evidence.RevokedAt == null &&
+                            evidence.ProcessingPurpose.TenantId == tenantId &&
+                            evidence.ProcessingPurpose.IsActive &&
+                            evidence.ProcessingPurpose.LegalBasis == WhatsAppAI.Domain.Privacy.LegalBasis.Consent &&
+                            evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName))
+                    .ToListAsync();
+
+                foreach (var recipient in recipientsWithoutConsent)
+                {
+                    recipient.MarkSkipped("Marketing consent is not active.");
+                    broadcast.RecordSkipped();
+                }
+            }
         }
 
         if (currentTenant.UserRole == "Operator")
@@ -332,12 +360,12 @@ public static class BroadcastEndpoints
         if (active is not null)
             return Results.BadRequest(new { error = "There is already a broadcast in progress." });
 
-        var totalCount = await broadcastRepo.CountPendingRecipientsAsync(broadcast.Id);
+        var pendingRecipientCount = await broadcastRepo.CountPendingRecipientsAsync(broadcast.Id);
 
-        if (totalCount == 0)
-            return Results.BadRequest(new { error = "No recipients found for this broadcast." });
+        if (pendingRecipientCount == 0)
+            return Results.BadRequest(new { error = "No eligible recipients found for this broadcast." });
 
-        broadcast.StartDispatch(requestedLine, totalCount);
+        broadcast.StartDispatch(requestedLine, pendingRecipientCount + broadcast.SkippedCount);
         await broadcastRepo.UpdateAsync(broadcast);
 
         // Notify via SignalR
@@ -542,12 +570,14 @@ public static class BroadcastEndpoints
         deliveryMode = b.DeliveryMode.ToString(),
         templateName = b.TemplateName,
         templateLanguage = b.TemplateLanguage,
+        templateCategory = b.TemplateCategory,
         status = b.Status.ToString(),
         linePhoneNumberId = b.LinePhoneNumberId,
         queueId = b.QueueId,
         totalCount = b.TotalCount,
         sentCount = b.SentCount,
         failedCount = b.FailedCount,
+        skippedCount = b.SkippedCount,
         createdAt = b.CreatedAt,
         startedAt = b.StartedAt,
         finishedAt = b.FinishedAt,

@@ -114,7 +114,8 @@ public sealed record WhatsAppTemplateSummary(
 
     public bool CanSendInBroadcast =>
         string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) &&
+        (string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(Category, "MARKETING", StringComparison.OrdinalIgnoreCase)) &&
         IsCompatible;
 }
 

@@ -36,18 +36,21 @@ function recipientStatusLabel(s: string) {
     case 'Pending': return { text: 'Pendente',  cls: 'text-slate-500' }
     case 'Sent':    return { text: 'Enviado',   cls: 'text-emerald-600' }
     case 'Failed':  return { text: 'Falhou',    cls: 'text-red-600' }
+    case 'Skipped': return { text: 'Sem consentimento', cls: 'text-amber-700' }
     default:        return { text: s,           cls: 'text-slate-500' }
   }
 }
 
-function ProgressBar({ sent, failed, total }: { sent: number; failed: number; total: number }) {
+function ProgressBar({ sent, failed, skipped, total }: { sent: number; failed: number; skipped: number; total: number }) {
   if (total === 0) return null
   const sentPct  = Math.round((sent  / total) * 100)
   const failPct  = Math.round((failed / total) * 100)
+  const skippedPct = Math.round((skipped / total) * 100)
   return (
     <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
       <div className="bg-emerald-500 h-full transition-all" style={{ width: `${sentPct}%` }} />
       <div className="bg-red-400 h-full transition-all"    style={{ width: `${failPct}%` }} />
+      <div className="bg-amber-400 h-full transition-all"  style={{ width: `${skippedPct}%` }} />
     </div>
   )
 }
@@ -94,6 +97,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     enabled: deliveryMode === 'OfficialApiTemplate' && Boolean(selectedOfficialLineId),
   })
   const selectedTemplate = (templateResult?.templates ?? []).find((template) => `${template.name}:${template.language}` === templateKey)
+  const isMarketingTemplate = selectedTemplate?.category === 'MARKETING'
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -105,7 +109,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
         templateName: selectedTemplate?.name,
         templateLanguage: selectedTemplate?.language,
         templateBodyParameters: templateParameters,
-        contactIds: selectingContacts ? [...selectedIds] : [],
+        contactIds: selectingContacts ? eligibleSelectedIds : [],
         queueId: selectedQueueId || undefined,
       }),
     onSuccess: () => {
@@ -114,7 +118,10 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     },
   })
 
-  const filtered = contacts ?? []
+  const filtered = (contacts ?? []).filter((contact) => !isMarketingTemplate || contact.hasMarketingConsent)
+  const eligibleSelectedIds = isMarketingTemplate
+    ? [...selectedIds].filter((id) => filtered.some((contact) => contact.id === id))
+    : [...selectedIds]
 
   const toggleContact = (id: string) =>
     setSelectedIds((prev) => {
@@ -152,7 +159,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     if (!name.trim() || (deliveryMode === 'QrCodeText' && !message.trim()) ||
       (deliveryMode === 'OfficialApiTemplate' && (!selectedOfficialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
-      (selectingContacts && (selectedIds.size === 0 || selectedIds.size > 500))) return
+      (selectingContacts && (eligibleSelectedIds.length === 0 || eligibleSelectedIds.length > 500))) return
     createMutation.mutate()
   }
 
@@ -181,14 +188,15 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 <option value="QrCodeText">QR Code — texto livre</option>
                 <option value="OfficialApiTemplate">API Oficial — template transacional</option>
               </select>
-              {deliveryMode === 'OfficialApiTemplate' && <p className="mt-1 text-xs text-slate-500">Somente templates UTILITY aprovados podem ser enviados.</p>}
+              {deliveryMode === 'OfficialApiTemplate' && <p className="mt-1 text-xs text-slate-500">Templates de Utilidade e Marketing aprovados podem ser enviados. Marketing exige consentimento ativo do contato.</p>}
             </div>
 
             {deliveryMode === 'OfficialApiTemplate' && <>
               <div><label htmlFor="broadcast-official-line" className="block text-sm font-medium text-slate-700 mb-1.5">Linha oficial</label><select id="broadcast-official-line" value={selectedOfficialLineId} onChange={(event) => { setOfficialLineId(event.target.value); setTemplateKey(''); setTemplateParameters([]) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione a linha</option>{officialLines.map((line) => <option key={line.phoneNumberId} value={line.phoneNumberId}>{line.lineNumber}</option>)}</select></div>
               <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required disabled={isLoadingTemplates || Boolean(templatesError) || !selectedOfficialLineId} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"><option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione o template'}</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
               {templatesError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{templatesError.message} <button type="button" onClick={() => refetchTemplates()} className="ml-2 font-semibold underline">Tentar novamente</button></div>}
-              {!isLoadingTemplates && !templatesError && selectedOfficialLineId && (templateResult?.templates.length ?? 0) === 0 && <p className="text-xs text-slate-500">Nenhum template elegível foi encontrado. O disparo em massa aceita apenas templates de Utilidade aprovados, com corpo textual e sem cabeçalho, mídia ou botões.</p>}
+              {!isLoadingTemplates && !templatesError && selectedOfficialLineId && (templateResult?.templates.length ?? 0) === 0 && <p className="text-xs text-slate-500">Nenhum template elegível foi encontrado. O disparo em massa aceita templates aprovados de Utilidade ou Marketing, com corpo textual e sem cabeçalho, mídia ou botões.</p>}
+              {isMarketingTemplate && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Este é um template de Marketing. Somente contatos com consentimento ativo para receber Marketing por WhatsApp serão incluídos. Registre ou revogue o consentimento em Contatos.</p>}
               {templateParameters.map((parameter, index) => <div key={index}><label htmlFor={`broadcast-template-param-${index}`} className="block text-sm font-medium text-slate-700 mb-1.5">Parâmetro {index + 1}</label><input id={`broadcast-template-param-${index}`} value={parameter} maxLength={1024} onChange={(event) => setTemplateParameters((current) => current.map((value, parameterIndex) => parameterIndex === index ? event.target.value : value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" /></div>)}
             </>}
 
@@ -215,7 +223,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                     <input type="radio" name="queue-recipient-mode" value="manual" checked={queueRecipientMode === 'manual'} onChange={() => selectQueueRecipientMode('manual')} />
                     Selecionar contatos desta fila
                   </label>
-                  {queueRecipientMode === 'all' && <p className="text-xs text-slate-500">Todos os contatos desta fila serão incluídos, mesmo que haja mais de 500.</p>}
+                  {queueRecipientMode === 'all' && <p className="text-xs text-slate-500">Todos os contatos desta fila serão incluídos, mesmo que haja mais de 500. Em Marketing, o backend impede os contatos sem consentimento ativo.</p>}
                 </div>
               )}
             </div>
@@ -254,7 +262,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 <label className="text-sm font-medium text-slate-700">
                   Destinatários{' '}
                   <span className="text-slate-400 font-normal">
-                    ({selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''})
+                    ({eligibleSelectedIds.length} selecionado{eligibleSelectedIds.length !== 1 ? 's' : ''})
                   </span>
                 </label>
                 {filtered.length > 0 && (
@@ -303,7 +311,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                   ))
                 )}
               </div>
-              {selectedIds.size > 500 && (
+              {eligibleSelectedIds.length > 500 && (
                 <p className="text-xs text-red-600 mt-1">Máximo de 500 destinatários por transmissão.</p>
               )}
               {filtered.length === 500 && <p className="text-xs text-slate-500 mt-1">Mostrando até 500 contatos. Busque pelo nome ou número para encontrar outros.</p>}
@@ -326,7 +334,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 !name.trim() ||
                 (deliveryMode === 'QrCodeText' && !message.trim()) ||
                 (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
-                (selectingContacts && (selectedIds.size === 0 || selectedIds.size > 500))
+                (selectingContacts && (eligibleSelectedIds.length === 0 || eligibleSelectedIds.length > 500))
               }
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
             >
@@ -678,11 +686,15 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
           {broadcast.failedCount > 0 && (
             <span className="text-red-400 ml-1">({broadcast.failedCount} falhas)</span>
           )}
+          {(broadcast.skippedCount ?? 0) > 0 && (
+            <span className="text-amber-600 ml-1">({broadcast.skippedCount} sem consentimento)</span>
+          )}
         </td>
         <td className="hidden sm:table-cell px-4 py-3">
           <ProgressBar
             sent={broadcast.sentCount}
             failed={broadcast.failedCount}
+            skipped={broadcast.skippedCount ?? 0}
             total={broadcast.totalCount}
           />
         </td>

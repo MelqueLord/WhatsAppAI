@@ -93,7 +93,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         var marketing = Assert.Single(result.Templates, template => template.Name == "marketing_offer");
         Assert.Equal("MARKETING", marketing.Category);
         Assert.True(marketing.CanSendInInbox);
-        Assert.False(marketing.CanSendInBroadcast);
+        Assert.True(marketing.CanSendInBroadcast);
 
         var pending = Assert.Single(result.Templates, template => template.Name == "draft");
         Assert.Equal("PENDING", pending.Status);

@@ -44,6 +44,14 @@ public sealed class BroadcastRecipient
         ErrorMessage = error;
     }
 
+    public void MarkSkipped(string reason)
+    {
+        if (Status != BroadcastRecipientStatus.Pending)
+            throw new InvalidOperationException("Only pending recipients can be skipped.");
+        Status = BroadcastRecipientStatus.Skipped;
+        ErrorMessage = reason;
+    }
+
     public void MarkQueued(Guid messageId)
     {
         if (Status != BroadcastRecipientStatus.Pending)

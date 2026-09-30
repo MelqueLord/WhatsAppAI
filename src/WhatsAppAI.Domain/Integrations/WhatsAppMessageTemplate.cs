@@ -77,7 +77,7 @@ public sealed class WhatsAppMessageTemplate
             !ComponentsJson.Contains("HEADER", StringComparison.OrdinalIgnoreCase) &&
             !ComponentsJson.Contains("BUTTONS", StringComparison.OrdinalIgnoreCase);
         IsInboxCompatible = supported && EffectiveCategory is "UTILITY" or "MARKETING";
-        IsBroadcastCompatible = supported && EffectiveCategory == "UTILITY";
+        IsBroadcastCompatible = supported && EffectiveCategory is "UTILITY" or "MARKETING";
     }
 
     private static string BuildComponentsJson(string body, string? footer) =>

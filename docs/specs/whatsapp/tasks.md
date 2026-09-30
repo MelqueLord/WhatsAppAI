@@ -15,7 +15,7 @@
 **Objetivo:** Owner/Operator autorizado cria e consulta rascunho oficial apenas no escopo permitido.
 
 - [X] T004 [US1] Aplicar política linha/fila e DTOs de criação/listagem em `src/WhatsAppAI.WebApi/Broadcast/BroadcastEndpoints.cs`
-- [X] T005 [US1] Expor templates UTILITY por linha oficial em `src/WhatsAppAI.WebApi/Broadcast/BroadcastEndpoints.cs`
+- [X] T005 [US1] Expor templates elegíveis por linha oficial em `src/WhatsAppAI.WebApi/Broadcast/BroadcastEndpoints.cs`
 - [ ] T006 [US1] Cobrir autorização, isolamento e validação de template em `tests/WhatsAppAI.WebApi.Tests/`
 
 ## Fase 3 — US2: disparo durável
@@ -36,4 +36,11 @@
 
 ## Fase 5 — validação
 
-- [ ] T013 Formatar, compilar, executar testes afetados e revisar diff
+- [X] T013 Formatar, compilar, executar testes afetados e revisar diff
+
+## Fase 6 — Marketing consentido
+
+- [X] T014 Registrar e revogar consentimento específico de Marketing por contato, isolado por tenant, em `src/WhatsAppAI.WebApi/Contacts/` e `apps/web/src/features/contacts/`.
+- [X] T015 Revalidar `MARKETING` no dispatch e no worker, impedindo a Outbox para consentimento ausente ou revogado, em `BroadcastEndpoints`, `BroadcastDispatchWorker` e domínio.
+- [X] T016 Persistir categoria do template e contagem de destinatários impedidos em migration reversível, DTOs e testes.
+- [X] T017 Cobrir compatibilidade de template Marketing, consentimento ativo/revogado, isolamento por tenant e regressão QR.

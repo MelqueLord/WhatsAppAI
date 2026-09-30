@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Policy;
+using WhatsAppAI.Application.Broadcast;
 using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Audit;
@@ -40,6 +41,12 @@ public static class ContactEndpoints
 
         group.MapDelete("/{contactId:guid}", DeleteContactAsync)
             .WithName("DeleteContact");
+
+        group.MapPost("/{contactId:guid}/marketing-consent", GrantMarketingConsentAsync)
+            .WithName("GrantMarketingConsent");
+
+        group.MapDelete("/{contactId:guid}/marketing-consent", RevokeMarketingConsentAsync)
+            .WithName("RevokeMarketingConsent");
 
         group.MapGet("/{contactId:guid}/memory", ListCustomerMemoryAsync)
             .WithName("ListCustomerMemory");
@@ -149,7 +156,15 @@ public static class ContactEndpoints
                 Name = c.Name,
                 ProfilePictureUrl = c.ProfilePictureUrl,
                 LastMessageAt = c.LastMessageAt,
-                CreatedAt = c.CreatedAt
+                CreatedAt = c.CreatedAt,
+                HasMarketingConsent = dbContext.ConsentEvidence.Any(evidence =>
+                    evidence.TenantId == currentTenant.TenantId.Value &&
+                    evidence.ContactId == c.Id &&
+                    evidence.RevokedAt == null &&
+                    evidence.ProcessingPurpose.TenantId == currentTenant.TenantId.Value &&
+                    evidence.ProcessingPurpose.IsActive &&
+                    evidence.ProcessingPurpose.LegalBasis == LegalBasis.Consent &&
+                    evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName)
             })
             .ToListAsync();
 
@@ -383,6 +398,112 @@ public static class ContactEndpoints
             httpContext.RequestAborted);
 
         return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
+    }
+
+    private static async Task<IResult> GrantMarketingConsentAsync(
+        Guid contactId,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId.Value;
+        var contactExists = await dbContext.Contacts.AnyAsync(
+            contact => contact.Id == contactId && contact.TenantId == tenantId,
+            cancellationToken);
+        if (!contactExists)
+            return Results.NotFound();
+
+        var purpose = await dbContext.ProcessingPurposes.FirstOrDefaultAsync(item =>
+            item.TenantId == tenantId &&
+            item.LegalBasis == LegalBasis.Consent &&
+            item.Name == MarketingBroadcastConsentPolicy.PurposeName,
+            cancellationToken);
+        if (purpose is null)
+        {
+            purpose = ProcessingPurpose.Create(
+                tenantId,
+                MarketingBroadcastConsentPolicy.PurposeName,
+                MarketingBroadcastConsentPolicy.PurposeDescription,
+                LegalBasis.Consent,
+                3650,
+                currentTenant.UserId.Value);
+            dbContext.ProcessingPurposes.Add(purpose);
+        }
+
+        var alreadyGranted = await dbContext.ConsentEvidence.AnyAsync(evidence =>
+            evidence.TenantId == tenantId &&
+            evidence.ContactId == contactId &&
+            evidence.ProcessingPurposeId == purpose.Id &&
+            evidence.RevokedAt == null,
+            cancellationToken);
+        if (!alreadyGranted)
+        {
+            var consent = ConsentEvidence.Create(
+                tenantId,
+                contactId,
+                purpose,
+                MarketingBroadcastConsentPolicy.OperatorConfirmedSource,
+                null,
+                DateTime.UtcNow,
+                currentTenant.UserId.Value);
+            dbContext.ConsentEvidence.Add(consent);
+            dbContext.AuditLogs.Add(AuditLog.Create(
+                tenantId,
+                currentTenant.UserId,
+                "Contact.MarketingConsentGranted",
+                "ConsentEvidence",
+                consent.Id.ToString()));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.Ok(new { contactId, hasMarketingConsent = true });
+    }
+
+    private static async Task<IResult> RevokeMarketingConsentAsync(
+        Guid contactId,
+        ICurrentTenant currentTenant,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (currentTenant.UserRole != "TenantOwner")
+            return Results.Forbid();
+
+        var tenantId = currentTenant.TenantId.Value;
+        var consents = await dbContext.ConsentEvidence
+            .Include(evidence => evidence.ProcessingPurpose)
+            .Where(evidence =>
+                evidence.TenantId == tenantId &&
+                evidence.ContactId == contactId &&
+                evidence.RevokedAt == null &&
+                evidence.ProcessingPurpose.TenantId == tenantId &&
+                evidence.ProcessingPurpose.LegalBasis == LegalBasis.Consent &&
+                evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName)
+            .ToListAsync(cancellationToken);
+        if (consents.Count == 0)
+        {
+            var contactExists = await dbContext.Contacts.AnyAsync(
+                contact => contact.Id == contactId && contact.TenantId == tenantId,
+                cancellationToken);
+            return contactExists ? Results.NoContent() : Results.NotFound();
+        }
+
+        foreach (var consent in consents)
+            consent.Revoke(DateTime.UtcNow);
+        dbContext.AuditLogs.Add(AuditLog.Create(
+            tenantId,
+            currentTenant.UserId,
+            "Contact.MarketingConsentRevoked",
+            "Contact",
+            contactId.ToString()));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static async Task<Conversation> EnsureDirectConversationAsync(
@@ -793,6 +914,7 @@ public sealed class ContactResponse
     public string? ProfilePictureUrl { get; init; }
     public DateTime? LastMessageAt { get; init; }
     public DateTime CreatedAt { get; init; }
+    public bool HasMarketingConsent { get; init; }
     public Guid? ConversationId { get; init; }
     public string? Message { get; init; }
 }
