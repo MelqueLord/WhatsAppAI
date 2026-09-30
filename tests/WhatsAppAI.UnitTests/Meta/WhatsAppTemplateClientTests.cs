@@ -26,6 +26,18 @@ public sealed class WhatsAppTemplateClientTests
         Assert.Equal("Maria", document.RootElement.GetProperty("components")[0].GetProperty("example").GetProperty("body_text")[0][0].GetString());
     }
 
+    [Fact]
+    public async Task ListTemplates_ExplainsWhenMetaDeniesTemplateManagementPermission()
+    {
+        using var httpClient = new HttpClient(new StatusCodeHandler(HttpStatusCode.Forbidden));
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.ListTemplatesAsync("waba-1", "token-1");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("A credencial não possui permissão para consultar templates. Configure whatsapp_business_management na Meta.", result.ErrorMessage);
+    }
+
     private sealed class CreateTemplateHandler : HttpMessageHandler
     {
         public string? Authorization { get; private set; }
@@ -36,5 +48,11 @@ public sealed class WhatsAppTemplateClientTests
             Body = await request.Content!.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"template-1\",\"status\":\"PENDING\",\"category\":\"UTILITY\"}") };
         }
+    }
+
+    private sealed class StatusCodeHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(statusCode));
     }
 }

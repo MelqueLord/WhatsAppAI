@@ -29,4 +29,11 @@ describe('WhatsAppTemplatesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar para análise' }))
     await waitFor(() => expect(api.whatsapp.createTemplate).toHaveBeenCalledWith(1, expect.any(String), expect.objectContaining({ bodyExamples: ['Maria'] })))
   })
+
+  it('selects the configured official line and synchronizes its existing Meta catalog', async () => {
+    renderPage()
+
+    await waitFor(() => expect(api.whatsapp.listTemplates).toHaveBeenCalledWith(1))
+    await waitFor(() => expect(api.whatsapp.syncTemplates).toHaveBeenCalledWith(1))
+  })
 })

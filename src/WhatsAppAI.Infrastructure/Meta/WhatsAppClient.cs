@@ -272,7 +272,7 @@ internal sealed class WhatsAppClient : IWhatsAppClient
                     logger.LogWarning("WhatsApp template API returned {StatusCode}", response.StatusCode);
                     return new WhatsAppTemplateListResult
                     {
-                        ErrorMessage = GetSanitizedErrorMessage(response.StatusCode)
+                        ErrorMessage = GetSanitizedTemplateListError(response.StatusCode)
                     };
                 }
 
@@ -447,6 +447,14 @@ internal sealed class WhatsAppClient : IWhatsAppClient
             _ => "Connection failed. Please check your configuration."
         };
     }
+
+    private static string GetSanitizedTemplateListError(System.Net.HttpStatusCode statusCode) => statusCode switch
+    {
+        HttpStatusCode.Unauthorized => "A credencial da linha não é válida para consultar templates.",
+        HttpStatusCode.Forbidden => "A credencial não possui permissão para consultar templates. Configure whatsapp_business_management na Meta.",
+        HttpStatusCode.TooManyRequests => "A Meta limitou temporariamente a consulta de templates. Tente novamente em alguns instantes.",
+        _ => "A Meta não conseguiu carregar os templates desta linha. Verifique a configuração da API Oficial."
+    };
 
     private static int CountBodyParameters(IReadOnlyList<TemplateListComponent>? components)
     {

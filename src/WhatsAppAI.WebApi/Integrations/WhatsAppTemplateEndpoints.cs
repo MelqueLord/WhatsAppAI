@@ -23,7 +23,7 @@ public static class WhatsAppTemplateEndpoints
         return app;
     }
 
-    private static async Task<IResult> ListAsync(int lineNumber, [FromQuery] string? cursor, [FromQuery] int limit,
+    private static async Task<IResult> ListAsync(int lineNumber, [FromQuery] string? cursor, [FromQuery] int? limit,
         ICurrentTenant currentTenant, IWhatsAppAccountRepository accounts, IWhatsAppTemplateRepository templates,
         CancellationToken cancellationToken)
     {
@@ -34,7 +34,7 @@ public static class WhatsAppTemplateEndpoints
         if (!TryDecodeCursor(cursor, out var skip))
             return Results.BadRequest(new { error = "Cursor inválido." });
 
-        var pageSize = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+        var pageSize = limit is null or <= 0 ? 50 : Math.Clamp(limit.Value, 1, 100);
         var catalog = await templates.ListTemplatesAsync(tenantId, waba.Id, skip, pageSize + 1, cancellationToken);
         var hasMore = catalog.Count > pageSize;
         var page = hasMore ? catalog.Take(pageSize) : catalog;

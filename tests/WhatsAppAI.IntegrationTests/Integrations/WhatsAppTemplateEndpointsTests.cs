@@ -59,6 +59,17 @@ public sealed class WhatsAppTemplateEndpointsTests(TestWebApplicationFactory fac
         Assert.Equal(0, catalog.GetProperty("templates").GetArrayLength());
     }
 
+    [Fact]
+    public async Task Catalog_uses_the_default_page_size_when_limit_is_omitted()
+    {
+        var owner = await CreateTenantUserAsync(MembershipRole.TenantOwner);
+        await AddOfficialLineAsync(owner.TenantId, 1, $"waba-{Guid.NewGuid():N}");
+
+        var response = await owner.Client.GetAsync("/api/integrations/whatsapp/official/1/templates");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private static async Task<HttpResponseMessage> CreateTemplateAsync(HttpClient client, int lineNumber, string idempotencyKey)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/integrations/whatsapp/official/{lineNumber}/templates")

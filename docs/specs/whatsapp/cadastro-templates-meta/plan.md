@@ -166,7 +166,7 @@ tests/
 
 ### 7. Entregar a experiência do TenantOwner
 
-- Criar página própria com seleção da linha oficial, explicando quando o catálogo é compartilhado por mais de uma linha da mesma WABA.
+- Criar página própria com seleção da linha oficial, explicando quando o catálogo é compartilhado por mais de uma linha da mesma WABA. Ao abrir ou trocar a linha, sincronizar o catálogo da Meta antes de exibi-lo, para incluir templates criados diretamente no WhatsApp Manager.
 - Exibir formulário guiado, preview, contadores, exemplos fictícios, catálogo por categoria/status e compatibilidade.
 - Fazer polling de cinco segundos apenas enquanto houver submissões ou revisões não terminais; sincronização manual permanece disponível.
 - Esconder rota e navegação de Operator e bloquear novamente no backend.

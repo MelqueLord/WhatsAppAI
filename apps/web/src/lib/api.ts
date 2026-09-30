@@ -849,7 +849,7 @@ export const api = {
       return res.lines ?? []
     },
     listTemplates: (lineNumber: number) =>
-      fetchApi<{ templates: ManagedWhatsAppTemplate[] }>(`/api/integrations/whatsapp/official/${lineNumber}/templates`),
+      fetchApi<{ templates: ManagedWhatsAppTemplate[] }>(`/api/integrations/whatsapp/official/${lineNumber}/templates?limit=50`),
     createTemplate: (lineNumber: number, idempotencyKey: string, data: {
       name: string
       language: string
