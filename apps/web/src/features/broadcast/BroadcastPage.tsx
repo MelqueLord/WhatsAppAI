@@ -82,10 +82,16 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
 
   const { data: officialLinesData } = useQuery({ queryKey: ['whatsapp-lines'], queryFn: () => api.whatsapp.getLines() })
   const officialLines = (officialLinesData ?? []).filter((line) => line.connectionType === 'OfficialApi' && line.isActive)
-  const { data: templateResult } = useQuery({
-    queryKey: ['broadcast-official-templates', officialLineId],
-    queryFn: () => api.broadcasts.listOfficialTemplates(officialLineId),
-    enabled: deliveryMode === 'OfficialApiTemplate' && Boolean(officialLineId),
+  const selectedOfficialLineId = officialLineId || (deliveryMode === 'OfficialApiTemplate' ? officialLines[0]?.phoneNumberId ?? '' : '')
+  const {
+    data: templateResult,
+    isLoading: isLoadingTemplates,
+    error: templatesError,
+    refetch: refetchTemplates,
+  } = useQuery({
+    queryKey: ['broadcast-official-templates', selectedOfficialLineId],
+    queryFn: () => api.broadcasts.listOfficialTemplates(selectedOfficialLineId),
+    enabled: deliveryMode === 'OfficialApiTemplate' && Boolean(selectedOfficialLineId),
   })
   const selectedTemplate = (templateResult?.templates ?? []).find((template) => `${template.name}:${template.language}` === templateKey)
 
@@ -95,7 +101,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
         name,
         message: deliveryMode === 'QrCodeText' ? message : '',
         deliveryMode: deliveryMode === 'OfficialApiTemplate' ? 1 : 0,
-        linePhoneNumberId: deliveryMode === 'OfficialApiTemplate' ? officialLineId : undefined,
+        linePhoneNumberId: deliveryMode === 'OfficialApiTemplate' ? selectedOfficialLineId : undefined,
         templateName: selectedTemplate?.name,
         templateLanguage: selectedTemplate?.language,
         templateBodyParameters: templateParameters,
@@ -145,7 +151,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || (deliveryMode === 'QrCodeText' && !message.trim()) ||
-      (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
+      (deliveryMode === 'OfficialApiTemplate' && (!selectedOfficialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
       (selectingContacts && (selectedIds.size === 0 || selectedIds.size > 500))) return
     createMutation.mutate()
   }
@@ -179,8 +185,10 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             {deliveryMode === 'OfficialApiTemplate' && <>
-              <div><label htmlFor="broadcast-official-line" className="block text-sm font-medium text-slate-700 mb-1.5">Linha oficial</label><select id="broadcast-official-line" value={officialLineId} onChange={(event) => { setOfficialLineId(event.target.value); setTemplateKey(''); setTemplateParameters([]) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione a linha</option>{officialLines.map((line) => <option key={line.phoneNumberId} value={line.phoneNumberId}>{line.lineNumber}</option>)}</select></div>
-              <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione o template</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
+              <div><label htmlFor="broadcast-official-line" className="block text-sm font-medium text-slate-700 mb-1.5">Linha oficial</label><select id="broadcast-official-line" value={selectedOfficialLineId} onChange={(event) => { setOfficialLineId(event.target.value); setTemplateKey(''); setTemplateParameters([]) }} required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"><option value="">Selecione a linha</option>{officialLines.map((line) => <option key={line.phoneNumberId} value={line.phoneNumberId}>{line.lineNumber}</option>)}</select></div>
+              <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required disabled={isLoadingTemplates || Boolean(templatesError) || !selectedOfficialLineId} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"><option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione o template'}</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
+              {templatesError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{templatesError.message} <button type="button" onClick={() => refetchTemplates()} className="ml-2 font-semibold underline">Tentar novamente</button></div>}
+              {!isLoadingTemplates && !templatesError && selectedOfficialLineId && (templateResult?.templates.length ?? 0) === 0 && <p className="text-xs text-slate-500">Nenhum template elegível foi encontrado. O disparo em massa aceita apenas templates de Utilidade aprovados, com corpo textual e sem cabeçalho, mídia ou botões.</p>}
               {templateParameters.map((parameter, index) => <div key={index}><label htmlFor={`broadcast-template-param-${index}`} className="block text-sm font-medium text-slate-700 mb-1.5">Parâmetro {index + 1}</label><input id={`broadcast-template-param-${index}`} value={parameter} maxLength={1024} onChange={(event) => setTemplateParameters((current) => current.map((value, parameterIndex) => parameterIndex === index ? event.target.value : value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" /></div>)}
             </>}
 

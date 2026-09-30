@@ -219,6 +219,40 @@ describe('BroadcastPage', () => {
     })))
   })
 
+  it('automatically loads templates from the first active official line', async () => {
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
+      lineNumber: 2,
+      connectionType: 'OfficialApi',
+      phoneNumberId: 'official-2',
+      isActive: true,
+    }])
+    vi.mocked(api.broadcasts.listOfficialTemplates).mockResolvedValue({
+      templates: [{ name: 'status_update', language: 'pt_BR', bodyParameterCount: 0, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    fireEvent.change(screen.getByLabelText('Canal de envio'), { target: { value: 'OfficialApiTemplate' } })
+
+    await waitFor(() => expect(api.broadcasts.listOfficialTemplates).toHaveBeenCalledWith('official-2'))
+    expect(await screen.findByRole('option', { name: 'status_update — pt_BR' })).toBeInTheDocument()
+  })
+
+  it('explains when an official line has no template eligible for broadcast', async () => {
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
+      lineNumber: 2,
+      connectionType: 'OfficialApi',
+      phoneNumberId: 'official-2',
+      isActive: true,
+    }])
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    fireEvent.change(screen.getByLabelText('Canal de envio'), { target: { value: 'OfficialApiTemplate' } })
+
+    expect(await screen.findByText(/Nenhum template elegível foi encontrado/)).toBeInTheDocument()
+  })
+
   it('does not ask for a queue again when dispatching a saved broadcast', async () => {
     vi.mocked(api.broadcasts.list).mockResolvedValue([{
       id: 'broadcast-1',
