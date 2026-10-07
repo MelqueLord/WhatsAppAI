@@ -289,6 +289,7 @@ public static class ConversationEndpoints
                 1);
         var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
             conversationAccount?.ConnectionType == WhatsAppConnectionType.QrCode;
+        List<WhatsAppTemplateParameter>? templateParameterPayload = null;
         var templateRequested = request.TemplateName is not null ||
             request.TemplateLanguage is not null ||
             request.TemplateParameters is not null;
@@ -349,6 +350,14 @@ public static class ConversationEndpoints
                     error = $"This template requires exactly {selectedTemplate.BodyParameterCount} body parameters."
                 });
             }
+
+            templateParameterPayload = templateParameters
+                .Select((value, index) => new WhatsAppTemplateParameter(
+                    value,
+                    string.Equals(selectedTemplate.ParameterFormat, "NAMED", StringComparison.OrdinalIgnoreCase)
+                        ? selectedTemplate.BodyParameterNames[index]
+                        : null))
+                .ToList();
         }
 
         if (!templateRequested && !isQrConversation && !conversation.IsWindowOpen(clock.UtcNow))
@@ -367,7 +376,7 @@ public static class ConversationEndpoints
                 conversation.ContactId,
                 request.TemplateName!.Trim(),
                 request.TemplateLanguage!.Trim(),
-                JsonSerializer.Serialize(templateParameters),
+                JsonSerializer.Serialize(templateParameterPayload),
                 idempotencyKey)
             : Message.CreateOutbound(
                 currentTenant.TenantId.Value,

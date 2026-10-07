@@ -189,7 +189,7 @@ internal sealed class WhatsAppClient : IWhatsAppClient
         string recipientPhone,
         string templateName,
         string templateLanguage,
-        IReadOnlyList<string> parameters,
+        IReadOnlyList<WhatsAppTemplateParameter> parameters,
         CancellationToken cancellationToken = default)
     {
         try
@@ -212,7 +212,8 @@ internal sealed class WhatsAppClient : IWhatsAppClient
                             Parameters = parameters.Select(value => new TemplateParameter
                             {
                                 Type = "text",
-                                Text = value
+                                Text = value.Text,
+                                ParameterName = value.Name
                             }).ToList()
                         }]
                 }
@@ -288,12 +289,15 @@ internal sealed class WhatsAppClient : IWhatsAppClient
                         CountBodyParameters(template.Components),
                         string.IsNullOrWhiteSpace(template.Category) ? "UNKNOWN" : template.Category.Trim().ToUpperInvariant(),
                         string.IsNullOrWhiteSpace(template.Status) ? "UNKNOWN" : template.Status.Trim().ToUpperInvariant(),
-                        HasOnlySupportedTemplateComponents(template.Components))
+                        HasOnlySupportedTemplateComponents(template.Components) &&
+                        HasSupportedParameters(template.Components, template.ParameterFormat))
                     {
                         MetaTemplateId = template.Id,
                         BodyText = GetComponentText(template.Components, "BODY") ?? string.Empty,
                         FooterText = GetComponentText(template.Components, "FOOTER"),
-                        ComponentsJson = JsonSerializer.Serialize(template.Components ?? [])
+                        ComponentsJson = JsonSerializer.Serialize(template.Components ?? []),
+                        ParameterFormat = NormalizeParameterFormat(template.ParameterFormat),
+                        BodyParameterNames = GetBodyParameterNames(template.Components, template.ParameterFormat)
                     }));
 
                 nextPageUrl = IsTrustedMetaPageUrl(content?.Paging?.Next)
@@ -456,11 +460,24 @@ internal sealed class WhatsAppClient : IWhatsAppClient
         _ => "A Meta não conseguiu carregar os templates desta linha. Verifique a configuração da API Oficial."
     };
 
-    private static int CountBodyParameters(IReadOnlyList<TemplateListComponent>? components)
+    private static int CountBodyParameters(IReadOnlyList<TemplateListComponent>? components) =>
+        GetBodyParameterNames(components, "POSITIONAL").Length;
+
+    private static string[] GetBodyParameterNames(IReadOnlyList<TemplateListComponent>? components, string? parameterFormat)
     {
         var body = components?.FirstOrDefault(component =>
             string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase));
-        return body?.Text is null ? 0 : System.Text.RegularExpressions.Regex.Count(body.Text, @"\{\{\d+\}\}");
+        if (body?.Text is null)
+            return [];
+
+        var names = System.Text.RegularExpressions.Regex.Matches(body.Text, @"\{\{\s*([A-Za-z][A-Za-z0-9_]*|\d+)\s*\}\}")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        return string.Equals(NormalizeParameterFormat(parameterFormat), "POSITIONAL", StringComparison.Ordinal)
+            ? names.OrderBy(name => int.TryParse(name, out var position) ? position : int.MaxValue).ToArray()
+            : names;
     }
 
     private static bool HasOnlySupportedTemplateComponents(IReadOnlyList<TemplateListComponent>? components) =>
@@ -472,6 +489,24 @@ internal sealed class WhatsAppClient : IWhatsAppClient
             string.Equals(component.Type, "BODY", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(component.Type, "FOOTER", StringComparison.OrdinalIgnoreCase)) &&
         CountBodyParameters(components) <= 10;
+
+    private static bool HasSupportedParameters(IReadOnlyList<TemplateListComponent>? components, string? parameterFormat)
+    {
+        var names = GetBodyParameterNames(components, parameterFormat);
+        if (names.Length > 10)
+            return false;
+
+        var format = NormalizeParameterFormat(parameterFormat);
+        return format switch
+        {
+            "POSITIONAL" => Array.TrueForAll(names, name => int.TryParse(name, out _)),
+            "NAMED" => Array.TrueForAll(names, name => !int.TryParse(name, out _)),
+            _ => false
+        };
+    }
+
+    private static string NormalizeParameterFormat(string? parameterFormat) =>
+        string.IsNullOrWhiteSpace(parameterFormat) ? "POSITIONAL" : parameterFormat.Trim().ToUpperInvariant();
 
     private static bool IsTrustedMetaPageUrl(string? pageUrl) =>
         Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri) &&
@@ -561,6 +596,9 @@ internal sealed class TemplateListItem
     [JsonPropertyName("category")]
     public string? Category { get; init; }
 
+    [JsonPropertyName("parameter_format")]
+    public string? ParameterFormat { get; init; }
+
     [JsonPropertyName("components")]
     public List<TemplateListComponent>? Components { get; init; }
 }
@@ -624,6 +662,10 @@ internal sealed class TemplateParameter
 
     [JsonPropertyName("text")]
     public string Text { get; init; } = string.Empty;
+
+    [JsonPropertyName("parameter_name")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParameterName { get; init; }
 }
 
 internal sealed class TextBody

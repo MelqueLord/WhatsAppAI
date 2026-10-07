@@ -35,7 +35,7 @@ public interface IWhatsAppClient
         string recipientPhone,
         string templateName,
         string templateLanguage,
-        IReadOnlyList<string> parameters,
+        IReadOnlyList<WhatsAppTemplateParameter> parameters,
         CancellationToken cancellationToken = default);
 
     Task<WhatsAppTemplateListResult> ListTemplatesAsync(
@@ -102,6 +102,8 @@ public sealed record WhatsAppTemplateSummary(
     string Status,
     bool IsCompatible)
 {
+    public string ParameterFormat { get; init; } = "POSITIONAL";
+    public IReadOnlyList<string> BodyParameterNames { get; init; } = [];
     public string? MetaTemplateId { get; init; }
     public string BodyText { get; init; } = string.Empty;
     public string? FooterText { get; init; }
@@ -116,8 +118,11 @@ public sealed record WhatsAppTemplateSummary(
         string.Equals(Status, "APPROVED", StringComparison.OrdinalIgnoreCase) &&
         (string.Equals(Category, "UTILITY", StringComparison.OrdinalIgnoreCase) ||
          string.Equals(Category, "MARKETING", StringComparison.OrdinalIgnoreCase)) &&
-        IsCompatible;
+        IsCompatible &&
+        string.Equals(ParameterFormat, "POSITIONAL", StringComparison.OrdinalIgnoreCase);
 }
+
+public sealed record WhatsAppTemplateParameter(string Text, string? Name = null);
 
 public sealed record WhatsAppTemplateCreateRequest(
     string Name,

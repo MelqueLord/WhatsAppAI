@@ -105,6 +105,9 @@ export interface WhatsAppTemplate {
   name: string
   language: string
   bodyParameterCount: number
+  bodyParameterNames?: string[]
+  bodyText?: string
+  parameterFormat?: 'POSITIONAL' | 'NAMED' | string
   category: string
   status: string
   isCompatible: boolean

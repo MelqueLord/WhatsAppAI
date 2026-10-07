@@ -270,12 +270,12 @@ public sealed class OutboxProcessingWorker(
                     return;
                 }
 
-                List<string> parameters;
+                List<WhatsAppTemplateParameter> parameters;
                 try
                 {
                     parameters = string.IsNullOrWhiteSpace(message.TemplateParametersJson)
                         ? []
-                        : JsonSerializer.Deserialize<List<string>>(message.TemplateParametersJson) ?? [];
+                        : ParseTemplateParameters(message.TemplateParametersJson);
                 }
                 catch (JsonException)
                 {
@@ -286,7 +286,7 @@ public sealed class OutboxProcessingWorker(
                 }
 
                 if (parameters.Count > 10 || parameters.Exists(parameter =>
-                    parameter is null || parameter.Length > 1024))
+                    parameter is null || parameter.Text is null || parameter.Text.Length > 1024))
                 {
                     message.MarkFailed("Invalid template parameters");
                     outboxMessage.MarkDead("Invalid template parameters");
@@ -412,6 +412,30 @@ public sealed class OutboxProcessingWorker(
         dbContext.Set<Message>().Update(message);
         dbContext.Set<OutboxMessage>().Update(outboxMessage);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static List<WhatsAppTemplateParameter> ParseTemplateParameters(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+            throw new JsonException("Template parameters must be an array.");
+
+        var parameters = new List<WhatsAppTemplateParameter>();
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                parameters.Add(new WhatsAppTemplateParameter(item.GetString() ?? string.Empty));
+                continue;
+            }
+
+            var parameter = item.Deserialize<WhatsAppTemplateParameter>();
+            if (parameter is null)
+                throw new JsonException("Template parameter is invalid.");
+            parameters.Add(parameter);
+        }
+
+        return parameters;
     }
 
     private static async Task SaveMessageOutboxAndAttachmentAsync(

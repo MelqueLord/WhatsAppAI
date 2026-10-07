@@ -78,7 +78,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         string recipientPhone,
         string templateName,
         string templateLanguage,
-        IReadOnlyList<string> parameters,
+        IReadOnlyList<WhatsAppTemplateParameter> parameters,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new SendMessageResult
         {

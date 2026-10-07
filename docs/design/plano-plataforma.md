@@ -60,7 +60,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 ## 4. Interfaces de borda
 
-- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, criar e listar templates da WABA, consultar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox autoriza Utilidade e Marketing individuais; o disparo em massa continua restrito a Utilidade.
+- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, incluindo parâmetros posicionais e nomeados conforme o formato da Meta; criar e listar templates da WABA, consultar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox autoriza Utilidade e Marketing individuais; o disparo em massa continua restrito a Utilidade.
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
 - `ISecretStore`: gravar, recuperar somente para uso interno, rotacionar e remover segredo; credenciais de IA são administradas pela plataforma e nunca retornadas ao tenant.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.

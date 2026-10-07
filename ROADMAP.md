@@ -5,7 +5,7 @@
 
 ## Estado atual
 
-O backlog de capacidades está implementado até T254. Permanecem abertas as validações T008 e T012 para avisos de fila, T013 para LGPD/prontidão de produção e o incremento de correção T255–T269, aberto pela avaliação de segurança e operação de 2026-09-13.
+O backlog de capacidades está implementado até T254; T274 também foi concluída para envio de templates posicionais e nomeados na Inbox. Permanecem abertas as validações T008 e T012 para avisos de fila, T013 para LGPD/prontidão de produção e o incremento de correção T255–T269, aberto pela avaliação de segurança e operação de 2026-09-13.
 
 ## Próximos marcos
 

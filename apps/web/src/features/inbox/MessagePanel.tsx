@@ -48,7 +48,7 @@ const TEMPLATE_CATEGORIES: Record<string, string> = {
 function templateUnavailableReason(template: WhatsAppTemplate): string {
   if (template.status !== 'APPROVED') return `status ${template.status.toLowerCase()}`
   if (template.category !== 'UTILITY' && template.category !== 'MARKETING') return 'categoria ainda não suportada'
-  return 'componentes ainda não suportados'
+  return 'componentes ou variáveis não suportados'
 }
 
 export function MessagePanel({
@@ -63,7 +63,7 @@ export function MessagePanel({
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateLanguage, setTemplateLanguage] = useState('pt_BR')
-  const [templateParameters, setTemplateParameters] = useState('')
+  const [templateParameters, setTemplateParameters] = useState<string[]>([])
   const [modeOverride, setModeOverride] = useState<string | null>(null)
   const [modeError, setModeError] = useState<string | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -160,15 +160,14 @@ export function MessagePanel({
   const selectedTemplate = templates.find((template) =>
     template.name === templateName && template.language === templateLanguage,
   )
-  const selectedTemplateParameters = templateParameters
-    .split(',')
-    .map((parameter) => parameter.trim())
-    .filter(Boolean)
+  const selectedTemplateParameterNames = selectedTemplate?.bodyParameterNames ??
+    (selectedTemplate ? Array.from({ length: selectedTemplate.bodyParameterCount }, (_, index) => String(index + 1)) : [])
+  const selectedTemplateParameters = templateParameters.map((parameter) => parameter.trim())
 
   const selectTemplate = (template: WhatsAppTemplate) => {
     setTemplateName(template.name)
     setTemplateLanguage(template.language)
-    setTemplateParameters('')
+    setTemplateParameters(Array.from({ length: template.bodyParameterCount }, () => ''))
   }
 
   const sendMutation = useMutation({
@@ -456,6 +455,11 @@ export function MessagePanel({
 
     if (selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount) {
       setSendError(`Este template exige exatamente ${selectedTemplate.bodyParameterCount} parâmetro(s) no corpo.`)
+      return
+    }
+
+    if (selectedTemplateParameters.some((parameter) => !parameter)) {
+      setSendError('Preencha todas as variáveis do template antes de enviar.')
       return
     }
 
@@ -971,26 +975,41 @@ export function MessagePanel({
               />
             </div>
             {templates.length > 0 && <p className="text-[11px] text-slate-400">Todos os modelos da linha aparecem por categoria. Os indisponíveis ficam desabilitados com o motivo; o disparo em massa continua limitado a Utilidade.</p>}
-            <div className="flex gap-2">
-              <input
-                value={templateParameters}
-                onChange={(event) => setTemplateParameters(event.target.value)}
-                placeholder={selectedTemplate
-                  ? selectedTemplate.bodyParameterCount === 0
-                    ? 'Este template não possui parâmetros no corpo'
-                    : `Informe ${selectedTemplate.bodyParameterCount} parâmetro(s), separados por vírgula`
-                  : 'Selecione um template primeiro'}
-                disabled={!selectedTemplate || selectedTemplate.bodyParameterCount === 0}
-                className="flex-1 rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
-              />
+            {selectedTemplate && (
+              <div className="space-y-2 rounded-lg border border-white/5 bg-[#0b1222] p-2 text-xs text-slate-300">
+                <p className="whitespace-pre-wrap">{selectedTemplate.bodyText || selectedTemplate.name}</p>
+                <p className="text-[10px] text-slate-400">
+                  Variáveis {selectedTemplate.parameterFormat?.toUpperCase() === 'NAMED' ? 'nomeadas' : 'posicionais'}
+                </p>
+              </div>
+            )}
+            {selectedTemplate && selectedTemplate.bodyParameterCount > 0 && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {selectedTemplateParameterNames.map((parameterName, index) => (
+                  <input
+                    key={`${parameterName}-${index}`}
+                    value={templateParameters[index] ?? ''}
+                    onChange={(event) => setTemplateParameters((current) => current.map((value, itemIndex) =>
+                      itemIndex === index ? event.target.value : value,
+                    ))}
+                    placeholder={`{{${parameterName || index + 1}}}`}
+                    aria-label={`Valor da variável ${parameterName || index + 1}`}
+                    maxLength={1024}
+                    className="min-w-0 rounded-lg border border-white/10 bg-[#0b1222] px-3 py-2 text-xs text-white placeholder:text-slate-500"
+                  />
+                ))}
+              </div>
+            )}
+            {selectedTemplate?.bodyParameterCount === 0 && (
+              <p className="text-[11px] text-slate-400">Este template não possui variáveis no corpo.</p>
+            )}
               <button
                 onClick={handleTemplateSend}
-                disabled={!selectedTemplate || !selectedTemplate.canSendInInbox || selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount || sendMutation.isPending}
+                disabled={!selectedTemplate || !selectedTemplate.canSendInInbox || selectedTemplateParameters.length !== selectedTemplate.bodyParameterCount || selectedTemplateParameters.some((parameter) => !parameter) || sendMutation.isPending}
                 className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
               >
                 {sendMutation.isPending ? 'Enviando…' : 'Enviar template'}
               </button>
-            </div>
           </div>
         )}
 

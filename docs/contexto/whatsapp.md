@@ -2,7 +2,7 @@
 
 Linhas podem usar WhatsApp Cloud API ou ponte WhatsApp Web por QR Code. Webhooks são autenticados e idempotentes. Cada evento é persistido antes de worker processá-lo, e os envios passam pela Outbox. A sessão QR é isolada por tenant e linha.
 
-Fora da janela de atendimento de 24 horas, a Inbox de uma linha oficial consulta todas as páginas de templates da WABA e oferece somente templates `UTILITY` aprovados. Antes de enfileirar o envio, o backend consulta novamente essa lista e valida nome, idioma e a quantidade de parâmetros do corpo; linhas QR Code não aceitam templates.
+Fora da janela de atendimento de 24 horas, a Inbox de uma linha oficial consulta todas as páginas de templates da WABA e oferece somente templates `UTILITY` ou `MARKETING` aprovados com formato de parâmetros posicional ou nomeado e componentes compatíveis. A tela mostra o texto do corpo e os nomes/índices das variáveis detectadas. Antes de enfileirar o envio, o backend consulta novamente essa lista e valida nome, idioma e a quantidade de parâmetros do corpo; variáveis nomeadas são mapeadas ao `parameter_name` exigido pela Meta, e linhas QR Code não aceitam templates.
 
 Na tela de integração, cada linha da API Oficial mostra `Conectado` somente após uma verificação sanitizada das credenciais contra a Meta; sem credenciais, token disponível ou resposta válida, mostra `Desconectado`. Esse status é consultado por linha e não expõe o token.
 

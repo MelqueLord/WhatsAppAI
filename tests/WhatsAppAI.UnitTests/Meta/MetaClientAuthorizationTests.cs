@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Infrastructure.Meta;
 using WhatsAppAI.Infrastructure.WhatsApp;
 
@@ -42,7 +43,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
 
         var result = await client.SendTemplateMessageAsync(
-            "phone-template", "token-template", "recipient", "welcome_customer", "pt_BR", ["Maria"]);
+            "phone-template", "token-template", "recipient", "welcome_customer", "pt_BR", [new WhatsAppTemplateParameter("Maria")]);
 
         Assert.True(result.IsSuccess);
         using var document = JsonDocument.Parse(handler.RequestBodies.Single());
@@ -52,6 +53,23 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         Assert.Equal("pt_BR", root.GetProperty("template").GetProperty("language").GetProperty("code").GetString());
         Assert.Equal("Maria", root.GetProperty("template").GetProperty("components")[0]
             .GetProperty("parameters")[0].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task WhatsAppClient_SendsNamedTemplateParameterNames()
+    {
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.SendTemplateMessageAsync(
+            "phone-template", "token-template", "recipient", "welcome_named", "pt_BR",
+            [new WhatsAppTemplateParameter("Maria", "nome")]);
+
+        Assert.True(result.IsSuccess);
+        using var document = JsonDocument.Parse(Assert.Single(handler.RequestBodies, body => body.Contains("welcome_named", StringComparison.Ordinal)));
+        var parameter = document.RootElement.GetProperty("template").GetProperty("components")[0]
+            .GetProperty("parameters")[0];
+        Assert.Equal("nome", parameter.GetProperty("parameter_name").GetString());
+        Assert.Equal("Maria", parameter.GetProperty("text").GetString());
     }
 
     [Fact]
@@ -83,7 +101,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         var result = await client.ListTemplatesAsync("waba-id", "token");
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(6, result.Templates.Count);
+        Assert.Equal(7, result.Templates.Count);
         var utility = Assert.Single(result.Templates, template => template.Name == "welcome_customer");
         Assert.Equal("UTILITY", utility.Category);
         Assert.Equal(1, utility.BodyParameterCount);
@@ -98,6 +116,13 @@ public sealed class MetaClientAuthorizationTests : IDisposable
         var pending = Assert.Single(result.Templates, template => template.Name == "draft");
         Assert.Equal("PENDING", pending.Status);
         Assert.False(pending.CanSendInInbox);
+
+        var namedParameters = Assert.Single(result.Templates, template => template.Name == "named_parameters");
+        Assert.Equal("NAMED", namedParameters.ParameterFormat);
+        Assert.Equal(["nome"], namedParameters.BodyParameterNames);
+        Assert.Equal(1, namedParameters.BodyParameterCount);
+        Assert.True(namedParameters.CanSendInInbox);
+        Assert.False(namedParameters.CanSendInBroadcast);
 
         var authentication = Assert.Single(result.Templates, template => template.Name == "otp_code");
         Assert.Equal("AUTHENTICATION", authentication.Category);
@@ -209,7 +234,7 @@ public sealed class MetaClientAuthorizationTests : IDisposable
                 TemplateRequests.Add(request.RequestUri.ToString());
                 var content = request.RequestUri.Query.Contains("after=next", StringComparison.Ordinal)
                     ? "{\"data\":[{\"name\":\"follow_up\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá\"}]}]}"
-                    : "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"marketing_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"BODY\",\"text\":\"Oferta para {{1}}\"}]},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Rascunho\"}]},{\"name\":\"otp_code\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"AUTHENTICATION\",\"components\":[{\"type\":\"BODY\"},{\"type\":\"BUTTONS\"}]},{\"name\":\"rich_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"HEADER\",\"text\":\"Promoção\"},{\"type\":\"BODY\",\"text\":\"Olá\"}]}],\"paging\":{\"next\":\"https://graph.facebook.com/v21.0/waba-id/message_templates?after=next\"}}";
+                    : "{\"data\":[{\"name\":\"welcome_customer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{1}}\"}]},{\"name\":\"marketing_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"BODY\",\"text\":\"Oferta para {{1}}\"}]},{\"name\":\"draft\",\"language\":\"pt_BR\",\"status\":\"PENDING\",\"category\":\"UTILITY\",\"components\":[{\"type\":\"BODY\",\"text\":\"Rascunho\"}]},{\"name\":\"otp_code\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"AUTHENTICATION\",\"components\":[{\"type\":\"BODY\"},{\"type\":\"BUTTONS\"}]},{\"name\":\"rich_offer\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"MARKETING\",\"components\":[{\"type\":\"HEADER\",\"text\":\"Promoção\"},{\"type\":\"BODY\",\"text\":\"Olá\"}]},{\"name\":\"named_parameters\",\"language\":\"pt_BR\",\"status\":\"APPROVED\",\"category\":\"UTILITY\",\"parameter_format\":\"NAMED\",\"components\":[{\"type\":\"BODY\",\"text\":\"Olá, {{nome}}\"}]}],\"paging\":{\"next\":\"https://graph.facebook.com/v21.0/waba-id/message_templates?after=next\"}}";
                 response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(content)

@@ -209,7 +209,7 @@ describe('MessagePanel conversation closing', () => {
 
   it('requires the selected template body parameter count before sending', async () => {
     apiMock.conversations.listTemplates.mockResolvedValue({
-      templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
+      templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1, bodyParameterNames: ['1'], bodyText: 'Olá, {{1}}', parameterFormat: 'POSITIONAL', category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
     })
     const conversation = { ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: true }
 
@@ -222,7 +222,7 @@ describe('MessagePanel conversation closing', () => {
 
     expect(screen.getByRole('button', { name: 'Enviar template' })).toBeDisabled()
 
-    fireEvent.change(screen.getByPlaceholderText('Informe 1 parâmetro(s), separados por vírgula'), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Valor da variável 1' }), {
       target: { value: 'Maria' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Enviar template' }))
@@ -239,7 +239,7 @@ describe('MessagePanel conversation closing', () => {
   it('groups every category and sends a compatible approved marketing template', async () => {
     apiMock.conversations.listTemplates.mockResolvedValue({
       templates: [
-        { name: 'retomar_atendimento', language: 'pt_BR', bodyParameterCount: 1, category: 'MARKETING', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: false },
+        { name: 'retomar_atendimento', language: 'pt_BR', bodyParameterCount: 1, bodyParameterNames: ['1'], bodyText: 'Olá, {{1}}', parameterFormat: 'POSITIONAL', category: 'MARKETING', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: false },
         { name: 'service_update', language: 'pt_BR', bodyParameterCount: 0, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true },
         { name: 'otp_code', language: 'pt_BR', bodyParameterCount: 0, category: 'AUTHENTICATION', status: 'APPROVED', isCompatible: false, canSendInInbox: false, canSendInBroadcast: false },
         { name: 'new_category', language: 'pt_BR', bodyParameterCount: 0, category: 'OTHER', status: 'APPROVED', isCompatible: true, canSendInInbox: false, canSendInBroadcast: false },
@@ -257,11 +257,35 @@ describe('MessagePanel conversation closing', () => {
     expect(screen.getByRole('option', { name: /pending_offer/ })).toBeDisabled()
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'retomar_atendimento:pt_BR' } })
-    fireEvent.change(screen.getByPlaceholderText('Informe 1 parâmetro(s), separados por vírgula'), { target: { value: 'Maria' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Valor da variável 1' }), { target: { value: 'Maria' } })
     fireEvent.click(screen.getByRole('button', { name: 'Enviar template' }))
 
     await waitFor(() => expect(apiMock.conversations.sendMessage).toHaveBeenCalledWith(
       'conversation-1', '', { name: 'retomar_atendimento', language: 'pt_BR', parameters: ['Maria'] },
+    ))
+  })
+
+  it('shows the detected named variables and sends their values in body order', async () => {
+    apiMock.conversations.listTemplates.mockResolvedValue({
+      templates: [{
+        name: 'welcome_named', language: 'pt_BR', bodyParameterCount: 2,
+        bodyParameterNames: ['nome', 'pedido'], bodyText: 'Olá {{nome}}, pedido {{pedido}}',
+        parameterFormat: 'NAMED', category: 'UTILITY', status: 'APPROVED',
+        isCompatible: true, canSendInInbox: true, canSendInBroadcast: true,
+      }],
+    })
+    renderPanel({ ...createConversation(), isQrCode: false, isWindowOpen: false, canUseTemplates: true })
+
+    await screen.findByRole('option', { name: /welcome_named \(pt_BR\)/ })
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'welcome_named:pt_BR' } })
+    expect(await screen.findByText('Variáveis nomeadas')).toBeInTheDocument()
+    expect(screen.getByText('Olá {{nome}}, pedido {{pedido}}')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Valor da variável nome' }), { target: { value: 'Maria' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Valor da variável pedido' }), { target: { value: '123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar template' }))
+
+    await waitFor(() => expect(apiMock.conversations.sendMessage).toHaveBeenCalledWith(
+      'conversation-1', '', { name: 'welcome_named', language: 'pt_BR', parameters: ['Maria', '123'] },
     ))
   })
 
