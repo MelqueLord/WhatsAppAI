@@ -304,30 +304,6 @@ public static class BroadcastEndpoints
                 return Results.BadRequest(new { error = "The selected template is no longer eligible for sending." });
 
             broadcast.SetTemplateCategory(selectedTemplate.Category);
-            if (MarketingBroadcastConsentPolicy.IsMarketing(selectedTemplate.Category))
-            {
-                var recipientsWithoutConsent = await db.BroadcastRecipients
-                    .IgnoreQueryFilters()
-                    .Where(recipient =>
-                        recipient.TenantId == tenantId &&
-                        recipient.BroadcastListId == broadcast.Id &&
-                        recipient.Status == BroadcastRecipientStatus.Pending &&
-                        !db.ConsentEvidence.IgnoreQueryFilters().Any(evidence =>
-                            evidence.TenantId == tenantId &&
-                            evidence.ContactId == recipient.ContactId &&
-                            evidence.RevokedAt == null &&
-                            evidence.ProcessingPurpose.TenantId == tenantId &&
-                            evidence.ProcessingPurpose.IsActive &&
-                            evidence.ProcessingPurpose.LegalBasis == WhatsAppAI.Domain.Privacy.LegalBasis.Consent &&
-                            evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName))
-                    .ToListAsync();
-
-                foreach (var recipient in recipientsWithoutConsent)
-                {
-                    recipient.MarkSkipped("Marketing consent is not active.");
-                    broadcast.RecordSkipped();
-                }
-            }
         }
 
         if (currentTenant.UserRole == "Operator")

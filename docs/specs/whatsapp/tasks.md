@@ -40,6 +40,8 @@
 
 ## Fase 6 — Marketing consentido
 
+Implementada originalmente por T014–T017; a coleta e o bloqueio por evidência do aplicativo foram removidos posteriormente por T275/ADR-0017. A responsabilidade do tenant de obter aceitação conforme a política do WhatsApp permanece.
+
 - [X] T014 Registrar e revogar consentimento específico de Marketing por contato, isolado por tenant, em `src/WhatsAppAI.WebApi/Contacts/` e `apps/web/src/features/contacts/`.
 - [X] T015 Revalidar `MARKETING` no dispatch e no worker, impedindo a Outbox para consentimento ausente ou revogado, em `BroadcastEndpoints`, `BroadcastDispatchWorker` e domínio.
 - [X] T016 Persistir categoria do template e contagem de destinatários impedidos em migration reversível, DTOs e testes.

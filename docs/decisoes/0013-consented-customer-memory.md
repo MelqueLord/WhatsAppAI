@@ -1,6 +1,6 @@
 # ADR-0013: Memória individual do cliente com consentimento
 
-**Status:** Aceito — 2026-09-05
+**Status:** Substituído por ADR-0017 — 2026-10-06
 
 ## Contexto
 

@@ -330,7 +330,6 @@ export interface Contact {
   profilePictureUrl?: string
   lastMessageAt?: string
   createdAt: string
-  hasMarketingConsent?: boolean
   conversationId?: string
   message?: string
 }
@@ -354,9 +353,6 @@ export interface CustomerMemory {
 }
 
 export interface CustomerMemoryListResponse {
-  consentGranted: boolean
-  consentGrantedAt?: string
-  consentPurpose: string
   items: CustomerMemory[]
 }
 
@@ -733,14 +729,6 @@ export const api = {
 
     delete: (id: string) =>
       fetchApi<void>(`/api/contacts/${id}`, { method: 'DELETE' }),
-
-    grantMarketingConsent: (id: string) =>
-      fetchApi<{ contactId: string; hasMarketingConsent: boolean }>(`/api/contacts/${id}/marketing-consent`, {
-        method: 'POST',
-      }),
-
-    revokeMarketingConsent: (id: string) =>
-      fetchApi<void>(`/api/contacts/${id}/marketing-consent`, { method: 'DELETE' }),
 
     import: (file: File, queueId?: string) => {
       const data = new FormData()

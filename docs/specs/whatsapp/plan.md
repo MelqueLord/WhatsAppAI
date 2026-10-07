@@ -4,7 +4,7 @@
 
 ## Resumo
 
-Adicionar um segundo modo à lista de transmissão: template `UTILITY` ou `MARKETING` aprovado na API Oficial. QR/texto livre permanece inalterado. Marketing usa somente contatos com consentimento ativo, específico e revogável registrado pelo TenantOwner. Cada destinatário receberá uma `Message` de template e uma `OutboxMessage` durável e idempotente; a Outbox, e não o worker de broadcast, chamará a Meta.
+Adicionar um segundo modo à lista de transmissão: template `UTILITY` ou `MARKETING` aprovado na API Oficial. QR/texto livre permanece inalterado. O aplicativo não coleta nem verifica aceitação por contato; o tenant permanece responsável por obter a aceitação exigida pela política do WhatsApp. Cada destinatário receberá uma `Message` de template e uma `OutboxMessage` durável e idempotente; a Outbox, e não o worker de broadcast, chamará a Meta.
 
 Estão fora do escopo: templates `AUTHENTICATION`, mídia, botões/cabeçalhos, agendamento, importação de listas e qualquer alteração no bridge QR.
 
@@ -24,7 +24,7 @@ Estão fora do escopo: templates `AUTHENTICATION`, mídia, botões/cabeçalhos, 
 
 **Meta**: até 500 contatos manualmente ou fotografia da fila; produção em lotes, sem bloqueio HTTP
 
-**Limites**: linha oficial ativa do tenant; template `APPROVED` + `UTILITY` ou `MARKETING`; Marketing exige consentimento ativo por contato; só `BODY` texto, até 10 parâmetros de 1024 caracteres
+**Limites**: linha oficial ativa do tenant; template `APPROVED` + `UTILITY` ou `MARKETING`; não há bloqueio por evidência de consentimento do aplicativo; só `BODY` texto, até 10 parâmetros de 1024 caracteres
 
 **Escopo**: uma lista ativa por tenant; isolamento por tenant, linha e fila
 
@@ -34,7 +34,7 @@ Estão fora do escopo: templates `AUTHENTICATION`, mídia, botões/cabeçalhos, 
 
 | Gate | Situação | Controle |
 |---|---|---|
-| Atendimento, privacidade e Marketing autorizado | Aprovado | Marketing só é enviado após consentimento específico e ativo; revogação bloqueia materialização futura. |
+| Atendimento, privacidade e Marketing autorizado | Substituído por ADR-0017 | O produto não registra evidência por contato; o tenant é responsável por obter e respeitar aceitação e cancelamentos conforme a política do WhatsApp. |
 | Tenant e privacidade | Aprovado | `TenantId` em dados/consultas; sem parâmetros em logs ou SignalR. |
 | Idempotência e observabilidade | Aprovado | Vínculo Message/Outbox por destinatário, chave de idempotência e progresso. |
 | Arquitetura proporcional | Aprovado | Reuso de PostgreSQL, Outbox e cliente Meta; sem serviço novo. |
@@ -75,7 +75,7 @@ Adicionar `DeliveryMode`, metadados do template e referência de mensagem/tentat
 
 ### 2. API e processamento durável
 
-Estender criação/edição para os dois modos exclusivos e oferecer consulta de templates por linha. Revalidar no dispatch linha, token, `APPROVED`, categoria, nome, idioma e quantidade de parâmetros. Para Marketing, remover destinatários sem consentimento antes de iniciar e revalidar o consentimento no worker antes de materializar a Outbox. O worker materializa conversa automática, mensagem e Outbox na mesma transação; o reconciliador atualiza `Queued`, `Sent` e `Failed` a partir da mensagem/Outbox. Cancelamento para produção nova, não para itens já assumidos.
+Estender criação/edição para os dois modos exclusivos e oferecer consulta de templates por linha. Revalidar no dispatch linha, token, `APPROVED`, categoria, nome, idioma e quantidade de parâmetros. O worker materializa conversa automática, mensagem e Outbox na mesma transação; o reconciliador atualiza `Queued`, `Sent` e `Failed` a partir da mensagem/Outbox. Cancelamento para produção nova, não para itens já assumidos.
 
 ### 3. Interface e validação
 

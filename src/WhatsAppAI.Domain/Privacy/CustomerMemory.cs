@@ -5,7 +5,6 @@ public sealed class CustomerMemory
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid ContactId { get; private set; }
-    public Guid ConsentEvidenceId { get; private set; }
     public string Key { get; private set; } = string.Empty;
     public string Value { get; private set; } = string.Empty;
     public CustomerMemorySource Source { get; private set; }
@@ -20,14 +19,13 @@ public sealed class CustomerMemory
     public static CustomerMemory Create(
         Guid tenantId,
         Guid contactId,
-        Guid consentEvidenceId,
         string key,
         string value,
         CustomerMemorySource source,
         DateTime expiresAt,
         Guid createdByUserId)
     {
-        ValidateIds(tenantId, contactId, consentEvidenceId, createdByUserId);
+        ValidateIds(tenantId, contactId, createdByUserId);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(expiresAt, DateTime.UtcNow);
@@ -37,7 +35,6 @@ public sealed class CustomerMemory
             Id = Guid.CreateVersion7(),
             TenantId = tenantId,
             ContactId = contactId,
-            ConsentEvidenceId = consentEvidenceId,
             Key = key.Trim(),
             Value = value.Trim(),
             Source = source,
@@ -49,17 +46,13 @@ public sealed class CustomerMemory
     }
 
     public void Replace(
-        Guid consentEvidenceId,
         string value,
         CustomerMemorySource source,
         DateTime expiresAt)
     {
-        if (consentEvidenceId == Guid.Empty)
-            throw new ArgumentException("Consent evidence is required.", nameof(consentEvidenceId));
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(expiresAt, DateTime.UtcNow);
 
-        ConsentEvidenceId = consentEvidenceId;
         Value = value.Trim();
         Source = source;
         ExpiresAt = expiresAt;
@@ -87,15 +80,12 @@ public sealed class CustomerMemory
     private static void ValidateIds(
         Guid tenantId,
         Guid contactId,
-        Guid consentEvidenceId,
         Guid createdByUserId)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("Tenant is required.", nameof(tenantId));
         if (contactId == Guid.Empty)
             throw new ArgumentException("Contact is required.", nameof(contactId));
-        if (consentEvidenceId == Guid.Empty)
-            throw new ArgumentException("Consent evidence is required.", nameof(consentEvidenceId));
         if (createdByUserId == Guid.Empty)
             throw new ArgumentException("Creator is required.", nameof(createdByUserId));
     }

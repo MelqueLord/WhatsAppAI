@@ -14,6 +14,7 @@
 - `Source` (descrição curta, sem conteúdo bruto), `EvidenceReference` opcional
 - `GrantedAt`, `RevokedAt`, `RecordedByUserId`, `CreatedAt`
 - Uma evidência ativa por contato/finalidade; somente finalidade com base `Consent` aceita criação.
+- A evidência permanece genérica para finalidades configuradas pelo tenant; não é requisito para disparos Marketing nem memória individual (ADR-0017).
 
 ## DataSubjectRequest
 

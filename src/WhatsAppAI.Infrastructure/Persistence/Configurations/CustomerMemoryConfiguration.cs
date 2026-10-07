@@ -14,7 +14,6 @@ public sealed class CustomerMemoryConfiguration : IEntityTypeConfiguration<Custo
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.ContactId).HasColumnName("contact_id").IsRequired();
-        builder.Property(x => x.ConsentEvidenceId).HasColumnName("consent_evidence_id").IsRequired();
         builder.Property(x => x.Key).HasColumnName("memory_key").HasMaxLength(80).IsRequired();
         builder.Property(x => x.Value).HasColumnName("memory_value").HasMaxLength(160).IsRequired();
         builder.Property(x => x.Source).HasColumnName("source").HasConversion<string>().HasMaxLength(30).IsRequired();
@@ -28,12 +27,7 @@ public sealed class CustomerMemoryConfiguration : IEntityTypeConfiguration<Custo
             .WithMany()
             .HasForeignKey(x => x.ContactId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ConsentEvidence>()
-            .WithMany()
-            .HasForeignKey(x => x.ConsentEvidenceId)
-            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.TenantId, x.ContactId, x.Key }).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.ContactId, x.IsActive, x.ExpiresAt });
-        builder.HasIndex(x => new { x.TenantId, x.ConsentEvidenceId });
     }
 }

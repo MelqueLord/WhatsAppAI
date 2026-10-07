@@ -18,14 +18,14 @@ public sealed class BroadcastRecipientTests
     }
 
     [Fact]
-    public void MarkSkipped_RecordsConsentReason()
+    public void MarkSkipped_RecordsReason()
     {
         var recipient = BroadcastRecipient.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
-        recipient.MarkSkipped("Marketing consent is not active.");
+        recipient.MarkSkipped("Recipient skipped.");
 
         Assert.Equal(BroadcastRecipientStatus.Skipped, recipient.Status);
-        Assert.Equal("Marketing consent is not active.", recipient.ErrorMessage);
+        Assert.Equal("Recipient skipped.", recipient.ErrorMessage);
     }
     [Fact]
     public void Retry_RejectsRecipientAlreadySent()

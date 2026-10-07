@@ -15,7 +15,7 @@ Monólito modular com frontend separado e um único backend implantável. O back
 - **Automation:** política, contexto, conversa natural, proteção contra informação inventada, exemplos de atendimento por tenant, aprendizado supervisionado a partir de feedback aprovado, testes diagnósticos por cenário, interação de IA e handoff.
 - **Routing policy:** decisão determinística de fila e handoff após a resposta do provedor, com prioridade para segurança/pedido humano, filas autorizadas em modo automático e fallback contextual.
 - **Knowledge:** conteúdo ativo, classificado e guiado por tipo de fato, que fundamenta respostas.
-- **Customer Privacy:** memória individual do contato, consentimento, validade, revogação e anonimização, integrada ao contexto sem permitir escrita automática pelo modelo.
+- **Customer Privacy:** memória individual manual do contato, validade, desativação e anonimização, integrada ao contexto sem permitir escrita automática pelo modelo; controles genéricos de base legal e evidência continuam em módulo próprio.
 - **Usage & Audit:** unidades, estimativas, auditoria e métricas.
 
 ## 2. Stack
@@ -64,7 +64,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
 - `ISecretStore`: gravar, recuperar somente para uso interno, rotacionar e remover segredo; credenciais de IA são administradas pela plataforma e nunca retornadas ao tenant.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.
-- `ICustomerMemoryRepository`: consultar memória ativa somente com consentimento vigente e tenant/contato explícitos.
+- `ICustomerMemoryRepository`: consultar até quatro memórias ativas e não expiradas com tenant/contato explícitos.
 - `ICurrentTenant`: transportar contexto autenticado sem aceitar `TenantId` arbitrário do cliente.
 - `IOutboxDispatcher`: despachar operações externas idempotentes.
 - `IMediaGateway`: obter mídia da Meta para proxy autenticado sem expor credenciais ou URL privada.

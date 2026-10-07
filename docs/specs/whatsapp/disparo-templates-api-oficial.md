@@ -2,13 +2,13 @@
 
 **ID:** 002-disparo-templates-api-oficial
 
-**Versão:** 1.0.0
+**Versão:** 1.1.0
 
-**Status:** Planejada
+**Status:** Implementada; regra de consentimento por contato substituída pelo ADR-0017
 
 ## Escopo
 
-Permitir que uma lista de transmissão use uma linha ativa da Cloud API e um template Meta `UTILITY` ou `MARKETING` aprovado. QR Code/texto livre continua com o comportamento atual. Marketing só alcança contatos com consentimento ativo, específico e revogável para mensagens de Marketing no WhatsApp. Ficam excluídos `AUTHENTICATION`, mídia, botões, cabeçalhos e agendamento.
+Permitir que uma lista de transmissão use uma linha ativa da Cloud API e um template Meta `UTILITY` ou `MARKETING` aprovado. QR Code/texto livre continua com o comportamento atual. O aplicativo não coleta nem exige evidência de aceitação por contato; o tenant deve obter e respeitar a aceitação explícita exigida pela política do WhatsApp. Ficam excluídos `AUTHENTICATION`, mídia, botões, cabeçalhos e agendamento.
 
 ## Requisitos
 
@@ -19,19 +19,19 @@ Permitir que uma lista de transmissão use uma linha ativa da Cloud API e um tem
 - **FR-BOT-005:** TenantOwner opera todo o tenant. Operator só acessa a interseção de sua linha e fila atribuídas, em listagem, detalhe, criação, edição, dispatch, cancelamento e retry.
 - **FR-BOT-006:** no dispatch o backend revalida linha, token, template, categoria, idioma e parâmetros na Meta; frontend não é fonte de verdade.
 - **FR-BOT-007:** cada destinatário gera `Message` de template + `OutboxMessage` transacionais e idempotentes; somente a Outbox chama a Meta.
-- **FR-BOT-008:** progresso distingue pendente, enfileirado, enviado, falho e impedido por consentimento. Falha individual não para os demais; retry atende somente falhas finais.
+- **FR-BOT-008:** progresso distingue pendente, enfileirado, enviado, falho e ignorado. Falha individual não para os demais; retry atende somente falhas finais.
 - **FR-BOT-009:** cancelamento impede novos enfileiramentos, sem apagar itens já assumidos pela Outbox.
 - **FR-BOT-010:** parâmetros/tokens não entram em logs, respostas de progresso ou SignalR; falhas são sanitizadas.
-- **FR-BOT-011:** interface explica claramente QR/texto livre e Oficial/template; nome/idioma selecionados não são editáveis livremente. A tela de contatos permite ao TenantOwner registrar e revogar o consentimento específico de Marketing, com confirmação explícita.
+- **FR-BOT-011:** interface explica claramente QR/texto livre e Oficial/template; nome/idioma selecionados não são editáveis livremente. A lista de destinatários não é filtrada por evidência de consentimento armazenada no aplicativo.
 
 ## Critérios de sucesso
 
 - **SC-BOT-001:** 50 destinatários são materializados sem duplicidade mesmo após reinício de worker.
-- **SC-BOT-002:** template inválido, reprovado ou com contagem errada não cria Outbox; template `MARKETING` só cria Outbox para destinatário com consentimento ativo.
+- **SC-BOT-002:** template inválido, reprovado ou com contagem errada não cria Outbox; destinatários selecionados de um template `MARKETING` são materializados sem consulta à evidência de consentimento do aplicativo.
 - **SC-BOT-003:** Operator não consulta nem opera lista fora do escopo, inclusive por URL direta.
 - **SC-BOT-004:** falha e 429 de um destinatário não interrompem os demais e são recuperáveis.
 - **SC-BOT-005:** fluxo QR existente segue enviando texto livre sem regressão.
 
 ## Compatibilidade
 
-Esta especificação complementa `broadcast-qrcode.md`: substitui somente sua exclusão de API Oficial por este caminho separado e restrito. A especificação de plataforma, especialmente `FR-012`, `FR-059`, `BR-006` e `BR-029`, continua prevalecendo. O envio individual de Marketing pela Inbox segue `FR-059`; o disparo em massa de Marketing segue o consentimento específico definido nesta especificação.
+Esta especificação complementa `broadcast-qrcode.md`: substitui somente sua exclusão de API Oficial por este caminho separado e restrito. A especificação de plataforma, especialmente `FR-012`, `FR-059`, `BR-006` e `BR-029`, continua prevalecendo. O tenant permanece responsável por obter a aceitação explícita e respeitar cancelamentos conforme a política do WhatsApp Business; o aplicativo não registra nem bloqueia disparos com base em evidência de consentimento por contato (ADR-0017).

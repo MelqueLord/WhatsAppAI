@@ -24,6 +24,10 @@ internal static class AiReplyDeliveryGuard
         conversation.Status == ConversationStatus.Open &&
         conversation.Mode == ConversationMode.Automatic;
 
+    public static bool IsRetiredConsentNotice(string? idempotencyKey) =>
+        idempotencyKey?.StartsWith("consent-request:", StringComparison.Ordinal) == true ||
+        idempotencyKey?.StartsWith("consent-confirmation:", StringComparison.Ordinal) == true;
+
     public static string CreateIdempotencyKey(Guid inboundMessageId, uint conversationVersion) =>
         $"ai:{inboundMessageId}:v{conversationVersion}";
 

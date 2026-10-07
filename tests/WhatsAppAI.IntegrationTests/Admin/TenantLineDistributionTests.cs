@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using WhatsAppAI.Domain.Privacy;
 
 namespace WhatsAppAI.IntegrationTests.Admin;
 
@@ -44,11 +43,8 @@ public sealed class TenantLineDistributionTests(TestWebApplicationFactory factor
         Assert.Equal(officialApiLineCount, tenant.OfficialApiLineCount);
         Assert.Equal(qrCodeLineCount, tenant.QrCodeLineCount);
 
-        var purpose = await db.ProcessingPurposes.IgnoreQueryFilters()
-            .SingleAsync(item => item.TenantId == tenantId);
-        Assert.Equal("Atendimento automatizado por IA", purpose.Name);
-        Assert.Equal(LegalBasis.Consent, purpose.LegalBasis);
-        Assert.True(purpose.IsActive);
+        Assert.False(await db.ProcessingPurposes.IgnoreQueryFilters()
+            .AnyAsync(item => item.TenantId == tenantId));
     }
 
     [Fact]

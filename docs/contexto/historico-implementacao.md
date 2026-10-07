@@ -1,6 +1,6 @@
 # Histórico consolidado de implementação
 
-**Atualizado em:** 2026-09-06
+**Atualizado em:** 2026-10-06
 **Escopo:** resumo do que foi implementado no projeto WhatsAppAI até esta data.
 **Fonte de verdade:** código, testes, migrations, especificação e ADRs versionados.
 
@@ -78,20 +78,20 @@ A tela de IA foi organizada em etapas de preparação do agente, para reduzir a 
 - Seleção de conhecimento local com termos, conceitos, sinônimos, intenção, categoria, prioridade e tolerância a pequenas variações de escrita.
 - Perguntas como “o que a empresa faz?”, “para que serve”, “preço” e paráfrases devem buscar fatos compatíveis antes de considerar handoff.
 - Até seis fontes locais relevantes entram no contexto; conteúdo é sanitizado e limitado para controlar custo.
-- Diretrizes, perfil, conhecimento, exemplos, memória institucional, memória consentida do cliente e histórico são combinados sem cruzar empresas.
+- Diretrizes, perfil, conhecimento, exemplos, memória institucional, memória individual e histórico são combinados sem cruzar empresas.
 - Perguntas genuinamente genéricas podem usar conhecimento público/pesquisa web quando habilitado, sem transformar conteúdo público em fato da empresa ou memória institucional.
 - A IA é orientada a responder primeiro, aproveitar o histórico, evitar repetir saudação/pergunta, usar tom de conversa e fazer no máximo uma pergunta útil.
 - Respostas de WhatsApp permanecem limitadas a 160 caracteres quando a política do tenant exigir esse limite.
 
-## 7. Memória, consentimento e aprendizado supervisionado
+## 7. Memória individual e aprendizado supervisionado
 
-- Finalidade padrão de atendimento automatizado por IA criada para novas empresas.
-- Consentimento do contato registrado de forma idempotente; sem consentimento, a automação não grava memória pessoal.
-- Memória individual do cliente exige consentimento ativo, é curta, sanitizada, tenant/contact-scoped, auditável, revogável e expirável.
+- A finalidade padrão de IA deixou de ser criada como consentimento presumido; tenants configuram suas bases legais nos controles gerais de privacidade.
+- A memória individual é manual, curta, sanitizada, tenant/contact-scoped, auditável e expirável, sem gate de consentimento por contato (ADR-0017).
 - Memória institucional da empresa é separada da memória pessoal e só aproveita respostas seguras e fundamentadas em conhecimento ativo.
 - A memória não é salva antes da validação final do envio: se um operador assumir durante a geração, a resposta e a memória associada são descartadas juntas.
 - Feedback do operador (`Helpful` ou correção textual segura) pode gerar exemplo supervisionado do próprio tenant, sem enviar nova mensagem ao cliente.
 - Exemplos supervisionados mantêm origem, sanitização, ativação, edição/desativação e concorrência otimista.
+- A evidência de consentimento por contato não é usada como bloqueio em Marketing ou memória individual; solicitações antigas de consentimento ainda pendentes na Outbox são encerradas e o tenant continua responsável por cumprir a política de mensagens do WhatsApp.
 - Feedback, memória e exemplos não habilitam fine-tuning, não compartilham dados entre empresas e não registram prompts completos ou PII sem mascaramento.
 
 ## 8. Decisão de resposta e proteção contra invenção
@@ -99,7 +99,7 @@ A tela de IA foi organizada em etapas de preparação do agente, para reduzir a 
 O backend aplica uma ordem determinística:
 
 1. segurança e pedido explícito de humano;
-2. validação de janela, consentimento, plano, credencial e orçamento;
+2. validação de janela, plano, credencial e orçamento;
 3. contexto autorizado da empresa e histórico;
 4. inferência conservadora para perguntas relacionadas ou genéricas;
 5. escolha de fila sem desligar o automático;
@@ -172,7 +172,7 @@ O commit documental posterior a este registro apenas sincroniza o histórico; n�
 - **T227:** encerramento, fila de encerradas e retomada da conversa.
 - **T228–T229:** memória institucional e feedback do operador.
 - **T230–T234:** inferência segura, tipos de negócio, conhecimento público, personalização e busca semântica.
-- **T235:** memória individual com consentimento.
+- **T235:** memória individual com consentimento (regra original substituída por T275/ADR-0017).
 - **T236:** aprendizado supervisionado por empresa.
 - **T237:** encaminhamento determinístico, filas automáticas e handoff humano explícito.
 - **T238:** respostas naturais e contextualizadas.

@@ -119,6 +119,14 @@ public sealed class OutboxProcessingWorker(
                 return;
             }
 
+            if (AiReplyDeliveryGuard.IsRetiredConsentNotice(message.IdempotencyKey))
+            {
+                message.MarkFailed("Consent notice retired");
+                outboxMessage.MarkDead("Consent notice retired");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                return;
+            }
+
             var tenant = await dbContext.Tenants.FindAsync([outboxMessage.TenantId], cancellationToken);
             if (tenant?.Status != TenantStatus.Active)
             {

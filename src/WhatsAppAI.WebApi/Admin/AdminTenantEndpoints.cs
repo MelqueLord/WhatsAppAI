@@ -6,7 +6,6 @@ using WhatsAppAI.Application.Administration;
 using WhatsAppAI.Application.Automation.Policy;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
-using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Domain.Usage;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
@@ -199,16 +198,6 @@ public static class AdminTenantEndpoints
             var membership = TenantMembership.Create(tenant.Id, owner, MembershipRole.TenantOwner);
             membership.Activate();
             dbContext.TenantMemberships.Add(membership);
-
-            // Every new tenant has an explicit, tenant-owned purpose for AI-assisted support.
-            // Consent remains required per contact before automation can process their messages.
-            dbContext.ProcessingPurposes.Add(ProcessingPurpose.Create(
-                tenant.Id,
-                AiConsentOptInPolicy.DefaultPurposeName,
-                AiConsentOptInPolicy.DefaultPurposeDescription,
-                LegalBasis.Consent,
-                365,
-                owner.Id));
 
             await dbContext.SaveChangesAsync();
 

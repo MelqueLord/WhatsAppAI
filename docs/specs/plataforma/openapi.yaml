@@ -315,8 +315,8 @@ paths:
     get:
       tags: [Contacts]
       operationId: listCustomerMemory
-      summary: Consultar memória consentida do contato
-      description: Retorna somente memórias ativas e não expiradas quando a finalidade padrão de atendimento por IA possui consentimento vigente.
+      summary: Consultar memória individual do contato
+      description: Retorna memórias ativas e não expiradas do tenant e contato informados.
       x-required-role: TenantOwner ou Operator
       x-tenant-scoped: true
       x-requirements: [US-015, FR-077, BR-045]
@@ -327,7 +327,7 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200':
-          description: Estado do consentimento e memórias disponíveis
+          description: Memórias disponíveis
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CustomerMemoryList' }
@@ -337,7 +337,7 @@ paths:
       tags: [Contacts]
       operationId: saveCustomerMemory
       summary: Salvar fato confirmado na memória do contato
-      description: Exige consentimento ativo do contato; a gravação é manual e não pode ser feita pelo modelo de IA.
+      description: A gravação é manual e não pode ser feita pelo modelo de IA. A validade máxima é de 365 dias.
       x-required-role: TenantOwner ou Operator
       x-tenant-scoped: true
       x-requirements: [US-015, FR-077, BR-045]
@@ -361,7 +361,6 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
-        '409': { $ref: '#/components/responses/Problem' }
   /contacts/{contactId}/memory/{memoryId}:
     delete:
       tags: [Contacts]
@@ -928,11 +927,8 @@ components:
         expiresAt: { type: string, format: date-time, nullable: true }
     CustomerMemoryList:
       type: object
-      required: [consentGranted, consentPurpose, items]
+      required: [items]
       properties:
-        consentGranted: { type: boolean }
-        consentGrantedAt: { type: string, format: date-time, nullable: true }
-        consentPurpose: { type: string }
         items:
           type: array
           items: { $ref: '#/components/schemas/CustomerMemory' }

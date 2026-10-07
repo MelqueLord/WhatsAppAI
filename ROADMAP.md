@@ -1,11 +1,11 @@
 # Roadmap do WhatsApp AI Manager
 
-**Atualizado em:** 2026-09-13
+**Atualizado em:** 2026-10-06
 **Papel:** roadmap canônico do repositório. Especificações, planos, tarefas e ADRs continuam sendo fontes de verdade para cada incremento.
 
 ## Estado atual
 
-O backlog de capacidades está implementado até T254; T274 também foi concluída para envio de templates posicionais e nomeados na Inbox. Permanecem abertas as validações T008 e T012 para avisos de fila, T013 para LGPD/prontidão de produção e o incremento de correção T255–T269, aberto pela avaliação de segurança e operação de 2026-09-13.
+O backlog de capacidades está implementado até T254; T270 concluiu o vínculo da fila selecionada na importação de contatos, T274 habilitou templates posicionais e nomeados na Inbox, e T275 removeu as exigências de consentimento por contato para Marketing e memória individual. Permanecem abertas as validações T008 e T012 para avisos de fila, T013 para LGPD/prontidão de produção e o incremento de correção T255–T269, aberto pela avaliação de segurança e operação de 2026-09-13.
 
 ## Próximos marcos
 

@@ -4,6 +4,8 @@ Linhas podem usar WhatsApp Cloud API ou ponte WhatsApp Web por QR Code. Webhooks
 
 Fora da janela de atendimento de 24 horas, a Inbox de uma linha oficial consulta todas as páginas de templates da WABA e oferece somente templates `UTILITY` ou `MARKETING` aprovados com formato de parâmetros posicional ou nomeado e componentes compatíveis. A tela mostra o texto do corpo e os nomes/índices das variáveis detectadas. Antes de enfileirar o envio, o backend consulta novamente essa lista e valida nome, idioma e a quantidade de parâmetros do corpo; variáveis nomeadas são mapeadas ao `parameter_name` exigido pela Meta, e linhas QR Code não aceitam templates.
 
+O disparo em massa inclui os contatos selecionados para templates `UTILITY` e `MARKETING` sem consultar evidência de consentimento no aplicativo. A política do WhatsApp exige aceitação explícita antes de contatar pessoas e respeito às solicitações de cancelamento; obter e cumprir essas condições é responsabilidade do tenant ([política oficial](https://business.whatsapp.com/policy/preview?lang=pt_BR)).
+
 Na tela de integração, cada linha da API Oficial mostra `Conectado` somente após uma verificação sanitizada das credenciais contra a Meta; sem credenciais, token disponível ou resposta válida, mostra `Desconectado`. Esse status é consultado por linha e não expõe o token.
 
 Somente TenantOwner configura, consulta o estado ou desconecta linhas. Desconectar uma linha oficial desativa o canal e remove seu token do cofre, preservando o registro da linha para uma reconexão explícita com novas credenciais. Operators não têm acesso às credenciais e a Inbox aplica a linha atribuída, a fila atribuída ou ambas como escopo de acesso.

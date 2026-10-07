@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.40.0
-**Data:** 2026-09-30
+**Versão:** 0.41.0
+**Data:** 2026-10-06
 
 ## 1. Problema
 
@@ -28,7 +28,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - Inbox em tempo real, histórico, texto e mídia básica.
 - Resposta humana e resposta automática textual por IA.
 - Templates aprovados pela Meta de Utilidade e Marketing para atendimento individual na Inbox da API Oficial fora da janela de 24 horas; outras categorias são visíveis, mas não enviáveis nesta entrega.
-- Disparo em massa por template aprovado de Utilidade ou Marketing na API Oficial; Marketing exige consentimento ativo, específico e revogável por contato.
+- Disparo em massa por template aprovado de Utilidade ou Marketing na API Oficial. O aplicativo não solicita nem registra consentimento por contato para Marketing; o tenant permanece responsável por obter e respeitar a aceitação exigida pela política do WhatsApp.
 - Modos `Automatic`, `Human` e `Paused` por conversa.
 - Base de conhecimento textual simples.
 - Consumo real de tokens, custo operacional estimado e controle de franquia/orçamento por tenant; o faturamento comercial é administrado pela plataforma.
@@ -131,15 +131,15 @@ Como Operator, quero encerrar uma conversa quando o atendimento terminar e permi
 3. Uma nova mensagem do cliente reabre a mesma conversa no modo automático, remove a atribuição humana e mantém o histórico disponível para a IA.
 4. Ao retomar, o contexto automático considera a mensagem recebida e até três mensagens anteriores, usando as diretrizes, o perfil e o conhecimento do tenant para guiar o atendimento.
 
-### US-015 — Personalizar atendimento com memória consentida (P2)
+### US-015 — Personalizar atendimento com memória individual (P2)
 
-Como Operator ou TenantOwner, quero registrar fatos confirmados pelo cliente em uma memória individual, para que a IA personalize atendimentos futuros sem misturar empresas nem guardar informações sem autorização.
+Como Operator ou TenantOwner, quero registrar fatos confirmados pelo cliente em uma memória individual, para que a IA personalize atendimentos futuros sem misturar empresas nem guardar fatos inferidos automaticamente.
 
 **Aceite:**
 
-1. A memória pertence simultaneamente ao tenant e ao contato e só pode ser consultada enquanto existir consentimento ativo para atendimento automatizado por IA.
+1. A memória pertence simultaneamente ao tenant e ao contato e só pode ser consultada enquanto estiver ativa e dentro da validade configurada.
 2. O operador pode salvar, consultar e desativar um fato curto, com validade e auditoria sem registrar o valor completo no log.
-3. Revogar o consentimento, expirar ou anonimizar o contato remove a memória do contexto da IA sem apagar o histórico operacional restante.
+3. Desativar, expirar ou anonimizar o contato remove a memória do contexto da IA sem apagar o histórico operacional restante.
 4. A IA recebe a memória como contexto de personalização, mas não pode criá-la ou alterá-la automaticamente.
 
 ### US-016 — Melhorar o agente com aprendizado supervisionado por empresa (P2)
@@ -163,7 +163,7 @@ Como TenantOwner, quero cadastrar templates textuais da API Oficial e acompanhar
 2. A primeira entrega aceita corpo textual, rodapé opcional e variáveis posicionais com exemplos, sem cabeçalho, mídia, botões, Autenticação, edição ou exclusão.
 3. A submissão é durável e idempotente; resultado incerto é reconciliado com a Meta antes de qualquer repetição.
 4. Aprovação, rejeição, mudança de categoria e demais estados aparecem no catálogo do tenant com motivo sanitizado, inclusive para templates criados diretamente no WhatsApp Manager.
-5. O cadastro não amplia as regras de envio: Marketing pode ser usado no disparo em massa somente com consentimento ativo, específico e revogável por contato; Utilidade continua elegível quando aprovada e compatível.
+5. O cadastro não amplia as regras técnicas de envio: Marketing e Utilidade continuam elegíveis no disparo em massa quando aprovados e compatíveis. O tenant deve obter e respeitar a aceitação explícita exigida pela política do WhatsApp fora do aplicativo.
 
 ### US-007 — Auditar operação (P2)
 
@@ -301,10 +301,10 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-056:** usar a base de conhecimento ativa do tenant como fonte prioritária para fatos da empresa; itens sem correspondência com a solicitação não podem ser injetados como contexto e, sem informação relevante, a IA deve evitar invenção e encaminhar quando a pergunta exigir um fato não documentado.
 - **FR-057:** coletar na tela de IA um perfil estruturado do negócio (descrição, público-alvo, produtos/serviços, tom, horário e localização), persistindo-o junto às diretrizes existentes para personalizar a abordagem sem substituir a base de conhecimento para fatos comerciais.
 - **FR-058:** permitir ao TenantOwner configurar expediente do BOT por dia da semana e fuso horário; quando habilitado, mensagens recebidas fora de um período aberto não podem seguir o fluxo automático e devem usar a mensagem configurada de fora do horário.
-- **FR-059:** listar na Inbox todos os templates da WABA da linha oficial, agrupados por categoria e com status visível; permitir ao operador enviar individualmente apenas templates aprovados de Utilidade ou Marketing com componentes suportados, idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas. O envio deve detectar o formato informado pela Meta e aceitar parâmetros posicionais e nomeados, mostrando o corpo do template e identificando cada valor esperado. O backend deve rejeitar templates não aprovados/incompatíveis e conexões QR Code e persistir a intenção na Outbox. No disparo em massa, Marketing exige consentimento ativo, específico e revogável por contato.
+- **FR-059:** listar na Inbox todos os templates da WABA da linha oficial, agrupados por categoria e com status visível; permitir ao operador enviar individualmente apenas templates aprovados de Utilidade ou Marketing com componentes suportados, idioma e parâmetros limitados quando a conversa oficial estiver fora da janela de 24 horas. O envio deve detectar o formato informado pela Meta e aceitar parâmetros posicionais e nomeados, mostrando o corpo do template e identificando cada valor esperado. O backend deve rejeitar templates não aprovados/incompatíveis e conexões QR Code e persistir a intenção na Outbox. O aplicativo não coleta nem exige evidência de aceitação individual para disparos; o tenant continua responsável por cumprir a política do WhatsApp.
 - **FR-060:** permitir executar múltiplas instâncias da ponte QR sem que duas instâncias controlem a mesma sessão; cada sessão deve ter lease exclusivo e renovável no PostgreSQL, e chamadas devem ser roteadas para a instância dona.
-- **FR-067:** manter a finalidade de atendimento automatizado por IA isolada por tenant para governança e auditoria, sem interromper o primeiro contato com uma solicitação de resposta `SIM`.
-- **FR-068:** permitir o atendimento automatizado por IA desde a primeira mensagem recebida ou iniciada pelo operador, sem solicitar confirmação textual ao contato; consentimento individual continua sendo exigido somente para memória pessoal do cliente.
+- **FR-067:** permitir que cada tenant configure finalidades e bases legais para os tratamentos de dados; o provisionamento não presume uma base legal por contato nem cria uma finalidade de IA baseada em consentimento.
+- **FR-068:** permitir o atendimento automatizado por IA desde a primeira mensagem recebida ou iniciada pelo operador, sem solicitar confirmação textual ao contato.
 - **FR-069:** permitir o encerramento explícito de uma conversa pelo operador, listá-la separadamente como encerrada sem apagar mensagens, e reabrir a mesma conversa no modo automático quando o cliente enviar nova mensagem, preservando o contexto recente.
 - **FR-070:** manter memória institucional automática por tenant, aproveitando respostas de IA com alta confiança e fundamentadas em conhecimento ativo para orientar atendimentos futuros da mesma empresa, sem compartilhar conteúdo entre tenants.
 - **FR-071:** permitir que Operator ou TenantOwner avalie uma resposta da IA como útil ou necessitando correção; uma correção textual sanitizada pode ser convertida em conhecimento validado do tenant, sem enviar uma nova mensagem automaticamente ao cliente.
@@ -313,7 +313,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-074:** detectar perguntas genuinamente genéricas sem correspondência no conhecimento da empresa e permitir ao provedor de IA usar conhecimento público ou pesquisa web atual para responder, preservando a prioridade absoluta das informações do tenant.
 - **FR-075:** personalizar cada atendimento com identidade da empresa, nome seguro do contato, etapa de primeiro contato ou continuidade, fila atual e até quatro mensagens recentes, evitando reiniciar o diálogo ou repetir perguntas já respondidas.
 - **FR-076:** selecionar conhecimento do tenant por significado, combinando termos, sinônimos, intenção, categoria e tolerância a pequenas variações de escrita, sem depender de correspondência literal da pergunta.
-- **FR-077:** permitir memória individual do cliente com consentimento ativo, vinculada ao tenant, contato e evidência de consentimento, para registrar somente fatos curtos confirmados por operador; a memória deve possuir validade, desativação, auditoria sanitizada e ser injetada no contexto da IA apenas enquanto autorizada.
+- **FR-077:** permitir memória individual do cliente vinculada ao tenant e contato, para registrar somente fatos curtos confirmados por operador; a memória deve possuir validade máxima de 365 dias, desativação, auditoria sanitizada e ser injetada no contexto da IA apenas enquanto ativa e não expirada.
 - **FR-078:** transformar avaliações aprovadas de respostas da IA em exemplos supervisionados tenant-scoped: feedback útil aprende a resposta enviada, correção aprende somente a resposta corrigida, e observação sem resposta não gera exemplo; cada exemplo deve preservar origem, sanitização, ativação e concorrência otimista dos exemplos existentes.
 - **FR-079:** gerar respostas de atendimento naturais, curtas e contextuais, usando o histórico, o tom e a identidade do tenant sem repetir saudações, perguntas já respondidas ou frases burocráticas; a naturalidade não pode alterar fatos autorizados nem ultrapassar 160 caracteres.
 - **FR-080:** validar antes do envio que valores concretos produzidos pela IA — preço, horário, prazo, percentual, data, link ou contato — aparecem no contexto autorizado do tenant; quando não houver correspondência, bloquear a resposta e aplicar handoff seguro, exceto em pesquisa pública explicitamente permitida para pergunta genérica.
@@ -360,10 +360,10 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-026:** conhecimento da empresa não correspondente à mensagem não é considerado evidência; ausência de item relevante exige resposta genérica segura, nunca uma afirmação específica inventada, e não muda a conversa para `Human`. A transferência automática por regra de negócio ocorre por palavra-chave de fila humana autorizada ou pedido explícito de atendente; proteções críticas de segurança e indisponibilidade preservam o handoff seguro existente, e a transferência manual permanece disponível ao operador.
 - **BR-027:** o perfil estruturado orienta estilo e enquadramento do atendimento; preços, políticas, disponibilidade e demais fatos operacionais devem ser consultados na base de conhecimento correspondente.
 - **BR-028:** agenda desabilitada mantém compatibilidade 24 horas; agenda habilitada exige sete dias válidos, horários de abertura/fechamento coerentes e fuso permitido. Sem mensagem de fora do horário, o BOT finaliza a entrada sem criar resposta automática.
-- **BR-029:** template enviável exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres no corpo e ausência de componentes que exijam payload adicional. O formato posicional envia os valores em ordem; o formato nomeado associa cada valor ao `parameter_name` declarado pela Meta. Ambos só podem ser despachados por uma conta `OfficialApi`. Em disparo Marketing, cada destinatário deve ter consentimento ativo para a finalidade específica no momento do dispatch e antes da materialização da Outbox; revogação impede o envio. QR Code deve finalizar a Outbox sem chamada externa.
+- **BR-029:** template enviável exige nome e idioma aprovados, no máximo dez parâmetros de texto de até 1.024 caracteres no corpo e ausência de componentes que exijam payload adicional. O formato posicional envia os valores em ordem; o formato nomeado associa cada valor ao `parameter_name` declarado pela Meta. Ambos só podem ser despachados por uma conta `OfficialApi`. O dispatch e o worker não consultam evidência de consentimento do contato. O tenant deve obter aceitação explícita para mensagens no WhatsApp e respeitar cancelamentos conforme a política da Meta. QR Code deve finalizar a Outbox sem chamada externa.
 - **BR-030:** uma instância QR sem lease válido não pode abrir socket Baileys, gravar credenciais, enviar mensagem, publicar webhook de entrada ou encerrar a sessão; após expiração do lease, outra instância pode assumir usando as credenciais protegidas no cofre.
-- **BR-035:** a finalidade padrão de IA é isolada pelo tenant e usada para governança; ela não exige uma confirmação textual do contato para o atendimento automatizado.
-- **BR-036:** a palavra `SIM` não possui tratamento especial no atendimento automatizado e não gera mensagem de confirmação; consentimento permanece obrigatório apenas quando o operador registrar memória pessoal do contato.
+- **BR-035:** a base legal de cada tratamento é definida pelo tenant nas finalidades de privacidade; o provisionamento não cria uma finalidade de IA presumindo consentimento do contato e a automação não exige confirmação textual.
+- **BR-036:** a palavra `SIM` não possui tratamento especial no atendimento automatizado e não gera mensagem de confirmação.
 - **BR-037:** encerrar uma conversa altera somente seu estado operacional e remove atribuições ativas; uma nova mensagem do cliente reabre o mesmo registro, retorna ao modo `Automatic` e deixa a IA usar a mensagem atual e até três mensagens anteriores.
 - **BR-038:** memória institucional só pode ser criada a partir de resposta segura, com confiança mínima de 0,8 e ao menos uma fonte ativa do tenant; a pergunta deve ser sanitizada, a memória permanece tenant-scoped e não pode conter credenciais, dados pessoais ou conteúdo de outro tenant.
 - **BR-039:** feedback de IA exige conversa e resposta pertencentes ao tenant corrente, registra o usuário e o horário em auditoria, permite no máximo uma avaliação vigente por resposta e só cria conhecimento corrigido após validação de tamanho e segurança.
@@ -372,7 +372,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-042:** conhecimento público ou pesquisa web só pode ser usado quando não houver conhecimento relevante do tenant e a pergunta não solicitar fatos específicos da empresa nem orientação médica, jurídica ou financeira sensível; conteúdo público não pode ser atribuído à empresa nem virar memória institucional automaticamente.
 - **BR-043:** a personalização do atendimento é efêmera e tenant-scoped; o nome do contato deve ser sanitizado, não autoriza inferir gênero ou características pessoais e não cria memória pessoal automática. Estar em fila não desativa a IA enquanto a conversa permanecer em modo automático.
 - **BR-044:** a busca semântica deve operar somente sobre itens ativos do tenant já carregados pelo repositório, priorizar categoria compatível e manter no máximo seis fontes; similaridade isolada ou termo genérico não pode introduzir conhecimento não relacionado.
-- **BR-045:** memória de cliente exige evidência ativa da finalidade padrão de atendimento automatizado por IA no mesmo tenant e contato; revogação ou expiração impede a consulta, o modelo nunca grava memória por conta própria, e valores não podem conter credenciais, dados pessoais identificáveis ou instruções maliciosas.
+- **BR-045:** memória de cliente é manual, tenant/contact-scoped, limitada a fatos curtos confirmados, ativa e não expirada; o modelo nunca grava memória por conta própria, e valores não podem conter credenciais, dados pessoais identificáveis ou instruções maliciosas.
 - **BR-046:** aprendizado supervisionado é local ao tenant e controlado por operador: no máximo uma avaliação vigente por resposta; somente resposta útil ou correção textual segura cria exemplo ativo; exemplos supervisionados orientam estilo e fluxo, nunca substituem conhecimento factual nem habilitam fine-tuning ou compartilhamento global.
 - **BR-047:** a decisão de encaminhamento segue uma ordem determinística: segurança e pedido explícito de humano vencem; fila autorizada somente atribui a conversa e mantém `Automatic`; resposta apoiada por contexto vence um handoff genérico; fila não autorizada, inexistente ou desativada é ignorada. Uma conversa já em fila continua recebendo respostas da IA até a assunção humana.
 - **BR-048:** a política de conversa natural deve responder primeiro ao pedido atual, aproveitar até o histórico autorizado, evitar repetição e usar no máximo uma pergunta útil; ela modifica somente linguagem e estrutura, nunca cria fatos nem substitui as regras de segurança, handoff ou limite de 160 caracteres.

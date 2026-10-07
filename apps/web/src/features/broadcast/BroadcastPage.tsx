@@ -36,7 +36,7 @@ function recipientStatusLabel(s: string) {
     case 'Pending': return { text: 'Pendente',  cls: 'text-slate-500' }
     case 'Sent':    return { text: 'Enviado',   cls: 'text-emerald-600' }
     case 'Failed':  return { text: 'Falhou',    cls: 'text-red-600' }
-    case 'Skipped': return { text: 'Sem consentimento', cls: 'text-amber-700' }
+    case 'Skipped': return { text: 'Ignorado', cls: 'text-amber-700' }
     default:        return { text: s,           cls: 'text-slate-500' }
   }
 }
@@ -97,7 +97,6 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     enabled: deliveryMode === 'OfficialApiTemplate' && Boolean(selectedOfficialLineId),
   })
   const selectedTemplate = (templateResult?.templates ?? []).find((template) => `${template.name}:${template.language}` === templateKey)
-  const isMarketingTemplate = selectedTemplate?.category === 'MARKETING'
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -118,10 +117,8 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
     },
   })
 
-  const filtered = (contacts ?? []).filter((contact) => !isMarketingTemplate || contact.hasMarketingConsent)
-  const eligibleSelectedIds = isMarketingTemplate
-    ? [...selectedIds].filter((id) => filtered.some((contact) => contact.id === id))
-    : [...selectedIds]
+  const filtered = contacts ?? []
+  const eligibleSelectedIds = [...selectedIds]
 
   const toggleContact = (id: string) =>
     setSelectedIds((prev) => {
@@ -188,7 +185,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 <option value="QrCodeText">QR Code — texto livre</option>
                 <option value="OfficialApiTemplate">API Oficial — template transacional</option>
               </select>
-              {deliveryMode === 'OfficialApiTemplate' && <p className="mt-1 text-xs text-slate-500">Templates de Utilidade e Marketing aprovados podem ser enviados. Marketing exige consentimento ativo do contato.</p>}
+              {deliveryMode === 'OfficialApiTemplate' && <p className="mt-1 text-xs text-slate-500">Templates aprovados de Utilidade e Marketing podem ser enviados.</p>}
             </div>
 
             {deliveryMode === 'OfficialApiTemplate' && <>
@@ -196,7 +193,6 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required disabled={isLoadingTemplates || Boolean(templatesError) || !selectedOfficialLineId} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"><option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione o template'}</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
               {templatesError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{templatesError.message} <button type="button" onClick={() => refetchTemplates()} className="ml-2 font-semibold underline">Tentar novamente</button></div>}
               {!isLoadingTemplates && !templatesError && selectedOfficialLineId && (templateResult?.templates.length ?? 0) === 0 && <p className="text-xs text-slate-500">Nenhum template elegível foi encontrado. O disparo em massa aceita templates aprovados de Utilidade ou Marketing, com corpo textual e sem cabeçalho, mídia ou botões.</p>}
-              {isMarketingTemplate && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Este é um template de Marketing. Somente contatos com consentimento ativo para receber Marketing por WhatsApp serão incluídos. Registre ou revogue o consentimento em Contatos.</p>}
               {templateParameters.map((parameter, index) => <div key={index}><label htmlFor={`broadcast-template-param-${index}`} className="block text-sm font-medium text-slate-700 mb-1.5">Parâmetro {index + 1}</label><input id={`broadcast-template-param-${index}`} value={parameter} maxLength={1024} onChange={(event) => setTemplateParameters((current) => current.map((value, parameterIndex) => parameterIndex === index ? event.target.value : value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" /></div>)}
             </>}
 
@@ -223,7 +219,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                     <input type="radio" name="queue-recipient-mode" value="manual" checked={queueRecipientMode === 'manual'} onChange={() => selectQueueRecipientMode('manual')} />
                     Selecionar contatos desta fila
                   </label>
-                  {queueRecipientMode === 'all' && <p className="text-xs text-slate-500">Todos os contatos desta fila serão incluídos, mesmo que haja mais de 500. Em Marketing, o backend impede os contatos sem consentimento ativo.</p>}
+                  {queueRecipientMode === 'all' && <p className="text-xs text-slate-500">Todos os contatos desta fila serão incluídos, mesmo que haja mais de 500.</p>}
                 </div>
               )}
             </div>
@@ -687,7 +683,7 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
             <span className="text-red-400 ml-1">({broadcast.failedCount} falhas)</span>
           )}
           {(broadcast.skippedCount ?? 0) > 0 && (
-            <span className="text-amber-600 ml-1">({broadcast.skippedCount} sem consentimento)</span>
+            <span className="text-amber-600 ml-1">({broadcast.skippedCount} ignorados)</span>
           )}
         </td>
         <td className="hidden sm:table-cell px-4 py-3">

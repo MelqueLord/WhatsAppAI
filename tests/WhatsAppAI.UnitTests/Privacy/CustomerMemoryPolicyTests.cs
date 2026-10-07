@@ -47,7 +47,6 @@ public sealed class CustomerMemoryPolicyTests
         var memory = CustomerMemory.Create(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            Guid.NewGuid(),
             "preferência",
             "Atendimento pela manhã.",
             CustomerMemorySource.OperatorConfirmed,
@@ -56,7 +55,6 @@ public sealed class CustomerMemoryPolicyTests
 
         memory.Deactivate();
         memory.Replace(
-            Guid.NewGuid(),
             "Atendimento à tarde.",
             CustomerMemorySource.OperatorConfirmed,
             DateTime.UtcNow.AddDays(365));

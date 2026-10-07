@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Automation.Policy;
-using WhatsAppAI.Application.Broadcast;
 using WhatsAppAI.Application.Contacts;
 using WhatsAppAI.Application.Integrations;
 using WhatsAppAI.Domain.Audit;
@@ -42,12 +41,6 @@ public static class ContactEndpoints
         group.MapDelete("/{contactId:guid}", DeleteContactAsync)
             .WithName("DeleteContact");
 
-        group.MapPost("/{contactId:guid}/marketing-consent", GrantMarketingConsentAsync)
-            .WithName("GrantMarketingConsent");
-
-        group.MapDelete("/{contactId:guid}/marketing-consent", RevokeMarketingConsentAsync)
-            .WithName("RevokeMarketingConsent");
-
         group.MapGet("/{contactId:guid}/memory", ListCustomerMemoryAsync)
             .WithName("ListCustomerMemory");
 
@@ -65,7 +58,7 @@ public static class ContactEndpoints
 
     private static async Task<IResult> ImportContactsAsync(
         IFormFile file,
-        Guid? queueId,
+        [FromForm] Guid? queueId,
         ICurrentTenant currentTenant,
         IServiceLineRepository queueRepository,
         ContactImportService importService,
@@ -156,15 +149,7 @@ public static class ContactEndpoints
                 Name = c.Name,
                 ProfilePictureUrl = c.ProfilePictureUrl,
                 LastMessageAt = c.LastMessageAt,
-                CreatedAt = c.CreatedAt,
-                HasMarketingConsent = dbContext.ConsentEvidence.Any(evidence =>
-                    evidence.TenantId == currentTenant.TenantId.Value &&
-                    evidence.ContactId == c.Id &&
-                    evidence.RevokedAt == null &&
-                    evidence.ProcessingPurpose.TenantId == currentTenant.TenantId.Value &&
-                    evidence.ProcessingPurpose.IsActive &&
-                    evidence.ProcessingPurpose.LegalBasis == LegalBasis.Consent &&
-                    evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName)
+                CreatedAt = c.CreatedAt
             })
             .ToListAsync();
 
@@ -400,112 +385,6 @@ public static class ContactEndpoints
         return Results.Ok(new { conversationId = conversation.Id, message = "Conversation started" });
     }
 
-    private static async Task<IResult> GrantMarketingConsentAsync(
-        Guid contactId,
-        ICurrentTenant currentTenant,
-        AppDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        if (currentTenant.TenantId is null || currentTenant.UserId is null)
-            return Results.Unauthorized();
-        if (currentTenant.UserRole != "TenantOwner")
-            return Results.Forbid();
-
-        var tenantId = currentTenant.TenantId.Value;
-        var contactExists = await dbContext.Contacts.AnyAsync(
-            contact => contact.Id == contactId && contact.TenantId == tenantId,
-            cancellationToken);
-        if (!contactExists)
-            return Results.NotFound();
-
-        var purpose = await dbContext.ProcessingPurposes.FirstOrDefaultAsync(item =>
-            item.TenantId == tenantId &&
-            item.LegalBasis == LegalBasis.Consent &&
-            item.Name == MarketingBroadcastConsentPolicy.PurposeName,
-            cancellationToken);
-        if (purpose is null)
-        {
-            purpose = ProcessingPurpose.Create(
-                tenantId,
-                MarketingBroadcastConsentPolicy.PurposeName,
-                MarketingBroadcastConsentPolicy.PurposeDescription,
-                LegalBasis.Consent,
-                3650,
-                currentTenant.UserId.Value);
-            dbContext.ProcessingPurposes.Add(purpose);
-        }
-
-        var alreadyGranted = await dbContext.ConsentEvidence.AnyAsync(evidence =>
-            evidence.TenantId == tenantId &&
-            evidence.ContactId == contactId &&
-            evidence.ProcessingPurposeId == purpose.Id &&
-            evidence.RevokedAt == null,
-            cancellationToken);
-        if (!alreadyGranted)
-        {
-            var consent = ConsentEvidence.Create(
-                tenantId,
-                contactId,
-                purpose,
-                MarketingBroadcastConsentPolicy.OperatorConfirmedSource,
-                null,
-                DateTime.UtcNow,
-                currentTenant.UserId.Value);
-            dbContext.ConsentEvidence.Add(consent);
-            dbContext.AuditLogs.Add(AuditLog.Create(
-                tenantId,
-                currentTenant.UserId,
-                "Contact.MarketingConsentGranted",
-                "ConsentEvidence",
-                consent.Id.ToString()));
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Results.Ok(new { contactId, hasMarketingConsent = true });
-    }
-
-    private static async Task<IResult> RevokeMarketingConsentAsync(
-        Guid contactId,
-        ICurrentTenant currentTenant,
-        AppDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        if (currentTenant.TenantId is null || currentTenant.UserId is null)
-            return Results.Unauthorized();
-        if (currentTenant.UserRole != "TenantOwner")
-            return Results.Forbid();
-
-        var tenantId = currentTenant.TenantId.Value;
-        var consents = await dbContext.ConsentEvidence
-            .Include(evidence => evidence.ProcessingPurpose)
-            .Where(evidence =>
-                evidence.TenantId == tenantId &&
-                evidence.ContactId == contactId &&
-                evidence.RevokedAt == null &&
-                evidence.ProcessingPurpose.TenantId == tenantId &&
-                evidence.ProcessingPurpose.LegalBasis == LegalBasis.Consent &&
-                evidence.ProcessingPurpose.Name == MarketingBroadcastConsentPolicy.PurposeName)
-            .ToListAsync(cancellationToken);
-        if (consents.Count == 0)
-        {
-            var contactExists = await dbContext.Contacts.AnyAsync(
-                contact => contact.Id == contactId && contact.TenantId == tenantId,
-                cancellationToken);
-            return contactExists ? Results.NoContent() : Results.NotFound();
-        }
-
-        foreach (var consent in consents)
-            consent.Revoke(DateTime.UtcNow);
-        dbContext.AuditLogs.Add(AuditLog.Create(
-            tenantId,
-            currentTenant.UserId,
-            "Contact.MarketingConsentRevoked",
-            "Contact",
-            contactId.ToString()));
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Results.NoContent();
-    }
-
     private static async Task<Conversation> EnsureDirectConversationAsync(
         Guid tenantId,
         Contact contact,
@@ -699,11 +578,8 @@ public static class ContactEndpoints
         if (!contactExists)
             return Results.NotFound();
 
-        var consent = await GetActiveAiConsentAsync(dbContext, tenantId, contactId, cancellationToken);
         var now = DateTime.UtcNow;
-        IReadOnlyList<CustomerMemoryResponse> memories = consent is null
-            ? []
-            : (await dbContext.CustomerMemories
+        var memories = (await dbContext.CustomerMemories
                 .Where(memory =>
                     memory.TenantId == tenantId &&
                     memory.ContactId == contactId &&
@@ -713,14 +589,7 @@ public static class ContactEndpoints
                 .ToListAsync(cancellationToken))
                 .Select(ToCustomerMemoryResponse)
                 .ToList();
-
-        return Results.Ok(new
-        {
-            consentGranted = consent is not null,
-            consentGrantedAt = consent?.GrantedAt,
-            consentPurpose = AiConsentOptInPolicy.DefaultPurposeName,
-            items = memories
-        });
+        return Results.Ok(new { items = memories });
     }
 
     private static async Task<IResult> SaveCustomerMemoryAsync(
@@ -739,16 +608,6 @@ public static class ContactEndpoints
         if (!contactExists)
             return Results.NotFound();
 
-        var consent = await GetActiveAiConsentAsync(dbContext, tenantId, contactId, cancellationToken);
-        if (consent is null)
-        {
-            return Results.Conflict(new
-            {
-                code = "consent_required",
-                error = "O contato precisa autorizar o atendimento automatizado respondendo SIM antes de salvar uma memória."
-            });
-        }
-
         if (!CustomerMemoryPolicy.TryNormalize(
                 request.Key,
                 request.Value,
@@ -760,15 +619,16 @@ public static class ContactEndpoints
         }
 
         var now = DateTime.UtcNow;
+        const int maximumRetentionDays = 365;
         var expiresAt = request.ExpiresAt.HasValue
             ? ToUtc(request.ExpiresAt.Value)
-            : now.AddDays(consent.ProcessingPurpose.RetentionDays);
-        var maximumExpiration = now.AddDays(consent.ProcessingPurpose.RetentionDays);
+            : now.AddDays(maximumRetentionDays);
+        var maximumExpiration = now.AddDays(maximumRetentionDays);
         if (expiresAt <= now || expiresAt > maximumExpiration)
         {
             return Results.BadRequest(new
             {
-                error = $"A validade deve estar entre agora e {consent.ProcessingPurpose.RetentionDays} dias."
+                error = $"A validade deve estar entre agora e {maximumRetentionDays} dias."
             });
         }
 
@@ -785,7 +645,6 @@ public static class ContactEndpoints
             memory = CustomerMemory.Create(
                 tenantId,
                 contactId,
-                consent.Id,
                 key,
                 value,
                 CustomerMemorySource.OperatorConfirmed,
@@ -796,7 +655,6 @@ public static class ContactEndpoints
         else
         {
             memory.Replace(
-                consent.Id,
                 value,
                 CustomerMemorySource.OperatorConfirmed,
                 expiresAt);
@@ -845,23 +703,6 @@ public static class ContactEndpoints
         await dbContext.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }
-
-    private static Task<ConsentEvidence?> GetActiveAiConsentAsync(
-        AppDbContext dbContext,
-        Guid tenantId,
-        Guid contactId,
-        CancellationToken cancellationToken) =>
-        dbContext.ConsentEvidence
-            .Include(evidence => evidence.ProcessingPurpose)
-            .Where(evidence =>
-                evidence.TenantId == tenantId &&
-                evidence.ContactId == contactId &&
-                evidence.RevokedAt == null &&
-                evidence.ProcessingPurpose.TenantId == tenantId &&
-                evidence.ProcessingPurpose.IsActive &&
-                evidence.ProcessingPurpose.Name == AiConsentOptInPolicy.DefaultPurposeName)
-            .OrderByDescending(evidence => evidence.GrantedAt)
-            .FirstOrDefaultAsync(cancellationToken);
 
     private static CustomerMemoryResponse ToCustomerMemoryResponse(CustomerMemory memory) => new(
         memory.Id,
@@ -914,7 +755,6 @@ public sealed class ContactResponse
     public string? ProfilePictureUrl { get; init; }
     public DateTime? LastMessageAt { get; init; }
     public DateTime CreatedAt { get; init; }
-    public bool HasMarketingConsent { get; init; }
     public Guid? ConversationId { get; init; }
     public string? Message { get; init; }
 }

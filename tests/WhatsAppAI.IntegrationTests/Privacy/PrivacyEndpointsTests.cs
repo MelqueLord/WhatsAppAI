@@ -82,32 +82,14 @@ public sealed class PrivacyEndpointsTests(TestWebApplicationFactory factory)
         var secondContact = await CreateContactWithMessageAsync(second.TenantId, sharedPhone, "Second", "second personal text");
         await using (var db = await factory.GetDbContextAsync())
         {
-            var purpose = ProcessingPurpose.Create(
-                first.TenantId,
-                WhatsAppAI.Application.Automation.Policy.AiConsentOptInPolicy.DefaultPurposeName,
-                WhatsAppAI.Application.Automation.Policy.AiConsentOptInPolicy.DefaultPurposeDescription,
-                LegalBasis.Consent,
-                365,
-                Guid.NewGuid());
-            var evidence = ConsentEvidence.Create(
-                first.TenantId,
-                firstContact,
-                purpose,
-                "WhatsApp",
-                "memory-consent",
-                DateTime.UtcNow,
-                Guid.NewGuid());
             var memory = CustomerMemory.Create(
                 first.TenantId,
                 firstContact,
-                evidence.Id,
                 "preferência",
                 "Atendimento pela manhã.",
                 CustomerMemorySource.OperatorConfirmed,
                 DateTime.UtcNow.AddDays(365),
                 Guid.NewGuid());
-            db.ProcessingPurposes.Add(purpose);
-            db.ConsentEvidence.Add(evidence);
             db.CustomerMemories.Add(memory);
             await db.SaveChangesAsync();
         }
@@ -141,67 +123,23 @@ public sealed class PrivacyEndpointsTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task CustomerMemory_RequiresActiveConsent_AndStopsAfterRevocation()
+    public async Task CustomerMemory_CanBeManagedWithoutContactConsent()
     {
         var owner = await CreateTenantOwnerAsync();
         var otherOwner = await CreateTenantOwnerAsync();
         var contactId = await CreateContactAsync(owner.TenantId, "+5511999990003", "Memory contact");
-        await using (var db = await factory.GetDbContextAsync())
-        {
-            var purpose = ProcessingPurpose.Create(
-                owner.TenantId,
-                WhatsAppAI.Application.Automation.Policy.AiConsentOptInPolicy.DefaultPurposeName,
-                WhatsAppAI.Application.Automation.Policy.AiConsentOptInPolicy.DefaultPurposeDescription,
-                LegalBasis.Consent,
-                365,
-                Guid.NewGuid());
-            db.ProcessingPurposes.Add(purpose);
-            await db.SaveChangesAsync();
-        }
-
-        var withoutConsent = await owner.Client.PostAsJsonAsync(
-            $"/api/contacts/{contactId}/memory",
-            new { key = "preferência", value = "Atendimento pela manhã." });
-        Assert.Equal(HttpStatusCode.Conflict, withoutConsent.StatusCode);
-
-        Guid purposeId;
-        await using (var db = await factory.GetDbContextAsync())
-        {
-            purposeId = await db.ProcessingPurposes
-                .IgnoreQueryFilters()
-                .Where(item => item.TenantId == owner.TenantId && item.Name == WhatsAppAI.Application.Automation.Policy.AiConsentOptInPolicy.DefaultPurposeName)
-                .Select(item => item.Id)
-                .SingleAsync();
-        }
-
-        var consent = await owner.Client.PostAsJsonAsync("/api/privacy/consents", new
-        {
-            contactId,
-            processingPurposeId = purposeId,
-            source = "WhatsApp",
-            evidenceReference = "message-reference"
-        });
-        Assert.Equal(HttpStatusCode.Created, consent.StatusCode);
-
         var saved = await owner.Client.PostAsJsonAsync(
             $"/api/contacts/{contactId}/memory",
             new { key = "preferência", value = "Atendimento pela manhã." });
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
 
         var listed = await owner.Client.GetFromJsonAsync<JsonElement>($"/api/contacts/{contactId}/memory");
-        Assert.True(listed.GetProperty("consentGranted").GetBoolean());
         Assert.Equal(1, listed.GetProperty("items").GetArrayLength());
+        Assert.False(listed.TryGetProperty("consentGranted", out _));
 
         var crossTenant = await otherOwner.Client.GetAsync($"/api/contacts/{contactId}/memory");
         Assert.Equal(HttpStatusCode.NotFound, crossTenant.StatusCode);
 
-        var evidenceId = await ReadIdAsync(consent);
-        var revoked = await owner.Client.PostAsync($"/api/privacy/consents/{evidenceId}/revoke", null);
-        Assert.Equal(HttpStatusCode.OK, revoked.StatusCode);
-
-        var afterRevoke = await owner.Client.GetFromJsonAsync<JsonElement>($"/api/contacts/{contactId}/memory");
-        Assert.False(afterRevoke.GetProperty("consentGranted").GetBoolean());
-        Assert.Equal(0, afterRevoke.GetProperty("items").GetArrayLength());
     }
 
     private async Task<(HttpClient Client, Guid TenantId)> CreateTenantOwnerAsync()
