@@ -209,6 +209,7 @@ public sealed class WebhookProcessingWorker(
                 return true; // Accept empty payloads
             }
 
+            var statusesResolved = true;
             foreach (var entry in payload.Entry)
             {
                 if (entry.Changes is null) continue;
@@ -243,18 +244,19 @@ public sealed class WebhookProcessingWorker(
                     {
                         foreach (var status in change.Value.Statuses)
                         {
-                            await ProcessStatusUpdateAsync(
+                            var statusResolved = await ProcessStatusUpdateAsync(
                                 tenantId,
                                 status,
                                 messageRepository,
                                 notifier,
                                 cancellationToken);
+                            statusesResolved &= statusResolved;
                         }
                     }
                 }
             }
 
-            return true;
+            return statusesResolved;
         }
         catch (Exception ex)
         {
@@ -417,20 +419,20 @@ public sealed class WebhookProcessingWorker(
         values.Select(value => value?.Trim())
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-    internal async Task ProcessStatusUpdateAsync(
+    internal async Task<bool> ProcessStatusUpdateAsync(
         Guid tenantId,
         WebhookStatus status,
         IMessageRepository messageRepository,
         IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
-        if (status.Id is null) return;
+        if (status.Id is null) return true;
 
         var message = await messageRepository.GetByExternalIdAsync(tenantId, status.Id, cancellationToken);
         if (message is null)
         {
             logger.LogWarning("Status update for unknown message {MessageId}", status.Id);
-            return;
+            return false;
         }
 
         switch (status.Status?.ToLowerInvariant())
@@ -471,6 +473,7 @@ public sealed class WebhookProcessingWorker(
             "Message {MessageId} updated from WhatsApp status {WhatsAppStatus}",
             message.Id,
             status.Status ?? "unknown");
+        return true;
     }
 
     internal static string ResolveStatusFailureReason(WebhookStatus status)

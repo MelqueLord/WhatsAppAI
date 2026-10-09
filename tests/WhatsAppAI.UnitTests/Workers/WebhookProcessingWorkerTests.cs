@@ -22,7 +22,7 @@ public sealed class WebhookProcessingWorkerTests
         using var services = new ServiceCollection().BuildServiceProvider();
         var worker = new WebhookProcessingWorker(services, NullLogger<WebhookProcessingWorker>.Instance);
 
-        await worker.ProcessStatusUpdateAsync(
+        var processed = await worker.ProcessStatusUpdateAsync(
             tenantId,
             new WebhookStatus { Id = "wamid.123", Status = "delivered" },
             repository,
@@ -30,10 +30,34 @@ public sealed class WebhookProcessingWorkerTests
             CancellationToken.None);
 
         Assert.Equal(MessageStatus.Delivered, message.Status);
+        Assert.True(processed);
         Assert.Same(message, repository.UpdatedMessage);
         Assert.Equal(tenantId, notifier.TenantId);
         Assert.Equal("MessageStatusUpdated", notifier.EventName);
         Assert.Equal(conversationId, notifier.Payload?.GetType().GetProperty("conversationId")?.GetValue(notifier.Payload));
+    }
+
+    [Fact]
+    public async Task ProcessStatusUpdateAsync_ReturnsFalseWhenMessageHasNotBeenPersistedYet()
+    {
+        var tenantId = Guid.NewGuid();
+        var message = Message.CreateOutbound(
+            tenantId, Guid.NewGuid(), Guid.NewGuid(), MessageType.Template, "Hello", "idempotency-key");
+        var repository = new MessageRepositoryFake(message);
+        var notifier = new RealtimeNotifierFake();
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var worker = new WebhookProcessingWorker(services, NullLogger<WebhookProcessingWorker>.Instance);
+
+        var processed = await worker.ProcessStatusUpdateAsync(
+            tenantId,
+            new WebhookStatus { Id = "wamid.123", Status = "delivered" },
+            repository,
+            notifier,
+            CancellationToken.None);
+
+        Assert.False(processed);
+        Assert.Null(repository.UpdatedMessage);
+        Assert.Null(notifier.EventName);
     }
 
     private sealed class MessageRepositoryFake(Message message) : IMessageRepository
