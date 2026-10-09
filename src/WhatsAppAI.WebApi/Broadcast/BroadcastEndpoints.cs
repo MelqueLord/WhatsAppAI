@@ -91,7 +91,11 @@ public static class BroadcastEndpoints
                 recipient.Status,
                 recipient.ErrorMessage,
                 recipient.SentAt
-            }).ToListAsync();
+            })
+            .OrderBy(recipient => recipient.contactName == null || recipient.contactName == string.Empty)
+            .ThenBy(recipient => recipient.contactName)
+            .ThenBy(recipient => recipient.contactPhoneNumber)
+            .ToListAsync();
 
         return Results.Ok(new
         {

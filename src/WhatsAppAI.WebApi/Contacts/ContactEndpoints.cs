@@ -151,8 +151,9 @@ public static class ContactEndpoints
         }
 
         var contacts = await query
-            .OrderByDescending(c => c.LastMessageAt)
-            .ThenByDescending(c => c.CreatedAt)
+            .OrderBy(c => c.Name == null || c.Name == string.Empty)
+            .ThenBy(c => c.Name)
+            .ThenBy(c => c.PhoneNumber)
             .Take(limit)
             .Select(c => new ContactResponse
             {
