@@ -240,6 +240,43 @@ describe('BroadcastPage', () => {
     expect(await screen.findByRole('option', { name: 'status_update — pt_BR' })).toBeInTheDocument()
   })
 
+  it('enables creating an official-template broadcast when the first line is selected automatically', async () => {
+    vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
+      lineNumber: 2,
+      connectionType: 'OfficialApi',
+      phoneNumberId: 'official-2',
+      isActive: true,
+    }])
+    vi.mocked(api.broadcasts.listOfficialTemplates).mockResolvedValue({
+      templates: [{ name: 'status_update', language: 'pt_BR', bodyParameterCount: 0, bodyText: 'Seu pedido foi atualizado.', category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
+    })
+    vi.mocked(api.broadcasts.create).mockResolvedValue({
+      id: 'broadcast-auto-line', name: 'Atualização', message: '', deliveryMode: 'OfficialApiTemplate',
+      templateName: 'status_update', templateLanguage: 'pt_BR', status: 'Draft', totalCount: 1,
+      sentCount: 0, failedCount: 0, createdAt: '2026-09-11T00:00:00Z',
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo Disparo' }))
+    fireEvent.change(screen.getByLabelText('Canal de envio'), { target: { value: 'OfficialApiTemplate' } })
+    await waitFor(() => expect(api.broadcasts.listOfficialTemplates).toHaveBeenCalledWith('official-2'))
+    await screen.findByRole('option', { name: 'status_update — pt_BR' })
+    fireEvent.change(screen.getByLabelText('Template aprovado'), { target: { value: 'status_update:pt_BR' } })
+    fireEvent.change(screen.getByLabelText('Nome da lista *'), { target: { value: 'Atualização' } })
+    fireEvent.click(screen.getByText('Cliente').closest('label')!.querySelector('input')!)
+
+    const createButton = screen.getByRole('button', { name: 'Criar Lista' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
+
+    await waitFor(() => expect(api.broadcasts.create).toHaveBeenCalledWith(expect.objectContaining({
+      deliveryMode: 1,
+      linePhoneNumberId: 'official-2',
+      templateName: 'status_update',
+      templateLanguage: 'pt_BR',
+    })))
+  })
+
   it('explains when an official line has no template eligible for broadcast', async () => {
     vi.mocked(api.whatsapp.getLines).mockResolvedValue([{
       lineNumber: 2,

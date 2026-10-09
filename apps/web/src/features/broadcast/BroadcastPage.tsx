@@ -349,7 +349,7 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
                 createMutation.isPending ||
                 !name.trim() ||
                 (deliveryMode === 'QrCodeText' && !message.trim()) ||
-                (deliveryMode === 'OfficialApiTemplate' && (!officialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
+                (deliveryMode === 'OfficialApiTemplate' && (!selectedOfficialLineId || !selectedTemplate || templateParameters.length !== selectedTemplate.bodyParameterCount)) ||
                 (selectingContacts && (eligibleSelectedIds.length === 0 || eligibleSelectedIds.length > 500))
               }
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-emerald-600"
