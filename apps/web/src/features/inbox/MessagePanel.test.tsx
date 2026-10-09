@@ -207,6 +207,25 @@ describe('MessagePanel conversation closing', () => {
     expect(screen.getAllByText(formatTime(sentAt))).toHaveLength(1)
   })
 
+  it('shows WhatsApp-style single and double delivery checks', async () => {
+    apiMock.conversations.getMessages.mockResolvedValue({
+      items: [
+        { id: 'queued', direction: 'Outbound', status: 'Queued', type: 'Text', content: 'Na fila', createdAt: '2026-09-08T15:30:00.000Z' },
+        { id: 'sent', direction: 'Outbound', status: 'Sent', type: 'Text', content: 'Enviada', createdAt: '2026-09-08T15:31:00.000Z' },
+        { id: 'delivered', direction: 'Outbound', status: 'Delivered', type: 'Text', content: 'Entregue', createdAt: '2026-09-08T15:32:00.000Z' },
+        { id: 'read', direction: 'Outbound', status: 'Read', type: 'Text', content: 'Lida', createdAt: '2026-09-08T15:33:00.000Z' },
+      ],
+      hasMore: false,
+    })
+
+    renderPanel()
+
+    expect(await screen.findByRole('img', { name: 'Enviando' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Enviado' }).querySelector('svg')).toHaveClass('text-slate-200')
+    expect(screen.getByRole('img', { name: 'Entregue' }).querySelector('svg')).toHaveClass('text-slate-200')
+    expect(screen.getByRole('img', { name: 'Lido' }).querySelector('svg')).toHaveClass('text-sky-300')
+  })
+
   it('requires the selected template body parameter count before sending', async () => {
     apiMock.conversations.listTemplates.mockResolvedValue({
       templates: [{ name: 'service_update', language: 'pt_BR', bodyParameterCount: 1, bodyParameterNames: ['1'], bodyText: 'Olá, {{1}}', parameterFormat: 'POSITIONAL', category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],

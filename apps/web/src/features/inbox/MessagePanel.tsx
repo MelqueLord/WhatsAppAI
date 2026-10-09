@@ -522,27 +522,37 @@ export function MessagePanel({
     switch (status) {
       case 'Queued':
         return (
-          <Clock className="w-3.5 h-3.5 text-slate-400" />
+          <span role="img" aria-label="Enviando" title="Enviando">
+            <Clock className="w-3.5 h-3.5 text-emerald-100" />
+          </span>
         )
 
       case 'Sent':
         return (
-          <Check className="w-3.5 h-3.5 text-slate-400" />
+          <span role="img" aria-label="Enviado" title="Enviado">
+            <Check className="w-3.5 h-3.5 text-slate-200" />
+          </span>
         )
 
       case 'Delivered':
         return (
-          <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+          <span role="img" aria-label="Entregue" title="Entregue">
+            <CheckCheck className="w-3.5 h-3.5 text-slate-200" />
+          </span>
         )
 
       case 'Read':
         return (
-          <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+          <span role="img" aria-label="Lido" title="Lido">
+            <CheckCheck className="w-3.5 h-3.5 text-sky-300" />
+          </span>
         )
 
       case 'Failed':
         return (
-          <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+          <span role="img" aria-label="Falhou" title="Falhou">
+            <AlertCircle className="w-3.5 h-3.5 text-red-200" />
+          </span>
         )
 
       default:
