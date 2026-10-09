@@ -87,8 +87,40 @@ describe('ContactsPage import', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'Importar contatos' }).closest('form')!)
 
     await waitFor(() => expect(api.contacts.import).toHaveBeenCalledWith(file, undefined))
-    expect(await screen.findByText('1 importados, 1 ignorados e 1 inválidos.')).toBeInTheDocument()
-    expect(screen.getByText('Linha 4: Contato inválido.')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('1 adicionados à agenda, 1 já existentes ou duplicados e 1 inválidos.')
+  })
+
+  it('refreshes the agenda and shows a clear success message after importing contacts', async () => {
+    const importedContact = {
+      id: 'contact-imported',
+      phoneNumber: '5511999990000',
+      name: 'Ana Importada',
+      createdAt: '2026-09-11T00:00:00Z',
+    }
+    vi.mocked(api.contacts.list)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([importedContact])
+    vi.mocked(api.contacts.import).mockResolvedValue({
+      total: 1, imported: 1, skipped: 0, invalid: 0, errors: [],
+    })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Importar' }))
+    const file = new File(['nome,contato\nAna Importada,5511999990000'], 'contatos.csv', { type: 'text/csv' })
+    fireEvent.change(screen.getByLabelText('Arquivo *'), { target: { files: [file] } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Importar contatos' }).closest('form')!)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('1 adicionados à agenda')
+    expect(await screen.findByText('Ana Importada')).toBeInTheDocument()
+    expect(api.contacts.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a load error instead of claiming the contacts list is empty', async () => {
+    vi.mocked(api.contacts.list).mockRejectedValue(new Error('Falha de conexão'))
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar a lista de contatos: Falha de conexão')
+    expect(screen.queryByText('Nenhum contato cadastrado.')).not.toBeInTheDocument()
   })
 
   it('sends the selected queue with the imported spreadsheet', async () => {

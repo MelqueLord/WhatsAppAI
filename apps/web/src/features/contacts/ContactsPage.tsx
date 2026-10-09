@@ -63,9 +63,9 @@ export function ContactsPage() {
   const automaticLineId = availableLines.length === 1 ? availableLines[0].phoneNumberId : undefined
   const chosenLineId = selectedLineId || automaticLineId
 
-  const { data: contacts, isLoading } = useQuery({
+  const { data: contacts, isLoading, isError: isContactsError, error: contactsError, refetch: refetchContacts } = useQuery({
     queryKey: ['contacts'],
-    queryFn: () => api.contacts.list(undefined, 100),
+    queryFn: () => api.contacts.list(undefined, 5000),
   })
 
   const { data: serviceQueues = [] } = useQuery({
@@ -157,10 +157,25 @@ export function ContactsPage() {
     },
   })
 
+  const [importFeedback, setImportFeedback] = useState<{
+    imported: number
+    skipped: number
+    invalid: number
+    errors: Array<{ row: number; message: string }>
+  } | null>(null)
+
   const importMutation = useMutation({
     mutationFn: ({ file, queueId }: { file: File; queueId?: string }) => api.contacts.import(file, queueId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['contacts'], exact: true })
+      setImportFeedback({
+        imported: result.imported,
+        skipped: result.skipped,
+        invalid: result.invalid,
+        errors: result.errors,
+      })
+      setShowImportForm(false)
+      setImportFile(null)
     },
   })
 
@@ -218,7 +233,11 @@ export function ContactsPage() {
           <div className="flex items-center gap-2">
             {isTenantOwner && (
               <button
-                onClick={() => setShowImportForm(true)}
+                onClick={() => {
+                  setImportFeedback(null)
+                  importMutation.reset()
+                  setShowImportForm(true)
+                }}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Importar</span>
@@ -239,6 +258,38 @@ export function ContactsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {importFeedback && (
+          <div role="status" aria-live="polite" className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <div>
+              <p className="font-semibold">Importação concluída</p>
+              <p className="mt-1">
+                {importFeedback.imported} adicionados à agenda, {importFeedback.skipped} já existentes ou duplicados e {importFeedback.invalid} inválidos.
+              </p>
+              {importFeedback.imported === 0 && importFeedback.skipped > 0 && (
+                <p className="mt-1">Nenhum contato novo foi adicionado porque os números já estão cadastrados.</p>
+              )}
+              {importFeedback.errors.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-red-700">
+                  {importFeedback.errors.slice(0, 20).map((error, index) => (
+                    <li key={`${error.row}-${index}`}>Linha {error.row}: {error.message}</li>
+                  ))}
+                  {importFeedback.errors.length > 20 && (
+                    <li>Mais {importFeedback.errors.length - 20} linhas com erro.</li>
+                  )}
+                </ul>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar aviso de importação"
+              onClick={() => setImportFeedback(null)}
+              className="rounded p-1 text-emerald-800 hover:bg-emerald-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -252,7 +303,14 @@ export function ContactsPage() {
           </div>
         </div>
 
-        {isLoading ? (
+        {isContactsError ? (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <span>Não foi possível carregar a lista de contatos: {contactsError instanceof Error ? contactsError.message : 'erro inesperado.'}</span>
+            <button type="button" onClick={() => void refetchContacts()} className="shrink-0 font-medium underline">
+              Tentar novamente
+            </button>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
           </div>
@@ -369,7 +427,7 @@ export function ContactsPage() {
             </div>
 
             {importMutation.isError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
                 {(importMutation.error as Error).message}
               </div>
             )}
