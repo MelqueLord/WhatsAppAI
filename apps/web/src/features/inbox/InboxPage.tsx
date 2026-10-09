@@ -63,12 +63,9 @@ export function InboxPage() {
     setShowMobileList(false)
   }
 
-  const handleBack = (showClosed = false) => {
+  const handleBack = () => {
     setShowMobileList(true)
     setSelectedConversation(null)
-    if (showClosed) {
-      setConversationStatusFilter('Closed')
-    }
   }
 
   return (
@@ -109,7 +106,7 @@ export function InboxPage() {
               key={selectedConversation.id}
               conversation={selectedConversation}
               onBack={handleBack}
-              onConversationClosed={() => handleBack(true)}
+              onConversationClosed={handleBack}
             />
           ) : (
             <EmptyState isConnected={isConnected} />

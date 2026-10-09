@@ -76,12 +76,12 @@ describe('InboxPage', () => {
     expect(screen.getByText('Reconectando ao servidor...')).toBeInTheDocument()
   })
 
-  it('switches to closed conversations after closing the selected conversation', () => {
+  it('keeps the active conversation list after closing the selected conversation', () => {
     renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir conversa' }))
     fireEvent.click(screen.getByRole('button', { name: 'Encerrar conversa' }))
 
-    expect(screen.getByTestId('conversation-status')).toHaveTextContent('Closed')
+    expect(screen.getByTestId('conversation-status')).toHaveTextContent('Open')
   })
 })
