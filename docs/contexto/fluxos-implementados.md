@@ -213,7 +213,7 @@ Serviço: `src/WhatsAppAI.Application/Contacts/ContactImportService.cs`
 
 - Painel de uso separa provedor/período e apresenta estimativa, não fatura.
 - Retenção, exclusão operacional, controles de privacidade e checklist LGPD estão previstos nos runbooks de segurança.
-- Existe módulo de broadcast com listagem, detalhe, criação, disparo, cancelamento e exclusão; ele segue permissões, tenant e outbox do backend.
+- Existe módulo de broadcast com listagem, detalhe, criação, disparo, cancelamento e exclusão; o detalhe exibe nomes e telefones dos contatos destinatários, e segue permissões, tenant e outbox do backend.
 
 ## 14. Persistência e migrations
 

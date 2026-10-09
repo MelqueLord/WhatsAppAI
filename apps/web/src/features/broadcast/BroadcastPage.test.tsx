@@ -372,6 +372,38 @@ describe('BroadcastPage', () => {
     ))
   })
 
+  it('shows recipient names instead of contact IDs in a draft broadcast', async () => {
+    const draft = {
+      id: 'broadcast-draft',
+      name: 'Aviso de teste',
+      message: 'Mensagem do disparo',
+      status: 'Draft',
+      queueId: 'queue-1',
+      totalCount: 1,
+      sentCount: 0,
+      failedCount: 0,
+      createdAt: '2026-09-11T00:00:00Z',
+    }
+    vi.mocked(api.broadcasts.list).mockResolvedValue([draft])
+    vi.mocked(api.broadcasts.get).mockResolvedValue({
+      broadcast: draft,
+      recipients: [{
+        id: 'recipient-1',
+        contactId: '12345678-1234-1234-1234-123456789012',
+        contactName: 'Maria Oliveira',
+        contactPhoneNumber: '5511999990000',
+        status: 'Pending',
+      }],
+    })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Aviso de teste' }))
+
+    expect(await screen.findByText('Maria Oliveira')).toBeInTheDocument()
+    expect(screen.getByText('5511999990000')).toBeInTheDocument()
+    expect(screen.queryByText(/12345678/)).not.toBeInTheDocument()
+  })
+
   it('allows resending only failed recipients', async () => {
     vi.mocked(api.broadcasts.list).mockResolvedValue([{
       id: 'broadcast-1',

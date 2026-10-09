@@ -484,6 +484,8 @@ export interface BroadcastList {
 export interface BroadcastRecipient {
   id: string
   contactId: string
+  contactName?: string | null
+  contactPhoneNumber?: string | null
   status: string
   errorMessage?: string
   sentAt?: string

@@ -74,11 +74,24 @@ public static class BroadcastEndpoints
         if (!await CanAccessBroadcastAsync(currentTenant, broadcast, accountRepository, membershipRepository))
             return Results.NotFound();
 
-        var recipients = await db.BroadcastRecipients
-            .IgnoreQueryFilters()
-            .Where(r => r.BroadcastListId == id && r.TenantId == currentTenant.TenantId)
-            .Select(r => new { r.Id, r.ContactId, r.Status, r.ErrorMessage, r.SentAt })
-            .ToListAsync();
+        var tenantId = currentTenant.TenantId.Value;
+        var recipients = await (
+            from recipient in db.BroadcastRecipients.IgnoreQueryFilters()
+            join contact in db.Contacts.IgnoreQueryFilters()
+                on new { recipient.ContactId, recipient.TenantId }
+                equals new { ContactId = contact.Id, contact.TenantId } into contactMatches
+            from contact in contactMatches.DefaultIfEmpty()
+            where recipient.BroadcastListId == id && recipient.TenantId == tenantId
+            select new
+            {
+                recipient.Id,
+                recipient.ContactId,
+                contactName = contact == null ? null : contact.Name,
+                contactPhoneNumber = contact == null ? null : contact.PhoneNumber,
+                recipient.Status,
+                recipient.ErrorMessage,
+                recipient.SentAt
+            }).ToListAsync();
 
         return Results.Ok(new
         {

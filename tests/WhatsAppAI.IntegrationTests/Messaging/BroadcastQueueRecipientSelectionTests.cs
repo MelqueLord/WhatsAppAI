@@ -71,6 +71,13 @@ public sealed class BroadcastQueueRecipientSelectionTests(TestWebApplicationFact
             Assert.Equal(new[] { imported.Id, inSales.Id }.Order(), recipientIds.Order());
         }
 
+        var broadcastDetail = await owner.Client.GetFromJsonAsync<JsonElement>($"/api/broadcasts/{broadcastId}");
+        var importedRecipient = Assert.Single(
+            broadcastDetail.GetProperty("recipients").EnumerateArray(),
+            recipient => recipient.GetProperty("contactId").GetGuid() == imported.Id);
+        Assert.Equal("Importado", importedRecipient.GetProperty("contactName").GetString());
+        Assert.Equal(imported.PhoneNumber, importedRecipient.GetProperty("contactPhoneNumber").GetString());
+
         var selectedSales = await owner.Client.PostAsJsonAsync("/api/broadcasts", new
         {
             name = "Contato sem importação",

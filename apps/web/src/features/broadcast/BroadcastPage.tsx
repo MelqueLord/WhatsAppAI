@@ -809,9 +809,16 @@ function BroadcastRow({ broadcast }: { broadcast: BroadcastList }) {
                   <tbody className="divide-y divide-slate-100">
                     {detail.recipients.map((r) => {
                       const { text: rText, cls: rCls } = recipientStatusLabel(r.status)
+                      const contactName = r.contactName?.trim() || 'Sem nome'
+                      const contactPhoneNumber = r.contactPhoneNumber && !r.contactPhoneNumber.startsWith('anon-')
+                        ? r.contactPhoneNumber
+                        : null
                       return (
                         <tr key={r.id}>
-                          <td className="px-4 py-2 text-sm text-slate-600">{r.contactId.slice(0, 8)}…</td>
+                          <td className="px-4 py-2 text-sm text-slate-600">
+                            <span className="block font-medium">{contactName}</span>
+                            {contactPhoneNumber && <span className="block text-xs text-slate-400">{contactPhoneNumber}</span>}
+                          </td>
                           <td className={`px-4 py-2 text-sm font-medium ${rCls}`}>{rText}</td>
                           <td className="hidden sm:table-cell px-4 py-2 text-sm text-slate-400">
                             {r.sentAt ? new Date(r.sentAt).toLocaleString('pt-BR') : '—'}
