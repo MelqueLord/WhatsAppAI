@@ -152,6 +152,48 @@ public class MessageTests
     }
 
     [Fact]
+    public void MarkSent_DoesNotDowngradeDeliveredMessage()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "idem123");
+        message.MarkSent("wa-msg-123");
+        message.MarkDelivered();
+
+        message.MarkSent("wa-msg-123");
+
+        Assert.Equal(MessageStatus.Delivered, message.Status);
+    }
+
+    [Fact]
+    public void MarkDelivered_DoesNotDowngradeReadMessage()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "idem123");
+        message.MarkSent("wa-msg-123");
+        message.MarkRead();
+
+        message.MarkDelivered();
+
+        Assert.Equal(MessageStatus.Read, message.Status);
+    }
+
+    [Fact]
+    public void MarkFailed_DoesNotDowngradeDeliveredMessage()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "idem123");
+        message.MarkSent("wa-msg-123");
+        message.MarkDelivered();
+
+        message.MarkFailed("Delayed failure event");
+
+        Assert.Equal(MessageStatus.Delivered, message.Status);
+    }
+
+    [Fact]
     public void MarkRead_SetsStatus()
     {
         var message = Message.CreateOutbound(

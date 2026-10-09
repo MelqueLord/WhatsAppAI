@@ -128,6 +128,9 @@ public sealed class Message
     public void MarkSent(string externalId)
     {
         ExternalId = externalId;
+        if (Status is MessageStatus.Delivered or MessageStatus.Read)
+            return;
+
         Status = MessageStatus.Sent;
         SentAt = DateTime.UtcNow;
         FailedAt = null;
@@ -143,6 +146,9 @@ public sealed class Message
 
     public void MarkDelivered()
     {
+        if (Status == MessageStatus.Read)
+            return;
+
         Status = MessageStatus.Delivered;
         DeliveredAt = DateTime.UtcNow;
     }
@@ -155,6 +161,9 @@ public sealed class Message
 
     public void MarkFailed(string reason)
     {
+        if (Status is MessageStatus.Delivered or MessageStatus.Read)
+            return;
+
         Status = MessageStatus.Failed;
         FailureReason = reason;
         FailedAt = DateTime.UtcNow;

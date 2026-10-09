@@ -247,6 +247,7 @@ public sealed class WebhookProcessingWorker(
                                 tenantId,
                                 status,
                                 messageRepository,
+                                notifier,
                                 cancellationToken);
                         }
                     }
@@ -416,10 +417,11 @@ public sealed class WebhookProcessingWorker(
         values.Select(value => value?.Trim())
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-    private async Task ProcessStatusUpdateAsync(
+    internal async Task ProcessStatusUpdateAsync(
         Guid tenantId,
         WebhookStatus status,
         IMessageRepository messageRepository,
+        IRealtimeNotifier notifier,
         CancellationToken cancellationToken)
     {
         if (status.Id is null) return;
@@ -448,6 +450,23 @@ public sealed class WebhookProcessingWorker(
         }
 
         await messageRepository.UpdateAsync(message, cancellationToken);
+        try
+        {
+            await notifier.NotifyTenantAsync(
+                tenantId,
+                "MessageStatusUpdated",
+                new { conversationId = message.ConversationId, messageId = message.Id, status = message.Status.ToString() },
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Unable to notify message status update for message {MessageId}", message.Id);
+        }
+
         logger.LogInformation(
             "Message {MessageId} updated from WhatsApp status {WhatsAppStatus}",
             message.Id,
