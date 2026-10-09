@@ -522,6 +522,7 @@ public static class WebhookEndpoints
             return Results.Ok("OK");
         }
 
+        var rawBodyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody)));
         for (var entryIndex = 0; entryIndex < payload.Entry.Count; entryIndex++)
         {
             var entry = payload.Entry[entryIndex];
@@ -544,7 +545,7 @@ public static class WebhookEndpoints
                     Entry = [new WebhookEntry { Id = entry.Id, Time = entry.Time, Changes = [change] }]
                 }, JsonOptions);
                 var idempotencyKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-                    $"{rawBody.Length}:{entryIndex}:{changeIndex}:{routingId}:{eventKind}"))).ToLowerInvariant();
+                    $"{rawBodyHash}:{entryIndex}:{changeIndex}:{routingId}:{eventKind}"))).ToLowerInvariant();
                 if (await webhookEventRepository.GetByIdempotencyKeyAsync(idempotencyKey) is not null)
                     continue;
 

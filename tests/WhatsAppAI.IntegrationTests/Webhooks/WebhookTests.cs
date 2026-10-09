@@ -163,7 +163,8 @@ public class WebhookTests : IClassFixture<TestWebApplicationFactory>, IAsyncLife
     {
         // Meta uses the same WABA entry ID for separate incoming deliveries.
         var firstPayload = CreateTestPayload("+5511999887665", "123456789", "First", "waba-entry");
-        var secondPayload = CreateTestPayload("+5511999887665", "123456789", "Second", "waba-entry");
+        var secondPayload = CreateTestPayload("+5511999887665", "123456789", "Other", "waba-entry");
+        Assert.Equal(firstPayload.Length, secondPayload.Length);
 
         foreach (var payload in new[] { firstPayload, secondPayload })
         {
