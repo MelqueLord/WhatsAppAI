@@ -13,6 +13,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     serviceQueues: { list: vi.fn() },
     conversations: { list: vi.fn() },
+    contacts: { list: vi.fn() },
   },
 }))
 
@@ -65,12 +66,26 @@ describe('QueueInboxPage', () => {
       }],
       hasMore: false,
     })
+    vi.mocked(api.contacts.list).mockResolvedValue([{
+      id: 'imported-contact-1',
+      name: 'Contato da planilha',
+      phoneNumber: '5511888888888',
+      createdAt: '2026-09-11T00:00:00Z',
+    }, {
+      id: 'contact-1',
+      name: 'Cliente importado com conversa',
+      phoneNumber: '5511999999999',
+      createdAt: '2026-09-11T00:00:00Z',
+    }])
   })
 
   it('refreshes the queue inbox when a conversation update arrives', async () => {
     renderPage()
 
     await screen.findByText('Cliente')
+    expect(await screen.findByText('Contato da planilha')).toBeInTheDocument()
+    expect(screen.queryByText('5511999999999')).not.toBeInTheDocument()
+    expect(api.contacts.list).toHaveBeenCalledWith(undefined, 5000, 'queue-1', true)
     expect(signalRMock.onConversationUpdate).toBeDefined()
     expect(api.conversations.list).toHaveBeenCalledTimes(1)
 

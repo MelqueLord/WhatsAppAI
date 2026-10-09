@@ -39,6 +39,12 @@ public sealed class ContactImportQueueTests(TestWebApplicationFactory factory)
 
         await using (var context = await factory.GetDbContextAsync())
         {
+            var conversationContact = Contact.Create(owner.TenantId, "5511777770000", "Cliente com conversa");
+            var conversation = Conversation.Create(owner.TenantId, conversationContact.Id, "manual", ConversationMode.Human);
+            conversation.AssignQueue(queue.Id);
+            context.AddRange(conversationContact, conversation);
+            await context.SaveChangesAsync();
+
             var importedContact = await context.Contacts.IgnoreQueryFilters()
                 .SingleAsync(contact => contact.TenantId == owner.TenantId && contact.PhoneNumber == "5511999990000");
             Assert.Equal(queue.Id, importedContact.QueueId);
@@ -47,6 +53,12 @@ public sealed class ContactImportQueueTests(TestWebApplicationFactory factory)
         var queuedContacts = await owner.Client.GetFromJsonAsync<List<QueuedContactResponse>>(
             $"/api/contacts?queueId={queue.Id}&limit=50");
         Assert.Contains(queuedContacts ?? [], contact => contact.PhoneNumber == "5511999990000");
+        Assert.Contains(queuedContacts ?? [], contact => contact.PhoneNumber == "5511777770000");
+
+        var importedContacts = await owner.Client.GetFromJsonAsync<List<QueuedContactResponse>>(
+            $"/api/contacts?queueId={queue.Id}&importedOnly=true&limit=50");
+        Assert.Contains(importedContacts ?? [], contact => contact.PhoneNumber == "5511999990000");
+        Assert.DoesNotContain(importedContacts ?? [], contact => contact.PhoneNumber == "5511777770000");
     }
 
     private async Task<(HttpClient Client, Guid TenantId)> CreateTenantOwnerAsync()

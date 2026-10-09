@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Inbox, Loader2, MessageCircle } from 'lucide-react'
-import { api, type Conversation, type ServiceQueue } from '../../lib/api'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Inbox, Loader2, MessageCircle, Users } from 'lucide-react'
+import { api, type Contact, type Conversation, type ServiceQueue } from '../../lib/api'
 import { MessagePanel } from '../inbox/MessagePanel'
 import { useSignalR } from '../../lib/signalr'
 
@@ -29,6 +29,15 @@ export function QueueInboxPage() {
     queryFn: () => api.conversations.list(undefined, 100),
     refetchInterval: 15000,
   })
+  const activeQueues = (queuesQuery.data ?? []).filter((queue) => queue.isActive)
+  const importedContactsQueries = useQueries({
+    queries: activeQueues.map((queue) => ({
+      queryKey: ['queue-imported-contacts', queue.id],
+      queryFn: () => api.contacts.list(undefined, 5000, queue.id, true),
+      enabled: !queuesQuery.isLoading,
+      refetchInterval: 15000,
+    })),
+  })
 
   if (selectedConversation) {
     return (
@@ -40,7 +49,6 @@ export function QueueInboxPage() {
   }
 
   const conversations = conversationsQuery.data?.items ?? []
-  const activeQueues = (queuesQuery.data ?? []).filter((queue) => queue.isActive)
   const transferred = conversations.filter((conversation) => conversation.queueId)
 
   return (
@@ -67,8 +75,11 @@ export function QueueInboxPage() {
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {activeQueues.map((queue: ServiceQueue) => {
+            {activeQueues.map((queue: ServiceQueue, queueIndex) => {
               const queueConversations = transferred.filter((conversation) => conversation.queueId === queue.id)
+              const importedContactsQuery = importedContactsQueries[queueIndex]
+              const importedContacts = (importedContactsQuery?.data ?? [])
+                .filter((contact: Contact) => !queueConversations.some((conversation) => conversation.contactId === contact.id))
               return (
                 <section key={queue.id} className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1222]">
                   <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -100,6 +111,34 @@ export function QueueInboxPage() {
                       ))}
                     </div>
                   )}
+                  <div className="border-t border-white/10">
+                    <div className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-300">
+                      <Users className="h-4 w-4 text-cyan-400" />
+                      <span>Contatos importados</span>
+                      <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-xs">{importedContacts.length}</span>
+                    </div>
+                    {importedContactsQuery?.isLoading ? (
+                      <p className="px-4 pb-4 text-center text-sm text-slate-500">Carregando contatos importados...</p>
+                    ) : importedContactsQuery?.isError ? (
+                      <p className="px-4 pb-4 text-center text-sm text-red-400">Não foi possível carregar os contatos importados.</p>
+                    ) : importedContacts.length === 0 ? (
+                      <p className="px-4 pb-4 text-center text-sm text-slate-500">Nenhum contato importado nesta fila.</p>
+                    ) : (
+                      <div className="divide-y divide-white/10">
+                        {importedContacts.map((contact: Contact) => (
+                          <div key={contact.id} className="flex items-center gap-3 px-4 py-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 font-semibold text-slate-300">
+                              {(contact.name || contact.phoneNumber).charAt(0).toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-white">{contact.name || 'Sem nome'}</span>
+                              <span className="block truncate text-xs text-slate-400">{contact.phoneNumber}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </section>
               )
             })}

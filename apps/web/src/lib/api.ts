@@ -696,11 +696,12 @@ export const api = {
   },
 
   contacts: {
-    list: (search?: string, limit = 50, queueId?: string) => {
+    list: (search?: string, limit = 50, queueId?: string, importedOnly = false) => {
       const params = new URLSearchParams()
       params.set('limit', String(limit))
       if (search) params.set('search', search)
       if (queueId) params.set('queueId', queueId)
+      if (importedOnly) params.set('importedOnly', 'true')
       return fetchApi<Contact[]>(`/api/contacts?${params.toString()}`)
     },
 

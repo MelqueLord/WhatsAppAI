@@ -6,6 +6,16 @@ namespace WhatsAppAI.WebApi.Contacts;
 
 internal static class QueueContactQuery
 {
+    internal static IQueryable<Contact> ForImportedQueue(AppDbContext dbContext, Guid tenantId, Guid queueId)
+    {
+        return dbContext.Contacts
+            .IgnoreQueryFilters()
+            .Where(contact =>
+                contact.TenantId == tenantId &&
+                contact.QueueId == queueId &&
+                !contact.PhoneNumber.StartsWith("anon-"));
+    }
+
     internal static IQueryable<Contact> ForQueue(AppDbContext dbContext, Guid tenantId, Guid queueId)
     {
         return dbContext.Contacts

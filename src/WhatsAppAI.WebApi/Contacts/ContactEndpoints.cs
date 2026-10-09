@@ -107,6 +107,7 @@ public static class ContactEndpoints
         AppDbContext dbContext,
         string? search = null,
         Guid? queueId = null,
+        bool importedOnly = false,
         int limit = 50)
     {
         if (currentTenant.TenantId is null)
@@ -124,11 +125,22 @@ public static class ContactEndpoints
                 return Results.BadRequest(new { error = "Queue not found." });
         }
 
-        var query = queueId.HasValue
-            ? QueueContactQuery.ForQueue(dbContext, currentTenant.TenantId.Value, queueId.Value)
-            : dbContext.Contacts.Where(c =>
+        if (importedOnly && !queueId.HasValue)
+            return Results.BadRequest(new { error = "Queue is required for imported contacts." });
+
+        IQueryable<Contact> query;
+        if (queueId.HasValue)
+        {
+            query = importedOnly
+                ? QueueContactQuery.ForImportedQueue(dbContext, currentTenant.TenantId.Value, queueId.Value)
+                : QueueContactQuery.ForQueue(dbContext, currentTenant.TenantId.Value, queueId.Value);
+        }
+        else
+        {
+            query = dbContext.Contacts.Where(c =>
                 c.TenantId == currentTenant.TenantId.Value &&
                 !c.PhoneNumber.StartsWith("anon-"));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
