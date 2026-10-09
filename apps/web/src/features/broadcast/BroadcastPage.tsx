@@ -15,7 +15,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { api } from '../../lib/api'
-import type { BroadcastList, Contact, ServiceQueue } from '../../lib/api'
+import type { BroadcastList, Contact, ServiceQueue, WhatsAppTemplate } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 
 // ──────────────────────────────── helpers ────────────────────────────────────
@@ -39,6 +39,16 @@ function recipientStatusLabel(s: string) {
     case 'Skipped': return { text: 'Ignorado', cls: 'text-amber-700' }
     default:        return { text: s,           cls: 'text-slate-500' }
   }
+}
+
+function renderTemplateBody(template: WhatsAppTemplate, parameters: string[]) {
+  return template.bodyText?.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (placeholder, name: string) => {
+    const namedIndex = template.bodyParameterNames?.indexOf(name) ?? -1
+    const parameterIndex = namedIndex >= 0 ? namedIndex : /^\d+$/.test(name) ? Number(name) - 1 : -1
+    return parameterIndex >= 0 && parameters[parameterIndex]?.trim()
+      ? parameters[parameterIndex].trim()
+      : placeholder
+  }) ?? ''
 }
 
 function ProgressBar({ sent, failed, skipped, total }: { sent: number; failed: number; skipped: number; total: number }) {
@@ -193,6 +203,16 @@ function CreateBroadcastDialog({ onClose }: { onClose: () => void }) {
               <div><label htmlFor="broadcast-template" className="block text-sm font-medium text-slate-700 mb-1.5">Template aprovado</label><select id="broadcast-template" value={templateKey} onChange={(event) => { const value = event.target.value; setTemplateKey(value); const template = (templateResult?.templates ?? []).find((item) => `${item.name}:${item.language}` === value); setTemplateParameters(Array(template?.bodyParameterCount ?? 0).fill('')) }} required disabled={isLoadingTemplates || Boolean(templatesError) || !selectedOfficialLineId} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm disabled:bg-slate-50"><option value="">{isLoadingTemplates ? 'Carregando templates…' : 'Selecione o template'}</option>{(templateResult?.templates ?? []).map((template) => <option key={`${template.name}:${template.language}`} value={`${template.name}:${template.language}`}>{template.name} — {template.language}</option>)}</select></div>
               {templatesError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{templatesError.message} <button type="button" onClick={() => refetchTemplates()} className="ml-2 font-semibold underline">Tentar novamente</button></div>}
               {!isLoadingTemplates && !templatesError && selectedOfficialLineId && (templateResult?.templates.length ?? 0) === 0 && <p className="text-xs text-slate-500">Nenhum template elegível foi encontrado. O disparo em massa aceita templates aprovados de Utilidade ou Marketing, com corpo textual e sem cabeçalho, mídia ou botões.</p>}
+              {selectedTemplate && (
+                <div role="region" aria-label="Mensagem do template" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="mb-2 text-sm font-medium text-slate-700">Mensagem do template</p>
+                  {selectedTemplate.bodyText?.trim() ? (
+                    <p className="whitespace-pre-wrap text-sm text-slate-800">{renderTemplateBody(selectedTemplate, templateParameters)}</p>
+                  ) : (
+                    <p role="alert" className="text-sm text-red-700">O corpo da mensagem não foi retornado para este template. Sincronize o catálogo e tente novamente.</p>
+                  )}
+                </div>
+              )}
               {templateParameters.map((parameter, index) => <div key={index}><label htmlFor={`broadcast-template-param-${index}`} className="block text-sm font-medium text-slate-700 mb-1.5">Parâmetro {index + 1}</label><input id={`broadcast-template-param-${index}`} value={parameter} maxLength={1024} onChange={(event) => setTemplateParameters((current) => current.map((value, parameterIndex) => parameterIndex === index ? event.target.value : value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" /></div>)}
             </>}
 

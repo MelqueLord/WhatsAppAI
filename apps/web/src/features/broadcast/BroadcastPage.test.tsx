@@ -192,7 +192,7 @@ describe('BroadcastPage', () => {
       isActive: true,
     }])
     vi.mocked(api.broadcasts.listOfficialTemplates).mockResolvedValue({
-      templates: [{ name: 'status_update', language: 'pt_BR', bodyParameterCount: 1, category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
+      templates: [{ name: 'status_update', language: 'pt_BR', bodyParameterCount: 1, bodyText: 'Olá, {{1}}! Seu pedido foi atualizado.', category: 'UTILITY', status: 'APPROVED', isCompatible: true, canSendInInbox: true, canSendInBroadcast: true }],
     })
     vi.mocked(api.broadcasts.create).mockResolvedValue({
       id: 'broadcast-official', name: 'Atualização', message: '', deliveryMode: 'OfficialApiTemplate',
@@ -208,7 +208,9 @@ describe('BroadcastPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Linha oficial')).toHaveValue('official-2'))
     await waitFor(() => expect(api.broadcasts.listOfficialTemplates).toHaveBeenCalledWith('official-2'))
     fireEvent.change(screen.getByLabelText('Template aprovado'), { target: { value: 'status_update:pt_BR' } })
+    expect(screen.getByRole('region', { name: 'Mensagem do template' })).toHaveTextContent('Olá, {{1}}! Seu pedido foi atualizado.')
     fireEvent.change(screen.getByLabelText('Parâmetro 1'), { target: { value: 'Pedido 10' } })
+    expect(screen.getByRole('region', { name: 'Mensagem do template' })).toHaveTextContent('Olá, Pedido 10! Seu pedido foi atualizado.')
     fireEvent.change(screen.getByLabelText('Nome da lista *'), { target: { value: 'Atualização' } })
     fireEvent.click(screen.getByText('Cliente').closest('label')!.querySelector('input')!)
     fireEvent.click(screen.getByRole('button', { name: 'Criar Lista' }))
