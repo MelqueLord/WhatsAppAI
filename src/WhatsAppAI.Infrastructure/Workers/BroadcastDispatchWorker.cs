@@ -135,7 +135,8 @@ public sealed class BroadcastDispatchWorker(
 
                 var officialMessage = Message.CreateOutboundTemplate(broadcast.TenantId, officialConversation.Id, contact.Id,
                     broadcast.TemplateName, broadcast.TemplateLanguage, broadcast.TemplateParametersJson ?? "[]",
-                    $"broadcast:{broadcast.Id}:recipient:{recipient.Id}:attempt:{recipient.DispatchAttempt}");
+                    $"broadcast:{broadcast.Id}:recipient:{recipient.Id}:attempt:{recipient.DispatchAttempt}",
+                    broadcast.Message);
                 dbContext.Set<Message>().Add(officialMessage);
                 dbContext.Set<OutboxMessage>().Add(OutboxMessage.Create(broadcast.TenantId, officialMessage.Id));
                 recipient.MarkQueued(officialMessage.Id);
@@ -264,7 +265,7 @@ public sealed class BroadcastDispatchWorker(
             }
             else if (message?.Status == MessageStatus.Failed)
             {
-                recipient.MarkFailed("Template delivery failed");
+                recipient.MarkFailed(message.FailureReason ?? "Template delivery failed");
                 await broadcastRepo.UpdateRecipientAsync(recipient);
                 broadcast.RecordFailed();
                 await broadcastRepo.UpdateAsync(broadcast);

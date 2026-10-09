@@ -97,7 +97,8 @@ public sealed class Message
         string templateName,
         string templateLanguage,
         string? templateParametersJson,
-        string? idempotencyKey)
+        string? idempotencyKey,
+        string? renderedBodyText = null)
     {
         if (string.IsNullOrWhiteSpace(templateName))
             throw new ArgumentException("Template name is required.", nameof(templateName));
@@ -113,7 +114,9 @@ public sealed class Message
             Direction = MessageDirection.Outbound,
             Status = MessageStatus.Queued,
             Type = MessageType.Template,
-            Content = $"Template: {templateName}",
+            Content = string.IsNullOrWhiteSpace(renderedBodyText)
+                ? $"Template: {templateName}"
+                : renderedBodyText.Trim(),
             TemplateName = templateName.Trim(),
             TemplateLanguage = templateLanguage.Trim(),
             TemplateParametersJson = templateParametersJson,

@@ -290,6 +290,7 @@ public static class ConversationEndpoints
         var isQrConversation = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
             conversationAccount?.ConnectionType == WhatsAppConnectionType.QrCode;
         List<WhatsAppTemplateParameter>? templateParameterPayload = null;
+        WhatsAppTemplateSummary? selectedTemplate = null;
         var templateRequested = request.TemplateName is not null ||
             request.TemplateLanguage is not null ||
             request.TemplateParameters is not null;
@@ -337,7 +338,7 @@ public static class ConversationEndpoints
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
-            var selectedTemplate = templatesResult.Templates.SingleOrDefault(template =>
+            selectedTemplate = templatesResult.Templates.SingleOrDefault(template =>
                 string.Equals(template.Name, request.TemplateName!.Trim(), StringComparison.Ordinal) &&
                 string.Equals(template.Language, request.TemplateLanguage!.Trim(), StringComparison.Ordinal));
             if (selectedTemplate is null || !selectedTemplate.CanSendInInbox)
@@ -377,7 +378,8 @@ public static class ConversationEndpoints
                 request.TemplateName!.Trim(),
                 request.TemplateLanguage!.Trim(),
                 JsonSerializer.Serialize(templateParameterPayload),
-                idempotencyKey)
+                idempotencyKey,
+                WhatsAppTemplateBodyRenderer.Render(selectedTemplate!.BodyText, templateParameterPayload!))
             : Message.CreateOutbound(
                 currentTenant.TenantId.Value,
                 conversationId,

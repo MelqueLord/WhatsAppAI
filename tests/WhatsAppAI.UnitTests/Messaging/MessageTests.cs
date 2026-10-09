@@ -41,6 +41,17 @@ public class MessageTests
     }
 
     [Fact]
+    public void CreateOutboundTemplate_UsesRenderedBodyForConversationHistory()
+    {
+        var message = Message.CreateOutboundTemplate(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "welcome_customer", "pt_BR", "[\"Maria\"]", "idem-template",
+            "Olá Maria, seu pedido foi atualizado.");
+
+        Assert.Equal("Olá Maria, seu pedido foi atualizado.", message.Content);
+    }
+
+    [Fact]
     public void RedactPersonalData_ClearsTemplateMetadata()
     {
         var message = Message.CreateOutboundTemplate(

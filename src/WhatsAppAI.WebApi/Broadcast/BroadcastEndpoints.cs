@@ -317,6 +317,11 @@ public static class BroadcastEndpoints
                 return Results.BadRequest(new { error = "The selected template is no longer eligible for sending." });
 
             broadcast.SetTemplateCategory(selectedTemplate.Category);
+            var templateParameters = JsonSerializer.Deserialize<List<string>>(broadcast.TemplateParametersJson ?? "[]") ?? [];
+            var renderedBody = WhatsAppTemplateBodyRenderer.Render(
+                selectedTemplate.BodyText,
+                templateParameters.Select(value => new WhatsAppTemplateParameter(value)).ToArray());
+            broadcast.SetTemplateBody(renderedBody);
         }
 
         if (currentTenant.UserRole == "Operator")

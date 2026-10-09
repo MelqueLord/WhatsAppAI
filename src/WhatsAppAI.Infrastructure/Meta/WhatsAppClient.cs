@@ -242,7 +242,12 @@ internal sealed class WhatsAppClient : IWhatsAppClient
             var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogWarning("WhatsApp template API returned {StatusCode}: {Error}",
                 response.StatusCode, SanitizeError(errorContent));
-            return new SendMessageResult { IsSuccess = false, ErrorMessage = "Failed to send template message." };
+            return new SendMessageResult
+            {
+                IsSuccess = false,
+                IsRetryable = IsRetryableTemplateStatus(response.StatusCode),
+                ErrorMessage = GetSanitizedTemplateSendError(response.StatusCode)
+            };
         }
         catch (Exception ex)
         {
@@ -459,6 +464,27 @@ internal sealed class WhatsAppClient : IWhatsAppClient
         HttpStatusCode.TooManyRequests => "A Meta limitou temporariamente a consulta de templates. Tente novamente em alguns instantes.",
         _ => "A Meta não conseguiu carregar os templates desta linha. Verifique a configuração da API Oficial."
     };
+
+    private static bool IsRetryableTemplateStatus(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests ||
+        (int)statusCode >= 500;
+
+    private static string GetSanitizedTemplateSendError(HttpStatusCode statusCode)
+    {
+        if ((int)statusCode >= 500)
+            return "A API da Meta está temporariamente indisponível; o sistema tentará novamente.";
+
+        return statusCode switch
+        {
+            HttpStatusCode.BadRequest => "A Meta rejeitou o template ou os parâmetros. Confira o idioma e as variáveis do template.",
+            HttpStatusCode.Unauthorized => "A credencial da API Oficial foi recusada pela Meta.",
+            HttpStatusCode.Forbidden => "A Meta negou permissão para enviar pela linha oficial.",
+            HttpStatusCode.NotFound => "A Meta não encontrou a linha oficial configurada.",
+            HttpStatusCode.TooManyRequests => "A Meta limitou temporariamente os envios; o sistema tentará novamente.",
+            HttpStatusCode.RequestTimeout => "A Meta demorou para responder; o sistema tentará novamente.",
+            _ => "A Meta não aceitou o envio do template."
+        };
+    }
 
     private static int CountBodyParameters(IReadOnlyList<TemplateListComponent>? components) =>
         GetBodyParameterNames(components, "POSITIONAL").Length;

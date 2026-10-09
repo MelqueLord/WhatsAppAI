@@ -56,6 +56,36 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatsAppClient_DoesNotRetryTemplateRejectionsFromMeta()
+    {
+        var client = new WhatsAppClient(
+            new HttpClient(new StaticResponseHandler(HttpStatusCode.BadRequest, "{\"error\":\"invalid template\"}")),
+            NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.SendTemplateMessageAsync(
+            "phone-template", "token-template", "recipient", "welcome_customer", "pt_BR", []);
+
+        Assert.False(result.IsSuccess);
+        Assert.False(result.IsRetryable);
+        Assert.Contains("A Meta rejeitou o template", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task WhatsAppClient_RetriesTemplateRateLimits()
+    {
+        var client = new WhatsAppClient(
+            new HttpClient(new StaticResponseHandler(HttpStatusCode.TooManyRequests, "{}")),
+            NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.SendTemplateMessageAsync(
+            "phone-template", "token-template", "recipient", "welcome_customer", "pt_BR", []);
+
+        Assert.False(result.IsSuccess);
+        Assert.True(result.IsRetryable);
+        Assert.Contains("limitou temporariamente", result.ErrorMessage);
+    }
+
+    [Fact]
     public async Task WhatsAppClient_SendsNamedTemplateParameterNames()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);

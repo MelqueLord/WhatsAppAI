@@ -36,6 +36,18 @@ public sealed class BroadcastListTests
     }
 
     [Fact]
+    public void SetTemplateBody_SavesTheMessageSnapshotForTheBroadcast()
+    {
+        var broadcast = BroadcastList.Create(Guid.NewGuid(), "Oferta", string.Empty, Guid.NewGuid(),
+            deliveryMode: BroadcastDeliveryMode.OfficialApiTemplate, templateName: "offer",
+            templateLanguage: "pt_BR", linePhoneNumberId: "123");
+
+        broadcast.SetTemplateBody("Olá, seu pedido foi atualizado.");
+
+        Assert.Equal("Olá, seu pedido foi atualizado.", broadcast.Message);
+    }
+
+    [Fact]
     public void RecordSkipped_CompletesDispatchWithoutMarkingRecipientAsFailed()
     {
         var broadcast = BroadcastList.Create(Guid.NewGuid(), "Oferta", "Mensagem", Guid.NewGuid());

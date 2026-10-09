@@ -95,6 +95,16 @@ public sealed class BroadcastList
         TemplateCategory = category.Trim().ToUpperInvariant();
     }
 
+    public void SetTemplateBody(string body)
+    {
+        if (DeliveryMode != BroadcastDeliveryMode.OfficialApiTemplate || Status != BroadcastStatus.Draft)
+            throw new InvalidOperationException("Only draft official template broadcasts can set a template body.");
+        if (string.IsNullOrWhiteSpace(body) || body.Length > 4096)
+            throw new ArgumentException("Template body is required and must be at most 4096 characters.", nameof(body));
+
+        Message = body.Trim();
+    }
+
     public void UpdateMessage(string message)
     {
         if (DeliveryMode != BroadcastDeliveryMode.QrCodeText)
