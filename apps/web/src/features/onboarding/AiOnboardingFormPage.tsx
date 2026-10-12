@@ -50,6 +50,7 @@ const whatsappSituations = [
 const restrictionAnswers = ['Não, nunca aconteceu', 'Sim, já aconteceu', 'Não sei informar']
 const restrictionTypes = ['Bloqueio temporário', 'Banimento da conta ou do número', 'Restrição no envio de mensagens', 'Cancelamento da linha telefônica', 'Outro problema', 'Não sei exatamente o que aconteceu']
 const informationSources = ['No site da empresa', 'No Instagram ou em outra rede social', 'Em um catálogo de produtos ou serviços', 'Em documentos, arquivos ou tabelas', 'Já estão cadastradas no sistema que utilizamos', 'Ainda não temos essas informações organizadas']
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const initialAnswers: AiOnboardingAnswers = {
   companyName: '', businessActivity: '', productsOrServices: '', averageTicket: '', aiGoals: [],
@@ -160,7 +161,7 @@ type Update = <K extends keyof AiOnboardingAnswers>(key: K, value: AiOnboardingA
 type Toggle = (key: 'aiGoals' | 'handoffConditions' | 'departments' | 'informationSources', value: string) => void
 
 function CompanyStep({ answers, update, toggle }: { answers: AiOnboardingAnswers; update: Update; toggle: Toggle }) {
-  return <div><StepTitle>1. Sobre sua empresa</StepTitle><TextInput label="Qual o nome da sua empresa?" value={answers.companyName} onChange={(value) => update('companyName', value)} maxLength={200} /><SingleQuestion label="Qual a principal atividade da sua empresa?" options={businessActivities} selected={answers.businessActivity} onSelect={(value) => update('businessActivity', value)} /><TextArea label="Qual serviço ou produto você oferece?" value={answers.productsOrServices} onChange={(value) => update('productsOrServices', value)} maxLength={4000} /><TextInput label="Qual o valor médio das vendas ou serviços (ticket médio)?" value={answers.averageTicket} onChange={(value) => update('averageTicket', value)} maxLength={100} placeholder="Ex.: R$ 150" /><MultiQuestion label="O que você deseja que a IA faça no atendimento?" options={aiGoals} selected={answers.aiGoals} onToggle={(value) => toggle('aiGoals', value)} compact /></div>
+  return <div><StepTitle>1. Sobre sua empresa</StepTitle><TextInput label="Qual o nome da sua empresa?" value={answers.companyName} onChange={(value) => update('companyName', value)} maxLength={200} /><SingleQuestion label="Qual a principal atividade da sua empresa?" options={businessActivities} selected={answers.businessActivity} onSelect={(value) => update('businessActivity', value)} /><TextArea label="Qual serviço ou produto você oferece?" value={answers.productsOrServices} onChange={(value) => update('productsOrServices', value)} maxLength={4000} /><CurrencyInput label="Qual o valor médio das vendas ou serviços (ticket médio)?" value={answers.averageTicket} onChange={(value) => update('averageTicket', value)} /><MultiQuestion label="O que você deseja que a IA faça no atendimento?" options={aiGoals} selected={answers.aiGoals} onToggle={(value) => toggle('aiGoals', value)} compact /></div>
 }
 
 function HoursStep({ answers, update }: { answers: AiOnboardingAnswers; update: Update }) {
@@ -191,6 +192,15 @@ function MultiQuestion({ title, label, options, selected, onToggle, compact = fa
 
 function TextInput({ label, value, onChange, maxLength, placeholder }: { label: string; value: string; onChange: (value: string) => void; maxLength: number; placeholder?: string }) {
   return <label className="mb-7 block"><span className="mb-2 block font-semibold text-slate-100">{label} <Required /></span><input value={value} onChange={(event) => onChange(event.target.value)} maxLength={maxLength} placeholder={placeholder} className="w-full rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20" /></label>
+}
+
+function CurrencyInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const handleChange = (rawValue: string) => {
+    const digits = rawValue.replace(/\D/g, '').slice(0, 15)
+    onChange(digits ? brlFormatter.format(Number(digits) / 100) : '')
+  }
+
+  return <label className="mb-7 block"><span className="mb-2 block font-semibold text-slate-100">{label} <Required /></span><input value={value} onChange={(event) => handleChange(event.target.value)} inputMode="numeric" placeholder="R$ 0,00" className="w-full rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20" /></label>
 }
 
 function TextArea({ label, value, onChange, maxLength, placeholder, required = true }: { label: string; value: string; onChange: (value: string) => void; maxLength: number; placeholder?: string; required?: boolean }) {
