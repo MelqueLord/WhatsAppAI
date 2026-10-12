@@ -943,6 +943,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ tenantId }),
       }),
+      update: (id: string, answers: AiOnboardingAnswers) =>
+        fetchApi<void>(`/api/admin/ai-onboarding-forms/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(answers),
+        }),
+      delete: (id: string) =>
+        fetchApi<void>(`/api/admin/ai-onboarding-forms/${id}`, { method: 'DELETE' }),
     },
     tenants: {
       list: () =>

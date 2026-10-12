@@ -4,52 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Loader2, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import atenzLogo from '../../assets/atenz-logo-a.png'
 import { api, type AiOnboardingAnswers } from '../../lib/api'
-
-const businessActivities = [
-  'Loja ou comércio', 'Clínica ou consultório', 'Salão de beleza ou estética',
-  'Restaurante ou alimentação', 'Oficina ou assistência técnica', 'Prestação de serviços',
-  'Imobiliária', 'Escola ou cursos', 'Advocacia ou serviços jurídicos', 'Outro',
-]
-
-const aiGoals = [
-  'Responder às dúvidas dos clientes', 'Apresentar produtos ou serviços', 'Informar preços e condições',
-  'Identificar clientes interessados em comprar', 'Agendar horários ou serviços',
-  'Receber pedidos ou solicitações', 'Acompanhar clientes após a compra',
-  'Resolver dúvidas e problemas comuns', 'Encaminhar conversas para a equipe',
-]
-
-const handoffConditions = [
-  'Quando o cliente pedir para falar com uma pessoa', 'Quando houver reclamação ou insatisfação',
-  'Quando o assunto envolver pagamentos ou cobranças', 'Quando a IA não conseguir resolver a solicitação',
-  'Quando for necessário negociar condições especiais',
-  'Quando o cliente demonstrar interesse em fechar uma compra ou contratação',
-  'Em todas as situações que precisarem de atendimento humano',
-]
-
-const serviceDays = ['De segunda a sexta-feira', 'De segunda a sábado', 'De segunda a domingo', 'Todos os dias', 'Em dias e horários variados']
-const serviceHours = ['Das 8h às 17h', 'Das 8h às 18h', 'Das 9h às 18h', 'Das 9h às 19h', 'Outro horário', 'Atendimento em turnos ou 24 horas']
-const outsideHoursBehaviors = [
-  'Continuar atendendo normalmente e respondendo às dúvidas',
-  'Informar o horário de funcionamento e continuar coletando informações',
-  'Registrar a solicitação para a equipe retornar no próximo expediente',
-  'Encaminhar para um plantão, quando disponível',
-]
-
-const departments = [
-  'Vendas e novos clientes', 'Agendamentos e reservas', 'Financeiro e cobranças',
-  'Suporte e assistência', 'Pós-venda', 'Entrega e acompanhamento de pedidos',
-  'Recepção', 'Não temos departamentos separados', 'Outros',
-]
-
-const whatsappSituations = [
-  'WhatsApp Business funcionando normalmente', 'WhatsApp pessoal funcionando normalmente',
-  'Já utilizo a API oficial do WhatsApp', 'O número está bloqueado ou com restrições',
-  'O número foi cancelado ou não tenho mais acesso', 'Ainda não defini qual número vou utilizar',
-]
-
-const restrictionAnswers = ['Não, nunca aconteceu', 'Sim, já aconteceu', 'Não sei informar']
-const restrictionTypes = ['Bloqueio temporário', 'Banimento da conta ou do número', 'Restrição no envio de mensagens', 'Cancelamento da linha telefônica', 'Outro problema', 'Não sei exatamente o que aconteceu']
-const informationSources = ['No site da empresa', 'No Instagram ou em outra rede social', 'Em um catálogo de produtos ou serviços', 'Em documentos, arquivos ou tabelas', 'Já estão cadastradas no sistema que utilizamos', 'Ainda não temos essas informações organizadas']
+import { aiGoals, businessActivities, departments, handoffConditions, informationSources, outsideHoursBehaviors, restrictionAnswers, restrictionTypes, serviceDays, serviceHours, whatsappSituations } from './aiOnboardingOptions'
 const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const initialAnswers: AiOnboardingAnswers = {

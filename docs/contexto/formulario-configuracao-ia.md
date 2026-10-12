@@ -4,6 +4,6 @@ O formulário coleta informações operacionais da empresa para que a equipe ATE
 
 As etapas cobrem perfil da empresa, objetivos da IA, regras de encaminhamento humano, expediente, setores, situação do WhatsApp e fontes de informação. As respostas são apenas material administrativo: não alteram automaticamente diretrizes, filas, BOT, conhecimento ou credenciais.
 
-Somente o PlatformAdmin gera links, lista envios e abre o conteúdo. TenantOwner e Operator não recebem endpoints nem rotas para essas respostas. O token é persistido apenas como hash; auditoria registra metadados de geração e envio sem conteúdo ou token.
+Somente o PlatformAdmin gera links, lista envios, abre, corrige e exclui o conteúdo. TenantOwner e Operator não recebem endpoints nem rotas para essas respostas. O token é persistido apenas como hash; auditoria registra metadados de geração, envio, edição e exclusão sem conteúdo ou token.
 
 Fonte: [US-018, FR-089 e BR-056](../specs/plataforma/especificacao-plataforma.md).

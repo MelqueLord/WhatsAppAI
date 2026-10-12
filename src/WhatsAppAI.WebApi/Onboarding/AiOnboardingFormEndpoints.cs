@@ -91,6 +91,8 @@ public static class AiOnboardingFormEndpoints
         admin.MapGet("/", ListAsync);
         admin.MapGet("/{formId:guid}", GetAsync);
         admin.MapPost("/", CreateAsync);
+        admin.MapPut("/{formId:guid}", UpdateAsync);
+        admin.MapDelete("/{formId:guid}", DeleteAsync);
 
         var publicGroup = app.MapGroup("/api/public/ai-onboarding")
             .WithTags("Public AI onboarding")
@@ -196,6 +198,79 @@ public static class AiOnboardingFormEndpoints
             token = rawToken,
             expiresAt = form.ExpiresAt
         });
+    }
+
+    private static async Task<IResult> UpdateAsync(
+        Guid formId,
+        AiOnboardingAnswers request,
+        ICurrentTenant currentTenant,
+        AppDbContext db,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        var form = await db.AiOnboardingForms.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.Id == formId, cancellationToken);
+        if (form is null)
+            return Results.NotFound();
+        if (form.Status != AiOnboardingFormStatus.Submitted)
+            return Results.Conflict(new { error = "Somente formulários respondidos podem ser editados." });
+
+        var validationError = Validate(request);
+        if (validationError is not null)
+            return Results.BadRequest(new { error = validationError });
+
+        var normalized = Normalize(request);
+        form.Revise(normalized.CompanyName, JsonSerializer.Serialize(normalized, JsonOptions));
+        db.AuditLogs.Add(AuditLog.Create(
+            form.TenantId,
+            currentTenant.UserId,
+            "AiOnboardingForm.Updated",
+            "AiOnboardingForm",
+            form.Id.ToString(),
+            "Onboarding answers updated by platform administrator.",
+            httpContext.Connection.RemoteIpAddress?.ToString()));
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new { error = "As respostas foram alteradas. Atualize e tente novamente." });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        Guid formId,
+        ICurrentTenant currentTenant,
+        AppDbContext db,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (currentTenant.UserId is null)
+            return Results.Unauthorized();
+
+        var form = await db.AiOnboardingForms.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.Id == formId, cancellationToken);
+        if (form is null)
+            return Results.NotFound();
+
+        db.AiOnboardingForms.Remove(form);
+        db.AuditLogs.Add(AuditLog.Create(
+            form.TenantId,
+            currentTenant.UserId,
+            "AiOnboardingForm.Deleted",
+            "AiOnboardingForm",
+            form.Id.ToString(),
+            "Onboarding form deleted by platform administrator.",
+            httpContext.Connection.RemoteIpAddress?.ToString()));
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> GetPublicAsync(

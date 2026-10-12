@@ -48,17 +48,23 @@ public sealed class AiOnboardingForm
         if (!IsUsable)
             throw new InvalidOperationException("The onboarding form is not available.");
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(companyName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(answersJson);
-        if (companyName.Length > 200)
-            throw new ArgumentException("Company name exceeds the allowed length.", nameof(companyName));
-        if (answersJson.Length > 50_000)
-            throw new ArgumentException("Answers exceed the allowed length.", nameof(answersJson));
+        ValidateAnswers(companyName, answersJson);
 
         CompanyName = companyName.Trim();
         AnswersJson = answersJson;
         Status = AiOnboardingFormStatus.Submitted;
         SubmittedAt = DateTime.UtcNow;
+        Version++;
+    }
+
+    public void Revise(string companyName, string answersJson)
+    {
+        if (Status != AiOnboardingFormStatus.Submitted)
+            throw new InvalidOperationException("Only a submitted onboarding form can be revised.");
+
+        ValidateAnswers(companyName, answersJson);
+        CompanyName = companyName.Trim();
+        AnswersJson = answersJson;
         Version++;
     }
 
@@ -70,6 +76,16 @@ public sealed class AiOnboardingForm
         Status = AiOnboardingFormStatus.Revoked;
         RevokedAt = DateTime.UtcNow;
         Version++;
+    }
+
+    private static void ValidateAnswers(string companyName, string answersJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(answersJson);
+        if (companyName.Length > 200)
+            throw new ArgumentException("Company name exceeds the allowed length.", nameof(companyName));
+        if (answersJson.Length > 50_000)
+            throw new ArgumentException("Answers exceed the allowed length.", nameof(answersJson));
     }
 }
 

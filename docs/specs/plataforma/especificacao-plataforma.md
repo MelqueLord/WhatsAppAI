@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.42.0
+**Versão:** 0.43.0
 **Data:** 2026-10-12
 
 ## 1. Problema
@@ -177,6 +177,7 @@ Como PlatformAdmin, quero gerar um formulário seguro para cada empresa preenche
 3. O backend valida opções, tamanhos e vínculo do token; cada link aceita um único envio e um novo link revoga o anterior ainda pendente.
 4. Somente PlatformAdmin lista e consulta as respostas; TenantOwner, Operator e outro tenant não acessam o conteúdo.
 5. Auditoria registra geração e envio sem copiar respostas, token ou demais conteúdos do formulário.
+6. O PlatformAdmin pode corrigir as respostas enviadas ou excluir um formulário do histórico; ambas as ações são auditadas sem registrar o conteúdo.
 
 ### US-007 — Auditar operação (P2)
 
@@ -339,7 +340,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-086:** processar submissões de template de forma durável e idempotente, reconciliando por WABA, nome e idioma após timeout, resposta incerta ou conflito antes de repetir uma criação na Meta.
 - **FR-087:** aceitar eventos autenticados de template identificados por WABA, persistir cada mudança de forma idempotente antes do processamento e atualizar somente o tenant proprietário da WABA.
 - **FR-088:** mostrar aprovação, rejeição, pausas, desativação, arquivamento, categoria efetiva e motivos sanitizados sem expor token, payload bruto, exemplos ou conteúdo completo em logs e auditoria.
-- **FR-089:** permitir ao PlatformAdmin gerar um link público de levantamento para um tenant, receber uma única resposta validada com perfil da empresa, objetivos, handoff, horários, setores, situação do WhatsApp e fontes de informação, e consultar o conteúdo em área administrativa exclusiva.
+- **FR-089:** permitir ao PlatformAdmin gerar um link público de levantamento para um tenant, receber uma única resposta validada com perfil da empresa, objetivos, handoff, horários, setores, situação do WhatsApp e fontes de informação, e consultar, corrigir ou excluir o conteúdo em área administrativa exclusiva.
 
 ## 6. Regras de negócio
 
