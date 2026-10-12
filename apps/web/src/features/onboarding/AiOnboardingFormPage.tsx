@@ -80,8 +80,6 @@ export function AiOnboardingFormPage() {
   if (!formQuery.data.available) return <FullScreenMessage title="Formulário indisponível" text={formQuery.data.status === 'Submitted' ? 'Este formulário já foi enviado. Obrigado pelas informações.' : 'Este link expirou ou foi substituído. Solicite um novo link à ATENZ.'} />
   if (submitMutation.isSuccess) return <FullScreenMessage icon={<div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15"><Check className="h-8 w-8 text-emerald-400" /></div>} title="Informações enviadas" text="Recebemos as informações da sua empresa. A equipe ATENZ continuará a configuração da sua IA." />
 
-  const effectiveAnswers = { ...answers, companyName: answers.companyName || formQuery.data.tenantName }
-
   const update = <K extends keyof AiOnboardingAnswers>(key: K, value: AiOnboardingAnswers[K]) => {
     setAnswers((current) => ({ ...current, [key]: value }))
     setValidationError('')
@@ -93,24 +91,22 @@ export function AiOnboardingFormPage() {
   }
 
   const advance = () => {
-    const error = validateStep(step, effectiveAnswers)
+    const error = validateStep(step, answers)
     if (error) {
       setValidationError(error)
       return
     }
-    setAnswers(effectiveAnswers)
     setStep((current) => Math.min(6, current + 1))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const submit = () => {
-    const error = validateStep(6, effectiveAnswers)
+    const error = validateStep(6, answers)
     if (error) {
       setValidationError(error)
       return
     }
-    setAnswers(effectiveAnswers)
-    submitMutation.mutate(effectiveAnswers)
+    submitMutation.mutate(answers)
   }
 
   return (
@@ -137,7 +133,7 @@ export function AiOnboardingFormPage() {
 
         <section className="rounded-3xl border border-white/10 bg-[#0b1b31] p-6 shadow-2xl shadow-black/20 sm:p-10">
           {step === 0 && <Intro tenantName={formQuery.data.tenantName} />}
-          {step === 1 && <CompanyStep answers={effectiveAnswers} update={update} toggle={toggle} />}
+          {step === 1 && <CompanyStep answers={answers} update={update} toggle={toggle} />}
           {step === 2 && <MultiQuestion title="2. Regras de atendimento" label="Quando a IA deve encaminhar o atendimento para uma pessoa?" options={handoffConditions} selected={answers.handoffConditions} onToggle={(value) => toggle('handoffConditions', value)} />}
           {step === 3 && <HoursStep answers={answers} update={update} />}
           {step === 4 && <DepartmentsStep answers={answers} update={update} toggle={toggle} />}
