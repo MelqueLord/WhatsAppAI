@@ -182,3 +182,11 @@ O incremento de endurecimento e publicação está detalhado em:
 - `production-readiness-quickstart.md` — validação da candidata.
 
 Esse incremento não cria entidades de domínio nem altera o escopo funcional. Ele fecha lacunas de **FR-001**, **FR-004**, **NFR-005**, **NFR-006**, **NFR-008** e dos gates da constituição.
+
+## Formulário público de configuração da IA
+
+- O PlatformAdmin gera um acesso por tenant; o token aleatório é apresentado uma única vez e somente seu hash SHA-256 é persistido.
+- O formulário público usa a rota `/configurar-ia#token`; o fragmento não é enviado ao servidor ou aos logs HTTP, e a SPA transmite o segredo à API em cabeçalho dedicado para validar o vínculo e enviar todas as etapas em uma única operação.
+- A resposta permanece em `ai_onboarding_forms` com `TenantId`, JSON estruturado e metadados de criação, expiração e envio. O conteúdo não é aplicado automaticamente às diretrizes da IA.
+- Consultas administrativas ignoram o filtro corrente somente sob a política `PlatformAdmin`; endpoints públicos localizam exclusivamente pelo hash do token.
+- Um link vale por 30 dias, aceita um envio e é revogado quando outro é criado para o mesmo tenant.

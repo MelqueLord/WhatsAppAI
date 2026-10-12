@@ -28,6 +28,7 @@ using WhatsAppAI.WebApi.Integrations;
 using WhatsAppAI.WebApi.Knowledge;
 using WhatsAppAI.WebApi.Media;
 using WhatsAppAI.WebApi.Operators;
+using WhatsAppAI.WebApi.Onboarding;
 using WhatsAppAI.WebApi.Privacy;
 using WhatsAppAI.WebApi.Queues;
 using WhatsAppAI.WebApi.Tags;
@@ -351,6 +352,12 @@ if (app.Environment.IsProduction())
                     "/api/webhooks",
                     StringComparison.OrdinalIgnoreCase);
 
+        var isPublicAiOnboardingRequest =
+            context.Request.Path
+                .StartsWithSegments(
+                    "/api/public/ai-onboarding",
+                    StringComparison.OrdinalIgnoreCase);
+
         var isAuthenticatedMutation =
             context.User.Identity
                 ?.IsAuthenticated == true;
@@ -369,6 +376,8 @@ if (app.Environment.IsProduction())
             isApiRequest
             &&
             !isWebhookRequest
+            &&
+            !isPublicAiOnboardingRequest
             &&
             requiresCsrf)
         {
@@ -413,6 +422,7 @@ app.MapActivateEndpoints();
 app.MapAdminTenantEndpoints();
 app.MapAdminAiProviderEndpoints();
 app.MapAdminAiPricingEndpoints();
+app.MapAiOnboardingFormEndpoints();
 app.MapSubscriptionPlanEndpoints();
 app.MapSupportSessionEndpoints();
 app.MapOperatorEndpoints();

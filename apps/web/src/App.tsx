@@ -23,6 +23,8 @@ import { AdminTenantsPage } from './features/admin/tenants/AdminTenantsPage'
 import { AdminAiUsagePage } from './features/admin/usage/AdminAiUsagePage'
 import { AdminAiPricingPage } from './features/admin/pricing/AdminAiPricingPage'
 import { WebhookEventsPage } from './features/admin/webhooks/WebhookEventsPage'
+import { AdminAiOnboardingFormsPage } from './features/admin/onboarding/AdminAiOnboardingFormsPage'
+import { AiOnboardingFormPage } from './features/onboarding/AiOnboardingFormPage'
 import { ContactsPage } from './features/contacts/ContactsPage'
 import { BroadcastPage } from './features/broadcast/BroadcastPage'
 import LandingPage from './features/landing/LandingPage'
@@ -120,6 +122,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/activate" element={<ActivatePage />} />
+            <Route path="/configurar-ia" element={<AiOnboardingFormPage />} />
             <Route
               element={
                 <ProtectedRoute>
@@ -148,6 +151,7 @@ function App() {
               <Route path="/admin/ai-usage" element={<AdminRoute><AdminAiUsagePage /></AdminRoute>} />
               <Route path="/admin/ai-pricing" element={<AdminRoute><AdminAiPricingPage /></AdminRoute>} />
               <Route path="/admin/webhooks" element={<AdminRoute><WebhookEventsPage /></AdminRoute>} />
+              <Route path="/admin/ai-onboarding-forms" element={<AdminRoute><AdminAiOnboardingFormsPage /></AdminRoute>} />
             </Route>
             <Route path="/app" element={<NavigateToHome />} />
             <Route path="*" element={<NavigateToHome />} />

@@ -8,6 +8,7 @@ using WhatsAppAI.Domain.Identity;
 using WhatsAppAI.Domain.Integrations;
 using WhatsAppAI.Domain.Knowledge;
 using WhatsAppAI.Domain.Messaging;
+using WhatsAppAI.Domain.Onboarding;
 using WhatsAppAI.Domain.Privacy;
 using WhatsAppAI.Domain.Usage;
 
@@ -62,6 +63,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<ConsentEvidence> ConsentEvidence => Set<ConsentEvidence>();
     public DbSet<CustomerMemory> CustomerMemories => Set<CustomerMemory>();
     public DbSet<DataSubjectRequest> DataSubjectRequests => Set<DataSubjectRequest>();
+    public DbSet<AiOnboardingForm> AiOnboardingForms => Set<AiOnboardingForm>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -141,6 +143,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<CustomerMemory>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<DataSubjectRequest>()
+            .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AiOnboardingForm>()
             .HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
 
         base.OnModelCreating(modelBuilder);

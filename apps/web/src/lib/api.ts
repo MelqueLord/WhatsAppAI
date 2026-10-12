@@ -504,7 +504,65 @@ export interface ClientTag {
   isActive: boolean
 }
 
+export interface AiOnboardingAnswers {
+  companyName: string
+  businessActivity: string
+  productsOrServices: string
+  averageTicket: string
+  aiGoals: string[]
+  handoffConditions: string[]
+  serviceDays: string
+  serviceHours: string
+  customServiceHours?: string
+  outsideHoursBehavior: string
+  departments: string[]
+  otherDepartment?: string
+  whatsappSituation: string
+  previousRestriction: string
+  restrictionType?: string
+  informationSources: string[]
+  informationNotes?: string
+  aiInstructions: string
+}
+
+export interface PublicAiOnboardingForm {
+  available: boolean
+  status: 'Pending' | 'Submitted' | 'Revoked' | 'Expired'
+  tenantName: string
+  expiresAt: string
+}
+
+export interface AiOnboardingFormSummary {
+  id: string
+  tenantId: string
+  tenantName: string
+  companyName?: string
+  status: 'Pending' | 'Submitted' | 'Revoked' | 'Expired'
+  createdAt: string
+  expiresAt: string
+  submittedAt?: string
+}
+
+export interface AiOnboardingFormDetail extends AiOnboardingFormSummary {
+  answers?: AiOnboardingAnswers
+}
+
 export const api = {
+  aiOnboarding: {
+    get: (token: string) =>
+      fetchApi<PublicAiOnboardingForm>('/api/public/ai-onboarding', {
+        headers: { 'X-Onboarding-Token': token },
+      }),
+    submit: (token: string, answers: AiOnboardingAnswers) =>
+      fetchApi<{ submitted: boolean; submittedAt: string }>(
+        '/api/public/ai-onboarding',
+        {
+          method: 'POST',
+          headers: { 'X-Onboarding-Token': token },
+          body: JSON.stringify(answers),
+        },
+      ),
+  },
   auth: {
     getMe: () => fetchApi<User>('/api/auth/me'),
 
@@ -872,6 +930,20 @@ export const api = {
   },
 
   admin: {
+    aiOnboardingForms: {
+      list: () => fetchApi<AiOnboardingFormSummary[]>('/api/admin/ai-onboarding-forms'),
+      get: (id: string) => fetchApi<AiOnboardingFormDetail>(`/api/admin/ai-onboarding-forms/${id}`),
+      create: (tenantId: string) => fetchApi<{
+        formId: string
+        tenantId: string
+        tenantName: string
+        token: string
+        expiresAt: string
+      }>('/api/admin/ai-onboarding-forms', {
+        method: 'POST',
+        body: JSON.stringify({ tenantId }),
+      }),
+    },
     tenants: {
       list: () =>
         fetchApi<Tenant[]>('/api/admin/tenants'),

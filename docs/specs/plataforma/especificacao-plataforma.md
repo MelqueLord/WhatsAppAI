@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.41.0
-**Data:** 2026-10-06
+**Versão:** 0.42.0
+**Data:** 2026-10-12
 
 ## 1. Problema
 
@@ -33,6 +33,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - Base de conhecimento textual simples.
 - Consumo real de tokens, custo operacional estimado e controle de franquia/orçamento por tenant; o faturamento comercial é administrado pela plataforma.
 - Logs de auditoria, métricas operacionais, exclusão e retenção básica.
+- Formulário público de levantamento para configuração inicial da IA, acessível por link seguro de uma empresa e consultável somente pelo PlatformAdmin.
 
 ### Fora do escopo
 
@@ -164,6 +165,18 @@ Como TenantOwner, quero cadastrar templates textuais da API Oficial e acompanhar
 3. A submissão é durável e idempotente; resultado incerto é reconciliado com a Meta antes de qualquer repetição.
 4. Aprovação, rejeição, mudança de categoria e demais estados aparecem no catálogo do tenant com motivo sanitizado, inclusive para templates criados diretamente no WhatsApp Manager.
 5. O cadastro não amplia as regras técnicas de envio: Marketing e Utilidade continuam elegíveis no disparo em massa quando aprovados e compatíveis. O tenant deve obter e respeitar a aceitação explícita exigida pela política do WhatsApp fora do aplicativo.
+
+### US-018 — Coletar informações para configuração inicial da IA (P1)
+
+Como PlatformAdmin, quero gerar um formulário seguro para cada empresa preencher sua rotina, regras de atendimento e situação do WhatsApp, para preparar a configuração inicial da IA com as respostas centralizadas na plataforma.
+
+**Aceite:**
+
+1. O PlatformAdmin gera um link aleatório, vinculado a um único tenant, válido por 30 dias e armazenado somente como hash.
+2. O cliente preenche o formulário em etapas dentro do domínio da plataforma sem precisar autenticar-se.
+3. O backend valida opções, tamanhos e vínculo do token; cada link aceita um único envio e um novo link revoga o anterior ainda pendente.
+4. Somente PlatformAdmin lista e consulta as respostas; TenantOwner, Operator e outro tenant não acessam o conteúdo.
+5. Auditoria registra geração e envio sem copiar respostas, token ou demais conteúdos do formulário.
 
 ### US-007 — Auditar operação (P2)
 
@@ -326,6 +339,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-086:** processar submissões de template de forma durável e idempotente, reconciliando por WABA, nome e idioma após timeout, resposta incerta ou conflito antes de repetir uma criação na Meta.
 - **FR-087:** aceitar eventos autenticados de template identificados por WABA, persistir cada mudança de forma idempotente antes do processamento e atualizar somente o tenant proprietário da WABA.
 - **FR-088:** mostrar aprovação, rejeição, pausas, desativação, arquivamento, categoria efetiva e motivos sanitizados sem expor token, payload bruto, exemplos ou conteúdo completo em logs e auditoria.
+- **FR-089:** permitir ao PlatformAdmin gerar um link público de levantamento para um tenant, receber uma única resposta validada com perfil da empresa, objetivos, handoff, horários, setores, situação do WhatsApp e fontes de informação, e consultar o conteúdo em área administrativa exclusiva.
 
 ## 6. Regras de negócio
 
@@ -384,6 +398,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-053:** uma WABA pertence a exatamente um tenant na instalação e pode atender várias linhas oficiais desse tenant; templates pertencem à WABA, não ao número individual.
 - **BR-054:** nome e idioma identificam uma variante de template dentro da WABA; uma chave idempotente repetida com o mesmo conteúdo retorna a operação existente, e com conteúdo diferente é rejeitada.
 - **BR-055:** o estado informado pela Meta não é monotônico; somente templates `APPROVED` e compatíveis são enviáveis, e o catálogo local nunca substitui a revalidação remota já exigida antes do envio.
+- **BR-056:** cada formulário de configuração da IA pertence a um tenant, usa token aleatório persistido somente como hash, expira em 30 dias e aceita um único envio; gerar outro link revoga os pendentes anteriores da empresa, e respostas ou tokens nunca entram em logs nem ficam acessíveis a usuários do tenant.
 
 ## 7. Requisitos não funcionais
 

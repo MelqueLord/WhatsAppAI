@@ -187,6 +187,7 @@ export function Sidebar({ collapsed, onToggle, onMobileClose }: SidebarProps) {
           { to: '/admin/tenants', icon: Building2, label: 'Empresas' },
           { to: '/admin/ai-usage', icon: BarChart3, label: 'Uso de IA' },
           { to: '/admin/ai-pricing', icon: WalletCards, label: 'Preços de IA' },
+          { to: '/admin/ai-onboarding-forms', icon: FileText, label: 'Formulários IA' },
           { to: '/admin/webhooks', icon: Shield, label: 'Webhooks' },
         ]
       : []),
