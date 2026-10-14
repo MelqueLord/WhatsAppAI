@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { type Conversation } from '../../lib/api'
+import { type Conversation, type CursorPaginationResponse } from '../../lib/api'
 import { ConversationList } from './ConversationList'
 import { MessagePanel } from './MessagePanel'
 import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
@@ -19,6 +19,24 @@ export function InboxPage() {
   const [conversationStatusFilter, setConversationStatusFilter] = useState<'Open' | 'Closed'>('Open')
   const queryClient = useQueryClient()
 
+  const markConversationRead = useCallback((conversationId: string) => {
+    queryClient.setQueriesData<CursorPaginationResponse<Conversation>>(
+      { queryKey: ['conversations'] },
+      (current) => current
+        ? {
+            ...current,
+            items: current.items.map((conversation) => conversation.id === conversationId
+              ? { ...conversation, unreadCount: 0 }
+              : conversation),
+          }
+        : current,
+    )
+
+    void api.conversations.markRead(conversationId)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['conversations'] }))
+      .catch(() => queryClient.invalidateQueries({ queryKey: ['conversations'] }))
+  }, [queryClient])
+
   useEffect(() => {
     if (!openConversationId) return
     window.history.replaceState({}, '')
@@ -26,16 +44,22 @@ export function InboxPage() {
       queryKey: ['conversation', openConversationId],
       queryFn: () => api.conversations.get(openConversationId),
     }).then((conv) => {
-      setSelectedConversation(conv)
+      setSelectedConversation({ ...conv, unreadCount: 0 })
       setShowMobileList(false)
+      markConversationRead(conv.id)
     }).catch(() => {/* ignore, user stays on list */})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openConversationId])
+  }, [openConversationId, markConversationRead])
 
   const { isConnected, isReconnecting, start: startSignalR } = useSignalR({
     hubUrl: '/hubs/inbox',
-    onMessage: () => {
+    onMessage: (event) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      const message = event as { conversationId?: string; direction?: string }
+      const conversationId = message.conversationId
+      if (conversationId && message.direction === 'Inbound' && conversationId === selectedConversation?.id) {
+        markConversationRead(conversationId)
+      }
     },
     onConversationUpdate: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -59,8 +83,9 @@ export function InboxPage() {
   }
 
   const handleSelect = (conversation: Conversation) => {
-    setSelectedConversation(conversation)
+    setSelectedConversation({ ...conversation, unreadCount: 0 })
     setShowMobileList(false)
+    markConversationRead(conversation.id)
   }
 
   const handleBack = () => {

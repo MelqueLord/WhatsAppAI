@@ -1802,6 +1802,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_message_at");
 
+                    b.Property<DateTime?>("LastReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_read_at");
+
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(20)

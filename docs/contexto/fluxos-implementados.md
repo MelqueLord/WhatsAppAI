@@ -161,7 +161,8 @@ Serviço: `src/WhatsAppAI.Application/Contacts/ContactImportService.cs`
 
 - Aceita CSV/XLSX de até 2 MB e 5.000 linhas.
 - Layout mínimo: `nome` e `contato` (número).
-- Normaliza números, valida linhas, deduplica e preserva resultados parciais.
+- Criação manual, edição, importação e entrada por webhook armazenam o telefone somente com dígitos; a busca também compara números legados após remover a formatação.
+- A importação normaliza números, valida linhas, deduplica e preserva resultados parciais. A unicidade no banco permanece tenant-scoped e impede corridas entre novas gravações canônicas.
 - Tudo é gravado no tenant corrente; números não são expostos em mensagens de erro/resultados.
 
 ## 12. Auditoria, uso e observabilidade

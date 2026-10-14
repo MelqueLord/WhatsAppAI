@@ -24,6 +24,8 @@ public sealed class RepositoryLookupTests
         var expected = Contact.Create(tenantId, "5511999990000", "Ana");
         db.Contacts.AddRange(expected, Contact.Create(otherTenantId, "5511999990000", "Outro"));
         await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE contacts SET phone_number = {"+55 (11) 99999-0000"} WHERE id = {expected.Id}");
 
         var result = await new ContactRepository(db).GetByPhoneAsync(tenantId, "+55 (11) 99999-0000");
 

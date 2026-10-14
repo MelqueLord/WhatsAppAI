@@ -52,6 +52,7 @@ function createConversation(): Conversation {
     mode: 'Human',
     status: 'Open',
     version: 1,
+    unreadCount: 0,
     isQrCode: true,
     isWindowOpen: true,
   }

@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.43.0
-**Data:** 2026-10-12
+**Versão:** 0.45.0
+**Data:** 2026-10-14
 
 ## 1. Problema
 
@@ -68,6 +68,8 @@ Como Operator, quero ver uma mensagem recebida aparecer na inbox com contato, ho
 2. A conversa aparece em tempo quase real para usuários conectados do tenant correto.
 3. Eventos desconhecidos são preservados para diagnóstico sem quebrar o endpoint.
 4. O histórico é paginado por cursor e a mídia é obtida somente por endpoint autenticado da plataforma no tenant corrente.
+5. Um disparo remove a conversa da lista padrão até uma resposta posterior do cliente, inclusive quando a conversa já possuía histórico, mas ela continua localizável pela busca de nome ou telefone.
+6. Cada conversa mostra um indicador verde com a quantidade de mensagens recebidas ainda não vistas; abrir a conversa limpa o indicador e novas mensagens voltam a incrementá-lo em tempo quase real.
 
 ### US-003 — Responder manualmente (P1)
 
@@ -341,6 +343,8 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-087:** aceitar eventos autenticados de template identificados por WABA, persistir cada mudança de forma idempotente antes do processamento e atualizar somente o tenant proprietário da WABA.
 - **FR-088:** mostrar aprovação, rejeição, pausas, desativação, arquivamento, categoria efetiva e motivos sanitizados sem expor token, payload bruto, exemplos ou conteúdo completo em logs e auditoria.
 - **FR-089:** permitir ao PlatformAdmin gerar um link público de levantamento para um tenant, receber uma única resposta validada com perfil da empresa, objetivos, handoff, horários, setores, situação do WhatsApp e fontes de informação, e consultar, corrigir ou excluir o conteúdo em área administrativa exclusiva.
+- **FR-090:** omitir da listagem padrão da Inbox conversas que nunca receberam mensagem do cliente ou cujo disparo mais recente ainda não recebeu resposta posterior, preservando sua localização por busca explícita de nome ou telefone e mantendo os filtros de tenant, fila, linha, operador e estado.
+- **FR-091:** calcular e exibir por conversa a quantidade de mensagens `Inbound` posteriores à última leitura compartilhada da Inbox, zerando-a quando um usuário autorizado abrir a conversa e atualizando a lista em tempo quase real.
 
 ## 6. Regras de negócio
 
@@ -400,6 +404,8 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-054:** nome e idioma identificam uma variante de template dentro da WABA; uma chave idempotente repetida com o mesmo conteúdo retorna a operação existente, e com conteúdo diferente é rejeitada.
 - **BR-055:** o estado informado pela Meta não é monotônico; somente templates `APPROVED` e compatíveis são enviáveis, e o catálogo local nunca substitui a revalidação remota já exigida antes do envio.
 - **BR-056:** cada formulário de configuração da IA pertence a um tenant, usa token aleatório persistido somente como hash, expira em 30 dias e aceita um único envio; gerar outro link revoga os pendentes anteriores da empresa, e respostas ou tokens nunca entram em logs nem ficam acessíveis a usuários do tenant.
+- **BR-057:** cada novo disparo torna a conversa invisível na lista padrão até a próxima mensagem recebida do cliente; a conversa, suas mensagens e seu histórico permanecem persistidos e acessíveis quando uma busca explícita encontra o contato.
+- **BR-058:** o estado de leitura pertence à conversa no tenant e é compartilhado pelos usuários autorizados; mensagens `Outbound` não incrementam a contagem, e a leitura nunca altera conteúdo, ordenação ou estado de entrega das mensagens.
 
 ## 7. Requisitos não funcionais
 

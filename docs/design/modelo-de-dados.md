@@ -74,9 +74,11 @@ A importação de planilha reutiliza `Contact` e não cria entidade paralela. O 
 
 ### Conversation
 
-`id`, `tenant_id`, `contact_id`, `mode`, `state`, `assigned_user_id`, `service_window_expires_at`, `last_message_at`, `version`, timestamps.
+`id`, `tenant_id`, `contact_id`, `mode`, `state`, `assigned_user_id`, `service_window_expires_at`, `last_message_at`, `last_read_at`, `version`, timestamps.
 
 Modos: `Automatic|Human|Paused`. Estado: `Open|Closed`. Índice `(tenant_id, state, last_message_at DESC)`.
+
+`last_read_at` é o marcador compartilhado da Inbox no tenant. A contagem não lida deriva das mensagens inbound posteriores a ele; a migration inicializa o campo com `last_message_at` para não marcar todo o histórico existente como novo (**FR-091**, **BR-058**).
 
 ### Message
 

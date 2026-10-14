@@ -6,13 +6,13 @@ namespace WhatsAppAI.UnitTests.Messaging;
 public class ContactTests
 {
     [Fact]
-    public void Create_SetsProperties()
+    public void Create_NormalizesPhoneNumberAndSetsProperties()
     {
         var tenantId = Guid.NewGuid();
         var contact = Contact.Create(tenantId, "+5511999999999", "John Doe");
 
         Assert.Equal(tenantId, contact.TenantId);
-        Assert.Equal("+5511999999999", contact.PhoneNumber);
+        Assert.Equal("5511999999999", contact.PhoneNumber);
         Assert.Equal("John Doe", contact.Name);
     }
 
@@ -59,6 +59,16 @@ public class ContactTests
         contact.UpdateName("Jane");
 
         Assert.Equal("Jane", contact.Name);
+    }
+
+    [Fact]
+    public void UpdatePhoneNumber_NormalizesFormatting()
+    {
+        var contact = Contact.Create(Guid.NewGuid(), "5511999999999");
+
+        contact.UpdatePhoneNumber("+55 (11) 98888-7777");
+
+        Assert.Equal("5511988887777", contact.PhoneNumber);
     }
 
     [Fact]

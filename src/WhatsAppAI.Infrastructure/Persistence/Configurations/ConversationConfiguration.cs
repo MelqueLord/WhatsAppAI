@@ -66,6 +66,10 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
             .HasColumnName("last_message_at")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(c => c.LastReadAt)
+            .HasColumnName("last_read_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(c => c.WindowExpiresAt)
             .HasColumnName("window_expires_at")
             .HasColumnType("timestamp with time zone");

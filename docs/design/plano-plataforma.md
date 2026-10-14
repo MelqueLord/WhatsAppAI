@@ -87,6 +87,12 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 3. Worker chama o canal da linha (Meta Cloud ou ponte Baileys) com correlação e idempotência local.
 4. Atualiza provider ID/status; webhooks posteriores avançam o status.
 
+### Visibilidade na Inbox
+
+A consulta paginada da Inbox exige uma mensagem inbound quando não há busca. Se houver mensagens de disparo, também exige uma inbound posterior à mais recente delas, evitando que um novo disparo recoloque na lista uma conversa com resposta antiga. Uma busca explícita por nome ou telefone remove somente esse critério de resposta e preserva tenant, permissões de linha/fila, operador e estado.
+
+`Conversation.last_read_at` registra a leitura compartilhada da Inbox. A listagem calcula `unread_count` somente com mensagens inbound posteriores a esse instante. Abrir uma conversa chama um comando idempotente e tenant-scoped que avança o marcador; mensagens recebidas via SignalR invalidam a lista e, quando a conversa está aberta, renovam a leitura.
+
 ### Handoff
 
 O comando de assumir conversa incrementa `Version`, muda para `Human` e registra auditoria. Qualquer decisão de IA baseada em versão anterior é descartada por **BR-004/BR-010**.

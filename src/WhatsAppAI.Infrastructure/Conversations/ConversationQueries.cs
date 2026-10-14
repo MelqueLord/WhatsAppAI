@@ -11,7 +11,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 {
     public async Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
         Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, List<string>? phoneNumberIds = null,
-        Guid? queueId = null, ConversationStatus? status = null,
+        Guid? queueId = null, ConversationStatus? status = null, string? search = null,
         CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
@@ -20,6 +20,38 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Include(c => c.Contact)
             .Where(c => c.TenantId == tenantId && c.Status == (status ?? ConversationStatus.Open))
             .AsQueryable();
+
+        var normalizedSearch = search?.Trim();
+        if (string.IsNullOrEmpty(normalizedSearch))
+        {
+            query = query.Where(conversation =>
+                conversation.Messages.Any(message =>
+                    message.TenantId == tenantId && message.Direction == MessageDirection.Inbound) &&
+                !context.BroadcastRecipients.Any(recipient =>
+                    recipient.TenantId == tenantId &&
+                    recipient.OutboundMessageId != null &&
+                    context.Messages.Any(broadcastMessage =>
+                        broadcastMessage.TenantId == tenantId &&
+                        broadcastMessage.Id == recipient.OutboundMessageId &&
+                        broadcastMessage.ConversationId == conversation.Id &&
+                        !context.Messages.Any(inboundMessage =>
+                            inboundMessage.TenantId == tenantId &&
+                            inboundMessage.ConversationId == conversation.Id &&
+                            inboundMessage.Direction == MessageDirection.Inbound &&
+                            inboundMessage.CreatedAt > broadcastMessage.CreatedAt))));
+        }
+        else
+        {
+            var nameSearch = $"%{EscapeLikePattern(normalizedSearch)}%";
+            var phoneSearch = new string(normalizedSearch.Where(char.IsDigit).ToArray());
+            query = context.Database.IsNpgsql()
+                ? query.Where(conversation =>
+                    (conversation.Contact.Name != null && EF.Functions.ILike(conversation.Contact.Name, nameSearch, "\\")) ||
+                    (phoneSearch.Length > 0 && conversation.Contact.PhoneNumber.Contains(phoneSearch)))
+                : query.Where(conversation =>
+                    (conversation.Contact.Name != null && EF.Functions.Like(conversation.Contact.Name, nameSearch, "\\")) ||
+                    (phoneSearch.Length > 0 && conversation.Contact.PhoneNumber.Contains(phoneSearch)));
+        }
 
         if (operatorUserId == "unassigned")
             query = query.Where(c => string.IsNullOrEmpty(c.AssignedToUserId));
@@ -80,6 +112,9 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 c.LastMessageAt,
+                UnreadCount = c.Messages.Count(message =>
+                    message.Direction == MessageDirection.Inbound &&
+                    (c.LastReadAt == null || message.CreatedAt > c.LastReadAt)),
                 c.QueueId,
                 c.PhoneNumberId,
                 c.WindowExpiresAt,
@@ -120,6 +155,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             Version = c.Version,
             LastMessage = c.LastMessage,
             LastMessageAt = c.LastMessageAt,
+            UnreadCount = c.UnreadCount,
             QueueId = c.QueueId,
             Tags = tagsLookup.GetValueOrDefault(c.ContactId, []),
             IsQrCode = c.PhoneNumberId.StartsWith("qr:") || c.PhoneNumberId == "whatsapp-web" ||
@@ -287,6 +323,9 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
                 c.LastMessageAt,
+                UnreadCount = c.Messages.Count(message =>
+                    message.Direction == MessageDirection.Inbound &&
+                    (c.LastReadAt == null || message.CreatedAt > c.LastReadAt)),
                 c.QueueId,
                 c.PhoneNumberId,
                 c.WindowExpiresAt,
@@ -325,6 +364,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             Version = raw.Version,
             LastMessage = raw.LastMessage,
             LastMessageAt = raw.LastMessageAt,
+            UnreadCount = raw.UnreadCount,
             QueueId = raw.QueueId,
             Tags = tags,
             IsQrCode = raw.PhoneNumberId.StartsWith("qr:") || raw.PhoneNumberId == "whatsapp-web" ||
@@ -342,6 +382,11 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
         var data = $"{timestamp.Ticks}:{id}";
         return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(data));
     }
+
+    private static string EscapeLikePattern(string value) => value
+        .Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("%", "\\%", StringComparison.Ordinal)
+        .Replace("_", "\\_", StringComparison.Ordinal);
 
     private static (DateTime timestamp, Guid id)? DecodeCursor(string cursor)
     {

@@ -172,6 +172,7 @@ public static class ContactEndpoints
     private static async Task<IResult> CreateContactAsync(
         [FromBody] CreateContactRequest request,
         ICurrentTenant currentTenant,
+        IContactRepository contactRepository,
         AppDbContext dbContext,
         HttpContext httpContext,
         IWhatsAppAccountRepository accountRepository,
@@ -184,13 +185,15 @@ public static class ContactEndpoints
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
             return Results.BadRequest(new { error = "Phone number is required." });
 
-        var phone = request.PhoneNumber.Trim();
+        var phone = Contact.NormalizePhoneNumber(request.PhoneNumber);
+        if (phone.Length is < 8 or > 15)
+            return Results.BadRequest(new { error = "Phone number must contain between 8 and 15 digits." });
 
         // Check if contact already exists
-        var existing = await dbContext.Contacts
-            .FirstOrDefaultAsync(c =>
-                c.TenantId == currentTenant.TenantId.Value &&
-                c.PhoneNumber == phone);
+        var existing = await contactRepository.GetByPhoneAsync(
+            currentTenant.TenantId.Value,
+            phone,
+            httpContext.RequestAborted);
 
         if (existing is not null)
         {
@@ -243,8 +246,11 @@ public static class ContactEndpoints
             phone,
             request.Name?.Trim());
 
-        dbContext.Contacts.Add(contact);
-        await dbContext.SaveChangesAsync();
+        await contactRepository.AddAsync(contact, httpContext.RequestAborted);
+        contact = await contactRepository.GetByPhoneAsync(
+            currentTenant.TenantId.Value,
+            phone,
+            httpContext.RequestAborted) ?? contact;
 
         // Start conversation if requested
         if (request.StartConversation)
@@ -314,6 +320,7 @@ public static class ContactEndpoints
         Guid contactId,
         [FromBody] UpdateContactRequest request,
         ICurrentTenant currentTenant,
+        IContactRepository contactRepository,
         AppDbContext dbContext)
     {
         if (currentTenant.TenantId is null)
@@ -329,14 +336,12 @@ public static class ContactEndpoints
 
         if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
         {
-            var phone = new string(request.PhoneNumber.Where(char.IsDigit).ToArray());
+            var phone = Contact.NormalizePhoneNumber(request.PhoneNumber);
             if (phone.Length is < 8 or > 15)
                 return Results.BadRequest(new { error = "Phone number must contain between 8 and 15 digits." });
 
-            if (await dbContext.Contacts.AnyAsync(c =>
-                    c.Id != contactId &&
-                    c.TenantId == currentTenant.TenantId.Value &&
-                    c.PhoneNumber == phone))
+            var existing = await contactRepository.GetByPhoneAsync(currentTenant.TenantId.Value, phone);
+            if (existing is not null && existing.Id != contactId)
                 return Results.Conflict(new { error = "This phone number is already in use." });
 
             contact.UpdatePhoneNumber(phone);

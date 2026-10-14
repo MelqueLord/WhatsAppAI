@@ -16,6 +16,30 @@ public sealed class ContactImportQueueTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {
     [Fact]
+    public async Task Create_reuses_existing_contact_when_phone_format_differs()
+    {
+        var owner = await CreateTenantOwnerAsync();
+
+        var firstResponse = await owner.Client.PostAsJsonAsync("/api/contacts", new
+        {
+            phoneNumber = "+55 (11) 99999-0000",
+            name = "Ana"
+        });
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        var duplicateResponse = await owner.Client.PostAsJsonAsync("/api/contacts", new
+        {
+            phoneNumber = "5511999990000",
+            name = "Ana atualizada"
+        });
+        Assert.Equal(HttpStatusCode.OK, duplicateResponse.StatusCode);
+
+        var contacts = await owner.Client.GetFromJsonAsync<List<QueuedContactResponse>>("/api/contacts?limit=50");
+        var contact = Assert.Single(contacts ?? []);
+        Assert.Equal("5511999990000", contact.PhoneNumber);
+    }
+
+    [Fact]
     public async Task Import_binds_selected_queue_from_multipart_form_and_lists_contact_in_queue()
     {
         var owner = await CreateTenantOwnerAsync();
@@ -82,9 +106,12 @@ public sealed class ContactImportQueueTests(TestWebApplicationFactory factory)
             password = "ContactImport@123"
         });
         login.EnsureSuccessStatusCode();
+        var loginResponse = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResponse!.Token);
         return (client, tenant.Id);
     }
 
+    private sealed record LoginResponse(string Token);
     private sealed record ContactImportResponse(int Imported);
 
     private sealed record QueuedContactResponse(string PhoneNumber);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Domain.Messaging;
 
@@ -15,17 +16,16 @@ public sealed class ContactRepository(AppDbContext context) : IContactRepository
 
     public async Task<Contact?> GetByPhoneAsync(Guid tenantId, string phoneNumber, CancellationToken cancellationToken = default)
     {
-        var normalizedPhone = NormalizePhone(phoneNumber);
-        return await context.Set<Contact>()
+        var normalizedPhone = Contact.NormalizePhoneNumber(phoneNumber);
+        var tenantContacts = await context.Set<Contact>()
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(contact =>
-                contact.TenantId == tenantId &&
-                (contact.PhoneNumber == normalizedPhone || contact.PhoneNumber == phoneNumber),
-                cancellationToken);
-    }
+            .Where(contact => contact.TenantId == tenantId && !contact.PhoneNumber.StartsWith("anon-"))
+            .OrderBy(contact => contact.CreatedAt)
+            .ToListAsync(cancellationToken);
 
-    private static string NormalizePhone(string phoneNumber) =>
-        new string(phoneNumber.Where(char.IsDigit).ToArray());
+        return tenantContacts.Find(contact =>
+            Contact.NormalizePhoneNumber(contact.PhoneNumber) == normalizedPhone);
+    }
 
     public async Task<IReadOnlyList<Contact>> GetByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
@@ -42,7 +42,9 @@ public sealed class ContactRepository(AppDbContext context) : IContactRepository
             await context.Set<Contact>().AddAsync(contact, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+        catch (DbUpdateException ex) when (
+            ex.InnerException?.Message.Contains("UNIQUE constraint failed", StringComparison.Ordinal) == true ||
+            ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // Contato já existe; remover da sessão e deixar usar o existente
             context.Entry(contact).State = EntityState.Detached;

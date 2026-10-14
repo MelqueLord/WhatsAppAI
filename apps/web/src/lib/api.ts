@@ -79,6 +79,7 @@ export interface Conversation {
   version: number
   lastMessage?: string
   lastMessageAt?: string
+  unreadCount: number
   queueId?: string
   queueName?: string
   queueColor?: string
@@ -617,7 +618,7 @@ export const api = {
   },
 
   conversations: {
-    list: (cursor?: string, limit = 50, operatorUserId?: string, lineFilter?: { connectionType: string; lineNumber: number }, status = 'Open') => {
+    list: (cursor?: string, limit = 50, operatorUserId?: string, lineFilter?: { connectionType: string; lineNumber: number }, status = 'Open', search?: string) => {
       const params = new URLSearchParams()
       params.set('limit', String(limit))
       if (cursor) params.set('cursor', cursor)
@@ -627,6 +628,7 @@ export const api = {
         params.set('lineNumber', String(lineFilter.lineNumber))
       }
       params.set('status', status)
+      if (search?.trim()) params.set('search', search.trim())
       return fetchApi<CursorPaginationResponse<Conversation>>(`/api/conversations?${params.toString()}`)
     },
 
@@ -636,6 +638,12 @@ export const api = {
     getMessages: (id: string, cursor?: string, limit = 50) =>
       fetchApi<CursorPaginationResponse<Message>>(
         `/api/conversations/${id}/messages?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
+      ),
+
+    markRead: (id: string) =>
+      fetchApi<{ conversationId: string; unreadCount: number }>(
+        `/api/conversations/${id}/read`,
+        { method: 'POST' },
       ),
 
     sendMessage: (id: string, content: string, template?: {

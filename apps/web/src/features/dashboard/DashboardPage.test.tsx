@@ -52,6 +52,7 @@ describe('DashboardPage AI package', () => {
         status: 'Open',
         version: 1,
         lastMessage: 'Olá',
+        unreadCount: 0,
         isWindowOpen: true,
       }],
       hasMore: false,

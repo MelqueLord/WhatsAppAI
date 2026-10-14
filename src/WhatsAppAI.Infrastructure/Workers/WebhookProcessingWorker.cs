@@ -368,7 +368,11 @@ public sealed class WebhookProcessingWorker(
         // Notify frontend via SignalR so the conversation bubbles to the top immediately
         try
         {
-            await notifier.NotifyTenantAsync(tenantId, "NewMessage", new { conversationId = conversation.Id }, cancellationToken);
+            await notifier.NotifyTenantAsync(tenantId, "NewMessage", new
+            {
+                conversationId = conversation.Id,
+                direction = MessageDirection.Inbound.ToString()
+            }, cancellationToken);
             await notifier.NotifyTenantAsync(tenantId, "ConversationUpdated", new { conversationId = conversation.Id }, cancellationToken);
         }
         catch (Exception ex)

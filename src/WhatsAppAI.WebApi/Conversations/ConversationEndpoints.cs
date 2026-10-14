@@ -1,15 +1,15 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using System.Text.Json;
 using WhatsAppAI.Application.Abstractions;
 using WhatsAppAI.Application.Conversations.Queries;
 using WhatsAppAI.Application.Integrations;
+using WhatsAppAI.Application.Messaging;
 using WhatsAppAI.Domain;
 using WhatsAppAI.Domain.Audit;
 using WhatsAppAI.Domain.Identity;
-using WhatsAppAI.Application.Messaging;
-using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Domain.Integrations;
+using WhatsAppAI.Domain.Messaging;
 using WhatsAppAI.Infrastructure.Identity;
 using WhatsAppAI.Infrastructure.Persistence;
 using WhatsAppAI.Infrastructure.Secrets;
@@ -33,6 +33,9 @@ public static class ConversationEndpoints
 
         group.MapGet("/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListMessages");
+
+        group.MapPost("/{conversationId:guid}/read", MarkConversationReadAsync)
+            .WithName("MarkConversationRead");
 
         group.MapGet("/{conversationId:guid}/templates", ListTemplatesAsync)
             .WithName("ListConversationTemplates");
@@ -64,7 +67,8 @@ public static class ConversationEndpoints
         string? operatorUserId = null,
         string? lineConnectionType = null,
         int? lineNumber = null,
-        string? status = null)
+        string? status = null,
+        string? search = null)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -145,7 +149,8 @@ public static class ConversationEndpoints
             operatorUserId,
             phoneNumberIds,
             queueId,
-            requestedStatus);
+            requestedStatus,
+            search);
 
         return Results.Ok(result);
     }
@@ -200,6 +205,40 @@ public static class ConversationEndpoints
             new CursorPaginationRequest { Cursor = cursor, Limit = limit });
 
         return Results.Ok(result);
+    }
+
+    private static async Task<IResult> MarkConversationReadAsync(
+        Guid conversationId,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IClock clock,
+        AppDbContext dbContext,
+        HttpContext httpContext)
+    {
+        if (currentTenant.TenantId is null)
+            return Results.Unauthorized();
+
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+
+        if (!await OperatorCanAccessConversationAsync(
+                conversationId,
+                currentTenant,
+                conversationRepository,
+                membershipRepository,
+                accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId, httpContext.RequestAborted);
+        if (conversation is null || conversation.TenantId != currentTenant.TenantId)
+            return Results.NotFound();
+
+        conversation.MarkRead(clock.UtcNow);
+        await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+        return Results.Ok(new { conversationId, unreadCount = 0 });
     }
 
     private static async Task<IResult> ListTemplatesAsync(
@@ -488,8 +527,12 @@ public static class ConversationEndpoints
         await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}").SendAsync(
             InboxHubMethods.NewMessage, new
             {
-                id = message.Id, conversationId, direction = message.Direction.ToString(),
-                type = message.Type.ToString(), hasCaption = !string.IsNullOrWhiteSpace(message.Caption), status = message.Status.ToString(),
+                id = message.Id,
+                conversationId,
+                direction = message.Direction.ToString(),
+                type = message.Type.ToString(),
+                hasCaption = !string.IsNullOrWhiteSpace(message.Caption),
+                status = message.Status.ToString(),
                 createdAt = message.CreatedAt
             });
         return Results.Ok(new { id = message.Id, status = message.Status.ToString(), type = message.Type.ToString(), hasCaption = !string.IsNullOrWhiteSpace(message.Caption), createdAt = message.CreatedAt });

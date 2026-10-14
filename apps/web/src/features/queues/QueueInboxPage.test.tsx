@@ -60,6 +60,7 @@ describe('QueueInboxPage', () => {
         mode: 'Human',
         queueId: 'queue-1',
         version: 1,
+        unreadCount: 0,
         isWindowOpen: true,
         lastMessage: 'Olá',
         lastMessageAt: '2026-09-11T00:00:00Z',

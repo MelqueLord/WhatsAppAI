@@ -14,6 +14,7 @@ public sealed class Conversation
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
     public DateTime? LastMessageAt { get; private set; }
+    public DateTime? LastReadAt { get; private set; }
     public DateTime? WindowExpiresAt { get; private set; }
 
     public Contact Contact { get; private set; } = null!;
@@ -76,6 +77,15 @@ public sealed class Conversation
     {
         LastMessageAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void MarkRead(DateTime readAt)
+    {
+        if (readAt.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("Read timestamp must be UTC.", nameof(readAt));
+
+        if (LastReadAt is null || readAt > LastReadAt)
+            LastReadAt = readAt;
     }
 
     public void Close(uint? expectedVersion = null)

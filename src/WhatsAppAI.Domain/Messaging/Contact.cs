@@ -19,11 +19,15 @@ public sealed class Contact
 
     public static Contact Create(Guid tenantId, string phoneNumber, string? name = null, Guid? queueId = null)
     {
+        var normalizedPhoneNumber = NormalizePhoneNumber(phoneNumber);
+        if (normalizedPhoneNumber.Length == 0)
+            throw new ArgumentException("Phone number is required.", nameof(phoneNumber));
+
         return new Contact
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            PhoneNumber = phoneNumber,
+            PhoneNumber = normalizedPhoneNumber,
             Name = NormalizeName(name),
             QueueId = queueId,
             CreatedAt = DateTime.UtcNow
@@ -49,12 +53,16 @@ public sealed class Contact
 
     public void UpdatePhoneNumber(string phoneNumber)
     {
-        if (string.IsNullOrWhiteSpace(phoneNumber))
+        var normalizedPhoneNumber = NormalizePhoneNumber(phoneNumber);
+        if (normalizedPhoneNumber.Length == 0)
             throw new ArgumentException("Phone number is required.", nameof(phoneNumber));
 
-        PhoneNumber = phoneNumber;
+        PhoneNumber = normalizedPhoneNumber;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public static string NormalizePhoneNumber(string phoneNumber) =>
+        new(phoneNumber.Where(character => character is >= '0' and <= '9').ToArray());
 
     public void UpdateProfilePicture(string? url)
     {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Conversation, type ServiceQueue, type LineAssignment } from '../../lib/api'
 import { cn, formatTime, truncate } from '../../lib/utils'
@@ -26,6 +26,7 @@ export function ConversationList({
   const { isTenantOwner, user } = useAuth()
   const queuesEnabled = user?.automaticDistributionEnabled === true
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search.trim())
   const [operatorFilter, setOperatorFilter] = useState<string>('all')
   const [queueFilter, setQueueFilter] = useState<string>('all')
   const [internalStatusFilter, setInternalStatusFilter] = useState<'Open' | 'Closed'>('Open')
@@ -46,13 +47,14 @@ export function ConversationList({
     : undefined
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['conversations', operatorFilter, activeLineFilter ?? 'all', statusFilter],
+    queryKey: ['conversations', operatorFilter, activeLineFilter ?? 'all', statusFilter, deferredSearch],
     queryFn: () => api.conversations.list(
       undefined,
       50,
       operatorFilter === 'all' ? undefined : operatorFilter,
       activeLineFilter,
-      statusFilter
+      statusFilter,
+      deferredSearch || undefined
     ),
     refetchInterval: 30000,
     refetchOnMount: 'always',
@@ -77,12 +79,9 @@ export function ConversationList({
   })
 
   const conversations = allConversations.filter((c) => {
-    const matchesSearch =
-      c.contactName.toLowerCase().includes(search.toLowerCase()) ||
-      c.contactPhone.includes(search)
     const matchesQueue = queueFilter === 'all' ||
       (queueFilter === 'none' ? !c.queueId : c.queueId === queueFilter)
-    return matchesSearch && matchesQueue
+    return matchesQueue
   })
 
   return (
@@ -215,7 +214,10 @@ export function ConversationList({
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-white truncate">{conv.contactName}</h3>
                 {conv.lastMessageAt && (
-                  <span className="text-[11px] text-slate-400 ml-2 flex-shrink-0">
+                  <span className={cn(
+                    'text-[11px] ml-2 flex-shrink-0',
+                    conv.unreadCount > 0 ? 'text-emerald-400 font-semibold' : 'text-slate-400'
+                  )}>
                     {formatTime(conv.lastMessageAt)}
                   </span>
                 )}
@@ -240,6 +242,15 @@ export function ConversationList({
                   {truncate(conv.lastMessage || 'Sem mensagens', 32)}
                 </p>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    {conv.unreadCount > 0 && (
+                      <span
+                        className="min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-semibold flex items-center justify-center"
+                        aria-label={`${conv.unreadCount} ${conv.unreadCount === 1 ? 'mensagem não lida' : 'mensagens não lidas'}`}
+                        title={`${conv.unreadCount} ${conv.unreadCount === 1 ? 'mensagem não lida' : 'mensagens não lidas'}`}
+                      >
+                        {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+                      </span>
+                    )}
                     {conv.assignedToUserName && (
                       <span
                         className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full max-w-[60px] truncate"

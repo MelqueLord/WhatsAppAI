@@ -6,7 +6,7 @@ public interface IConversationQueries
 {
     Task<CursorPaginationResponse<ConversationDto>> GetConversationsAsync(
         Guid tenantId, CursorPaginationRequest request, string? operatorUserId = null, List<string>? phoneNumberIds = null,
-        Guid? queueId = null, ConversationStatus? status = null,
+        Guid? queueId = null, ConversationStatus? status = null, string? search = null,
         CancellationToken cancellationToken = default);
 
     Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(

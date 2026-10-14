@@ -75,6 +75,11 @@ public sealed class ConversationQueriesTests
         otherConversation.AssignQueue(otherQueueId);
         context.AddRange(firstContact, secondContact, closedContact, assignedConversation, otherConversation, closedConversation);
         await context.SaveChangesAsync();
+        context.Messages.AddRange(
+            Message.CreateInbound(tenantId, assignedConversation.Id, firstContact.Id, "assigned-inbound", MessageType.Text, "Olá"),
+            Message.CreateInbound(tenantId, otherConversation.Id, secondContact.Id, "other-inbound", MessageType.Text, "Olá"),
+            Message.CreateInbound(tenantId, closedConversation.Id, closedContact.Id, "closed-inbound", MessageType.Text, "Olá"));
+        await context.SaveChangesAsync();
         Assert.Equal(3, await context.Conversations.CountAsync());
         Assert.Equal(assignedQueueId, await context.Conversations
             .Where(conversation => conversation.Id == assignedConversation.Id)
