@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.47.1
+**Versão:** 0.47.2
 **Data:** 2026-10-18
 
 ## 1. Problema
@@ -80,6 +80,7 @@ Como Operator, quero assumir uma conversa e enviar texto para resolver casos que
 1. Assumir altera o modo para `Human` antes do próximo disparo automático.
 2. O envio apresenta estados `Queued`, `Sent`, `Delivered`, `Read` ou `Failed`.
 3. Texto livre é bloqueado quando a janela de atendimento de 24 horas está fechada.
+4. Enter insere uma quebra de linha no compositor; enviar a mensagem exige acionar o botão de envio.
 
 ### US-019 — Responder a uma mensagem específica (P1)
 

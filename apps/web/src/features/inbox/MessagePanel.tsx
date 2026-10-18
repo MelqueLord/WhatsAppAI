@@ -1366,12 +1366,6 @@ export function MessagePanel({
                 e.target.value
               )
             }
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
             rows={1}
             aria-label="Mensagem"
             placeholder={selectedFile ? 'Adicione uma legenda (opcional)...' : 'Digite uma mensagem...'}
