@@ -6,6 +6,117 @@ namespace WhatsAppAI.UnitTests.Messaging;
 public class MessageTests
 {
     [Fact]
+    public void CreateOutbound_PreservesQuotedProviderMessageIdAndRedactsIt()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Reply", "reply-idem", quotedMessageId: " wamid.original ");
+
+        Assert.Equal("wamid.original", message.QuotedMessageId);
+        message.RedactPersonalData();
+        Assert.Null(message.QuotedMessageId);
+    }
+
+    [Fact]
+    public void CreateInbound_PreservesQuotedProviderMessageId()
+    {
+        var message = Message.CreateInbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "wamid.reply", MessageType.Text, "Reply", quotedMessageId: "wamid.original");
+
+        Assert.Equal("wamid.original", message.QuotedMessageId);
+    }
+
+    [Fact]
+    public void MarkForwardedFrom_TracksOriginalWithoutChangingContent()
+    {
+        var sourceId = Guid.NewGuid();
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Original", "forward-idem");
+
+        message.MarkForwardedFrom(sourceId);
+
+        Assert.Equal(sourceId, message.ForwardedFromMessageId);
+        Assert.Equal("Original", message.Content);
+    }
+
+    [Fact]
+    public void MarkCorrectionOf_RequiresQuotedOutboundText()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Correção: Valor novo", "correction-idem",
+            quotedMessageId: "original-provider-id");
+        var originalId = Guid.NewGuid();
+
+        message.MarkCorrectionOf(originalId);
+
+        Assert.Equal(originalId, message.CorrectsMessageId);
+        Assert.Equal("original-provider-id", message.QuotedMessageId);
+    }
+
+    [Fact]
+    public void MarkDeletedForEveryone_HidesSentOutboundMessage()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "To revoke", "delete-idem");
+        message.MarkSent("provider-id");
+
+        message.MarkDeletedForEveryone();
+
+        Assert.NotNull(message.HiddenFromInboxAt);
+        Assert.NotNull(message.DeletedForEveryoneAt);
+        Assert.Equal("To revoke", message.Content);
+    }
+
+    [Fact]
+    public void MarkDeletedByCustomer_KeepsReceivedContentAndIsIdempotent()
+    {
+        var message = Message.CreateInbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "customer-message-id", MessageType.Text, "Mensagem original");
+        var firstDeletion = DateTime.UtcNow;
+
+        message.MarkDeletedByCustomer(firstDeletion);
+        message.MarkDeletedByCustomer(firstDeletion.AddMinutes(1));
+
+        Assert.Equal(firstDeletion, message.CustomerDeletedAt);
+        Assert.Equal("Mensagem original", message.Content);
+        Assert.Null(message.HiddenFromInboxAt);
+        Assert.Equal(MessageStatus.Received, message.Status);
+
+        message.HideFromInbox();
+        message.MarkDeletedByCustomer(firstDeletion.AddMinutes(2));
+        Assert.NotNull(message.HiddenFromInboxAt);
+        Assert.Equal(firstDeletion, message.CustomerDeletedAt);
+
+        var outbound = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Resposta", "outbound-key");
+        outbound.MarkSent("sent-id");
+        Assert.Throws<InvalidOperationException>(() => outbound.MarkDeletedByCustomer(firstDeletion));
+    }
+
+    [Fact]
+    public void ApplyNativeEdit_UpdatesRecentSentTextButRejectsExpiredEdit()
+    {
+        var message = Message.CreateOutbound(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            MessageType.Text, "Texto anterior", "native-edit-idem");
+        message.MarkSent("qr-provider-id");
+
+        message.ApplyNativeEdit("Texto atualizado", message.CreatedAt.AddMinutes(5));
+
+        Assert.Equal("Texto atualizado", message.Content);
+        Assert.NotNull(message.EditedAt);
+        Assert.Throws<InvalidOperationException>(() =>
+            message.ApplyNativeEdit("Fora do prazo", message.CreatedAt.AddMinutes(16)));
+        Assert.Equal("Texto atualizado", message.Content);
+    }
+
+    [Fact]
     public void CreateInbound_SetsDirectionInbound()
     {
         var message = Message.CreateInbound(

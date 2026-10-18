@@ -1,10 +1,11 @@
 import { Fragment, useState, useRef, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import {
   api,
   type Conversation,
   type CursorPaginationResponse,
+  type Message,
   type ServiceQueue,
   type WhatsAppTemplate,
 } from '../../lib/api'
@@ -31,6 +32,13 @@ import {
   XCircle,
   ThumbsDown,
   ThumbsUp,
+  Reply,
+  Forward,
+  Pencil,
+  Copy,
+  Search,
+  Trash2,
+  X,
 } from 'lucide-react'
 
 interface MessagePanelProps {
@@ -60,6 +68,19 @@ export function MessagePanel({
   const queuesEnabled = user?.automaticDistributionEnabled === true
   const tagsEnabled = user?.tagsEnabled === true
   const [message, setMessage] = useState('')
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [savedDraft, setSavedDraft] = useState<{ message: string; replyTo: Message | null } | null>(null)
+  const [forwardSource, setForwardSource] = useState<Message | null>(null)
+  const [forwardSearch, setForwardSearch] = useState('')
+  const [forwardError, setForwardError] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [messageSearch, setMessageSearch] = useState('')
+  const [throughMessageId, setThroughMessageId] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState<{ id: string; ok: boolean } | null>(null)
+  const [reactToMessageId, setReactToMessageId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Message | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateLanguage, setTemplateLanguage] = useState('pt_BR')
@@ -122,10 +143,10 @@ export function MessagePanel({
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['messages', conversation.id],
+    queryKey: ['messages', conversation.id, throughMessageId],
 
     queryFn: () =>
-      api.conversations.getMessages(conversation.id),
+      api.conversations.getMessages(conversation.id, undefined, 50, undefined, throughMessageId ?? undefined),
 
     refetchInterval: 2000,
 
@@ -136,7 +157,76 @@ export function MessagePanel({
     enabled: Boolean(conversation.id),
   })
 
-  const messages = [...(messagesData?.items ?? [])].reverse()
+  const allMessages = [...(messagesData?.items ?? [])].reverse()
+  const messages = allMessages.filter((item) => item.type !== 'Reaction')
+  const reactionsByMessage = new Map<string, { Inbound?: string; Outbound?: string }>()
+  for (const reaction of allMessages) {
+    if (reaction.type !== 'Reaction' || !reaction.replyTo?.id) continue
+    const current = reactionsByMessage.get(reaction.replyTo.id) ?? {}
+    current[reaction.direction === 'Outbound' ? 'Outbound' : 'Inbound'] = reaction.content ?? ''
+    reactionsByMessage.set(reaction.replyTo.id, current)
+  }
+
+  const reactionMutation = useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      api.conversations.sendReaction(conversation.id, messageId, emoji),
+    onSuccess: () => {
+      setReactToMessageId(null)
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    },
+    onError: (error) => setSendError(error instanceof Error ? error.message : 'Não foi possível reagir à mensagem.'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ messageId, scope }: { messageId: string; scope: 'local' | 'everyone' }) =>
+      api.conversations.deleteMessage(conversation.id, messageId, scope),
+    onSuccess: () => {
+      setDeleteTarget(null)
+      setDeleteError(null)
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    },
+    onError: (error) => setDeleteError(error instanceof Error ? error.message : 'Não foi possível apagar a mensagem.'),
+  })
+
+  const editMutation = useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      api.conversations.editMessage(conversation.id, messageId, content),
+    onSuccess: () => {
+      setMessage(savedDraft?.message ?? '')
+      setReplyTo(savedDraft?.replyTo ?? null)
+      setEditingMessage(null)
+      setSavedDraft(null)
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    },
+    onError: (error) => setSendError(error instanceof Error ? error.message : 'Não foi possível editar a mensagem.'),
+  })
+
+  const messageSearchResults = useInfiniteQuery({
+    queryKey: ['message-search', conversation.id, messageSearch.trim()],
+    queryFn: ({ pageParam }) => api.conversations.getMessages(
+      conversation.id, pageParam, 100, messageSearch.trim()),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
+    enabled: searchOpen && messageSearch.trim().length >= 2,
+  })
+
+  const { data: forwardTargets, isLoading: isLoadingForwardTargets } = useQuery({
+    queryKey: ['forward-targets', forwardSearch],
+    queryFn: () => api.conversations.list(undefined, 50, undefined, undefined, 'Open', forwardSearch.trim() || undefined),
+    enabled: forwardSource !== null,
+  })
+
+  const forwardMutation = useMutation({
+    mutationFn: (targetConversationId: string) =>
+      api.conversations.sendMessage(targetConversationId, '', undefined, undefined, forwardSource!.id),
+    onSuccess: () => {
+      setForwardSource(null)
+      setForwardSearch('')
+      setForwardError(null)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+    onError: (error) => setForwardError(error instanceof Error ? error.message : 'Não foi possível encaminhar a mensagem.'),
+  })
 
   const { data: templatesData, isLoading: isLoadingTemplates, isError: templatesFailed } = useQuery({
     queryKey: ['conversation-templates', conversation.id],
@@ -171,14 +261,23 @@ export function MessagePanel({
   }
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { content: string; template?: { name: string; language: string; parameters?: string[] } }) =>
+    mutationFn: (payload: { content: string; replyToMessageId?: string; correctsMessageId?: string; template?: { name: string; language: string; parameters?: string[] } }) =>
       api.conversations.sendMessage(
         conversation.id,
         payload.content,
-        payload.template
+        payload.template,
+        payload.replyToMessageId,
+        undefined,
+        payload.correctsMessageId,
       ),
 
-    onSuccess: () => {
+    onSuccess: (_result, payload) => {
+      if (!payload.template) {
+        setMessage(payload.correctsMessageId ? savedDraft?.message ?? '' : '')
+        setReplyTo(payload.correctsMessageId ? savedDraft?.replyTo ?? null : null)
+        setEditingMessage(null)
+        setSavedDraft(null)
+      }
       queryClient.invalidateQueries({
         queryKey: ['messages', conversation.id],
       })
@@ -386,10 +485,12 @@ export function MessagePanel({
   }, [startSignalR])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    })
-  }, [messages])
+    if (throughMessageId) {
+      document.getElementById(`message-${throughMessageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, throughMessageId])
 
   useEffect(() => {
     const input = messageInputRef.current
@@ -402,8 +503,19 @@ export function MessagePanel({
   const mode =
     modeOverride ?? conversation.mode
 
+  const isNativeQrEdit = Boolean(editingMessage && conversation.isQrCode &&
+    Date.now() - new Date(editingMessage.createdAt).getTime() <= 15 * 60 * 1000)
+
   const handleSend = () => {
+    if (editingMessage && selectedFile) {
+      setSendError('Remova o anexo para editar a mensagem de texto.')
+      return
+    }
     if (selectedFile) {
+      if (replyTo) {
+        setSendError('Respostas a mensagens específicas ainda aceitam apenas texto.')
+        return
+      }
       setSendError(null)
       sendImageMutation.mutate({ image: selectedFile, caption: message })
       return
@@ -414,9 +526,11 @@ export function MessagePanel({
     }
 
     setSendError(null)
-    sendMutation.mutate({ content: message })
-
-    setMessage('')
+    if (editingMessage && isNativeQrEdit) {
+      editMutation.mutate({ messageId: editingMessage.id, content: message })
+      return
+    }
+    sendMutation.mutate({ content: message, replyToMessageId: replyTo?.id, correctsMessageId: editingMessage?.id })
   }
 
   const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
@@ -661,6 +775,16 @@ export function MessagePanel({
 
           {getModeBadge()}
 
+          <button
+            type="button"
+            onClick={() => { setSearchOpen(true); setMessageSearch('') }}
+            aria-label="Buscar mensagens nesta conversa"
+            title="Buscar mensagens"
+            className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+
           {isConversationClosed ? (
             <span className="rounded-lg bg-slate-700 px-2 py-1.5 text-xs font-medium text-slate-200">
               Encerrada
@@ -722,6 +846,11 @@ export function MessagePanel({
       </div>
 
       {/* Messages */}
+      {throughMessageId && (
+        <button type="button" onClick={() => setThroughMessageId(null)} className="shrink-0 border-b border-white/10 bg-[#10223f] px-4 py-2 text-left text-xs text-emerald-300 hover:bg-[#183052]">
+          Voltar às mensagens recentes
+        </button>
+      )}
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -771,6 +900,7 @@ export function MessagePanel({
                     </div>
                   )}
                   <div
+                    id={`message-${msg.id}`}
                     className={cn(
                       'flex',
                       msg.direction ===
@@ -789,6 +919,26 @@ export function MessagePanel({
                       : 'bg-[#10223f] text-slate-100 rounded-bl-md shadow-sm'
                   )}
                 >
+                  {msg.isDeleted && (
+                    <p className="text-sm italic opacity-75">{msg.isDeletedForEveryone ? 'Mensagem apagada para todos' : 'Mensagem apagada da Inbox'}</p>
+                  )}
+                  {msg.isDeletedByCustomer && (
+                    <p className="mb-1 text-[11px] font-medium italic opacity-80">Apagada pelo cliente</p>
+                  )}
+                  {msg.isForwarded && <span className="mb-1 block text-[10px] italic opacity-70">Encaminhada</span>}
+                  {msg.isCorrection && <span className="mb-1 block text-[10px] italic opacity-70">Correção enviada</span>}
+                  {msg.editedAt && <span className="mb-1 block text-[10px] italic opacity-70">Editada</span>}
+                  {msg.replyTo && (
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById(`message-${msg.replyTo?.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                      className="mb-2 block w-full rounded-lg border-l-4 border-emerald-300 bg-black/15 px-2 py-1.5 text-left"
+                      aria-label="Ir para mensagem respondida"
+                    >
+                      <span className="block text-[11px] font-semibold">{msg.replyTo.direction === 'Outbound' ? 'Você' : conversation.contactName}</span>
+                      <span className="block max-w-64 truncate text-xs opacity-80">{msg.replyTo.content || msg.replyTo.type}</span>
+                    </button>
+                  )}
                   {msg.direction ===
                     'Inbound' &&
                     msg.senderName && (
@@ -839,6 +989,115 @@ export function MessagePanel({
 
                   {msg.status === 'Failed' && msg.failureReason && (
                     <p className="mt-1 text-[11px] text-red-200">Falha: {msg.failureReason}</p>
+                  )}
+
+                  {msg.canReply && isConversationOpen && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editingMessage) {
+                          setMessage(savedDraft?.message ?? '')
+                          setEditingMessage(null)
+                          setSavedDraft(null)
+                        }
+                        setReplyTo(msg)
+                        setSelectedFile(null)
+                        messageInputRef.current?.focus()
+                      }}
+                      className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                      aria-label={`Responder mensagem de ${msg.direction === 'Outbound' ? 'você' : conversation.contactName}`}
+                    >
+                      <Reply className="h-3.5 w-3.5" /> Responder
+                    </button>
+                  )}
+                  {msg.canReply && isConversationOpen && (
+                    <span className="relative inline-block">
+                      <button
+                        type="button"
+                        onClick={() => setReactToMessageId(reactToMessageId === msg.id ? null : msg.id)}
+                        className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                        aria-label="Reagir à mensagem"
+                      >
+                        <Smile className="h-3.5 w-3.5" /> Reagir
+                      </button>
+                      {reactToMessageId === msg.id && (
+                        <span className="absolute bottom-full left-0 z-10 mb-1 flex rounded-lg bg-[#10223f] p-1 shadow-xl">
+                          {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => reactionMutation.mutate({ messageId: msg.id, emoji: reactionsByMessage.get(msg.id)?.Outbound === emoji ? '' : emoji })}
+                              disabled={reactionMutation.isPending}
+                              className="rounded px-1 text-lg hover:bg-white/10 disabled:opacity-50"
+                              aria-label={`Reagir com ${emoji}`}
+                            >{emoji}</button>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {(msg.type === 'Text' || msg.type === 'Template') && msg.content && (
+                    <button
+                      type="button"
+                      onClick={() => { setForwardSource(msg); setForwardSearch(''); setForwardError(null) }}
+                      className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                      aria-label="Encaminhar mensagem"
+                    >
+                      <Forward className="h-3.5 w-3.5" /> Encaminhar
+                    </button>
+                  )}
+                  {msg.direction === 'Outbound' && msg.type === 'Text' && msg.content &&
+                    ['Sent', 'Delivered', 'Read'].includes(msg.status) && isConversationOpen && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSavedDraft({ message, replyTo })
+                        setEditingMessage(msg)
+                        setReplyTo(null)
+                        setSelectedFile(null)
+                        setMessage(msg.isCorrection ? msg.content!.replace(/^Correção: /, '') : msg.content!)
+                        messageInputRef.current?.focus()
+                      }}
+                      className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                      aria-label="Editar mensagem enviada"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar
+                    </button>
+                  )}
+                  {(msg.content || msg.caption) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(msg.content || msg.caption || '')
+                          setCopyStatus({ id: msg.id, ok: true })
+                        } catch {
+                          setCopyStatus({ id: msg.id, ok: false })
+                        }
+                      }}
+                      className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                      aria-label="Copiar mensagem"
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copiar
+                    </button>
+                  )}
+                  {copyStatus?.id === msg.id && <span role="status" className="ml-1 text-[11px]">{copyStatus.ok ? 'Copiada' : 'Falha ao copiar'}</span>}
+                  {(!msg.isDeleted || (conversation.isQrCode && msg.direction === 'Outbound' && !msg.isDeletedForEveryone)) && (
+                    <button
+                      type="button"
+                      onClick={() => { setDeleteTarget(msg); setDeleteError(null) }}
+                      className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] opacity-75 hover:bg-white/15 hover:opacity-100"
+                      aria-label="Apagar mensagem"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Apagar
+                    </button>
+                  )}
+                  {reactionsByMessage.has(msg.id) && (
+                    <div className="mt-1 flex gap-1" aria-label="Reações">
+                      {Object.entries(reactionsByMessage.get(msg.id)!).filter(([, emoji]) => emoji).map(([direction, emoji]) => (
+                        <span key={direction} title={direction === 'Outbound' ? 'Sua reação' : `Reação de ${conversation.contactName}`} className="rounded-full bg-white/15 px-1.5 py-0.5 text-sm">{emoji}</span>
+                      ))}
+                    </div>
                   )}
 
                   {msg.direction === 'Outbound' && msg.aiInteractionId && (
@@ -927,6 +1186,29 @@ export function MessagePanel({
 
       {/* Input */}
       <div className="shrink-0 border-t border-white/10 bg-[#0b1222] p-3 sm:p-4">
+        {editingMessage && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-amber-400 bg-[#10223f] px-3 py-2 text-slate-100">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold">{isNativeQrEdit ? 'Editar mensagem enviada' : 'Corrigir mensagem enviada'}</p>
+              <p className="truncate text-xs text-slate-300">{isNativeQrEdit ? 'A mensagem será editada no WhatsApp QR.' : 'Uma nova correção será enviada ao cliente; a mensagem anterior ficará no histórico.'}</p>
+            </div>
+            <button type="button" onClick={() => {
+              setMessage(savedDraft?.message ?? '')
+              setReplyTo(savedDraft?.replyTo ?? null)
+              setEditingMessage(null)
+              setSavedDraft(null)
+            }} aria-label="Cancelar correção" className="rounded p-1 hover:bg-white/10"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+        {replyTo && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-emerald-400 bg-[#10223f] px-3 py-2 text-slate-100">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold">Respondendo a {replyTo.direction === 'Outbound' ? 'você' : conversation.contactName}</p>
+              <p className="truncate text-xs text-slate-300">{replyTo.content || replyTo.caption || replyTo.type}</p>
+            </div>
+            <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancelar resposta" className="rounded p-1 hover:bg-white/10"><X className="h-4 w-4" /></button>
+          </div>
+        )}
         {isConversationClosed ? (
           <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl p-3 mb-3">
             <XCircle className="w-4 h-4 text-slate-500 flex-shrink-0" />
@@ -1028,7 +1310,7 @@ export function MessagePanel({
             <button
               type="button"
               onClick={() => setShowEmojiPicker((visible) => !visible)}
-              disabled={!isConversationOpen || sendMutation.isPending || sendImageMutation.isPending}
+              disabled={!isConversationOpen || sendMutation.isPending || sendImageMutation.isPending || editMutation.isPending}
               aria-label="Abrir emojis"
               aria-expanded={showEmojiPicker}
               className="rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -1068,7 +1350,7 @@ export function MessagePanel({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!isConversationOpen || sendMutation.isPending || sendImageMutation.isPending}
+            disabled={!isConversationOpen || Boolean(editingMessage) || sendMutation.isPending || sendImageMutation.isPending || editMutation.isPending}
             aria-label="Anexar arquivo"
             title="Anexar arquivo"
             className="shrink-0 rounded-xl p-2.5 hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -1095,7 +1377,7 @@ export function MessagePanel({
             placeholder={selectedFile ? 'Adicione uma legenda (opcional)...' : 'Digite uma mensagem...'}
             disabled={
               !isConversationOpen ||
-              sendMutation.isPending || sendImageMutation.isPending
+              sendMutation.isPending || sendImageMutation.isPending || editMutation.isPending
             }
             className="min-w-0 flex-1 max-h-36 resize-none overflow-y-auto rounded-xl border border-white/10 bg-[#10223f] px-3 py-2.5 text-sm leading-5 text-white focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
           />
@@ -1105,11 +1387,11 @@ export function MessagePanel({
             disabled={
               (!message.trim() && !selectedFile) ||
               !isConversationOpen ||
-              sendMutation.isPending || sendImageMutation.isPending
+              sendMutation.isPending || sendImageMutation.isPending || editMutation.isPending
             }
             className="shrink-0 rounded-xl bg-emerald-500 p-2.5 text-white shadow-sm transition-all hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {sendMutation.isPending || sendImageMutation.isPending ? (
+            {sendMutation.isPending || sendImageMutation.isPending || editMutation.isPending ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <Send className="w-5 h-5" />
@@ -1140,6 +1422,106 @@ export function MessagePanel({
       </div>
 
       {/* Save Contact Modal */}
+      {deleteTarget && (
+        <div role="dialog" aria-modal="true" aria-label="Apagar mensagem" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1222] p-5 text-white shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Apagar mensagem</h2>
+              <button type="button" onClick={() => setDeleteTarget(null)} aria-label="Cancelar exclusão" className="rounded p-1 hover:bg-white/10"><X className="h-5 w-5" /></button>
+            </div>
+            {!deleteTarget.isDeleted && (
+              <button type="button" onClick={() => deleteMutation.mutate({ messageId: deleteTarget.id, scope: 'local' })} disabled={deleteMutation.isPending} className="mb-2 block w-full rounded-lg bg-[#10223f] px-3 py-2 text-left text-sm hover:bg-[#183052] disabled:opacity-50">
+                Apagar só da Inbox <span className="block text-xs text-slate-400">O cliente continuará vendo a mensagem no WhatsApp.</span>
+              </button>
+            )}
+            {conversation.isQrCode && deleteTarget.direction === 'Outbound' && !deleteTarget.isDeletedForEveryone &&
+              ['Sent', 'Delivered', 'Read'].includes(deleteTarget.status) && (
+              <button type="button" onClick={() => deleteMutation.mutate({ messageId: deleteTarget.id, scope: 'everyone' })} disabled={deleteMutation.isPending} className="block w-full rounded-lg bg-red-900/40 px-3 py-2 text-left text-sm hover:bg-red-900/60 disabled:opacity-50">
+                Apagar para todos <span className="block text-xs text-slate-300">A ponte QR solicitará a revogação no WhatsApp.</span>
+              </button>
+            )}
+            {deleteError && <p role="alert" className="mt-3 text-sm text-red-300">{deleteError}</p>}
+          </div>
+        </div>
+      )}
+      {searchOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Buscar mensagens" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b1222] p-5 text-white shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Buscar mensagens</h2>
+              <button type="button" onClick={() => setSearchOpen(false)} aria-label="Fechar busca" className="rounded p-1 hover:bg-white/10"><X className="h-5 w-5" /></button>
+            </div>
+            <input
+              type="search"
+              value={messageSearch}
+              onChange={(event) => setMessageSearch(event.target.value.slice(0, 100))}
+              placeholder="Digite pelo menos 2 caracteres"
+              aria-label="Texto a buscar no histórico"
+              className="mb-3 w-full rounded-lg border border-white/10 bg-[#10223f] px-3 py-2 text-sm text-white"
+              autoFocus
+            />
+            <div className="max-h-80 space-y-1 overflow-y-auto">
+              {messageSearchResults.isLoading && <p className="text-sm text-slate-400">Buscando…</p>}
+              {messageSearchResults.data?.pages.flatMap((page) => page.items).map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  onClick={() => { setThroughMessageId(result.id); setSearchOpen(false) }}
+                  className="block w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
+                >
+                  <span className="block text-[11px] text-slate-400">{formatDate(result.createdAt)} · {result.direction === 'Outbound' ? 'Você' : conversation.contactName}</span>
+                  <span className="block truncate text-sm">{result.content || result.caption}</span>
+                </button>
+              ))}
+              {messageSearch.trim().length >= 2 && !messageSearchResults.isLoading &&
+                messageSearchResults.data?.pages.flatMap((page) => page.items).length === 0 &&
+                <p className="text-sm text-slate-400">Nenhuma mensagem encontrada.</p>}
+            </div>
+            {messageSearchResults.hasNextPage && (
+              <button type="button" onClick={() => messageSearchResults.fetchNextPage()} disabled={messageSearchResults.isFetchingNextPage} className="mt-3 rounded-lg bg-white/10 px-3 py-1.5 text-xs disabled:opacity-50">
+                {messageSearchResults.isFetchingNextPage ? 'Carregando…' : 'Carregar mais'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {forwardSource && (
+        <div role="dialog" aria-modal="true" aria-label="Encaminhar mensagem" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1222] p-5 text-white shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Encaminhar mensagem</h2>
+              <button type="button" onClick={() => setForwardSource(null)} aria-label="Fechar encaminhamento" className="rounded p-1 hover:bg-white/10"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="mb-3 line-clamp-3 rounded-lg bg-[#10223f] px-3 py-2 text-sm text-slate-200">{forwardSource.content}</p>
+            <input
+              type="search"
+              value={forwardSearch}
+              onChange={(event) => setForwardSearch(event.target.value)}
+              placeholder="Buscar conversa por nome ou telefone"
+              aria-label="Buscar conversa de destino"
+              className="mb-3 w-full rounded-lg border border-white/10 bg-[#10223f] px-3 py-2 text-sm text-white"
+              autoFocus
+            />
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {isLoadingForwardTargets && <p className="text-sm text-slate-400">Carregando conversas…</p>}
+              {forwardTargets?.items.filter((target) => target.id !== conversation.id).map((target) => (
+                <button
+                  key={target.id}
+                  type="button"
+                  onClick={() => forwardMutation.mutate(target.id)}
+                  disabled={forwardMutation.isPending}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10 disabled:opacity-50"
+                >
+                  {target.contactName || target.contactPhone}
+                </button>
+              ))}
+              {!isLoadingForwardTargets && forwardTargets?.items.filter((target) => target.id !== conversation.id).length === 0 &&
+                <p className="text-sm text-slate-400">Nenhuma outra conversa encontrada.</p>}
+            </div>
+            {forwardError && <p role="alert" className="mt-3 text-sm text-red-300">{forwardError}</p>}
+          </div>
+        </div>
+      )}
       {showSaveContact && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-[#0b1222] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/40">

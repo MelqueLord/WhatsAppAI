@@ -60,7 +60,7 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 
 ## 4. Interfaces de borda
 
-- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, incluindo parâmetros posicionais e nomeados conforme o formato da Meta; criar e listar templates da WABA, consultar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox autoriza Utilidade e Marketing individuais; o disparo em massa continua restrito a Utilidade.
+- `IWhatsAppClient`: enviar texto e templates aprovados compatíveis, incluindo parâmetros posicionais e nomeados conforme o formato da Meta; criar e listar templates da WABA, consultar categoria/status/capacidade, baixar metadados de mídia e verificar conexão; templates são implementados somente pelo adaptador Meta Cloud. A Inbox e o disparo em massa autorizam Utilidade e Marketing aprovados e compatíveis na API Oficial, com revalidação pela Meta antes do envio (**BR-006**, ADR-0017).
 - `IAiProvider`: gerar `AiDecision` estruturada e verificar conexão.
 - `ISecretStore`: gravar, recuperar somente para uso interno, rotacionar e remover segredo; credenciais de IA são administradas pela plataforma e nunca retornadas ao tenant.
 - `IClock`: tornar janela de 24 horas e expiração testáveis.
@@ -85,13 +85,23 @@ Cada módulo possui casos de uso em `Application`, entidades/regras em `Domain`,
 1. Caso de uso valida autorização, modo, janela e conteúdo.
 2. Cria `Message` em `Queued` e `OutboxMessage` na mesma transação.
 3. Worker chama o canal da linha (Meta Cloud ou ponte Baileys) com correlação e idempotência local.
-4. Atualiza provider ID/status; webhooks posteriores avançam o status.
+4. Antes do despacho pela API Oficial, o worker revalida a janela de atendimento para texto, imagem e reação; templates aprovados seguem a própria política. Atualiza provider ID/status; webhooks posteriores avançam o status.
 
 ### Visibilidade na Inbox
 
 A consulta paginada da Inbox exige uma mensagem inbound quando não há busca. Se houver mensagens de disparo, também exige uma inbound posterior à mais recente delas, evitando que um novo disparo recoloque na lista uma conversa com resposta antiga. Uma busca explícita por nome ou telefone remove somente esse critério de resposta e preserva tenant, permissões de linha/fila, operador e estado.
 
 `Conversation.last_read_at` registra a leitura compartilhada da Inbox. A listagem calcula `unread_count` somente com mensagens inbound posteriores a esse instante. Abrir uma conversa chama um comando idempotente e tenant-scoped que avança o marcador; mensagens recebidas via SignalR invalidam a lista e, quando a conversa está aberta, renovam a leitura.
+
+### Ações por mensagem na Inbox
+
+- Responder persiste o identificador citado e o adaptador inclui a referência nativa na Cloud API ou no QR; origem, conversa, linha e tenant são validados antes do envio (**T288**).
+- Encaminhar texto cria uma mensagem nova no destino autorizado a partir do conteúdo persistido da origem. Correções fora da edição nativa criam outra mensagem textual com citação e prefixo visível (**T289–T290**).
+- A consulta paginada aceita busca de texto e navegação até uma mensagem; o conteúdo de mensagens ocultas não aparece na busca nem no histórico retornado (**T291**).
+- Reações são mensagens com alvo externo enviadas pela Outbox, que revalida a janela da linha oficial no despacho; as recebidas são persistidas sem acionar IA ou renovar a janela de 24 horas (**T292**).
+- Apagar da Inbox marca o registro e oculta o conteúdo da equipe. Revogar para todos é restrito a mensagem própria enviada por QR e exige confirmação da ponte; a Cloud API não oferece revogação (**T293**).
+- Editar nativamente é restrito a texto próprio de QR enviado há no máximo 15 minutos. A ponte confirma a edição antes de atualizar conteúdo e `edited_at`; fora dessa condição, o operador envia uma correção nova (**T294**). As colunas opcionais para encaminhamento, correção, exclusão e edição têm migrations reversíveis.
+- A ponte QR encaminha revogação recebida com ID da mensagem original pelo webhook autenticado. Um `status=deleted` da API Oficial também é aceito quando traz ID original e telefone verificáveis. O worker confere tenant, linha, contato e conversa, grava um marcador separado da exclusão local e notifica a Inbox; mensagem sem ID original confiável não é associada por heurística (**T295**).
 
 ### Handoff
 
@@ -140,7 +150,7 @@ O comando de assumir conversa incrementa `Version`, muda para `Human` e registra
 - Health checks separados em liveness e readiness.
 - OpenTelemetry para traces; exportador definido no deploy.
 - Retry exponencial com jitter apenas para falhas transitórias; dead-letter lógico após limite.
-- O SLI mensal de **NFR-004** divide respostas elegíveis concluídas sem 5xx/timeout da plataforma pelo total de requisições válidas recebidas; falhas Meta/OpenAI recebem dimensão separada sem sair do total e manutenção não é excluída.
+- O SLI mensal de **NFR-004** divide respostas elegíveis concluídas sem 5xx/timeout da plataforma pelo total de requisições válidas recebidas; falhas dos canais WhatsApp e provedores de IA recebem dimensão separada sem sair do total e manutenção não é excluída.
 - O ensaio de recuperação restaura backup com ponto de no máximo 24 horas e mede até 4 horas da declaração do incidente ao smoke test aprovado (**NFR-005**).
 - A validação de IA usa no mínimo 100 requisições elegíveis e separa fila, aplicação e provedor para comprovar **NFR-003**.
 - O PlatformAdmin consulta um resumo agregado e somente leitura da capacidade da instalação. A Application define o contrato e a política de limiar, a Infrastructure executa as contagens globais ignorando filtros de tenant de forma explícita, e a WebApi protege o endpoint com a política `PlatformAdmin` (**FR-040/FR-041**).
@@ -155,7 +165,7 @@ Implementar fatias verticais em ordem de `tasks.md`. A primeira demo funcional t
 | Princípio | Como o plano atende |
 |---|---|
 | Simplicidade | monólito, escopo inbound/service, sem orquestrador externo |
-| Integrações | adaptadores diretos Meta/OpenAI e ponte QR Baileys |
+| Integrações | adaptadores de provedores de IA e dos canais Meta Cloud/QR Baileys |
 | Controle humano | estados de conversa, versão e revalidação |
 | Isolamento | tenant em dados, auth, SignalR, jobs e testes |
 | Observável | Inbox/Outbox, correlação, métricas e runbooks |

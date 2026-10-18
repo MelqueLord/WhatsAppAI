@@ -11,7 +11,8 @@ public interface IConversationQueries
 
     Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
         Guid tenantId, Guid conversationId, CursorPaginationRequest request,
-        Guid? throughMessageId = null, CancellationToken cancellationToken = default);
+        Guid? throughMessageId = null, string? search = null,
+        CancellationToken cancellationToken = default);
 
     Task<ConversationDto?> GetConversationByIdAsync(
         Guid tenantId, Guid conversationId, CancellationToken cancellationToken = default);

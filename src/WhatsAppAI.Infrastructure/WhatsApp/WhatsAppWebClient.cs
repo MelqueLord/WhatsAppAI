@@ -29,6 +29,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         string accessToken,
         string recipientPhone,
         string text,
+        WhatsAppReplyContext? replyContext = null,
         CancellationToken cancellationToken = default)
     {
         if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
@@ -51,7 +52,123 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
             });
         }
 
-        return SendWhatsAppWebMessageAsync(parts[1], parts[2], recipientPhone, text, cancellationToken);
+        return SendWhatsAppWebMessageAsync(parts[1], parts[2], recipientPhone, text, replyContext, cancellationToken);
+    }
+
+    public async Task<SendMessageResult> SendReactionMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string emoji,
+        WhatsAppReplyContext target,
+        CancellationToken cancellationToken = default)
+    {
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3)
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        try
+        {
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(HttpMethod.Post,
+                    $"{baseUrl}/sessions/{parts[1]}-qr-{parts[2]}/send-reaction")
+                {
+                    Content = JsonContent.Create(new { recipientPhone, emoji, target })
+                },
+                cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult
+            {
+                IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                IsRetryable = IsRetryableStatus(response.StatusCode),
+                MessageId = result?.MessageId,
+                ErrorMessage = result?.Error ?? "WhatsApp Web reaction could not be sent."
+            };
+        }
+        catch
+        {
+            return new SendMessageResult { IsSuccess = false, IsRetryable = true, ErrorMessage = "Serviço WhatsApp Web indisponível." };
+        }
+    }
+
+    public async Task<SendMessageResult> DeleteMessageForEveryoneAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3)
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        try
+        {
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(HttpMethod.Post,
+                    $"{baseUrl}/sessions/{parts[1]}-qr-{parts[2]}/delete-message")
+                {
+                    Content = JsonContent.Create(new { recipientPhone, externalMessageId })
+                },
+                cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult
+            {
+                IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                IsRetryable = IsRetryableStatus(response.StatusCode),
+                MessageId = result?.MessageId,
+                ErrorMessage = result?.Error ?? "WhatsApp Web message could not be revoked."
+            };
+        }
+        catch
+        {
+            return new SendMessageResult { IsSuccess = false, IsRetryable = true, ErrorMessage = "Serviço WhatsApp Web indisponível." };
+        }
+    }
+
+    public async Task<SendMessageResult> EditTextMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        if (!phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase))
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        var parts = phoneNumberId.Split(':', 3);
+        if (parts.Length != 3)
+            return new SendMessageResult { IsSuccess = false, IsRetryable = false, ErrorMessage = "Invalid WhatsApp Web session reference." };
+
+        try
+        {
+            using var response = await SendToSessionOwnerAsync(
+                baseUrl => new HttpRequestMessage(HttpMethod.Post,
+                    $"{baseUrl}/sessions/{parts[1]}-qr-{parts[2]}/edit-message")
+                {
+                    Content = JsonContent.Create(new { recipientPhone, externalMessageId, text })
+                },
+                cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult
+            {
+                IsSuccess = response.IsSuccessStatusCode && result?.Success == true,
+                IsRetryable = IsRetryableStatus(response.StatusCode),
+                MessageId = result?.MessageId,
+                ErrorMessage = result?.Error ?? "WhatsApp Web message could not be edited."
+            };
+        }
+        catch
+        {
+            return new SendMessageResult { IsSuccess = false, IsRetryable = true, ErrorMessage = "Serviço WhatsApp Web indisponível." };
+        }
     }
 
     public Task<SendMessageResult> SendMediaMessageAsync(
@@ -100,6 +217,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
         string lineNumber,
         string recipientPhone,
         string text,
+        WhatsAppReplyContext? replyContext,
         CancellationToken cancellationToken)
     {
         try
@@ -109,7 +227,7 @@ public sealed class WhatsAppWebClient(HttpClient httpClient, IConfiguration conf
                     HttpMethod.Post,
                     $"{baseUrl}/sessions/{tenantId}-qr-{lineNumber}/send-message")
                 {
-                    Content = JsonContent.Create(new { recipientPhone, text })
+                    Content = JsonContent.Create(new { recipientPhone, text, replyContext })
                 },
                 cancellationToken);
             var result = await response.Content.ReadFromJsonAsync<BridgeSendResponse>(cancellationToken: cancellationToken);

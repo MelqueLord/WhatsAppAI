@@ -78,6 +78,7 @@ export interface Conversation {
   status: string
   version: number
   lastMessage?: string
+  lastMessageDeletedByCustomer?: boolean
   lastMessageAt?: string
   unreadCount: number
   queueId?: string
@@ -122,6 +123,20 @@ export interface Message {
   status: string
   type: string
   content?: string
+  quotedMessageId?: string | null
+  replyTo?: {
+    id: string
+    content?: string | null
+    type: string
+    direction: string
+  } | null
+  canReply?: boolean
+  isForwarded?: boolean
+  isCorrection?: boolean
+  isDeleted?: boolean
+  isDeletedForEveryone?: boolean
+  isDeletedByCustomer?: boolean
+  editedAt?: string | null
   mediaId?: string
   caption?: string
   failureReason?: string
@@ -635,9 +650,9 @@ export const api = {
     get: (id: string) =>
       fetchApi<Conversation>(`/api/conversations/${id}`),
 
-    getMessages: (id: string, cursor?: string, limit = 50) =>
+    getMessages: (id: string, cursor?: string, limit = 50, search?: string, throughMessageId?: string) =>
       fetchApi<CursorPaginationResponse<Message>>(
-        `/api/conversations/${id}/messages?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
+        `/api/conversations/${id}/messages?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}${throughMessageId ? `&throughMessageId=${encodeURIComponent(throughMessageId)}` : ''}`
       ),
 
     markRead: (id: string) =>
@@ -650,7 +665,7 @@ export const api = {
       name: string
       language: string
       parameters?: string[]
-    }) =>
+    }, replyToMessageId?: string, forwardSourceMessageId?: string, correctsMessageId?: string) =>
       fetchApi<{ id: string; status: string }>(
         `/api/conversations/${id}/messages`,
         {
@@ -662,8 +677,26 @@ export const api = {
                 templateLanguage: template.language,
                 templateParameters: template.parameters ?? [],
               }
-            : { content }),
+            : { content, replyToMessageId, forwardSourceMessageId, correctsMessageId }),
         }
+      ),
+
+    sendReaction: (conversationId: string, messageId: string, emoji: string) =>
+      fetchApi<{ id: string; status: string }>(
+        `/api/conversations/${conversationId}/messages/${messageId}/reactions`,
+        { method: 'POST', body: JSON.stringify({ emoji }) },
+      ),
+
+    deleteMessage: (conversationId: string, messageId: string, scope: 'local' | 'everyone') =>
+      fetchApi<{ messageId: string; scope: string }>(
+        `/api/conversations/${conversationId}/messages/${messageId}?scope=${scope}`,
+        { method: 'DELETE' },
+      ),
+
+    editMessage: (conversationId: string, messageId: string, content: string) =>
+      fetchApi<{ messageId: string; editedAt: string }>(
+        `/api/conversations/${conversationId}/messages/${messageId}`,
+        { method: 'PATCH', body: JSON.stringify({ content }) },
       ),
 
     sendImage: (id: string, image: File, caption?: string) => {

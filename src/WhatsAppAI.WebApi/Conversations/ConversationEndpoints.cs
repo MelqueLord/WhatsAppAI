@@ -43,6 +43,15 @@ public static class ConversationEndpoints
         group.MapPost("/{conversationId:guid}/messages", SendMessageAsync)
             .WithName("SendMessage");
 
+        group.MapPost("/{conversationId:guid}/messages/{messageId:guid}/reactions", SendReactionAsync)
+            .WithName("SendMessageReaction");
+
+        group.MapDelete("/{conversationId:guid}/messages/{messageId:guid}", DeleteMessageAsync)
+            .WithName("DeleteInboxMessage");
+
+        group.MapPatch("/{conversationId:guid}/messages/{messageId:guid}", EditQrMessageAsync)
+            .WithName("EditQrMessage");
+
         group.MapPost("/{conversationId:guid}/media", SendMediaMessageAsync)
             .WithName("SendMediaMessage")
             // Production CSRF validation is performed by the authenticated API middleware.
@@ -188,7 +197,9 @@ public static class ConversationEndpoints
         IWhatsAppAccountRepository accountRepository,
         AppDbContext dbContext,
         string? cursor = null,
-        int limit = 50)
+        int limit = 50,
+        string? search = null,
+        Guid? throughMessageId = null)
     {
         if (currentTenant.TenantId is null)
             return Results.Unauthorized();
@@ -199,10 +210,15 @@ public static class ConversationEndpoints
         if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant, conversationRepository, membershipRepository, accountRepository))
             return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
 
+        if (search is { Length: > 100 })
+            return Results.BadRequest(new { error = "Search is limited to 100 characters." });
+
         var result = await conversationQueries.GetMessagesAsync(
             currentTenant.TenantId.Value,
             conversationId,
-            new CursorPaginationRequest { Cursor = cursor, Limit = limit });
+            new CursorPaginationRequest { Cursor = cursor, Limit = limit },
+            throughMessageId,
+            search);
 
         return Results.Ok(result);
     }
@@ -333,6 +349,73 @@ public static class ConversationEndpoints
         var templateRequested = request.TemplateName is not null ||
             request.TemplateLanguage is not null ||
             request.TemplateParameters is not null;
+        if (templateRequested && request.ReplyToMessageId.HasValue)
+            return Results.BadRequest(new { error = "Replies in this release must be text messages." });
+
+        if (request.ForwardSourceMessageId.HasValue &&
+            (templateRequested || request.ReplyToMessageId.HasValue || request.CorrectsMessageId.HasValue))
+            return Results.BadRequest(new { error = "Forwarding cannot be combined with a template or reply." });
+
+        if (request.CorrectsMessageId.HasValue &&
+            (templateRequested || request.ReplyToMessageId.HasValue))
+            return Results.BadRequest(new { error = "A correction must be a separate text message." });
+
+        Message? forwardSource = null;
+        if (request.ForwardSourceMessageId.HasValue)
+        {
+            forwardSource = await messageRepository.GetByIdAsync(request.ForwardSourceMessageId.Value);
+            if (forwardSource is null ||
+                forwardSource.TenantId != currentTenant.TenantId.Value ||
+                forwardSource.ConversationId == conversationId ||
+                forwardSource.HiddenFromInboxAt is not null ||
+                forwardSource.Type is not (MessageType.Text or MessageType.Template) ||
+                string.IsNullOrWhiteSpace(forwardSource.Content) ||
+                !await OperatorCanAccessConversationAsync(
+                    forwardSource.ConversationId,
+                    currentTenant,
+                    conversationRepository,
+                    membershipRepository,
+                    accountRepository))
+                return Results.BadRequest(new { error = "The selected message cannot be forwarded." });
+        }
+
+        Message? quotedMessage = null;
+        if (request.ReplyToMessageId.HasValue)
+        {
+            quotedMessage = await messageRepository.GetByIdAsync(request.ReplyToMessageId.Value);
+            if (quotedMessage is null ||
+                quotedMessage.TenantId != currentTenant.TenantId.Value ||
+                quotedMessage.ConversationId != conversationId ||
+                quotedMessage.ContactId != conversation.ContactId ||
+                quotedMessage.HiddenFromInboxAt is not null ||
+                string.IsNullOrWhiteSpace(quotedMessage.ExternalId) ||
+                quotedMessage.ExternalId.Length > 100)
+            {
+                return Results.BadRequest(new { error = "The selected message cannot be quoted in this conversation." });
+            }
+        }
+
+        Message? correctionSource = null;
+        if (request.CorrectsMessageId.HasValue)
+        {
+            correctionSource = await messageRepository.GetByIdAsync(request.CorrectsMessageId.Value);
+            if (correctionSource is null ||
+                correctionSource.TenantId != currentTenant.TenantId.Value ||
+                correctionSource.ConversationId != conversationId ||
+                correctionSource.ContactId != conversation.ContactId ||
+                correctionSource.HiddenFromInboxAt is not null ||
+                correctionSource.Direction != MessageDirection.Outbound ||
+                correctionSource.Type != MessageType.Text ||
+                correctionSource.Status is not (MessageStatus.Sent or MessageStatus.Delivered or MessageStatus.Read) ||
+                string.IsNullOrWhiteSpace(correctionSource.ExternalId) ||
+                correctionSource.ExternalId.Length > 100)
+                return Results.BadRequest(new { error = "The selected message cannot be corrected." });
+
+            if (string.IsNullOrWhiteSpace(request.Content) || request.Content.Trim().Length > 3990)
+                return Results.BadRequest(new { error = "Correction text must contain 1 to 3990 characters." });
+
+            quotedMessage = correctionSource;
+        }
         if (templateRequested && isQrConversation)
             return Results.BadRequest(new { error = "Templates are available only for the official WhatsApp API." });
 
@@ -409,6 +492,10 @@ public static class ConversationEndpoints
         if (existing is not null)
             return Results.Ok(new { id = existing.Id, status = existing.Status.ToString() });
 
+        var outgoingContent = correctionSource is null
+            ? forwardSource?.Content ?? request.Content
+            : $"Correção: {request.Content!.Trim()}";
+
         var message = templateRequested
             ? Message.CreateOutboundTemplate(
                 currentTenant.TenantId.Value,
@@ -424,8 +511,14 @@ public static class ConversationEndpoints
                 conversationId,
                 conversation.ContactId,
                 MessageType.Text,
-                request.Content,
-                idempotencyKey);
+                outgoingContent,
+                idempotencyKey,
+                quotedMessageId: quotedMessage?.ExternalId);
+
+        if (forwardSource is not null)
+            message.MarkForwardedFrom(forwardSource.Id);
+        if (correctionSource is not null)
+            message.MarkCorrectionOf(correctionSource.Id);
 
         await messageRepository.AddAsync(message);
 
@@ -447,6 +540,223 @@ public static class ConversationEndpoints
             });
 
         return Results.Ok(new { id = message.Id, status = message.Status.ToString() });
+    }
+
+    private static async Task<IResult> EditQrMessageAsync(
+        Guid conversationId,
+        Guid messageId,
+        [FromBody] EditMessageRequest request,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        IContactRepository contactRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IWhatsAppClientResolver whatsAppClientResolver,
+        IClock clock,
+        IHubContext<InboxHub> hubContext,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant,
+                conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+
+        var content = request.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 4000)
+            return Results.BadRequest(new { error = "Edited text must contain 1 to 4000 characters." });
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        var message = await messageRepository.GetByIdAsync(messageId);
+        if (conversation is null || message is null ||
+            conversation.TenantId != currentTenant.TenantId.Value ||
+            message.TenantId != currentTenant.TenantId.Value ||
+            message.ConversationId != conversationId ||
+            message.ContactId != conversation.ContactId)
+            return Results.NotFound();
+        if (conversation.Status == ConversationStatus.Closed)
+            return Results.Conflict(new { error = "Conversation is closed." });
+
+        var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        if (account is null && conversation.PhoneNumberId == "manual")
+            account = await accountRepository.GetByTenantAndSlotAsync(
+                currentTenant.TenantId.Value, WhatsAppConnectionType.QrCode, 1);
+        var phoneNumberId = account?.PhoneNumberId ?? conversation.PhoneNumberId;
+        if (!IsQrSessionForTenant(phoneNumberId, currentTenant.TenantId.Value) ||
+            account is { IsActive: false } ||
+            account is not null && account.TenantId != currentTenant.TenantId.Value)
+            return Results.BadRequest(new { error = "Native editing is available only on an active QR line." });
+
+        var now = clock.UtcNow;
+        if (message.Direction != MessageDirection.Outbound || message.Type != MessageType.Text ||
+            message.Status is not (MessageStatus.Sent or MessageStatus.Delivered or MessageStatus.Read) ||
+            message.HiddenFromInboxAt is not null || string.IsNullOrWhiteSpace(message.ExternalId) ||
+            message.ExternalId.Length > 100 || now < message.CreatedAt ||
+            now - message.CreatedAt > TimeSpan.FromMinutes(15))
+            return Results.BadRequest(new { error = "This message can no longer be edited natively." });
+
+        var contact = await contactRepository.GetByIdAsync(message.ContactId);
+        if (contact is null || contact.TenantId != currentTenant.TenantId.Value)
+            return Results.NotFound();
+
+        var result = await whatsAppClientResolver.GetClient(WhatsAppConnectionType.QrCode)
+            .EditTextMessageAsync(phoneNumberId, "whatsapp-web", contact.PhoneNumber,
+                message.ExternalId, content);
+        if (!result.IsSuccess)
+            return Results.Problem(result.ErrorMessage ?? "Message could not be edited.",
+                statusCode: StatusCodes.Status502BadGateway);
+
+        message.ApplyNativeEdit(content, now);
+        await messageRepository.UpdateAsync(message);
+        await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}")
+            .SendAsync(InboxHubMethods.NewMessage, new { conversationId, id = message.Id });
+        return Results.Ok(new { messageId, editedAt = message.EditedAt });
+    }
+
+    private static async Task<IResult> DeleteMessageAsync(
+        Guid conversationId,
+        Guid messageId,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        IContactRepository contactRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IWhatsAppClientResolver whatsAppClientResolver,
+        IHubContext<InboxHub> hubContext,
+        AppDbContext dbContext,
+        string scope = "local")
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant,
+                conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+        if (scope is not ("local" or "everyone"))
+            return Results.BadRequest(new { error = "Invalid deletion scope." });
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        var message = await messageRepository.GetByIdAsync(messageId);
+        if (conversation is null || message is null ||
+            conversation.TenantId != currentTenant.TenantId.Value ||
+            message.TenantId != currentTenant.TenantId.Value ||
+            message.ConversationId != conversationId ||
+            message.ContactId != conversation.ContactId)
+            return Results.NotFound();
+
+        if (scope == "everyone")
+        {
+            if (message.DeletedForEveryoneAt is not null)
+                return Results.Ok(new { messageId, scope });
+            if (message.Direction != MessageDirection.Outbound ||
+                string.IsNullOrWhiteSpace(message.ExternalId) ||
+                message.ExternalId.Length > 100)
+                return Results.BadRequest(new { error = "Only sent messages can be revoked." });
+
+            var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+            if (account is null && conversation.PhoneNumberId == "manual")
+                account = await accountRepository.GetByTenantAndSlotAsync(
+                    currentTenant.TenantId.Value, WhatsAppConnectionType.QrCode, 1);
+            var phoneNumberId = account?.PhoneNumberId ?? conversation.PhoneNumberId;
+            if (!IsQrSessionForTenant(phoneNumberId, currentTenant.TenantId.Value) ||
+                account is { IsActive: false } ||
+                account is not null && account.TenantId != currentTenant.TenantId.Value)
+                return Results.BadRequest(new { error = "Revocation is available only on an active QR line." });
+
+            var contact = await contactRepository.GetByIdAsync(message.ContactId);
+            if (contact is null || contact.TenantId != currentTenant.TenantId.Value)
+                return Results.NotFound();
+
+            var result = await whatsAppClientResolver.GetClient(WhatsAppConnectionType.QrCode)
+                .DeleteMessageForEveryoneAsync(phoneNumberId, "whatsapp-web", contact.PhoneNumber,
+                    message.ExternalId);
+            if (!result.IsSuccess)
+                return Results.Problem(result.ErrorMessage ?? "Message could not be revoked.",
+                    statusCode: StatusCodes.Status502BadGateway);
+
+            message.MarkDeletedForEveryone();
+        }
+        else
+        {
+            message.HideFromInbox();
+        }
+
+        await messageRepository.UpdateAsync(message);
+        await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}")
+            .SendAsync(InboxHubMethods.NewMessage, new { conversationId, id = message.Id });
+        return Results.Ok(new { messageId, scope });
+    }
+
+    private static async Task<IResult> SendReactionAsync(
+        Guid conversationId,
+        Guid messageId,
+        [FromBody] SendReactionRequest request,
+        ICurrentTenant currentTenant,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        IOutboxMessageRepository outboxMessageRepository,
+        ITenantMembershipRepository membershipRepository,
+        IWhatsAppAccountRepository accountRepository,
+        IClock clock,
+        IHubContext<InboxHub> hubContext,
+        AppDbContext dbContext)
+    {
+        if (currentTenant.TenantId is null || currentTenant.UserId is null)
+            return Results.Unauthorized();
+        if (!await IsTenantActiveAsync(currentTenant.TenantId.Value, dbContext))
+            return Results.StatusCode(StatusCodes.Status423Locked);
+        if (!await OperatorCanAccessConversationAsync(conversationId, currentTenant,
+                conversationRepository, membershipRepository, accountRepository))
+            return currentTenant.UserRole == "Operator" ? Results.Forbid() : Results.NotFound();
+
+        var conversation = await conversationRepository.GetByIdAsync(conversationId);
+        if (conversation is null || conversation.TenantId != currentTenant.TenantId.Value)
+            return Results.NotFound();
+        if (conversation.Status == ConversationStatus.Closed)
+            return Results.Conflict(new { error = "Conversation is closed." });
+        if (request.Emoji is not ("👍" or "❤️" or "😂" or "😮" or "😢" or "🙏" or ""))
+            return Results.BadRequest(new { error = "Unsupported reaction emoji." });
+
+        var account = await accountRepository.GetByPhoneNumberIdAsync(conversation.PhoneNumberId);
+        var isQr = IsQrPhoneNumberId(conversation.PhoneNumberId) ||
+            account?.ConnectionType == WhatsAppConnectionType.QrCode;
+        if (!isQr && !conversation.IsWindowOpen(clock.UtcNow))
+            return Results.BadRequest(new { error = "Window closed. Reactions are unavailable." });
+
+        var target = await messageRepository.GetByIdAsync(messageId);
+        if (target is null || target.TenantId != currentTenant.TenantId.Value ||
+            target.ConversationId != conversationId || target.ContactId != conversation.ContactId ||
+            target.Type == MessageType.Reaction || target.HiddenFromInboxAt is not null ||
+            string.IsNullOrWhiteSpace(target.ExternalId) ||
+            target.ExternalId.Length > 100)
+            return Results.BadRequest(new { error = "The selected message cannot receive a reaction." });
+
+        var idempotencyKey = request.IdempotencyKey ?? Guid.NewGuid().ToString();
+        var existing = await messageRepository.GetByIdempotencyKeyAsync(idempotencyKey);
+        if (existing is not null)
+        {
+            if (existing.TenantId != currentTenant.TenantId.Value || existing.ConversationId != conversationId ||
+                existing.Type != MessageType.Reaction || existing.QuotedMessageId != target.ExternalId ||
+                existing.Content != request.Emoji)
+                return Results.Conflict(new { error = "Idempotency key belongs to another operation." });
+            return Results.Ok(new { id = existing.Id, status = existing.Status.ToString() });
+        }
+
+        var reaction = Message.CreateOutbound(
+            currentTenant.TenantId.Value, conversationId, conversation.ContactId,
+            MessageType.Reaction, request.Emoji, idempotencyKey,
+            quotedMessageId: target.ExternalId);
+        await messageRepository.AddAsync(reaction);
+        await outboxMessageRepository.AddAsync(OutboxMessage.Create(currentTenant.TenantId.Value, reaction.Id));
+        await hubContext.Clients.Group($"tenant:{currentTenant.TenantId}")
+            .SendAsync(InboxHubMethods.NewMessage, new { conversationId, id = reaction.Id });
+
+        return Results.Ok(new { id = reaction.Id, status = reaction.Status.ToString() });
     }
 
     private static async Task<IResult> SendMediaMessageAsync(
@@ -630,6 +940,16 @@ public static class ConversationEndpoints
         phoneNumberId.StartsWith("qr:", StringComparison.OrdinalIgnoreCase) ||
         phoneNumberId.Equals("whatsapp-web", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsQrSessionForTenant(string phoneNumberId, Guid tenantId)
+    {
+        var parts = phoneNumberId.Split(':', 3);
+        return parts.Length == 3 &&
+            parts[0].Equals("qr", StringComparison.OrdinalIgnoreCase) &&
+            Guid.TryParse(parts[1], out var sessionTenantId) &&
+            sessionTenantId == tenantId &&
+            int.TryParse(parts[2], out var lineNumber) && lineNumber > 0;
+    }
+
     private static async Task<bool> OperatorCanAccessConversationAsync(
         Guid conversationId,
         ICurrentTenant currentTenant,
@@ -717,4 +1037,11 @@ public sealed record SendMessageRequest
     public string? TemplateName { get; init; }
     public string? TemplateLanguage { get; init; }
     public IReadOnlyList<string>? TemplateParameters { get; init; }
+    public Guid? ReplyToMessageId { get; init; }
+    public Guid? ForwardSourceMessageId { get; init; }
+    public Guid? CorrectsMessageId { get; init; }
 }
+
+public sealed record SendReactionRequest(string Emoji, string? IdempotencyKey = null);
+
+public sealed record EditMessageRequest(string Content);

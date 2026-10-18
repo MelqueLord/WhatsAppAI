@@ -18,6 +18,12 @@ public sealed class Message
     public string? TemplateLanguage { get; private set; }
     public string? TemplateParametersJson { get; private set; }
     public string? QuotedMessageId { get; private set; }
+    public Guid? ForwardedFromMessageId { get; private set; }
+    public Guid? CorrectsMessageId { get; private set; }
+    public DateTime? HiddenFromInboxAt { get; private set; }
+    public DateTime? DeletedForEveryoneAt { get; private set; }
+    public DateTime? CustomerDeletedAt { get; private set; }
+    public DateTime? EditedAt { get; private set; }
     public string? IdempotencyKey { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? SentAt { get; private set; }
@@ -42,7 +48,8 @@ public sealed class Message
         MessageType type,
         string? content,
         string? mediaId = null,
-        string? caption = null)
+        string? caption = null,
+        string? quotedMessageId = null)
     {
         return new Message
         {
@@ -57,6 +64,7 @@ public sealed class Message
             Content = content,
             MediaId = mediaId,
             Caption = caption,
+            QuotedMessageId = ValidateQuotedMessageId(quotedMessageId),
             CreatedAt = DateTime.UtcNow
         };
     }
@@ -70,7 +78,8 @@ public sealed class Message
         string? idempotencyKey,
         string? mediaId = null,
         string? caption = null,
-        string? mediaUrl = null)
+        string? mediaUrl = null,
+        string? quotedMessageId = null)
     {
         return new Message
         {
@@ -85,6 +94,7 @@ public sealed class Message
             MediaId = mediaId,
             MediaUrl = mediaUrl,
             Caption = caption,
+            QuotedMessageId = ValidateQuotedMessageId(quotedMessageId),
             IdempotencyKey = idempotencyKey,
             CreatedAt = DateTime.UtcNow
         };
@@ -135,6 +145,64 @@ public sealed class Message
         SentAt = DateTime.UtcNow;
         FailedAt = null;
         FailureReason = null;
+    }
+
+    public void MarkForwardedFrom(Guid sourceMessageId)
+    {
+        if (Direction != MessageDirection.Outbound || Type != MessageType.Text ||
+            sourceMessageId == Guid.Empty)
+            throw new InvalidOperationException("Only outbound text messages can be forwarded.");
+
+        ForwardedFromMessageId = sourceMessageId;
+    }
+
+    public void MarkCorrectionOf(Guid originalMessageId)
+    {
+        if (Direction != MessageDirection.Outbound || Type != MessageType.Text ||
+            originalMessageId == Guid.Empty || QuotedMessageId is null)
+            throw new InvalidOperationException("Corrections must quote a sent text message.");
+
+        CorrectsMessageId = originalMessageId;
+    }
+
+    public void HideFromInbox()
+    {
+        HiddenFromInboxAt ??= DateTime.UtcNow;
+    }
+
+    public void MarkDeletedForEveryone()
+    {
+        if (Direction != MessageDirection.Outbound || string.IsNullOrWhiteSpace(ExternalId))
+            throw new InvalidOperationException("Only sent outbound messages can be revoked.");
+
+        DeletedForEveryoneAt ??= DateTime.UtcNow;
+        HideFromInbox();
+    }
+
+    public void MarkDeletedByCustomer(DateTime deletedAt)
+    {
+        if (Direction != MessageDirection.Inbound || string.IsNullOrWhiteSpace(ExternalId))
+            throw new InvalidOperationException("Only received customer messages can be marked as deleted by the customer.");
+        if (deletedAt.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("Deletion time must be UTC.", nameof(deletedAt));
+
+        CustomerDeletedAt ??= deletedAt;
+    }
+
+    public void ApplyNativeEdit(string content, DateTime editedAt)
+    {
+        if (Direction != MessageDirection.Outbound || Type != MessageType.Text ||
+            Status is not (MessageStatus.Sent or MessageStatus.Delivered or MessageStatus.Read) ||
+            string.IsNullOrWhiteSpace(ExternalId) || HiddenFromInboxAt is not null ||
+            editedAt < CreatedAt || editedAt - CreatedAt > TimeSpan.FromMinutes(15))
+            throw new InvalidOperationException("This message can no longer be edited natively.");
+
+        var value = content?.Trim();
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 4000)
+            throw new ArgumentException("Edited text must contain 1 to 4000 characters.", nameof(content));
+
+        Content = value;
+        EditedAt = editedAt;
     }
 
     public void MarkQueuedForRetry()
@@ -201,8 +269,22 @@ public sealed class Message
         TemplateLanguage = null;
         TemplateParametersJson = null;
         QuotedMessageId = null;
+        ForwardedFromMessageId = null;
+        CorrectsMessageId = null;
         IdempotencyKey = null;
         FailureReason = null;
+    }
+
+    private static string? ValidateQuotedMessageId(string? quotedMessageId)
+    {
+        if (quotedMessageId is null)
+            return null;
+
+        var value = quotedMessageId.Trim();
+        if (value.Length is 0 or > 100)
+            throw new ArgumentException("Quoted message id must contain 1 to 100 characters.", nameof(quotedMessageId));
+
+        return value;
     }
 }
 

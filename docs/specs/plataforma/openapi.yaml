@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: WhatsApp AI Manager API
-  version: 0.34.0
+  version: 0.36.0
   description: Contrato inicial do MVP. Endpoints autenticados usam sessão em cookie.
   license:
     name: Proprietary
@@ -22,7 +22,7 @@ tags:
   - name: Knowledge
     description: Conhecimento ativo do tenant.
   - name: Integrations
-    description: Configuração e diagnóstico Meta/OpenAI.
+    description: Configuração e diagnóstico de integrações WhatsApp e provedores de IA.
   - name: Usage
     description: Unidades e custos estimados.
   - name: Webhooks
@@ -413,7 +413,7 @@ paths:
       tags: [Conversations]
       operationId: listConversations
       summary: Listar conversas por cursor
-      x-requirements: [US-002, FR-008, FR-024]
+      x-requirements: [US-002, US-022, FR-008, FR-024, FR-095]
       parameters:
         - in: query
           name: cursor
@@ -458,6 +458,14 @@ paths:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageLimit'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Buscar texto ou legenda na conversa autorizada.
+        - name: throughMessageId
+          in: query
+          schema: { type: string, format: uuid }
+          description: Abrir o histórico até uma mensagem específica.
       responses:
         '200':
           description: Página de mensagens do tenant corrente em ordem estável
@@ -469,7 +477,7 @@ paths:
       tags: [Conversations]
       operationId: sendMessage
       summary: Enfileirar mensagem humana
-      x-requirements: [US-003, FR-010, FR-012, BR-005, BR-006]
+      x-requirements: [US-003, US-019, US-020, US-021, FR-010, FR-012, FR-092, FR-093, FR-094, BR-005, BR-006]
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -481,13 +489,71 @@ paths:
             schema:
               $ref: '#/components/schemas/SendMessageRequest'
       responses:
-        '202':
+        '200':
           description: Mensagem enfileirada
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Message' }
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string }
         '409': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /conversations/{conversationId}/messages/{messageId}:
+    patch:
+      tags: [Conversations]
+      operationId: editQrMessage
+      summary: Editar texto próprio recente em linha QR
+      x-requirements: [US-021, FR-094, BR-061]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EditMessageRequest' }
+      responses:
+        '200': { description: Edição confirmada pelo canal e registrada na Inbox }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [Conversations]
+      operationId: deleteInboxMessage
+      summary: Apagar da Inbox ou solicitar revogação QR
+      x-requirements: [US-024, FR-097, BR-064]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+        - $ref: '#/components/parameters/AntiforgeryToken'
+        - name: scope
+          in: query
+          schema: { type: string, enum: [local, everyone], default: local }
+      responses:
+        '200': { description: Mensagem marcada na Inbox; revogação confirmada se solicitada }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /conversations/{conversationId}/messages/{messageId}/reactions:
+    post:
+      tags: [Conversations]
+      operationId: sendMessageReaction
+      summary: Reagir a uma mensagem da conversa
+      x-requirements: [US-023, FR-096, BR-063]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+        - $ref: '#/components/parameters/AntiforgeryToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SendReactionRequest' }
+      responses:
+        '200': { description: Reação enfileirada }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /conversations/{conversationId}/mode:
     put:
       tags: [Conversations]
@@ -1073,6 +1139,7 @@ components:
         version: { type: integer, minimum: 0 }
         serviceWindowExpiresAt: { type: [string, 'null'], format: date-time }
         lastMessageAt: { type: string, format: date-time }
+        lastMessageDeletedByCustomer: { type: boolean, description: A última mensagem recebida foi apagada pelo cliente; seu conteúdo original permanece disponível na conversa. }
     ConversationPage:
       type: object
       required: [items]
@@ -1093,19 +1160,32 @@ components:
         version: { type: integer, minimum: 0 }
     Message:
       type: object
-      required: [id, direction, senderType, type, status, occurredAt]
+      required: [id, direction, type, status, createdAt]
       properties:
         id: { type: string, format: uuid }
         direction: { type: string, enum: [Inbound, Outbound] }
-        senderType: { type: string, enum: [Customer, Human, AI, System] }
-        type: { type: string, enum: [Text, Image, Document, Audio, Unsupported] }
-        text: { type: [string, 'null'] }
-        media:
-          anyOf:
-            - $ref: '#/components/schemas/MediaMetadata'
-            - type: 'null'
+        type: { type: string, enum: [Text, Image, Document, Audio, Template, Reaction, Unsupported] }
+        content: { type: [string, 'null'] }
+        caption: { type: [string, 'null'] }
+        mediaId: { type: [string, 'null'] }
+        replyTo: { anyOf: [{ $ref: '#/components/schemas/MessageQuote' }, { type: 'null' }] }
+        canReply: { type: boolean }
+        isForwarded: { type: boolean }
+        isCorrection: { type: boolean }
+        isDeleted: { type: boolean }
+        isDeletedForEveryone: { type: boolean }
+        isDeletedByCustomer: { type: boolean, description: Revogação recebida do cliente com conteúdo original preservado. }
+        editedAt: { type: [string, 'null'], format: date-time }
         status: { type: string, enum: [Received, Queued, Sent, Delivered, Read, Failed] }
-        occurredAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    MessageQuote:
+      type: object
+      required: [id, type, direction]
+      properties:
+        id: { type: string, format: uuid }
+        content: { type: [string, 'null'] }
+        type: { type: string }
+        direction: { type: string, enum: [Inbound, Outbound] }
     MediaMetadata:
       type: object
       required: [downloadPath]
@@ -1119,17 +1199,33 @@ components:
           description: Caminho relativo autenticado da API; nunca URL privada da Meta
     MessagePage:
       type: object
-      required: [items]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items: { $ref: '#/components/schemas/Message' }
         nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
     SendMessageRequest:
       type: object
-      required: [text]
+      required: [content]
       properties:
-        text: { type: string, minLength: 1, maxLength: 4096 }
+        content: { type: string, maxLength: 4000 }
+        replyToMessageId: { type: [string, 'null'], format: uuid }
+        forwardSourceMessageId: { type: [string, 'null'], format: uuid }
+        correctsMessageId: { type: [string, 'null'], format: uuid }
+        idempotencyKey: { type: [string, 'null'] }
+    EditMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 4000 }
+    SendReactionRequest:
+      type: object
+      required: [emoji]
+      properties:
+        emoji: { type: string, maxLength: 16 }
+        idempotencyKey: { type: [string, 'null'] }
     ChangeModeRequest:
       type: object
       required: [mode, reason]

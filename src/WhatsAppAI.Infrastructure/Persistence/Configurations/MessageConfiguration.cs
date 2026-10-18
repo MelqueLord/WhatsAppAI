@@ -82,6 +82,28 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName("quoted_message_id")
             .HasMaxLength(100);
 
+        builder.Property(m => m.ForwardedFromMessageId)
+            .HasColumnName("forwarded_from_message_id");
+
+        builder.Property(m => m.CorrectsMessageId)
+            .HasColumnName("corrects_message_id");
+
+        builder.Property(m => m.HiddenFromInboxAt)
+            .HasColumnName("hidden_from_inbox_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(m => m.DeletedForEveryoneAt)
+            .HasColumnName("deleted_for_everyone_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(m => m.CustomerDeletedAt)
+            .HasColumnName("customer_deleted_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(m => m.EditedAt)
+            .HasColumnName("edited_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(m => m.IdempotencyKey)
             .HasColumnName("idempotency_key")
             .HasMaxLength(200);

@@ -38,6 +38,37 @@ public sealed class MetaClientAuthorizationTests : IDisposable
     }
 
     [Fact]
+    public async Task WhatsAppClient_SendsReplyWithProviderContext()
+    {
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.SendTextMessageAsync(
+            "phone", "token", "recipient", "Resposta",
+            new WhatsAppReplyContext("wamid.original", false, "Mensagem original"));
+
+        Assert.True(result.IsSuccess);
+        using var document = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        Assert.Equal("wamid.original", document.RootElement.GetProperty("context").GetProperty("message_id").GetString());
+        Assert.Equal("Resposta", document.RootElement.GetProperty("text").GetProperty("body").GetString());
+    }
+
+    [Fact]
+    public async Task WhatsAppClient_SendsReactionPayload()
+    {
+        var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);
+
+        var result = await client.SendReactionMessageAsync(
+            "phone", "token", "recipient", "👍",
+            new WhatsAppReplyContext("wamid.original", false, null));
+
+        Assert.True(result.IsSuccess);
+        using var document = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        Assert.Equal("reaction", document.RootElement.GetProperty("type").GetString());
+        Assert.Equal("wamid.original", document.RootElement.GetProperty("reaction").GetProperty("message_id").GetString());
+        Assert.Equal("👍", document.RootElement.GetProperty("reaction").GetProperty("emoji").GetString());
+    }
+
+    [Fact]
     public async Task WhatsAppClient_SendsOfficialTemplatePayload()
     {
         var client = new WhatsAppClient(httpClient, NullLogger<WhatsAppClient>.Instance);

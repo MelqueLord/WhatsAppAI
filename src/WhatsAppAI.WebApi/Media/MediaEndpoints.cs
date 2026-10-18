@@ -36,7 +36,8 @@ public static class MediaEndpoints
             return Results.Unauthorized();
 
         var message = await messageRepository.GetByIdAsync(messageId);
-        if (message is null || message.TenantId != currentTenant.TenantId)
+        if (message is null || message.TenantId != currentTenant.TenantId ||
+            message.HiddenFromInboxAt is not null)
             return Results.NotFound();
 
         if (string.IsNullOrEmpty(message.MediaId))

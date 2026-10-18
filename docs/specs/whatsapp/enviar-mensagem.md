@@ -4,7 +4,7 @@ Mensagem humana ou automática é criada junto à Outbox e enviada de forma idem
 
 Na Inbox, a opção de template aparece somente quando a conversa está vinculada a uma linha ativa da API Oficial. Conversas QR, legadas sem linha oficial e linhas oficiais desativadas não consultam templates; a interface informa que a conexão da linha precisa ser verificada. O backend valida a linha novamente ao listar e enviar templates.
 
-A lista mostra todas as categorias e situações retornadas pela WABA, agrupando Utilidade, Marketing, Autenticação e outras categorias presentes. Apenas modelos aprovados de Utilidade ou Marketing com parâmetros textuais no corpo e sem componentes adicionais incompatíveis podem ser selecionados para envio individual. Os demais continuam visíveis com o motivo do bloqueio. O disparo em massa permanece limitado a templates de Utilidade aprovados.
+A lista mostra todas as categorias e situações retornadas pela WABA, agrupando Utilidade, Marketing, Autenticação e outras categorias presentes. Apenas modelos aprovados de Utilidade ou Marketing com parâmetros textuais no corpo e sem componentes adicionais incompatíveis podem ser selecionados para envio individual. Os demais continuam visíveis com o motivo do bloqueio. O disparo em massa da API Oficial também aceita templates de Utilidade ou Marketing aprovados e compatíveis, com revalidação pela Meta antes do envio (**BR-006**, ADR-0017).
 
 ## Imagem enviada manualmente pela Inbox
 

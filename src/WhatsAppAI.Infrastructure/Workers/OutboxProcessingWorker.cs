@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -225,8 +226,45 @@ public sealed class OutboxProcessingWorker(
                 }
             }
 
+            if (connectionType == WhatsAppConnectionType.OfficialApi &&
+                message.Type is (MessageType.Text or MessageType.Image or MessageType.Reaction) &&
+                (conversation is null || !conversation.IsWindowOpen(DateTime.UtcNow)))
+            {
+                message.MarkFailed("Customer service window closed before delivery");
+                outboxMessage.MarkDead("Customer service window closed before delivery");
+                await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                return;
+            }
+
             SendMessageResult result;
-            if (message.Type == MessageType.Image)
+            if (message.Type == MessageType.Reaction)
+            {
+                var target = await dbContext.Messages.IgnoreQueryFilters()
+                    .Where(item => item.TenantId == message.TenantId &&
+                        item.ConversationId == message.ConversationId &&
+                        item.ContactId == message.ContactId &&
+                        item.ExternalId == message.QuotedMessageId &&
+                        item.Type != MessageType.Reaction &&
+                        item.HiddenFromInboxAt == null)
+                    .Select(item => new { item.ExternalId, item.Direction })
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (target?.ExternalId is null)
+                {
+                    message.MarkFailed("Reaction target is no longer available");
+                    outboxMessage.MarkDead("Reaction target is no longer available");
+                    await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                    return;
+                }
+
+                result = await whatsAppClient.SendReactionMessageAsync(
+                    outboundPhoneNumberId,
+                    token,
+                    contact.PhoneNumber,
+                    message.Content ?? string.Empty,
+                    new WhatsAppReplyContext(target.ExternalId, target.Direction == MessageDirection.Outbound, null),
+                    cancellationToken);
+            }
+            else if (message.Type == MessageType.Image)
             {
                 mediaAttachment = await mediaAttachmentRepository.GetByMessageIdAsync(
                     message.TenantId,
@@ -313,11 +351,36 @@ public sealed class OutboxProcessingWorker(
             }
             else
             {
+                WhatsAppReplyContext? replyContext = null;
+                if (message.QuotedMessageId is not null)
+                {
+                    var quoted = await dbContext.Messages.IgnoreQueryFilters()
+                        .Where(item => item.TenantId == message.TenantId &&
+                            item.ConversationId == message.ConversationId &&
+                            item.ExternalId == message.QuotedMessageId &&
+                            item.HiddenFromInboxAt == null)
+                        .Select(item => new { item.ExternalId, item.Direction, item.Content, item.Caption })
+                        .FirstOrDefaultAsync(cancellationToken);
+                    if (quoted?.ExternalId is null)
+                    {
+                        message.MarkFailed("Quoted message is no longer available");
+                        outboxMessage.MarkDead("Quoted message is no longer available");
+                        await SaveMessageAndOutboxAsync(dbContext, message, outboxMessage, cancellationToken);
+                        return;
+                    }
+
+                    replyContext = new WhatsAppReplyContext(
+                        quoted.ExternalId,
+                        quoted.Direction == MessageDirection.Outbound,
+                        quoted.Content ?? quoted.Caption);
+                }
+
                 result = await whatsAppClient.SendTextMessageAsync(
                     outboundPhoneNumberId,
                     token,
                     contact.PhoneNumber,
                     message.Content ?? string.Empty,
+                    replyContext,
                     cancellationToken);
             }
 

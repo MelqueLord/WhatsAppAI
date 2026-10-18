@@ -15,6 +15,249 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
     : IClassFixture<TestWebApplicationFactory>
 {
     [Fact]
+    public async Task ForwardMessage_UsesStoredSourceAndRejectsAnotherTenant()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var otherOwner = await CreateTenantOwnerAsync();
+        var originContact = Contact.Create(owner.TenantId, "5511999999921", "Origin");
+        var targetContact = Contact.Create(owner.TenantId, "5511999999922", "Target");
+        var otherContact = Contact.Create(otherOwner.TenantId, "5511999999923", "Other");
+        var originConversation = Conversation.Create(owner.TenantId, originContact.Id, "manual");
+        var targetConversation = Conversation.Create(owner.TenantId, targetContact.Id, "manual");
+        targetConversation.RenewWindow();
+        var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "manual");
+        var origin = Message.CreateInbound(owner.TenantId, originConversation.Id, originContact.Id,
+            "forward-source", MessageType.Text, "Texto original");
+        var other = Message.CreateInbound(otherOwner.TenantId, otherConversation.Id, otherContact.Id,
+            "other-forward-source", MessageType.Text, "Segredo de outro tenant");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(originContact, targetContact, otherContact);
+            db.Conversations.AddRange(originConversation, targetConversation, otherConversation);
+            db.Messages.AddRange(origin, other);
+            await db.SaveChangesAsync();
+        }
+
+        var denied = await owner.Client.PostAsJsonAsync($"/api/conversations/{targetConversation.Id}/messages",
+            new { content = "Texto adulterado", forwardSourceMessageId = other.Id });
+        Assert.Equal(HttpStatusCode.BadRequest, denied.StatusCode);
+
+        var accepted = await owner.Client.PostAsJsonAsync($"/api/conversations/{targetConversation.Id}/messages",
+            new { content = "Texto adulterado", forwardSourceMessageId = origin.Id });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+
+        await using var verification = await factory.GetDbContextAsync();
+        var forwarded = await verification.Messages.IgnoreQueryFilters()
+            .SingleAsync(message => message.TenantId == owner.TenantId &&
+                message.ConversationId == targetConversation.Id);
+        Assert.Equal("Texto original", forwarded.Content);
+        Assert.Equal(origin.Id, forwarded.ForwardedFromMessageId);
+    }
+
+    [Fact]
+    public async Task CorrectMessage_CreatesQuotedCorrectionAndPreservesOriginal()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(owner.TenantId, "5511999999924", "Correction target");
+        var conversation = Conversation.Create(owner.TenantId, contact.Id, "manual");
+        conversation.RenewWindow();
+        var original = Message.CreateOutbound(owner.TenantId, conversation.Id, contact.Id,
+            MessageType.Text, "Valor antigo", "original-idem");
+        original.MarkSent("original-provider-id");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.Add(contact);
+            db.Conversations.Add(conversation);
+            db.Messages.Add(original);
+            await db.SaveChangesAsync();
+        }
+
+        var response = await owner.Client.PostAsJsonAsync($"/api/conversations/{conversation.Id}/messages",
+            new { content = "Valor corrigido", correctsMessageId = original.Id });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using var verification = await factory.GetDbContextAsync();
+        var messages = await verification.Messages.IgnoreQueryFilters()
+            .Where(item => item.TenantId == owner.TenantId && item.ConversationId == conversation.Id)
+            .ToListAsync();
+        Assert.Equal("Valor antigo", messages.Single(item => item.Id == original.Id).Content);
+        var correction = messages.Single(item => item.Id != original.Id);
+        Assert.Equal("Correção: Valor corrigido", correction.Content);
+        Assert.Equal(original.Id, correction.CorrectsMessageId);
+        Assert.Equal("original-provider-id", correction.QuotedMessageId);
+    }
+
+    [Fact]
+    public async Task SearchMessages_IsScopedToAuthorizedConversation()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var otherOwner = await CreateTenantOwnerAsync();
+        var ownContact = Contact.Create(owner.TenantId, "5511999999925", "Own search");
+        var otherContact = Contact.Create(otherOwner.TenantId, "5511999999926", "Other search");
+        var ownConversation = Conversation.Create(owner.TenantId, ownContact.Id, "manual");
+        var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "manual");
+        var ownMessage = Message.CreateInbound(owner.TenantId, ownConversation.Id, ownContact.Id,
+            "own-search-id", MessageType.Text, "Pedido azul");
+        var otherMessage = Message.CreateInbound(otherOwner.TenantId, otherConversation.Id, otherContact.Id,
+            "other-search-id", MessageType.Text, "Pedido azul secreto");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(ownContact, otherContact);
+            db.Conversations.AddRange(ownConversation, otherConversation);
+            db.Messages.AddRange(ownMessage, otherMessage);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await owner.Client.GetFromJsonAsync<JsonElement>(
+            $"/api/conversations/{ownConversation.Id}/messages?search=azul");
+        Assert.Equal(ownMessage.Id, result.GetProperty("items")[0].GetProperty("id").GetGuid());
+        Assert.Single(result.GetProperty("items").EnumerateArray());
+
+        var forbidden = await owner.Client.GetAsync(
+            $"/api/conversations/{otherConversation.Id}/messages?search=azul");
+        Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReactToMessage_RequiresAnAuthorizedTargetAndQueuesReaction()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var otherOwner = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(owner.TenantId, "5511999999927", "Reaction target");
+        var otherContact = Contact.Create(otherOwner.TenantId, "5511999999928", "Other reaction target");
+        var conversation = Conversation.Create(owner.TenantId, contact.Id, "manual");
+        conversation.RenewWindow();
+        var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "manual");
+        var target = Message.CreateInbound(owner.TenantId, conversation.Id, contact.Id,
+            "reaction-target", MessageType.Text, "Olá");
+        var otherTarget = Message.CreateInbound(otherOwner.TenantId, otherConversation.Id, otherContact.Id,
+            "other-reaction-target", MessageType.Text, "Segredo");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(contact, otherContact);
+            db.Conversations.AddRange(conversation, otherConversation);
+            db.Messages.AddRange(target, otherTarget);
+            await db.SaveChangesAsync();
+        }
+
+        var rejected = await owner.Client.PostAsJsonAsync(
+            $"/api/conversations/{conversation.Id}/messages/{otherTarget.Id}/reactions",
+            new { emoji = "👍" });
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+
+        var accepted = await owner.Client.PostAsJsonAsync(
+            $"/api/conversations/{conversation.Id}/messages/{target.Id}/reactions",
+            new { emoji = "👍" });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+
+        await using var verification = await factory.GetDbContextAsync();
+        var reaction = await verification.Messages.IgnoreQueryFilters()
+            .SingleAsync(item => item.TenantId == owner.TenantId && item.Type == MessageType.Reaction);
+        Assert.Equal("reaction-target", reaction.QuotedMessageId);
+        Assert.Equal("👍", reaction.Content);
+    }
+
+    [Fact]
+    public async Task DeleteFromInbox_HidesContentWithoutCrossTenantAccess()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var otherOwner = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(owner.TenantId, "5511999999929", "Delete target");
+        var otherContact = Contact.Create(otherOwner.TenantId, "5511999999930", "Other delete target");
+        var conversation = Conversation.Create(owner.TenantId, contact.Id, "manual");
+        var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "manual");
+        var target = Message.CreateInbound(owner.TenantId, conversation.Id, contact.Id,
+            "delete-target", MessageType.Text, "Conteúdo privado");
+        var otherTarget = Message.CreateInbound(otherOwner.TenantId, otherConversation.Id, otherContact.Id,
+            "other-delete-target", MessageType.Text, "Outro conteúdo");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(contact, otherContact);
+            db.Conversations.AddRange(conversation, otherConversation);
+            db.Messages.AddRange(target, otherTarget);
+            await db.SaveChangesAsync();
+        }
+
+        var forbidden = await owner.Client.DeleteAsync(
+            $"/api/conversations/{otherConversation.Id}/messages/{otherTarget.Id}?scope=local");
+        Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
+
+        var deleted = await owner.Client.DeleteAsync(
+            $"/api/conversations/{conversation.Id}/messages/{target.Id}?scope=local");
+        Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
+
+        var history = await owner.Client.GetFromJsonAsync<JsonElement>(
+            $"/api/conversations/{conversation.Id}/messages");
+        var visibleMessage = history.GetProperty("items")[0];
+        Assert.True(visibleMessage.GetProperty("isDeleted").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, visibleMessage.GetProperty("content").ValueKind);
+
+        var search = await owner.Client.GetFromJsonAsync<JsonElement>(
+            $"/api/conversations/{conversation.Id}/messages?search=privado");
+        Assert.Empty(search.GetProperty("items").EnumerateArray());
+
+        await using var verification = await factory.GetDbContextAsync();
+        var stored = await verification.Messages.IgnoreQueryFilters().SingleAsync(item => item.Id == target.Id);
+        Assert.Equal("Conteúdo privado", stored.Content);
+        Assert.NotNull(stored.HiddenFromInboxAt);
+    }
+
+    [Fact]
+    public async Task NativeEdit_RejectsOfficialLineAndAnotherTenant()
+    {
+        var owner = await CreateTenantOwnerAsync();
+        var otherOwner = await CreateTenantOwnerAsync();
+        var contact = Contact.Create(owner.TenantId, "5511999999931", "Official edit target");
+        var otherContact = Contact.Create(otherOwner.TenantId, "5511999999932", "Other edit target");
+        var conversation = Conversation.Create(owner.TenantId, contact.Id, "official-edit-line");
+        var foreignQrConversation = Conversation.Create(owner.TenantId, contact.Id,
+            $"qr:{otherOwner.TenantId:D}:1");
+        var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "official-other-line");
+        var message = Message.CreateOutbound(owner.TenantId, conversation.Id, contact.Id,
+            MessageType.Text, "Original", "edit-idem");
+        message.MarkSent("provider-edit-id");
+        var foreignQrMessage = Message.CreateOutbound(owner.TenantId, foreignQrConversation.Id,
+            contact.Id, MessageType.Text, "QR original", "foreign-qr-edit-idem");
+        foreignQrMessage.MarkSent("foreign-qr-provider-edit-id");
+        var otherMessage = Message.CreateOutbound(otherOwner.TenantId, otherConversation.Id,
+            otherContact.Id, MessageType.Text, "Other original", "other-edit-idem");
+        otherMessage.MarkSent("other-provider-edit-id");
+
+        await using (var db = await factory.GetDbContextAsync())
+        {
+            db.Contacts.AddRange(contact, otherContact);
+            db.Conversations.AddRange(conversation, foreignQrConversation, otherConversation);
+            db.Messages.AddRange(message, foreignQrMessage, otherMessage);
+            await db.SaveChangesAsync();
+        }
+
+        var forbidden = await owner.Client.PatchAsJsonAsync(
+            $"/api/conversations/{otherConversation.Id}/messages/{otherMessage.Id}",
+            new { content = "Changed" });
+        Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
+
+        var unsupported = await owner.Client.PatchAsJsonAsync(
+            $"/api/conversations/{conversation.Id}/messages/{message.Id}",
+            new { content = "Changed" });
+        Assert.Equal(HttpStatusCode.BadRequest, unsupported.StatusCode);
+
+        var foreignQr = await owner.Client.PatchAsJsonAsync(
+            $"/api/conversations/{foreignQrConversation.Id}/messages/{foreignQrMessage.Id}",
+            new { content = "Changed" });
+        Assert.Equal(HttpStatusCode.BadRequest, foreignQr.StatusCode);
+
+        await using var verification = await factory.GetDbContextAsync();
+        var stored = await verification.Messages.IgnoreQueryFilters().SingleAsync(item => item.Id == message.Id);
+        Assert.Equal("Original", stored.Content);
+        Assert.Null(stored.EditedAt);
+    }
+
+    [Fact]
     public async Task SendImage_DoesNotAllowAnotherTenantConversation()
     {
         var requestingTenant = await CreateTenantOwnerAsync();

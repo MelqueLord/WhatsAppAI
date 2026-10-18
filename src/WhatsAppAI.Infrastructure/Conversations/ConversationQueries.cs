@@ -111,6 +111,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Status = c.Status.ToString(),
                 c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
+                LastMessageDeletedByCustomer = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.CustomerDeletedAt != null,
                 c.LastMessageAt,
                 UnreadCount = c.Messages.Count(message =>
                     message.Direction == MessageDirection.Inbound &&
@@ -154,6 +155,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             Status = c.Status,
             Version = c.Version,
             LastMessage = c.LastMessage,
+            LastMessageDeletedByCustomer = c.LastMessageDeletedByCustomer,
             LastMessageAt = c.LastMessageAt,
             UnreadCount = c.UnreadCount,
             QueueId = c.QueueId,
@@ -184,7 +186,8 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
 
     public async Task<CursorPaginationResponse<MessageDto>> GetMessagesAsync(
         Guid tenantId, Guid conversationId, CursorPaginationRequest request,
-        Guid? throughMessageId = null, CancellationToken cancellationToken = default)
+        Guid? throughMessageId = null, string? search = null,
+        CancellationToken cancellationToken = default)
     {
         var limit = Math.Clamp(request.Limit, 1, 100);
 
@@ -193,6 +196,17 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             .Include(m => m.Contact)
             .Where(m => m.TenantId == tenantId && m.ConversationId == conversationId)
             .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("%", "\\%", StringComparison.Ordinal)
+                .Replace("_", "\\_", StringComparison.Ordinal);
+            var pattern = $"%{term}%";
+            query = query.Where(message => message.HiddenFromInboxAt == null && (
+                (message.Content != null && EF.Functions.ILike(message.Content, pattern, "\\")) ||
+                (message.Caption != null && EF.Functions.ILike(message.Caption, pattern, "\\"))));
+        }
 
         if (throughMessageId.HasValue)
         {
@@ -233,9 +247,17 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Direction = m.Direction.ToString(),
                 Status = m.Status.ToString(),
                 Type = m.Type.ToString(),
-                Content = m.Content,
-                MediaId = m.MediaId,
-                Caption = m.Caption,
+                Content = m.HiddenFromInboxAt == null ? m.Content : null,
+                MediaId = m.HiddenFromInboxAt == null ? m.MediaId : null,
+                Caption = m.HiddenFromInboxAt == null ? m.Caption : null,
+                QuotedMessageId = m.HiddenFromInboxAt == null ? m.QuotedMessageId : null,
+                CanReply = m.HiddenFromInboxAt == null && m.ExternalId != null && m.ExternalId != "" && m.ExternalId.Length <= 100,
+                IsForwarded = m.ForwardedFromMessageId != null,
+                IsCorrection = m.CorrectsMessageId != null,
+                IsDeleted = m.HiddenFromInboxAt != null,
+                IsDeletedForEveryone = m.DeletedForEveryoneAt != null,
+                IsDeletedByCustomer = m.CustomerDeletedAt != null,
+                EditedAt = m.EditedAt,
                 FailureReason = m.FailureReason,
                 CreatedAt = m.CreatedAt,
                 SenderName = m.Direction == MessageDirection.Inbound
@@ -244,8 +266,53 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             })
             .ToListAsync(cancellationToken);
 
+        var quotedExternalIds = messages
+            .Where(message => !string.IsNullOrEmpty(message.QuotedMessageId))
+            .Select(message => message.QuotedMessageId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (quotedExternalIds.Count > 0)
+        {
+            var quotedMessages = await context.Messages
+                .IgnoreQueryFilters()
+                .Where(message => message.TenantId == tenantId &&
+                    message.ConversationId == conversationId &&
+                    message.ExternalId != null &&
+                    quotedExternalIds.Contains(message.ExternalId))
+                .Select(message => new
+                {
+                    message.Id,
+                    message.ExternalId,
+                    message.Content,
+                    message.Caption,
+                    message.HiddenFromInboxAt,
+                    message.Type,
+                    message.Direction
+                })
+                .ToListAsync(cancellationToken);
+            var quotedByExternalId = quotedMessages
+                .GroupBy(message => message.ExternalId!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+            messages = messages.Select(message =>
+            {
+                if (message.QuotedMessageId is null ||
+                    !quotedByExternalId.TryGetValue(message.QuotedMessageId, out var quoted))
+                    return message;
+
+                return message with
+                {
+                    ReplyTo = new MessageQuoteDto(
+                        quoted.Id,
+                        quoted.HiddenFromInboxAt == null ? quoted.Content ?? quoted.Caption : null,
+                        quoted.Type.ToString(),
+                        quoted.Direction.ToString())
+                };
+            }).ToList();
+        }
+
         var responseMessageIds = messages
-            .Where(message => message.Direction == nameof(MessageDirection.Outbound))
+            .Where(message => message.Direction == nameof(MessageDirection.Outbound) && !message.IsDeleted)
             .Select(message => message.Id)
             .ToList();
         if (responseMessageIds.Count > 0)
@@ -322,6 +389,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
                 Status = c.Status.ToString(),
                 c.Version,
                 LastMessage = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.Content,
+                LastMessageDeletedByCustomer = c.Messages.OrderByDescending(m => m.CreatedAt).FirstOrDefault()!.CustomerDeletedAt != null,
                 c.LastMessageAt,
                 UnreadCount = c.Messages.Count(message =>
                     message.Direction == MessageDirection.Inbound &&
@@ -363,6 +431,7 @@ internal sealed class ConversationQueries(AppDbContext context) : IConversationQ
             Status = raw.Status,
             Version = raw.Version,
             LastMessage = raw.LastMessage,
+            LastMessageDeletedByCustomer = raw.LastMessageDeletedByCustomer,
             LastMessageAt = raw.LastMessageAt,
             UnreadCount = raw.UnreadCount,
             QueueId = raw.QueueId,

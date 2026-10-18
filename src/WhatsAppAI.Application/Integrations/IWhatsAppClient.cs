@@ -14,6 +14,30 @@ public interface IWhatsAppClient
         string accessToken,
         string recipientPhone,
         string text,
+        WhatsAppReplyContext? replyContext = null,
+        CancellationToken cancellationToken = default);
+
+    Task<SendMessageResult> SendReactionMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string emoji,
+        WhatsAppReplyContext target,
+        CancellationToken cancellationToken = default);
+
+    Task<SendMessageResult> DeleteMessageForEveryoneAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        CancellationToken cancellationToken = default);
+
+    Task<SendMessageResult> EditTextMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        string text,
         CancellationToken cancellationToken = default);
 
     Task<SendMessageResult> SendMediaMessageAsync(
@@ -86,6 +110,8 @@ public sealed record SendMessageResult
     public string? MessageId { get; init; }
     public string? ErrorMessage { get; init; }
 }
+
+public sealed record WhatsAppReplyContext(string MessageId, bool FromMe, string? Text);
 
 public sealed record WhatsAppTemplateListResult
 {

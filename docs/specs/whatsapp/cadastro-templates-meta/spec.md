@@ -111,6 +111,6 @@ Como TenantOwner, quero visualizar os templates da conta oficial com idioma, cat
 
 - O primeiro incremento usa somente corpo textual, rodapé opcional e parâmetros posicionais porque esses componentes já são compatíveis com os fluxos atuais de envio.
 - TenantOwner é o papel adequado para gerir conteúdo enviado à Meta; Operators apenas usam templates aprovados nos fluxos já autorizados.
-- Utilidade e Marketing podem ser cadastrados, mas o cadastro não muda as restrições atuais: Marketing permanece individual na Inbox e broadcast continua restrito a Utilidade.
+- Utilidade e Marketing podem ser cadastrados e, quando aprovados e compatíveis, usados individualmente na Inbox ou em disparos em massa da API Oficial. O cadastro não altera as demais barreiras de envio, incluindo a revalidação remota e a proibição de templates em linhas QR (**BR-006**, ADR-0017).
 - A plataforma continuará usando as credenciais protegidas já vinculadas à linha oficial; o incremento apenas verificará se elas possuem autorização suficiente para gerenciar templates.
 - Edição, exclusão, apelação e componentes avançados serão especificados separadamente caso haja necessidade demonstrada.

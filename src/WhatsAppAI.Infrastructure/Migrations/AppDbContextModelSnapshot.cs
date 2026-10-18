@@ -1981,9 +1981,21 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
 
+                    b.Property<Guid?>("CorrectsMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("corrects_message_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("CustomerDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("customer_deleted_at");
+
+                    b.Property<DateTime?>("DeletedForEveryoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_for_everyone_at");
 
                     b.Property<DateTime?>("DeliveredAt")
                         .HasColumnType("timestamp with time zone")
@@ -1994,6 +2006,10 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("direction");
+
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("edited_at");
 
                     b.Property<string>("ExternalId")
                         .HasMaxLength(100)
@@ -2008,6 +2024,14 @@ namespace WhatsAppAI.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("failure_reason");
+
+                    b.Property<Guid?>("ForwardedFromMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("forwarded_from_message_id");
+
+                    b.Property<DateTime?>("HiddenFromInboxAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_from_inbox_at");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(200)

@@ -2,7 +2,7 @@
 
 | Decisão | Motivo | Alternativa descartada |
 |---|---|---|
-| Apenas `UTILITY` aprovado e BODY texto | É o modelo já validado na Inbox e atende a janela de 24h sem ampliar escopo. | Marketing/authentication e componentes avançados exigem governança/modelagem própria. |
+| Apenas `UTILITY` aprovado e BODY texto (decisão inicial, superada) | Foi o primeiro recorte de implementação. A especificação vigente passou a aceitar também `MARKETING` aprovado e compatível no disparo em massa, conforme BR-006 e ADR-0017. | `AUTHENTICATION` e componentes avançados continuam excluídos. |
 | Broadcast produz Message + Outbox | `Message.CreateOutboundTemplate` e `OutboxProcessingWorker` já enviam template, validam limites e têm retry. | Chamada Meta direta no worker perde durabilidade e cria duplicidade. |
 | Revalidar no dispatch | Template pode mudar de aprovação ou estrutura depois de carregado. | Confiar no frontend ou apenas na criação. |
 | Referenciar mensagem por destinatário | Permite progresso final, retry e reinício seguro. | Marcar como enviado ao enfileirar produz sucesso falso. |

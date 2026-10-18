@@ -190,7 +190,7 @@ public sealed class BroadcastDispatchWorker(
                 accessToken,
                 contact.PhoneNumber,
                 broadcast.Message,
-                ct);
+                cancellationToken: ct);
 
             if (!result.IsSuccess)
             {

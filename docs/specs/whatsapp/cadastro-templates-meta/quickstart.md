@@ -134,7 +134,7 @@ Esperado: todas as páginas são aplicadas; variantes de idioma permanecem separ
 Validar:
 
 - Inbox permite individualmente apenas Utilidade/Marketing aprovados e compatíveis;
-- broadcast permite apenas Utilidade aprovada e compatível;
+- broadcast pela API Oficial permite Utilidade ou Marketing aprovados e compatíveis, com revalidação remota;
 - status pendente/rejeitado/pausado permanece bloqueado;
 - backend continua consultando a Meta antes de enfileirar envio;
 - QR Code continua rejeitando templates.

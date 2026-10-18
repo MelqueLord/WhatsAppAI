@@ -223,13 +223,29 @@ public sealed class WebhookProcessingWorker(
                     {
                         foreach (var whatsappMessage in change.Value.Messages)
                         {
+                            var phoneNumberId = change.Value.Metadata?.PhoneNumberId ?? webhookEvent.RoutingId;
+                            if (string.Equals(whatsappMessage.Type, "revoked", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var revocationResolved = await ProcessCustomerRevocationAsync(
+                                    tenantId,
+                                    phoneNumberId,
+                                    whatsappMessage,
+                                    contactRepository,
+                                    conversationRepository,
+                                    messageRepository,
+                                    notifier,
+                                    cancellationToken);
+                                statusesResolved &= revocationResolved;
+                                continue;
+                            }
+
                             var contactName = ResolveWhatsAppContactName(
                                 whatsappMessage,
                                 change.Value.Contacts);
                             await ProcessInboundMessageAsync(
                                 tenantId,
                                 whatsappMessage,
-                                change.Value.Metadata?.PhoneNumberId ?? webhookEvent.RoutingId,
+                                phoneNumberId,
                                 contactName,
                                 contactRepository,
                                 conversationRepository,
@@ -244,6 +260,25 @@ public sealed class WebhookProcessingWorker(
                     {
                         foreach (var status in change.Value.Statuses)
                         {
+                            if (string.Equals(status.Status, "deleted", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var deletionResolved = await ProcessCustomerRevocationAsync(
+                                    tenantId,
+                                    change.Value.Metadata?.PhoneNumberId ?? webhookEvent.RoutingId,
+                                    new WebhookMessage
+                                    {
+                                        From = status.RecipientId,
+                                        Revoked = new WebhookRevocation { MessageId = status.Id }
+                                    },
+                                    contactRepository,
+                                    conversationRepository,
+                                    messageRepository,
+                                    notifier,
+                                    cancellationToken);
+                                statusesResolved &= deletionResolved;
+                                continue;
+                            }
+
                             var statusResolved = await ProcessStatusUpdateAsync(
                                 tenantId,
                                 status,
@@ -263,6 +298,62 @@ public sealed class WebhookProcessingWorker(
             logger.LogError(ex, "Error parsing webhook payload for event {EventId}", webhookEvent.Id);
             return false;
         }
+    }
+
+    internal async Task<bool> ProcessCustomerRevocationAsync(
+        Guid tenantId,
+        string phoneNumberId,
+        WebhookMessage revocation,
+        IContactRepository contactRepository,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        IRealtimeNotifier notifier,
+        CancellationToken cancellationToken)
+    {
+        var originalExternalId = revocation.Revoked?.MessageId;
+        if (string.IsNullOrWhiteSpace(revocation.From) ||
+            originalExternalId is not { Length: > 0 and <= 100 })
+            return true;
+
+        var original = await messageRepository.GetByExternalIdAsync(
+            tenantId, originalExternalId, cancellationToken);
+        if (original is null)
+            return false;
+        if (original.Direction != MessageDirection.Inbound)
+            return true;
+
+        var contact = await contactRepository.GetByPhoneAsync(
+            tenantId, NormalizePhoneNumber(revocation.From), cancellationToken);
+        var conversation = await conversationRepository.GetByIdAsync(
+            original.ConversationId, cancellationToken);
+        if (contact is null || conversation is null ||
+            contact.TenantId != tenantId || conversation.TenantId != tenantId ||
+            original.ContactId != contact.Id || conversation.ContactId != contact.Id ||
+            conversation.PhoneNumberId != phoneNumberId)
+            return true;
+
+        if (original.CustomerDeletedAt is not null)
+            return true;
+
+        original.MarkDeletedByCustomer(DateTime.UtcNow);
+        await messageRepository.UpdateAsync(original, cancellationToken);
+        try
+        {
+            await notifier.NotifyTenantAsync(tenantId, "MessageStatusUpdated",
+                new { conversationId = conversation.Id, messageId = original.Id }, cancellationToken);
+            await notifier.NotifyTenantAsync(tenantId, "ConversationUpdated",
+                new { conversationId = conversation.Id }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Unable to notify customer revocation for message {MessageId}", original.Id);
+        }
+
+        return true;
     }
 
     private async Task ProcessInboundMessageAsync(
@@ -292,6 +383,44 @@ public sealed class WebhookProcessingWorker(
         if (existingMessage is not null)
         {
             logger.LogInformation("Duplicate message {MessageId}, skipping", whatsappMessage.Id);
+            return;
+        }
+
+        if (string.Equals(whatsappMessage.Type, "reaction", StringComparison.OrdinalIgnoreCase))
+        {
+            var reaction = whatsappMessage.Reaction;
+            if (reaction?.MessageId is not { Length: > 0 and <= 100 } targetExternalId ||
+                reaction.Emoji is null or { Length: > 16 })
+                return;
+
+            var target = await messageRepository.GetByExternalIdAsync(
+                tenantId, targetExternalId, cancellationToken);
+            var reactionContact = await contactRepository.GetByPhoneAsync(
+                tenantId, phoneNumber, cancellationToken);
+            var reactionConversation = target is null
+                ? null
+                : await conversationRepository.GetByIdAsync(target.ConversationId, cancellationToken);
+            if (target is null || reactionContact is null || target.ContactId != reactionContact.Id ||
+                reactionConversation is null || reactionConversation.TenantId != tenantId ||
+                reactionConversation.PhoneNumberId != phoneNumberId)
+                return;
+
+            var inboundReaction = Message.CreateInbound(
+                tenantId, target.ConversationId, reactionContact.Id,
+                whatsappMessage.Id, MessageType.Reaction, reaction.Emoji,
+                quotedMessageId: targetExternalId);
+            inboundReaction.MarkProcessedByAi();
+            await messageRepository.AddAsync(inboundReaction, cancellationToken);
+            try
+            {
+                await notifier.NotifyTenantAsync(tenantId, "NewMessage",
+                    new { conversationId = target.ConversationId, direction = MessageDirection.Inbound.ToString() },
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "SignalR notification failed for inbound reaction {MessageId}", inboundReaction.Id);
+            }
             return;
         }
 
@@ -358,7 +487,10 @@ public sealed class WebhookProcessingWorker(
             messageType,
             content,
             mediaId,
-            caption);
+            caption,
+            whatsappMessage.Context?.Id is { Length: > 0 and <= 100 } quotedMessageId
+                ? quotedMessageId
+                : null);
 
         await messageRepository.AddAsync(message, cancellationToken);
 

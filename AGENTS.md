@@ -38,7 +38,7 @@ Se código e especificação divergirem, interrompa a implementação e proponha
 - Frontend: React 19.2, TypeScript e Vite.
 - Persistência: PostgreSQL via Npgsql; Supabase gerenciado ou Docker em produção própria.
 - Organização: monólito modular com separação leve entre Domain, Application, Infrastructure e WebApi.
-- Integrações: WhatsApp Cloud API oficial e OpenAI Responses API atrás de interfaces próprias.
+- Integrações: WhatsApp Cloud API oficial e ponte WhatsApp Web/Baileys para linhas QR, conforme ADR-0009 e ADR-0015; provedores de IA administrados pela plataforma atrás de interfaces próprias, incluindo OpenAI Responses API.
 - Assíncrono: padrões Inbox/Outbox e worker durável apoiado no PostgreSQL.
 - Não adicionar ao núcleo do MVP: n8n, microsserviços, RabbitMQ, Redis ou Kubernetes.
 
@@ -54,7 +54,7 @@ Se código e especificação divergirem, interrompa a implementação e proponha
 
 ## Qualidade
 
-- Código de domínio e aplicação não depende de SDKs da Meta ou OpenAI.
+- Código de domínio e aplicação não depende de SDKs da Meta, Baileys ou provedores de IA.
 - Regras críticas exigem testes unitários; integrações exigem testes de contrato/integração.
 - Mudanças de banco devem incluir migration reversível e teste de isolamento por tenant.
 - Trate warnings novos como falhas no código do projeto.

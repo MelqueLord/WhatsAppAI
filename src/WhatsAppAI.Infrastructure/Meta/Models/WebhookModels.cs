@@ -106,6 +106,36 @@ public sealed class WebhookMessage
 
     [JsonPropertyName("audio")]
     public WebhookAudio? Audio { get; set; }
+
+    [JsonPropertyName("context")]
+    public WebhookMessageContext? Context { get; set; }
+
+    [JsonPropertyName("reaction")]
+    public WebhookReaction? Reaction { get; set; }
+
+    [JsonPropertyName("revoked")]
+    public WebhookRevocation? Revoked { get; set; }
+}
+
+public sealed class WebhookRevocation
+{
+    [JsonPropertyName("message_id")]
+    public string? MessageId { get; set; }
+}
+
+public sealed class WebhookReaction
+{
+    [JsonPropertyName("message_id")]
+    public string? MessageId { get; set; }
+
+    [JsonPropertyName("emoji")]
+    public string? Emoji { get; set; }
+}
+
+public sealed class WebhookMessageContext
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
 }
 
 public sealed class WebhookText

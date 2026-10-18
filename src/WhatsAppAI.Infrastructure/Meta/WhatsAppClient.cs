@@ -76,6 +76,7 @@ internal sealed class WhatsAppClient : IWhatsAppClient
         string accessToken,
         string recipientPhone,
         string text,
+        WhatsAppReplyContext? replyContext = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -85,7 +86,8 @@ internal sealed class WhatsAppClient : IWhatsAppClient
                 MessagingProduct = "whatsapp",
                 To = recipientPhone,
                 Type = "text",
-                Text = new TextBody { Body = text }
+                Text = new TextBody { Body = text },
+                Context = replyContext is null ? null : new SendMessageContext { MessageId = replyContext.MessageId }
             };
 
             using var request = new HttpRequestMessage(
@@ -130,6 +132,68 @@ internal sealed class WhatsAppClient : IWhatsAppClient
             };
         }
     }
+
+    public async Task<SendMessageResult> SendReactionMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string emoji,
+        WhatsAppReplyContext target,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/{phoneNumberId}/messages")
+            {
+                Content = JsonContent.Create(new
+                {
+                    messaging_product = "whatsapp",
+                    to = recipientPhone,
+                    type = "reaction",
+                    reaction = new { message_id = target.MessageId, emoji }
+                })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return new SendMessageResult { IsSuccess = false, IsRetryable = (int)response.StatusCode >= 500, ErrorMessage = "Failed to send reaction." };
+
+            var body = await response.Content.ReadFromJsonAsync<SendMessageResponse>(cancellationToken: cancellationToken);
+            return new SendMessageResult { IsSuccess = true, MessageId = body?.Messages?.FirstOrDefault()?.Id };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "Failed to send WhatsApp reaction");
+            return new SendMessageResult { IsSuccess = false, IsRetryable = true, ErrorMessage = "Failed to send reaction." };
+        }
+    }
+
+    public Task<SendMessageResult> DeleteMessageForEveryoneAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SendMessageResult
+        {
+            IsSuccess = false,
+            IsRetryable = false,
+            ErrorMessage = "Message revocation is unavailable on the official WhatsApp API."
+        });
+
+    public Task<SendMessageResult> EditTextMessageAsync(
+        string phoneNumberId,
+        string accessToken,
+        string recipientPhone,
+        string externalMessageId,
+        string text,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SendMessageResult
+        {
+            IsSuccess = false,
+            IsRetryable = false,
+            ErrorMessage = "Native message editing is unavailable on the official WhatsApp API."
+        });
 
     public async Task<SendMessageResult> SendMediaMessageAsync(
         string phoneNumberId, string accessToken, string recipientPhone,
@@ -589,6 +653,16 @@ internal sealed class SendMessageRequest
 
     [JsonPropertyName("text")]
     public TextBody Text { get; init; } = new();
+
+    [JsonPropertyName("context")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SendMessageContext? Context { get; init; }
+}
+
+internal sealed class SendMessageContext
+{
+    [JsonPropertyName("message_id")]
+    public string MessageId { get; init; } = string.Empty;
 }
 
 internal sealed class TemplateListResponse

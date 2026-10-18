@@ -1,8 +1,8 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.45.0
-**Data:** 2026-10-14
+**Versão:** 0.47.0
+**Data:** 2026-10-18
 
 ## 1. Problema
 
@@ -20,7 +20,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 
 ### Incluído
 
-- SaaS multi-tenant com um número de WhatsApp por tenant.
+- SaaS multi-tenant com linhas WhatsApp por tenant dentro da quantidade contratada no plano STAR, FLOW ou SCALA.
 - Autenticação de TenantOwner/Operator, ambos presentes no primeiro piloto, e administração mínima da plataforma.
 - Frontend e backend publicados no mesmo site, com sessão baseada em cookie e proteção antiforgery.
 - Conexão guiada à WhatsApp Cloud API ou WhatsApp Web via QR/Baileys, e aos provedores de IA com credenciais administradas pela plataforma.
@@ -42,7 +42,7 @@ Pequenas empresas precisam atender clientes no WhatsApp com rapidez, sem implant
 - Construtor visual de fluxos, n8n no caminho crítico e múltiplos canais.
 - IA para áudio/imagem, treinamento de modelos e RAG vetorial no MVP.
 - Aplicativos móveis nativos, marketplace e cobrança do SaaS dentro do produto.
-- Múltiplos números por tenant e roteamento avançado entre equipes.
+- Linhas além da quantidade contratada e roteamento avançado entre equipes.
 
 ## 4. Histórias de usuário
 
@@ -53,7 +53,7 @@ Como PlatformAdmin, quero criar um tenant, configurar as integrações e provisi
 **Aceite:**
 
 1. Tenant, proprietário e configurações são isolados por `TenantId`.
-2. O sistema testa Meta e OpenAI sem revelar os segredos armazenados.
+2. O sistema testa o canal WhatsApp e o provedor de IA configurados sem revelar os segredos armazenados.
 3. Uma falha indica qual integração e qual passo precisam de correção.
 4. O PlatformAdmin pode criar, suspender e reativar o tenant; a suspensão bloqueia novas operações sem apagar o histórico.
 5. A criação devolve uma única vez o link de ativação do TenantOwner para envio manual, sem serviço de e-mail.
@@ -80,6 +80,84 @@ Como Operator, quero assumir uma conversa e enviar texto para resolver casos que
 1. Assumir altera o modo para `Human` antes do próximo disparo automático.
 2. O envio apresenta estados `Queued`, `Sent`, `Delivered`, `Read` ou `Failed`.
 3. Texto livre é bloqueado quando a janela de atendimento de 24 horas está fechada.
+
+### US-019 — Responder a uma mensagem específica (P1)
+
+Como Operator, quero selecionar uma mensagem da conversa e responder com uma citação visível para manter o contexto do atendimento.
+
+**Aceite:**
+
+1. A Inbox mostra a mensagem selecionada acima do compositor e permite cancelar a seleção antes do envio.
+2. O backend aceita somente uma mensagem original da mesma conversa e do tenant corrente, com identificador externo disponível; acesso a outra conversa ou tenant é rejeitado.
+3. O envio textual persiste a referência junto da mensagem e da Outbox e usa a referência nativa do canal; a Cloud API recebe `context.message_id` e a ponte QR envia a mensagem citada à sessão correta.
+4. A Inbox mostra a citação em respostas recebidas e enviadas quando a mensagem original ainda estiver disponível; ausência ou anonimização da original não expõe conteúdo de outro tenant.
+5. Janela de 24 horas, permissões de linha/fila, modo humano, idempotência e estados de entrega continuam aplicados.
+
+### US-020 — Encaminhar mensagem entre conversas da Inbox (P1)
+
+Como Operator, quero encaminhar o texto de uma mensagem para outra conversa autorizada para dar continuidade ao atendimento sem redigitá-lo.
+
+**Aceite:**
+
+1. A Inbox permite localizar uma conversa de destino e pré-visualizar a mensagem textual selecionada antes do envio.
+2. O backend confirma acesso do operador às conversas de origem e destino no mesmo tenant; conteúdo e autoria da origem são lidos no servidor, não aceitos do navegador.
+3. O destino respeita as regras normais de texto livre, inclusive janela de 24 horas e estado da conversa, e a nova mensagem registra a origem como encaminhamento no histórico.
+4. Mensagens de mídia sem texto enviável não são oferecidas como encaminhamento textual.
+
+### US-021 — Editar rascunho e corrigir mensagem enviada (P1)
+
+Como Operator, quero revisar o texto antes de enviá-lo e corrigir uma mensagem já enviada sem esconder o histórico do cliente.
+
+**Aceite:**
+
+1. O texto no compositor permanece editável até o envio e, se o envio falhar, permanece disponível para revisão.
+2. Ao escolher editar uma mensagem textual enviada da própria conversa, a Inbox mostra seu texto no compositor e informa se a confirmação editará a mensagem QR recente ou enviará uma nova correção.
+3. A API Oficial envia uma nova mensagem de correção, citando a original quando seu identificador externo existe; o texto anterior não é alterado no banco ou no WhatsApp.
+4. O servidor valida tenant, conversa, autoria de saída, texto, janela de atendimento, permissão e idempotência antes da Outbox.
+5. No QR, mensagem textual própria enviada há até 15 minutos pode ser editada no próprio canal; o histórico mostra o conteúdo atualizado e o indicador de edição. Fora desse prazo, usa a correção nova.
+
+### US-022 — Copiar e localizar mensagens (P1)
+
+Como Operator, quero copiar o texto de uma mensagem e procurar no histórico completo da conversa para recuperar informações durante o atendimento.
+
+**Aceite:**
+
+1. Copiar usa o conteúdo textual exibido e informa sucesso ou falha sem enviar nova mensagem.
+2. A busca consulta o servidor dentro da conversa autorizada, em páginas, e permite abrir o trecho correspondente no histórico.
+3. Resultados de outro tenant, linha ou fila nunca são exibidos.
+
+### US-023 — Reagir a uma mensagem (P1)
+
+Como Operator, quero reagir com emoji a uma mensagem da conversa e ver as reações no próprio balão.
+
+**Aceite:**
+
+1. A Inbox oferece reações comuns para mensagem com identificador do provedor e mostra a reação junto da mensagem original.
+2. O envio registra a reação e seu alvo na Outbox e usa o payload de reação da API Oficial ou da ponte QR.
+3. Reações recebidas do cliente são registradas e exibidas, sem iniciar resposta automática de IA ou renovar indevidamente a janela de atendimento.
+4. Tenant, conversa, permissão, idempotência e limite de envio são verificados antes do despacho.
+
+### US-024 — Apagar mensagem da Inbox ou revogar no QR (P1)
+
+Como Operator, quero apagar uma mensagem do histórico exibido e, quando for minha mensagem enviada por QR, solicitar sua revogação para o cliente.
+
+**Aceite:**
+
+1. Apagar da Inbox substitui o conteúdo por um aviso no histórico da equipe; o registro continua disponível para auditoria interna e não altera o WhatsApp do cliente.
+2. Em mensagens Outbound de QR com identificador do provedor, a opção apagar para todos solicita a revogação à ponte antes de marcar o histórico; uma falha não afirma sucesso ao operador.
+3. A API Oficial não oferece opção de revogação pela Inbox. Uma mensagem apagada da Inbox não pode ser citada, encaminhada, corrigida ou encontrada pela busca textual.
+4. Tenant, linha, fila, autoria e estado da conversa são validados no servidor.
+
+### US-025 — Identificar mensagem apagada pelo cliente (P1)
+
+Como Operator, quero ver quando o cliente apagou uma mensagem no WhatsApp e ainda consultar o conteúdo que a plataforma já recebeu para manter o contexto do atendimento.
+
+**Aceite:**
+
+1. Quando o canal entrega uma revogação vinculada ao identificador da mensagem original, a Inbox mostra o aviso “Apagada pelo cliente” junto à mensagem recebida, preservando texto, legenda e referência de mídia já armazenados.
+2. A revogação não cria outra fala, não aciona a IA, não renova a janela de 24 horas e não aumenta o contador de mensagens não lidas.
+3. O processamento confirma tenant, linha, contato e conversa da mensagem original; reentregas mantêm um único marcador e eventos anteriores à mensagem original são repetidos pelo worker.
+4. “Apagar da Inbox” pelo operador continua ocultando o conteúdo. Um evento sem identificador confiável da mensagem original, inclusive aviso `unsupported` da Cloud API, não marca outra mensagem por inferência.
 
 ### US-004 — Responder automaticamente (P1)
 
@@ -345,15 +423,22 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-089:** permitir ao PlatformAdmin gerar um link público de levantamento para um tenant, receber uma única resposta validada com perfil da empresa, objetivos, handoff, horários, setores, situação do WhatsApp e fontes de informação, e consultar, corrigir ou excluir o conteúdo em área administrativa exclusiva.
 - **FR-090:** omitir da listagem padrão da Inbox conversas que nunca receberam mensagem do cliente ou cujo disparo mais recente ainda não recebeu resposta posterior, preservando sua localização por busca explícita de nome ou telefone e mantendo os filtros de tenant, fila, linha, operador e estado.
 - **FR-091:** calcular e exibir por conversa a quantidade de mensagens `Inbound` posteriores à última leitura compartilhada da Inbox, zerando-a quando um usuário autorizado abrir a conversa e atualizando a lista em tempo quase real.
+- **FR-092:** permitir resposta textual a uma mensagem específica do mesmo tenant e conversa, persistindo o identificador citado na Outbox e transmitindo a referência ao canal; registrar e apresentar referências de respostas recebidas quando disponíveis.
+- **FR-093:** encaminhar texto de uma mensagem para outra conversa acessível do mesmo tenant, gerando uma nova mensagem Outbound com referência de origem e sem alterar a original.
+- **FR-094:** permitir edição do texto no compositor, edição nativa de mensagem textual própria recente no QR e correção de mensagem textual já enviada por meio de nova mensagem vinculada à original quando a edição nativa não estiver disponível.
+- **FR-095:** oferecer cópia de texto e busca paginada por conteúdo ou legenda das mensagens de uma conversa autorizada.
+- **FR-096:** enviar e receber reação de emoji a uma mensagem específica e agregá-la visualmente à mensagem alvo.
+- **FR-097:** ocultar o conteúdo de uma mensagem na Inbox com marcador persistente e permitir revogação no canal QR para mensagens próprias quando a ponte confirmar a operação.
+- **FR-098:** marcar mensagens recebidas revogadas pelo cliente quando o canal informar o identificador original, preservando conteúdo e mídia já recebidos e exibindo o aviso no histórico autorizado.
 
 ## 6. Regras de negócio
 
-- **BR-001:** um tenant possui exatamente um número ativo no MVP.
+- **BR-001:** a quantidade de linhas WhatsApp ativas de um tenant não pode exceder as vagas contratadas em seu plano; cada linha pertence exclusivamente a esse tenant e usa API Oficial ou QR Code conforme o provisionamento (**US-012**, **BR-021**, **BR-023**).
 - **BR-002:** um identificador de telefone de cliente pertence a um contato por tenant.
 - **BR-003:** uma conversa em `Human` ou `Paused` nunca gera envio automático.
 - **BR-004:** a mudança para `Human` vence uma resposta de IA concorrente ainda não enviada.
 - **BR-005:** somente mensagem recebida do cliente abre/renova a janela de 24 horas.
-- **BR-006:** template de Marketing aprovado pode ser enviado manualmente somente na Inbox de uma conversa individual da API Oficial; campanhas em massa de Marketing, Autenticação e componentes não suportados permanecem bloqueados. A categoria e o status informados pela Meta são revalidados pelo backend no envio.
+- **BR-006:** templates aprovados de Utilidade ou Marketing podem ser enviados individualmente na Inbox e em disparos em massa da API Oficial quando forem compatíveis com os componentes suportados. Templates de Autenticação e componentes não suportados permanecem bloqueados. A categoria e o status informados pela Meta são revalidados pelo backend no envio; o tenant permanece responsável pela aceitação exigida pela política do WhatsApp, conforme ADR-0017.
 - **BR-007:** preço exibido é estimativo e versionado; unidades originais são a fonte auditável.
 - **BR-008:** credenciais de IA são administradas pela plataforma; o PlatformAdmin pode provisioná-las, rotacioná-las e testá-las sem recuperá-las em claro, e o tenant nunca pode visualizá-las ou substituí-las.
 - **BR-009:** após limite controlado de tentativas, o job vai para estado morto e gera alerta.
@@ -406,13 +491,20 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-056:** cada formulário de configuração da IA pertence a um tenant, usa token aleatório persistido somente como hash, expira em 30 dias e aceita um único envio; gerar outro link revoga os pendentes anteriores da empresa, e respostas ou tokens nunca entram em logs nem ficam acessíveis a usuários do tenant.
 - **BR-057:** cada novo disparo torna a conversa invisível na lista padrão até a próxima mensagem recebida do cliente; a conversa, suas mensagens e seu histórico permanecem persistidos e acessíveis quando uma busca explícita encontra o contato.
 - **BR-058:** o estado de leitura pertence à conversa no tenant e é compartilhado pelos usuários autorizados; mensagens `Outbound` não incrementam a contagem, e a leitura nunca altera conteúdo, ordenação ou estado de entrega das mensagens.
+- **BR-059:** a citação só é enviada quando a mensagem original possui identificador do provedor e pertence à mesma conversa e linha; a referência não autoriza acesso a conteúdo de outra conversa, não contorna a janela de atendimento nem modifica a mensagem original.
+- **BR-060:** encaminhar exige autorização nas duas conversas, usa o conteúdo persistido da origem e aplica as mesmas regras de envio do destino; a referência de origem é interna e não é enviada como citação ao WhatsApp.
+- **BR-061:** uma correção não modifica nem apaga a mensagem original; é uma nova mensagem textual com prefixo visível e referência interna e, quando possível, citação nativa da original. Fora da janela da API Oficial, a correção textual é bloqueada. Edição nativa limita-se a texto Outbound de QR com identificador externo e idade máxima de 15 minutos; somente após confirmação do canal o conteúdo local é atualizado.
+- **BR-062:** a busca de mensagens é limitada no servidor pelo tenant, conversa e permissões de acesso, restringe o termo e a página, e não expõe conteúdo de mensagens de outras conversas.
+- **BR-063:** reação exige alvo com identificador externo da mesma conversa e linha, não é conteúdo de atendimento para IA e não abre janela de 24 horas; a API Oficial só envia quando a janela de atendimento está aberta.
+- **BR-064:** apagar da Inbox não apaga a mensagem do provedor e mantém trilha interna; apagar para todos somente tenta revogar mensagem Outbound de QR, e nunca é oferecido como operação da Cloud API.
+- **BR-065:** revogação pelo cliente somente altera mensagem `Inbound` já persistida do mesmo tenant, linha, contato e conversa; é idempotente, não substitui o conteúdo original, não altera leitura/janela/IA e não desfaz ocultação solicitada pelo operador. Sem referência confiável ao original, não atribuir a revogação a outra mensagem.
 
 ## 7. Requisitos não funcionais
 
 - **NFR-001:** reconhecer webhook válido em p95 inferior a 1 segundo, sem aguardar IA.
 - **NFR-002:** refletir mensagem persistida na inbox em p95 inferior a 3 segundos, desconsiderando atraso do provedor.
 - **NFR-003:** obter a decisão estruturada da IA em p95 inferior a 10 segundos em teste controlado com pelo menos 100 requisições elegíveis, medindo separadamente tempo de fila, aplicação e provedor.
-- **NFR-004:** atingir SLO mensal de 99,5% para requisições elegíveis da API e reconhecimentos de webhook; `SLI = respostas concluídas sem 5xx nem timeout da plataforma ÷ total de requisições válidas recebidas`, sem excluir manutenção, e falhas atribuídas a Meta/OpenAI recebem dimensão separada sem serem removidas do total.
+- **NFR-004:** atingir SLO mensal de 99,5% para requisições elegíveis da API e reconhecimentos de webhook; `SLI = respostas concluídas sem 5xx nem timeout da plataforma ÷ total de requisições válidas recebidas`, sem excluir manutenção, e falhas atribuídas aos canais WhatsApp ou provedores de IA recebem dimensão separada sem serem removidas do total.
 - **NFR-005:** demonstrar no piloto RPO de até 24 horas restaurando backup cujo ponto tenha no máximo 24 horas e RTO de até 4 horas entre a declaração do incidente e a aprovação do smoke test do serviço restaurado.
 - **NFR-006:** zero acesso cruzado entre tenants em testes automatizados e produção.
 - **NFR-007:** suportar inicialmente 50 tenants, 100 usuários concorrentes e 50 mil mensagens/mês por implantação sem mudança de arquitetura.
@@ -421,7 +513,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 
 ## 8. Critérios de sucesso do piloto
 
-- **SC-001:** em até 60 minutos depois de disponíveis as contas aprovadas e com os convidados presentes, criar o tenant, entregar manualmente e consumir os convites do TenantOwner e de pelo menos um Operator, obter `GET /auth/me` correto para ambos e concluir os testes Meta/OpenAI.
+- **SC-001:** em até 60 minutos depois de disponíveis as contas aprovadas e com os convidados presentes, criar o tenant, entregar manualmente e consumir os convites do TenantOwner e de pelo menos um Operator, obter `GET /auth/me` correto para ambos e concluir os testes do canal WhatsApp e do provedor de IA configurados.
 - **SC-002:** pelo menos 95% de uma amostra de no mínimo 1.000 webhooks válidos alcançam `Processed` sem reprocessamento manual; retries automáticos controlados não contam como intervenção.
 - **SC-003:** nenhuma mensagem duplicada após teste de reentrega em massa.
 - **SC-004:** operador assume conversa antes de qualquer nova resposta automática em 100% dos testes de corrida.
@@ -466,11 +558,7 @@ Funcionalidades de IA são filtradas pelo plano contratado. Plano BOT não usa I
 
 A tela de configuração de IA deve suportar múltiplos provedores e reunir apenas as configurações de IA. Modo, mensagens e fluxo do BOT permanecem na tela e nos endpoints próprios do BOT.
 
-**Provedores suportados e administrados pelo PlatformAdmin:**
-- **OpenAI** (GPT-4o, GPT-4o-mini, etc.)
-- **Google Gemini** (Gemini 2.5 Pro, Gemini 2.5 Flash, etc.)
-- **Anthropic** (Claude Sonnet 4, Claude Haiku 3.5, etc.)
-- **Xiaomi MiMo** (mimo-v2.5-pro, mimo-v2.5, etc.)
+**Provedores suportados e administrados pelo PlatformAdmin:** OpenAI, Google Gemini, Anthropic, Xiaomi MiMo, xAI Grok e Groq. Os modelos selecionáveis são definidos pelo catálogo operacional versionado da aplicação.
 
 **Configuração na tela de IA (somente BOT + IA):**
 1. Seleção de provedor e modelo autorizados para o tenant

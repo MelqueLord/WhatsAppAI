@@ -239,6 +239,7 @@ export function ConversationList({
               )}
               <div className="flex items-center justify-between mt-0.5">
                 <p className="text-sm text-slate-500 truncate">
+                  {conv.lastMessageDeletedByCustomer && 'Apagada pelo cliente · '}
                   {truncate(conv.lastMessage || 'Sem mensagens', 32)}
                 </p>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">

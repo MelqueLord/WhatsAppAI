@@ -6,8 +6,9 @@ import { promisify } from 'node:util'
 import { gzip, gunzip } from 'node:zlib'
 import { Transform } from 'node:stream'
 import QRCode from 'qrcode'
-import makeWASocket, { DisconnectReason, downloadMediaMessage, useMultiFileAuthState } from '@whiskeysockets/baileys'
+import makeWASocket, { DisconnectReason, downloadMediaMessage, proto, useMultiFileAuthState } from '@whiskeysockets/baileys'
 import { rememberInboundMessage } from './retention.mjs'
+import { getInboundRevocation } from './revocations.mjs'
 
 const app = express()
 const port = Number(process.env.PORT ?? 3020)
@@ -145,6 +146,14 @@ async function initializeSession(tenantId, session) {
       if (type !== 'notify') return
       for (const message of messages ?? []) addMessage(session, message)
     })
+    sock.ev.on('messages.update', (updates) => {
+      for (const update of updates ?? []) {
+        const revocation = getInboundRevocation(update, proto.WebMessageInfo.StubType.REVOKE)
+        if (!revocation) continue
+        void forwardInboundRevocation(session, revocation)
+          .catch((error) => logError('Failed to forward WhatsApp Web revocation', session.tenantId, error))
+      }
+    })
   } catch (error) {
     session.status = 'disconnected'
     session.sock = null
@@ -233,8 +242,13 @@ app.post('/sessions/:tenantId/logout', withSessionOwnership(async (req, res) => 
 
 app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, res) => {
   const session = await getSession(req.params.tenantId)
-  const { recipientPhone, text } = req.body ?? {}
-  if (!isValidRecipient(recipientPhone) || !isValidMessageText(text)) {
+  const { recipientPhone, text, replyContext } = req.body ?? {}
+  if (!isValidRecipient(recipientPhone) || !isValidMessageText(text) ||
+      (replyContext != null &&
+        (typeof replyContext.messageId !== 'string' || replyContext.messageId.length < 1 ||
+         replyContext.messageId.length > 100 || typeof replyContext.fromMe !== 'boolean' ||
+         (replyContext.text != null &&
+          (typeof replyContext.text !== 'string' || replyContext.text.length > 4096))))) {
     return res.status(400).json({ success: false, error: 'recipientPhone and text are required.' })
   }
 
@@ -260,11 +274,114 @@ app.post('/sessions/:tenantId/send-message', withSessionOwnership(async (req, re
     recipientJid = registeredContact.jid
     console.log(`WhatsApp recipient resolved: session=${req.params.tenantId} type=${recipientJid.split('@')[1] ?? 'unknown'}`)
 
-    const result = await socket.sendMessage(recipientJid, { text })
+    const quoted = replyContext == null ? undefined : {
+      key: { remoteJid: recipientJid, id: replyContext.messageId, fromMe: replyContext.fromMe },
+      message: { conversation: replyContext.text ?? '' },
+    }
+    const result = await socket.sendMessage(recipientJid, { text }, quoted ? { quoted } : undefined)
     res.json({ success: true, messageId: result?.key?.id ?? `bridge-${Date.now()}` })
   } catch (error) {
     logError('Failed to send WhatsApp message', req.params.tenantId, error)
     res.status(502).json({ success: false, error: 'WhatsApp Web message could not be sent.' })
+  }
+}))
+
+app.post('/sessions/:tenantId/send-reaction', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
+  const { recipientPhone, emoji, target } = req.body ?? {}
+  if (!isValidRecipient(recipientPhone) ||
+      typeof emoji !== 'string' || !['👍', '❤️', '😂', '😮', '😢', '🙏', ''].includes(emoji) ||
+      typeof target?.messageId !== 'string' || target.messageId.length < 1 ||
+      target.messageId.length > 100 || typeof target.fromMe !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'Invalid reaction request.' })
+  }
+
+  const socket = session?.sock
+  if (!socket || session.status !== 'connected')
+    return res.status(503).json({ success: false, error: 'WhatsApp Web session is reconnecting.' })
+
+  try {
+    const registeredContact = (await socket.onWhatsApp(recipientPhone))
+      ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
+    if (!registeredContact?.jid)
+      return res.status(422).json({ success: false, error: 'The recipient is not registered on WhatsApp.' })
+
+    const recipientJid = registeredContact.jid
+    const result = await socket.sendMessage(recipientJid, {
+      react: {
+        text: emoji,
+        key: { remoteJid: recipientJid, id: target.messageId, fromMe: target.fromMe },
+      },
+    })
+    res.json({ success: true, messageId: result?.key?.id ?? `bridge-reaction-${Date.now()}` })
+  } catch (error) {
+    logError('Failed to send WhatsApp reaction', req.params.tenantId, error)
+    res.status(502).json({ success: false, error: 'WhatsApp Web reaction could not be sent.' })
+  }
+}))
+
+app.post('/sessions/:tenantId/delete-message', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
+  const { recipientPhone, externalMessageId } = req.body ?? {}
+  if (!isValidRecipient(recipientPhone) ||
+      typeof externalMessageId !== 'string' || externalMessageId.length < 1 ||
+      externalMessageId.length > 100) {
+    return res.status(400).json({ success: false, error: 'Invalid deletion request.' })
+  }
+
+  const socket = session?.sock
+  if (!socket || session.status !== 'connected')
+    return res.status(503).json({ success: false, error: 'WhatsApp Web session is reconnecting.' })
+
+  try {
+    const registeredContact = (await socket.onWhatsApp(recipientPhone))
+      ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
+    if (!registeredContact?.jid)
+      return res.status(422).json({ success: false, error: 'The recipient is not registered on WhatsApp.' })
+
+    const recipientJid = registeredContact.jid
+    const result = await socket.sendMessage(recipientJid, {
+      delete: { remoteJid: recipientJid, id: externalMessageId, fromMe: true },
+    })
+    if (!result?.key?.id)
+      return res.status(502).json({ success: false, error: 'WhatsApp Web did not confirm revocation.' })
+    res.json({ success: true, messageId: result.key.id })
+  } catch (error) {
+    logError('Failed to revoke WhatsApp message', req.params.tenantId, error)
+    res.status(502).json({ success: false, error: 'WhatsApp Web message could not be revoked.' })
+  }
+}))
+
+app.post('/sessions/:tenantId/edit-message', withSessionOwnership(async (req, res) => {
+  const session = await getSession(req.params.tenantId)
+  const { recipientPhone, externalMessageId, text } = req.body ?? {}
+  if (!isValidRecipient(recipientPhone) || !isValidMessageText(text) ||
+      typeof externalMessageId !== 'string' || externalMessageId.length < 1 ||
+      externalMessageId.length > 100) {
+    return res.status(400).json({ success: false, error: 'Invalid edit request.' })
+  }
+
+  const socket = session?.sock
+  if (!socket || session.status !== 'connected')
+    return res.status(503).json({ success: false, error: 'WhatsApp Web session is reconnecting.' })
+
+  try {
+    const registeredContact = (await socket.onWhatsApp(recipientPhone))
+      ?.find((contact) => contact?.exists && typeof contact.jid === 'string')
+    if (!registeredContact?.jid)
+      return res.status(422).json({ success: false, error: 'The recipient is not registered on WhatsApp.' })
+
+    const recipientJid = registeredContact.jid
+    const result = await socket.sendMessage(recipientJid, {
+      text,
+      edit: { remoteJid: recipientJid, id: externalMessageId, fromMe: true },
+    })
+    if (!result?.key?.id)
+      return res.status(502).json({ success: false, error: 'WhatsApp Web did not confirm editing.' })
+    res.json({ success: true, messageId: result.key.id })
+  } catch (error) {
+    logError('Failed to edit WhatsApp message', req.params.tenantId, error)
+    res.status(502).json({ success: false, error: 'WhatsApp Web message could not be edited.' })
   }
 }))
 
@@ -407,7 +524,8 @@ function rememberMediaSend(session, idempotencyKey, messageId) {
 
 function addMessage(session, msg) {
   const jid = msg.key?.remoteJid
-  if (!jid || msg.key?.fromMe || jid.endsWith('@g.us') || jid === 'status@broadcast') return
+  if (!jid || msg.key?.fromMe || msg.message?.protocolMessage ||
+      jid.endsWith('@g.us') || jid === 'status@broadcast') return
 
   const messageId = msg.key?.id
   if (messageId && !rememberInboundMessage(session.seenMessageIds, messageId)) {
@@ -435,6 +553,11 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
   const remoteJid = msg.key.remoteJid
   const phoneNumber = await resolvePhoneNumber(session, remoteJid, msg.key.remoteJidAlt)
   const image = msg.message?.imageMessage
+  const reaction = msg.message?.reactionMessage
+  const quotedMessageId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId ??
+    msg.message?.imageMessage?.contextInfo?.stanzaId ??
+    msg.message?.videoMessage?.contextInfo?.stanzaId ??
+    msg.message?.documentMessage?.contextInfo?.stanzaId
   const imageStored = image ? await storeInboundImage(session, msg, image) : false
   const payload = {
     object: 'whatsapp_business_account',
@@ -456,8 +579,15 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
             from: phoneNumber,
             id: msg.key.id,
             timestamp: Math.floor(new Date(createdAt).getTime() / 1000),
-            type: image ? 'image' : 'text',
-            text: text !== '[midia]' ? { body: text } : undefined,
+            type: reaction ? 'reaction' : image ? 'image' : 'text',
+            text: !reaction && text !== '[midia]' ? { body: text } : undefined,
+            reaction: reaction ? {
+              message_id: reaction.key?.id,
+              emoji: reaction.text ?? '',
+            } : undefined,
+            context: typeof quotedMessageId === 'string' && quotedMessageId.length <= 100
+              ? { id: quotedMessageId }
+              : undefined,
             image: image && imageStored ? {
               id: msg.key.id,
               mime: image.mimetype,
@@ -468,6 +598,40 @@ async function forwardInboundMessage(session, msg, text, createdAt, contactName)
       }],
     }],
   }
+
+  await postInboundPayload(session, payload)
+}
+
+async function forwardInboundRevocation(session, revocation) {
+  const match = session.tenantId.match(/^(.+)-qr-(\d+)$/)
+  if (!match) return
+
+  const [, tenantId, lineNumber] = match
+  const phoneNumber = await resolvePhoneNumber(session, revocation.remoteJid, revocation.remoteJidAlt)
+  const payload = {
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: `whatsapp-web-${tenantId}-${lineNumber}`,
+      changes: [{
+        field: 'messages',
+        value: {
+          messaging_product: 'whatsapp',
+          metadata: { phone_number_id: `qr:${tenantId}:${lineNumber}` },
+          messages: [{
+            from: phoneNumber,
+            id: revocation.eventId,
+            type: 'revoked',
+            revoked: { message_id: revocation.originalId },
+          }],
+        },
+      }],
+    }],
+  }
+
+  await postInboundPayload(session, payload)
+}
+
+async function postInboundPayload(session, payload) {
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
