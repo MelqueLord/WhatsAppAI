@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: WhatsApp AI Manager API
-  version: 0.36.0
+  version: 0.36.1
   description: Contrato inicial do MVP. Endpoints autenticados usam sessão em cookie.
   license:
     name: Proprietary
@@ -522,7 +522,7 @@ paths:
     delete:
       tags: [Conversations]
       operationId: deleteInboxMessage
-      summary: Apagar da Inbox ou solicitar revogação QR
+      summary: Apagar mensagem Outbound da Inbox ou solicitar revogação QR
       x-requirements: [US-024, FR-097, BR-064]
       parameters:
         - $ref: '#/components/parameters/ConversationId'
@@ -534,6 +534,7 @@ paths:
       responses:
         '200': { description: Mensagem marcada na Inbox; revogação confirmada se solicitada }
         '400': { $ref: '#/components/responses/Problem' }
+        '403': { description: Mensagens Inbound do cliente não podem ser apagadas pelo Operator }
         '404': { $ref: '#/components/responses/Problem' }
   /conversations/{conversationId}/messages/{messageId}/reactions:
     post:

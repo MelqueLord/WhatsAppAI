@@ -170,8 +170,10 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
         var otherContact = Contact.Create(otherOwner.TenantId, "5511999999930", "Other delete target");
         var conversation = Conversation.Create(owner.TenantId, contact.Id, "manual");
         var otherConversation = Conversation.Create(otherOwner.TenantId, otherContact.Id, "manual");
-        var target = Message.CreateInbound(owner.TenantId, conversation.Id, contact.Id,
-            "delete-target", MessageType.Text, "Conteúdo privado");
+        var target = Message.CreateOutbound(owner.TenantId, conversation.Id, contact.Id,
+            MessageType.Text, "Conteúdo próprio", "delete-target-idempotency");
+        var customerMessage = Message.CreateInbound(owner.TenantId, conversation.Id, contact.Id,
+            "customer-delete-target", MessageType.Text, "Mensagem do cliente");
         var otherTarget = Message.CreateInbound(otherOwner.TenantId, otherConversation.Id, otherContact.Id,
             "other-delete-target", MessageType.Text, "Outro conteúdo");
 
@@ -179,7 +181,7 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
         {
             db.Contacts.AddRange(contact, otherContact);
             db.Conversations.AddRange(conversation, otherConversation);
-            db.Messages.AddRange(target, otherTarget);
+            db.Messages.AddRange(target, customerMessage, otherTarget);
             await db.SaveChangesAsync();
         }
 
@@ -187,18 +189,28 @@ public sealed class ConversationLifecycleEndpointsTests(TestWebApplicationFactor
             $"/api/conversations/{otherConversation.Id}/messages/{otherTarget.Id}?scope=local");
         Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
 
+        var customerDelete = await owner.Client.DeleteAsync(
+            $"/api/conversations/{conversation.Id}/messages/{customerMessage.Id}?scope=local");
+        Assert.Equal(HttpStatusCode.Forbidden, customerDelete.StatusCode);
+
         var deleted = await owner.Client.DeleteAsync(
             $"/api/conversations/{conversation.Id}/messages/{target.Id}?scope=local");
         Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
 
         var history = await owner.Client.GetFromJsonAsync<JsonElement>(
             $"/api/conversations/{conversation.Id}/messages");
-        var visibleMessage = history.GetProperty("items")[0];
+        var visibleMessage = history.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == target.Id);
         Assert.True(visibleMessage.GetProperty("isDeleted").GetBoolean());
         Assert.Equal(JsonValueKind.Null, visibleMessage.GetProperty("content").ValueKind);
 
+        var preservedCustomerMessage = history.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == customerMessage.Id);
+        Assert.False(preservedCustomerMessage.GetProperty("isDeleted").GetBoolean());
+        Assert.Equal("Mensagem do cliente", preservedCustomerMessage.GetProperty("content").GetString());
+
         var search = await owner.Client.GetFromJsonAsync<JsonElement>(
-            $"/api/conversations/{conversation.Id}/messages?search=privado");
+            $"/api/conversations/{conversation.Id}/messages?search=próprio");
         Assert.Empty(search.GetProperty("items").EnumerateArray());
 
         await using var verification = await factory.GetDbContextAsync();

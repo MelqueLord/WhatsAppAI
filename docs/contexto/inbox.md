@@ -14,7 +14,7 @@ O texto exibido pode ser copiado. A busca percorre o histórico da conversa no s
 
 Reações de emoji são enviadas como operações próprias pela Outbox e aparecem junto da mensagem alvo. Reações recebidas são registradas sem renovar a janela de atendimento nem acionar a IA.
 
-Apagar da Inbox oculta o conteúdo no histórico da equipe, mantendo o registro interno e impedindo busca, citação, encaminhamento ou correção da mensagem ocultada. Para mensagem própria enviada por QR, o operador também pode solicitar a revogação no WhatsApp; a Inbox só confirma após retorno da ponte. A API Oficial não oferece essa ação.
+O operador só pode apagar mensagens enviadas pela empresa (`Outbound`); mensagens do cliente (`Inbound`) não oferecem essa ação e o backend também rejeita a tentativa. Apagar da Inbox oculta o conteúdo no histórico da equipe, mantendo o registro interno e impedindo busca, citação, encaminhamento ou correção da mensagem ocultada. Para mensagem própria enviada por QR, o operador também pode solicitar a revogação no WhatsApp; a Inbox só confirma após retorno da ponte. A API Oficial não oferece essa ação.
 
 Quando o cliente revoga uma mensagem já recebida e o canal informa o identificador original, a Inbox mantém o texto ou a mídia já armazenados e acrescenta o aviso “Apagada pelo cliente”. Esse aviso é diferente da exclusão local feita pelo operador. Eventos sem referência segura ao original não são vinculados por aproximação.
 

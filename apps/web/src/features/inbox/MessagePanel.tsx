@@ -1082,7 +1082,7 @@ export function MessagePanel({
                     </button>
                   )}
                   {copyStatus?.id === msg.id && <span role="status" className="ml-1 text-[11px]">{copyStatus.ok ? 'Copiada' : 'Falha ao copiar'}</span>}
-                  {(!msg.isDeleted || (conversation.isQrCode && msg.direction === 'Outbound' && !msg.isDeletedForEveryone)) && (
+                  {msg.direction === 'Outbound' && (!msg.isDeleted || (conversation.isQrCode && !msg.isDeletedForEveryone)) && (
                     <button
                       type="button"
                       onClick={() => { setDeleteTarget(msg); setDeleteError(null) }}

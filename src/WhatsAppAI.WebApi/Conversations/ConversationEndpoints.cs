@@ -649,6 +649,9 @@ public static class ConversationEndpoints
             message.ContactId != conversation.ContactId)
             return Results.NotFound();
 
+        if (message.Direction != MessageDirection.Outbound)
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+
         if (scope == "everyone")
         {
             if (message.DeletedForEveryoneAt is not null)

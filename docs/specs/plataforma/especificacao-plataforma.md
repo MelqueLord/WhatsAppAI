@@ -1,7 +1,7 @@
 # Especificação do produto: plataforma de atendimento WhatsApp com IA
 
 **Status:** Draft para revisão  
-**Versão:** 0.47.0
+**Versão:** 0.47.1
 **Data:** 2026-10-18
 
 ## 1. Problema
@@ -139,11 +139,11 @@ Como Operator, quero reagir com emoji a uma mensagem da conversa e ver as reaç�
 
 ### US-024 — Apagar mensagem da Inbox ou revogar no QR (P1)
 
-Como Operator, quero apagar uma mensagem do histórico exibido e, quando for minha mensagem enviada por QR, solicitar sua revogação para o cliente.
+Como Operator, quero apagar minhas mensagens do histórico exibido e, quando uma mensagem minha tiver sido enviada por QR, solicitar sua revogação para o cliente.
 
 **Aceite:**
 
-1. Apagar da Inbox substitui o conteúdo por um aviso no histórico da equipe; o registro continua disponível para auditoria interna e não altera o WhatsApp do cliente.
+1. O Operator só pode apagar mensagens `Outbound` enviadas pela empresa; mensagens `Inbound` do cliente não oferecem essa ação na Inbox e são rejeitadas pelo backend. Apagar da Inbox substitui o conteúdo por um aviso no histórico da equipe; o registro continua disponível para auditoria interna e não altera o WhatsApp do cliente.
 2. Em mensagens Outbound de QR com identificador do provedor, a opção apagar para todos solicita a revogação à ponte antes de marcar o histórico; uma falha não afirma sucesso ao operador.
 3. A API Oficial não oferece opção de revogação pela Inbox. Uma mensagem apagada da Inbox não pode ser citada, encaminhada, corrigida ou encontrada pela busca textual.
 4. Tenant, linha, fila, autoria e estado da conversa são validados no servidor.
@@ -428,7 +428,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **FR-094:** permitir edição do texto no compositor, edição nativa de mensagem textual própria recente no QR e correção de mensagem textual já enviada por meio de nova mensagem vinculada à original quando a edição nativa não estiver disponível.
 - **FR-095:** oferecer cópia de texto e busca paginada por conteúdo ou legenda das mensagens de uma conversa autorizada.
 - **FR-096:** enviar e receber reação de emoji a uma mensagem específica e agregá-la visualmente à mensagem alvo.
-- **FR-097:** ocultar o conteúdo de uma mensagem na Inbox com marcador persistente e permitir revogação no canal QR para mensagens próprias quando a ponte confirmar a operação.
+- **FR-097:** permitir ocultar na Inbox somente mensagens `Outbound` enviadas pela empresa, com marcador persistente, e permitir revogação no canal QR para essas mensagens próprias quando a ponte confirmar a operação; mensagens `Inbound` do cliente não podem ser apagadas pelo Operator.
 - **FR-098:** marcar mensagens recebidas revogadas pelo cliente quando o canal informar o identificador original, preservando conteúdo e mídia já recebidos e exibindo o aviso no histórico autorizado.
 
 ## 6. Regras de negócio
@@ -496,7 +496,7 @@ Como PlatformAdmin, quero selecionar STAR, FLOW ou SCALA e personalizar a franqu
 - **BR-061:** uma correção não modifica nem apaga a mensagem original; é uma nova mensagem textual com prefixo visível e referência interna e, quando possível, citação nativa da original. Fora da janela da API Oficial, a correção textual é bloqueada. Edição nativa limita-se a texto Outbound de QR com identificador externo e idade máxima de 15 minutos; somente após confirmação do canal o conteúdo local é atualizado.
 - **BR-062:** a busca de mensagens é limitada no servidor pelo tenant, conversa e permissões de acesso, restringe o termo e a página, e não expõe conteúdo de mensagens de outras conversas.
 - **BR-063:** reação exige alvo com identificador externo da mesma conversa e linha, não é conteúdo de atendimento para IA e não abre janela de 24 horas; a API Oficial só envia quando a janela de atendimento está aberta.
-- **BR-064:** apagar da Inbox não apaga a mensagem do provedor e mantém trilha interna; apagar para todos somente tenta revogar mensagem Outbound de QR, e nunca é oferecido como operação da Cloud API.
+- **BR-064:** Operator só pode apagar mensagens `Outbound` enviadas pela empresa; mensagem `Inbound` do cliente é rejeitada também no backend. Apagar da Inbox não apaga a mensagem do provedor e mantém trilha interna; apagar para todos somente tenta revogar mensagem Outbound de QR, e nunca é oferecido como operação da Cloud API.
 - **BR-065:** revogação pelo cliente somente altera mensagem `Inbound` já persistida do mesmo tenant, linha, contato e conversa; é idempotente, não substitui o conteúdo original, não altera leitura/janela/IA e não desfaz ocultação solicitada pelo operador. Sem referência confiável ao original, não atribuir a revogação a outra mensagem.
 
 ## 7. Requisitos não funcionais
